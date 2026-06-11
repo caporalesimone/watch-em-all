@@ -19,6 +19,7 @@ Il traduttore tra il contenuto delle notifiche (deciso dal core) e un canale di 
 | Merge config admin+utente (con filtro chiavi) | ✅ | — |
 | Passare la lingua dell'utente | ✅ | — |
 | Registrare l'esito per canale | ✅ | — |
+| Fornire gli helper Markdown (HTML sanificato / testo puro) | ✅ | — |
 | Formattare il messaggio per il canale | — | ✅ |
 | Tradurre i testi nella lingua richiesta | — | ✅ |
 | Inviare sul canale | — | ✅ |
@@ -26,13 +27,14 @@ Il traduttore tra il contenuto delle notifiche (deciso dal core) e un canale di 
 
 ## Requisiti del contratto
 
-- **NOT-R1** — Il notifier riceve due tipi di payload, distinti da un campo tipo: il **digest di alert** (diff) e il **summary** (snapshot); formatta ciascuno in modo appropriato al canale.
+- **NOT-R1** — Il notifier riceve tre tipi di payload, distinti dal campo `kind`: il **digest di alert** (diff), il **summary** (snapshot) e i **messaggi testuali** (sistema o admin, titolo + body); formatta ciascuno in modo appropriato al canale.
 - **NOT-R2** — Configurazione a due livelli: **admin** (infrastruttura del canale, es. server e credenziali di invio) e **utente** (recapito personale + flag attivo). Entrambe da schema dichiarativo. Senza la parte admin il canale è "non disponibile" per tutti.
 - **NOT-R3** — Il core consegna a **tutti i canali attivi** dell'utente, senza routing per tipo di evento. Il plugin non filtra contenuti.
 - **NOT-R4** — Il plugin riceve la **lingua dell'utente** e genera i testi in quella lingua con le **proprie traduzioni di backend** (file di lingua del plugin, lato server — distinti dalle traduzioni frontend della sua UI). La valuta è resa come simbolo (default €).
 - **NOT-R5** — **Errori**: il plugin esegue pochi tentativi con attesa crescente per gli errori transitori; se fallisce, solleva un errore descrittivo. Il core registra l'esito finale per canale (consegnata/fallita/saltata); un canale fallito non blocca gli altri né la registrazione nello storico.
 - **NOT-R6** — **Test**: ogni notifier implementa l'invio di una **notifica di prova** con la config corrente (merge admin+utente), invocabile dall'utente (suo recapito) e dall'admin (verifica del canale). Nessuna persistenza.
 - **NOT-R7** — Il contenuto formattato deve preservare le informazioni decisionali del payload: tag degli eventi, prezzi prima/dopo, **provenienza** dei prodotti, link, totali e soglia dei carrelli. Il rendering (testo, HTML, embed, markdown del canale) è libero.
+- **NOT-R8** — Il `body` dei **messaggi testuali è Markdown** (AEV-R7): il notifier lo rende con gli helper del contesto (`markdown.to_html()` per i canali HTML, `markdown.strip()` per quelli a testo puro, pass-through dove il canale parla markdown nativamente). **Degradazione, mai fallimento**: un costrutto non rendibile diventa testo semplice, la consegna non fallisce mai per il formato.
 
 ## Flusso di consegna
 

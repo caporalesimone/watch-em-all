@@ -63,4 +63,4 @@ I tag sono resi come badge grafici; lo stesso prodotto può cumulare più tag ne
 
 - **Profilo → Notifiche**: picker dei giorni (L–D) + orario; configurazione canali con flag on/off e bottone **Test** per ciascuno ([profile-and-notifiers.md](profile-and-notifiers.md)).
 - **Carrello**: selezione dei tipi di alert (default: nessuno). L'abilitazione/disabilitazione mostra l'effetto sulla baseline ("il monitoraggio riparte da ora").
-- **Storico alert**: elenco con badge non letto, filtro per categoria (sistema/admin) e per tipo (digest/summary), notifiche admin evidenziate con icona e colore dedicati, dettaglio con esiti di consegna.
+- **Storico alert**: elenco con badge non letto, filtro per categoria (sistema/admin) e per tipo (digest/summary), notifiche admin evidenziate con icona e colore dedicati, messaggi testuali resi in Markdown (sanificato), dettaglio con esiti di consegna.

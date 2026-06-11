@@ -124,7 +124,7 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 
 | Metodo | Path | Ruolo | Body / Query | Note |
 |---|---|---|---|---|
-| POST | `/api/admin/messages` | 🛡 | `{title, body, user_id?}` | invio a tutti gli utenti attivi (user_id assente) o a uno specifico; sempre in storico, consegna sui canali abilitati del destinatario |
+| POST | `/api/admin/messages` | 🛡 | `{title, body, user_id?}` | body in **Markdown** (AEV-R7); invio a tutti gli utenti attivi (user_id assente) o a uno specifico; sempre in storico, consegna sui canali abilitati del destinatario |
 | GET | `/api/admin/messages` | 🛡 | `?page=` | messaggi inviati con esiti di consegna per destinatario/canale; mai lo stato letto/non letto (ADMSG-R5) |
 
 ## Health — [deployment](../infrastructure/deployment.md)

@@ -6,7 +6,7 @@
 
 ```python
 from core.plugins import NotifierPlugin, PluginContext
-from core.contracts import AlertEvent, SummaryReport, ConfigField
+from core.contracts import AlertEvent, SummaryReport, TextMessageEvent, ConfigField
 
 class MioNotifier(NotifierPlugin):
     plugin_id    = "mio_canale"           # == manifest.name
@@ -15,10 +15,11 @@ class MioNotifier(NotifierPlugin):
     def initialize(self, context: PluginContext) -> None:
         ...   # di solito niente tabelle: la config la persiste il core
 
-    def send(self, notification: AlertEvent | SummaryReport,
+    def send(self, notification: AlertEvent | SummaryReport | TextMessageEvent,
              config: dict, locale: str) -> None:
         # config = merge admin+utente GIÀ fatto (e filtrato) dal core
-        # 1. formatta in base a notification.kind (digest = diff, summary = snapshot)
+        # 1. formatta in base a notification.kind (digest = diff, summary = snapshot,
+        #    *_message = titolo + body Markdown: rendi con context.markdown, MAI parsing tuo)
         # 2. traduci con i TUOI file lingua backend (backend/locales/{locale}.json)
         # 3. invia sul canale via context.http (o protocollo dedicato, es. SMTP)
         # 4. errori transitori: riprova 2-3 volte con backoff; poi solleva
@@ -52,10 +53,11 @@ Qualunque sia il formato del canale, devono sopravvivere (NOT-R7):
 | Link al prodotto | andare a comprare |
 | Totali del carrello + stato soglia | il quadro d'insieme (UC-1) |
 
-Due payload, distinti da `kind`:
+Tre payload, distinti da `kind`:
 
 - `alert_digest` — un diff: racconta **cosa è cambiato**.
 - `summary` — uno snapshot: racconta **come stanno le cose**.
+- `system_message` / `admin_message` — un **messaggio testuale** (titolo + body). Il body è **Markdown**: rendilo con gli helper del contesto — `context.markdown.to_html(body)` per i canali HTML, `context.markdown.strip(body)` per quelli a testo puro, pass-through se il canale parla markdown nativamente. Regola d'oro (NOT-R8): **degrada, non fallire mai** per il formato. Qui non c'è nulla da tradurre: il testo è dell'autore del messaggio.
 
 ## Config a due livelli (esempio canale di messaggistica via webhook)
 
@@ -90,4 +92,4 @@ Pochi tentativi, backoff, poi un errore **descrittivo**: finisce nello storico d
 
 ## Prima del rilascio
 
-[Checklist](checklist-and-testing.md): entrambi i `kind` formattati, provenienza presente, send_test funzionante, errori descrittivi, traduzioni complete nelle lingue del core.
+[Checklist](checklist-and-testing.md): tutti i `kind` formattati (markdown via helper per i messaggi testuali), provenienza presente, send_test funzionante, errori descrittivi, traduzioni complete nelle lingue del core.

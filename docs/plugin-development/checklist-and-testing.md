@@ -33,8 +33,9 @@ class TestMioScraper(ScraperContractSuite):
 
 | Check | Contratto |
 |---|---|
-| `send` gestisce **entrambi** i `kind` senza errori su payload campione | NOT-R1 |
+| `send` gestisce **tutti** i `kind` senza errori su payload campione (digest, summary, messaggio testuale) | NOT-R1 |
 | L'output formattato contiene prezzi, provenienza e link (sui campioni) | NOT-R7 |
+| Body Markdown reso via helper del contesto, degradato e mai bloccante | NOT-R8 |
 | `send_test` funziona con config minima valida | NOT-R6 |
 | Errore permanente → `NotifierDeliveryError` con messaggio non vuoto | NOT-R5 |
 | Traduzioni presenti per le lingue del core (it, en) | NOT-R4 |

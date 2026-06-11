@@ -16,6 +16,7 @@ class PluginContext:
     http: HttpClient           # client OBBLIGATORIO per ogni I/O di rete (vedi sotto)
     update_catalog: Callable   # solo scraper: (user_id, list[Product]) -> DeltaCounters
     locale_of: Callable        # user_id -> locale (per i testi delle notifiche)
+    markdown: MarkdownHelper   # render dei messaggi testuali (vedi sotto)
 ```
 
 ## Il client HTTP (`http`)
@@ -46,6 +47,18 @@ Consegna per-utente della lista corrente di [Product](../contracts/product.md); 
 ## `config`
 
 Solo la sezione **admin** del plugin (persistita nel DB e gestita dalla UI admin via [ConfigField](../contracts/config-field.md)); i parametri di sistema riservati (politeness, timeout) sono letti dal core, non dal plugin. La config **utente** degli scraper vive nelle tabelle del plugin; quella dei notifier arriva già mergeata alla `send()`.
+
+## `markdown`
+
+I `body` dei messaggi testuali (`TextMessageEvent`, [alert-event](../contracts/alert-event.md) AEV-R7) sono **Markdown**; il render è centralizzato nel core, mai reimplementato dai plugin.
+
+```python
+class MarkdownHelper:
+    def to_html(self, md: str) -> str: ...   # markdown-it-py + sanificazione nh3
+    def strip(self, md: str) -> str: ...     # testo puro per i canali senza formattazione
+```
+
+- **CTX-R8** — Il notifier rende il Markdown **solo** tramite questi helper: l'HTML in uscita è sempre sanificato (niente HTML inline passante), e il comportamento sintattico è identico su tutti i canali e coerente con l'anteprima frontend (parser della stessa famiglia markdown-it).
 
 ## `logger`
 
