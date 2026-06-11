@@ -1,0 +1,140 @@
+# Architettura di sistema
+
+> **Layer 2 — Architettura** · Audience: architetti SW, system engineer · Testo + Mermaid, niente codice.
+
+## Vista a container
+
+Il sistema è composto da tre processi applicativi più il database, orchestrati con Docker Compose. `web` e `worker` non comunicano mai direttamente: **condividono solo il database**.
+
+```mermaid
+graph TB
+    subgraph Browser
+        SPA[SPA SvelteKit<br/>app + frontend dei plugin]
+    end
+    subgraph "Docker host"
+        WEB[web<br/>FastAPI + bundle statico SPA<br/>API, auth, scrape on-demand]
+        WORKER[worker<br/>dispatcher temporale +<br/>pool di esecuzione scraper]
+        DB[(db<br/>PostgreSQL 16)]
+        ADM[adminer<br/>solo profilo dev]
+    end
+    EXT1[Siti e-commerce]
+    EXT2[Canali di notifica<br/>SMTP, webhook…]
+
+    SPA -->|HTTP /api/*| WEB
+    WEB --> DB
+    WORKER --> DB
+    WORKER -->|scraping| EXT1
+    WEB -->|dry-run / scrape-now| EXT1
+    WORKER -->|invio notifiche| EXT2
+    WEB -->|test notifica| EXT2
+    ADM -.-> DB
+```
+
+| Container | Responsabilità | Note |
+|---|---|---|
+| `web` | API HTTP, autenticazione, serve la SPA buildata, esegue gli **scrape on-demand** (dry-run, scrape-now, test notifier) come task in background | Carica i plugin per esporre le loro route e i loro schemi di config |
+| `worker` | Dispatcher temporale (tick al minuto) + **pool di scraper** con limite di parallelismo gestito dall'admin; run di alert e summary; heartbeat | Carica i plugin per eseguirli |
+| `db` | PostgreSQL: unico stato condiviso del sistema | MVCC gestisce le scritture concorrenti di web e worker |
+| `adminer` | Ispezione del DB dal browser | Solo `--profile dev`, mai in produzione |
+
+**Perché PostgreSQL e non SQLite**: due processi scrivono concorrentemente (web e worker); SQLite con lock su file condiviso tra container è fragile, Postgres con MVCC no.
+
+**Perché entrambi i container caricano i plugin**: il worker esegue le run schedulate; il web espone le route dei plugin (UI, dry-run, schemi di config) ed esegue gli scrape on-demand richiesti dalla UI. Le esecuzioni si coordinano tramite **lock per-scraper sul DB** (mai due run dello stesso scraper in parallelo, da qualunque container partano).
+
+## Vista a componenti del core
+
+```mermaid
+graph LR
+    subgraph core
+        REG[Plugin Registry]
+        CTX[Plugin Context]
+        CRON[Cron Worker]
+        POOL[Scraper Pool]
+        CAT[Catalog Update Service]
+        CART[Cart Engine]
+        ALERT[Alert Engine]
+        SUM[Summary Report]
+        HIST[Price History]
+        AUTH[Auth]
+        NSVC[Notification Dispatch]
+    end
+    subgraph plugins
+        SCR[Scraper Plugin]
+        NOT[Notifier Plugin]
+    end
+
+    REG --> CTX
+    CRON --> POOL
+    POOL --> SCR
+    SCR -->|update_catalog| CAT
+    CAT --> HIST
+    CRON --> ALERT
+    CRON --> SUM
+    ALERT --> CART
+    SUM --> CART
+    ALERT --> NSVC
+    SUM --> NSVC
+    NSVC --> NOT
+    CART -->|get_adjustments| SCR
+```
+
+| Componente | Responsabilità | Dettaglio |
+|---|---|---|
+| Plugin Registry | Discovery, validazione manifest, caricamento, registrazione route | [L4](../4-capabilities/core/plugin-registry.md) |
+| Plugin Context | Sandbox soft: tutto ciò che un plugin può usare | [L4](../4-capabilities/core/plugin-context.md) |
+| Cron Worker | Dispatcher temporale dei tre flussi (scrape, alert, summary) | [L4](../4-capabilities/core/cron-worker.md) |
+| Scraper Pool | Esecuzione parallela controllata degli scraper (limiti admin) | [L4](../4-capabilities/core/scraper-pool.md) |
+| Catalog Update Service | Riceve i prodotti dagli scraper, calcola i delta, scrive lo storico | [L4](../4-capabilities/core/catalog-update-service.md) |
+| Cart Engine | Totali, adjustments, soglie dei carrelli | [L4](../4-capabilities/core/cart-engine.md) |
+| Alert Engine | Diff vs baseline → notifica aggregata | [L4](../4-capabilities/core/alert-engine.md) |
+| Summary Report | Fotografia periodica opt-in | [L4](../4-capabilities/core/summary-report.md) |
+| Price History | Storico append-only di prezzi e disponibilità + serie per i grafici | [L4](../4-capabilities/core/price-history.md) |
+| Auth | JWT (access breve + refresh ruotato), ruoli | [L4](../4-capabilities/core/auth.md) |
+| Notification Dispatch | Consegna ai notifier abilitati, registrazione esiti per canale | [Notification architecture](notification-architecture.md) |
+
+## Confini core ↔ plugin
+
+Il core comunica con i plugin **solo** attraverso contratti dichiarativi:
+
+- riceve dati come modelli tipizzati: `Product`, `Adjustment` ([contratti, L4](../4-capabilities/contracts/));
+- invoca i metodi astratti dei contratti (`run_for_user`, `send`, `get_adjustments`, gli schemi di config);
+- non conosce: strategia di scraping, concetto di **categoria** (interno agli scraper), formato dei messaggi, retry di invio.
+
+Il grafo delle dipendenze è aciclico: i plugin dipendono dal core, mai il contrario. Vedi [plugin-architecture.md](plugin-architecture.md).
+
+## Flusso end-to-end (il giro completo)
+
+```mermaid
+sequenceDiagram
+    participant A as Admin
+    participant W as Worker
+    participant S as Scraper plugin
+    participant C as Core (catalog)
+    participant AE as Alert Engine
+    participant N as Notifier plugin
+    participant U as Utente
+
+    A->>W: schedula scraper (1..N orari/giorno, limiti)
+    loop ogni slot dovuto
+        W->>S: run (nel pool, con lock per-scraper)
+        S->>C: update_catalog(user, prodotti) per ogni utente
+        C->>C: delta → storico prezzi/disponibilità
+    end
+    Note over W,AE: all'orario di alert dell'utente (giorni scelti)
+    W->>AE: run(user)
+    AE->>AE: diff carrelli vs baseline
+    AE->>N: digest aggregato (per ogni canale abilitato)
+    N->>U: notifica
+    AE->>C: registra in storico alert (sempre)
+```
+
+## Decisioni architetturali chiave
+
+| Decisione | Scelta | Razionale |
+|---|---|---|
+| Scrape e notifica | **Disaccoppiati** (orari indipendenti) | L'utente sceglie quando essere disturbato; gli scrape girano quando serve ai dati |
+| Catalogo | **Per-utente** | Isolamento totale; il costo (scraping duplicato tra utenti) è accettabile a ≤5 utenti |
+| Stato dei plugin | **Tabelle dedicate per plugin** | Nessuna tabella generica condivisa; il core non le conosce |
+| Frontend | **SPA client-side** (no SSR) | App dietro login, niente SEO; il mounting dinamico dei plugin è naturale lato client |
+| Notifiche mancate | **Storico interno sempre scritto** | Il notifier è un canale aggiuntivo, mai un single point of failure informativo |
+| Concorrenza scraper | **Pool con limite admin; scraper internamente mono-thread** | Parallelismo tra siti diversi, mai verso lo stesso sito; vedi [scheduling-and-execution.md](scheduling-and-execution.md) |
