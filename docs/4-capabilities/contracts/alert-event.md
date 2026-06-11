@@ -24,8 +24,9 @@ class AlertType(StrEnum):
     CART_THRESHOLD_REACHED_PARTIAL = "CART_THRESHOLD_REACHED_PARTIAL"
 
 class NotificationKind(StrEnum):
-    ALERT_DIGEST = "alert_digest"    # diff vs baseline
-    SUMMARY      = "summary"         # snapshot (payload in summary-report.md)
+    ALERT_DIGEST  = "alert_digest"    # diff vs baseline           (categoria: sistema)
+    SUMMARY       = "summary"         # snapshot (summary-report)  (categoria: sistema)
+    ADMIN_MESSAGE = "admin_message"   # messaggio dell'admin       (categoria: admin)
 ```
 
 Un solo enum per i tipi: la distinzione prodotto/carrello è data dalla **posizione** nel modello, garantita da validatori.
@@ -64,6 +65,13 @@ class AlertEvent(BaseModel):
     user_id: int
     generated_at: datetime
     cart_alerts: list[CartAlert]      # solo carrelli con almeno un evento
+
+class AdminMessageEvent(BaseModel):   # payload dei messaggi admin (admin-notifications)
+    kind: NotificationKind = NotificationKind.ADMIN_MESSAGE
+    user_id: int                      # il destinatario di QUESTA consegna
+    generated_at: datetime
+    title: str
+    body: str                         # testo semplice, formattato dal canale
 ```
 
 ## Regole
@@ -73,6 +81,7 @@ class AlertEvent(BaseModel):
 - **AEV-R3** — I tag sono resi graficamente dal canale (badge/emoji), mai come stringhe con underscore.
 - **AEV-R4** — `Decimal` serializzato come **stringa** nel JSON (storico e API), `datetime` ISO-8601 UTC.
 - **AEV-R5** — Il summary usa lo stesso `NotificationKind` e lo stesso canale ma payload diverso ([summary-report](../core/summary-report.md)); il notifier distingue da `kind`.
+- **AEV-R6** — Il messaggio admin (`AdminMessageEvent`) viaggia sullo stesso canale con payload minimale (titolo + testo); il notifier lo rende come testo semplice, senza struttura a carrelli. La **categoria** (sistema/admin) è derivata dal `kind`, non è un campo ([admin-notifications](../../3-features/admin/admin-notifications.md)).
 
 ## Esempio
 

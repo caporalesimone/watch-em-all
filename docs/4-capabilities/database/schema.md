@@ -32,9 +32,10 @@ Motore **PostgreSQL 16**, accesso via SQLAlchemy, validazione I/O Pydantic v2. S
 | `alert_schedule` | user_id PK/FK, scheduled_time, weekdays (int[], 0=lun), last_run_date | cadenza per-utente; [] = off |
 | `summary_config` | user_id PK/FK, enabled, frequency (`weekly`\|`monthly`), weekday, scheduled_time, last_run_date | opt-in; monthly = giorno 1 |
 | `alert_snapshot` | user_id FK, cart_id FK **CASCADE**, snapshot_json, taken_at — **PK (user_id, cart_id)** | baseline **per-carrello**: seed all'abilitazione, avanza a ogni run, delete alla disabilitazione |
-| `alert_log` | id, user_id FK, kind (`alert_digest`\|`summary`), payload_json, created_at, read_at (null = non letto) | sempre scritto; INDEX (user_id, created_at); purge admin per data |
+| `alert_log` | id, user_id FK, kind (`alert_digest`\|`summary`\|`admin_message`), admin_message_id FK (null se non admin), payload_json, created_at, read_at (null = non letto) | sempre scritto; INDEX (user_id, created_at); purge admin per data; kind determina la categoria (sistema/admin) |
+| `admin_message` | id, target_user_id FK (null = broadcast a tutti), title, body, created_at | il messaggio master; una riga `alert_log` per destinatario; gli esiti si leggono via `alert_delivery` |
 | `alert_delivery` | id, alert_id FK **CASCADE**, plugin_id (null = nessun canale), status (`delivered`\|`failed`\|`skipped_no_notifier`), error_message, delivered_at | **un esito per canale** |
-| `notifier_admin_config` | plugin_id PK, config_json, updated_at | parametri di sistema del canale |
+| `notifier_admin_config` | plugin_id PK, config_json, **enabled** (default true), updated_at | parametri di sistema del canale; enabled = interruttore globale admin (PCFG-R8) |
 | `notifier_user_config` | plugin_id, user_id FK, **enabled** (flag attivazione), config_json — PK (plugin_id, user_id) | disattivare ≠ cancellare la config |
 
 ## Scheduling e monitoraggio

@@ -56,6 +56,12 @@ Decisioni di design:
 
 Canale e infrastruttura identici, semantica opposta: una **fotografia** dello stato corrente di tutti i carrelli (non un diff), opt-in, settimanale o mensile. Distinto dal digest dal tipo di payload; il notifier li formatta diversamente. Serve a chi vuole "il polso della situazione" anche quando non cambia nulla.
 
+## Le notifiche admin e le categorie
+
+Le notifiche del sistema si dividono in **due categorie** (per ora le uniche): **sistema** (digest e summary, generate dal motore) e **admin** (messaggi scritti da un amministratore per tutti gli utenti o per uno specifico). Il messaggio admin **riusa l'intera pipeline**: una riga nello storico interno per ogni destinatario — **sempre**, anche per chi non ha canali — e consegna sui canali abilitati dal destinatario, con esito per canale. Nello storico dell'utente la categoria admin è visivamente distinta (icona e colore dedicati). Dettagli: [3-features/admin/admin-notifications.md](../3-features/admin/admin-notifications.md).
+
+L'admin governa anche la **disponibilità globale dei canali**: può disabilitare un notifier per tutti gli utenti a runtime (speculare alla sospensione di uno scraper), preservando le configurazioni personali.
+
 ## Cosa resta: lo storico alert
 
 - Elenco consultabile in-app di tutti i digest e summary, con stato **letto/non letto** (badge in dashboard).

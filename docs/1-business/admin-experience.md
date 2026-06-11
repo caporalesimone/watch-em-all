@@ -40,6 +40,12 @@ Sono sempre e soltanto numeri: la dashboard dice che un utente ha trecento prodo
 
 I canali di consegna (email, Discord…) hanno due livelli di configurazione: l'admin imposta la parte **di sistema** (ad esempio il server di posta in uscita e le sue credenziali), ogni utente aggiunge la propria parte **personale** (il proprio indirizzo). Senza la parte di sistema il canale non è utilizzabile da nessuno; l'interfaccia lo segnala.
 
+Come per gli scraper, l'admin ha anche l'**interruttore globale**: può disabilitare un canale **per tutti gli utenti** (e riattivarlo) senza toccare le configurazioni personali, che restano al loro posto in attesa della riattivazione.
+
+## Comunicare con gli utenti
+
+L'admin può scrivere direttamente agli utenti attraverso il sistema stesso: una pagina dedicata gli permette di comporre un messaggio (titolo e testo) e inviarlo **a tutti** o **a un utente specifico** — un avviso di manutenzione, una novità, una segnalazione personale. Il messaggio viaggia sui canali di notifica che ciascun utente ha attivato; chi non ha alcun canale lo trova comunque **nella pagina delle notifiche ricevute**, dove i messaggi dell'admin sono evidenziati con un'icona e un colore propri. L'admin vede gli esiti di consegna dei propri messaggi, non lo stato di lettura.
+
 ## Manutenzione
 
 - **Pulizia degli storici**: l'admin applica regole globali per data ("elimina le notifiche di tutti più vecchie di 90 giorni") senza mai vedere il contenuto delle notifiche degli utenti.

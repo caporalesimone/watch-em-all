@@ -26,6 +26,7 @@
 - **ALERT-R13** — Ogni notifica è **sempre** registrata nello storico interno, anche senza canali configurati; ha uno stato **letto/non letto** (badge in dashboard).
 - **ALERT-R14** — La consegna avviene su **tutti i canali abilitati** dall'utente; l'esito è registrato **per canale** (consegnata / fallita con motivo / nessun canale). Un fallimento di consegna non blocca né nasconde nulla.
 - **ALERT-R15** — Lo storico è consultabile e paginato; il dettaglio di una notifica mostra il digest completo e gli esiti di consegna.
+- **ALERT-R16** — Lo storico distingue **due categorie**: notifiche di **sistema** (digest, summary) e notifiche **admin** (messaggi inviati dall'amministratore — [admin-notifications](../admin/admin-notifications.md)). Le notifiche admin hanno **icona e colore dedicati** e lo storico è filtrabile per categoria. Anche per le notifiche admin valgono ALERT-R13/R14: sempre in storico, consegna sui canali abilitati.
 
 ## Flusso di una run
 
@@ -62,4 +63,4 @@ I tag sono resi come badge grafici; lo stesso prodotto può cumulare più tag ne
 
 - **Profilo → Notifiche**: picker dei giorni (L–D) + orario; configurazione canali con flag on/off e bottone **Test** per ciascuno ([profile-and-notifiers.md](profile-and-notifiers.md)).
 - **Carrello**: selezione dei tipi di alert (default: nessuno). L'abilitazione/disabilitazione mostra l'effetto sulla baseline ("il monitoraggio riparte da ora").
-- **Storico alert**: elenco con badge non letto, filtro per tipo (digest/summary), dettaglio con esiti di consegna.
+- **Storico alert**: elenco con badge non letto, filtro per categoria (sistema/admin) e per tipo (digest/summary), notifiche admin evidenziate con icona e colore dedicati, dettaglio con esiti di consegna.

@@ -115,9 +115,17 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 
 | Metodo | Path | Ruolo | Body | Note |
 |---|---|---|---|---|
-| GET | `/api/admin/notifiers` | 🛡 | — | per canale: schema admin, `is_set` dei secret, stato |
+| GET | `/api/admin/notifiers` | 🛡 | — | per canale: schema admin, `is_set` dei secret, stato, enabled |
 | PUT | `/api/admin/notifiers/{plugin_id}/config` | 🛡 | `{config}` | chiavi filtrate sullo schema admin |
+| PATCH | `/api/admin/notifiers/{plugin_id}` | 🛡 | `{enabled}` | interruttore globale del canale (PCFG-R8): off = non disponibile per tutti, config utente preservate |
 | POST | `/api/admin/notifiers/{plugin_id}/test` | 🛡 | `{...campi utente minimi}` | verifica del canale lato sistema |
+
+## Admin — notifiche agli utenti — [admin-notifications](../3-features/admin/admin-notifications.md)
+
+| Metodo | Path | Ruolo | Body / Query | Note |
+|---|---|---|---|---|
+| POST | `/api/admin/messages` | 🛡 | `{title, body, user_id?}` | invio a tutti gli utenti attivi (user_id assente) o a uno specifico; sempre in storico, consegna sui canali abilitati del destinatario |
+| GET | `/api/admin/messages` | 🛡 | `?page=` | messaggi inviati con esiti di consegna per destinatario/canale; mai lo stato letto/non letto (ADMSG-R5) |
 
 ## Health — [deployment](../infrastructure/deployment.md)
 

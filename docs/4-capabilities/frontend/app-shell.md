@@ -40,7 +40,7 @@ src/frontend/src/
 | Product Picker | tabella catalogo paginata server-side; provenienza; azioni di pulizia; scrape-now a catalogo vuoto | [catalog](../../3-features/user/catalog-and-product-picker.md) |
 | Carrelli | card dei carrelli, creazione/modifica, tipi di alert, soglie | [carts](../../3-features/user/carts.md) |
 | Storico prezzi | **un componente grafico unico** (serie prodotto o carrello, selettori week/month/all, gap) | [price-history](../../3-features/user/price-history.md) |
-| Storico alert | elenco paginato, letto/non letto, dettaglio con esiti di consegna per canale | [alerts](../../3-features/user/alerts-and-notifications.md) |
+| Storico alert | elenco paginato, letto/non letto, categorie sistema/admin (notifiche admin con icona e colore dedicati), dettaglio con esiti di consegna per canale | [alerts](../../3-features/user/alerts-and-notifications.md) |
 | Profilo | password, lingua, cadenza, summary, canali notifier (form dinamici + test + flag) | [profile](../../3-features/user/profile-and-notifiers.md) |
 | Pagine plugin | montate dinamicamente sotto la route del plugin | [plugin-discovery](plugin-discovery.md) |
 
@@ -53,6 +53,7 @@ src/frontend/src/
 | Scheduler scrapers | slot 1..N per scraper, sospensione, impostazioni globali (pool, timeout, retention) |
 | Monitoraggio scrapers | ultima run, trend, elenco run, drill-down per utente |
 | Config plugin | pagine admin dei plugin (form dinamici + Test Scraper / test canale) |
+| Notifiche agli utenti | composizione e invio messaggi a tutti/un utente, elenco inviati con esiti ([admin-notifications](../../3-features/admin/admin-notifications.md)) |
 | Log di sistema | polling incrementale con cursore, filtri, heartbeat del worker evidenziato |
 | Manutenzione | purge storico alert per data |
 

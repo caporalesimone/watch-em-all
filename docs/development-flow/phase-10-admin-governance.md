@@ -19,6 +19,8 @@ L'admin apre il monitoraggio e capisce in un colpo d'occhio quanto lavorano gli 
 - [ ] **10.B3 — Impostazioni di sistema + retention** (~3h): `system_settings` con seed dei default, effetto a caldo (pool, timeout, soglia recuperi); retention automatica di log e run nel worker ([system-logs-and-maintenance](../3-features/admin/system-logs-and-maintenance.md)). *Verifica: pool a 1 → due scraper dovuti girano in sequenza.*
 - [ ] **10.B4 — Purge storico alert** (~1h): `DELETE /api/admin/alerts?before=`. *Verifica: notifiche vecchie sparite per tutti, recenti intatte.*
 - [ ] **10.B5 — API dashboard di sistema** (~3h): `GET /api/admin/dashboard` e `/dashboard/users` — aggregati globali, ranking per utente e per (utente, scraper), statistiche notifiche; include `http_requests` per-utente su `scrape_user_log` ([admin-dashboard](../3-features/admin/admin-dashboard.md)). *Verifica: i totali tornano con i dati delle tabelle; nessun contenuto utente nelle risposte (DASH-R6).*
+- [ ] **10.B6 — Interruttore globale notifier** (~1h): colonna `enabled` su `notifier_admin_config`, `PATCH /api/admin/notifiers/{id}`; canale off = non disponibile per tutti, config utente preservate (PCFG-R8). *Verifica: canale disabilitato → consegne saltate per tutti, riattivato → tornano senza riconfigurare.*
+- [ ] **10.B7 — API messaggi admin** (~3h): tabella `admin_message`, kind `admin_message` su `alert_log`, `POST/GET /api/admin/messages` — invio a tutti/un utente sulla pipeline notifiche esistente, esiti per destinatario/canale ([admin-notifications](../3-features/admin/admin-notifications.md)). *Verifica: utente senza canali riceve il messaggio in-app (ADMSG-R2); l'admin non vede lo stato letto/non letto (ADMSG-R5).*
 
 ### Frontend
 
@@ -27,6 +29,7 @@ L'admin apre il monitoraggio e capisce in un colpo d'occhio quanto lavorano gli 
 - [ ] **10.F3 — Trend e contatori** (~2h): grafici durate/http_requests/variazioni per run (componente grafico riusato), contatori 7/30gg. *Verifica: trend leggibili.*
 - [ ] **10.F4 — Pagina impostazioni + purge** (~2h): form impostazioni di sistema con default e validazioni; azione di purge con conferma. *Verifica: modifica a caldo visibile senza riavvio.*
 - [ ] **10.F5 — Pagina dashboard di sistema** (~3h): statistiche globali, ranking utenti (dati e carico per scraper), statistiche notifiche con finestra 7/30gg ([admin-dashboard](../3-features/admin/admin-dashboard.md)). *Verifica: ranking coerenti con i dati; solo numeri e username, nessun contenuto.*
+- [ ] **10.F6 — Pagina notifiche agli utenti + categorie nello storico** (~3h): composizione e invio (tutti/un utente), elenco inviati con esiti; toggle enabled nella pagina notifier; nello storico utente: categorie sistema/admin, icona e colore dedicati ai messaggi admin, filtro per categoria (ALERT-R16). *Verifica: messaggio broadcast visibile ed evidenziato nello storico di ogni utente.*
 
 ## Definition of Done
 
