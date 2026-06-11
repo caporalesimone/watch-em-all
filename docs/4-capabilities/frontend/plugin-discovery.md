@@ -23,7 +23,7 @@ export const plugins = [
     name: "<plugin_id>",
     route_base: "/plugins/<route>",
     component: () => import("../../plugins/<tipo>/<nome>/frontend/index.ts"),
-    locales: () => import("../../plugins/<tipo>/<nome>/frontend/locales"),
+    i18n: () => import("../../plugins/<tipo>/<nome>/frontend/i18n"),
   },
 ]
 ```
@@ -43,7 +43,7 @@ export default {
 boot SPA
   → GET /api/plugins                       (name, type, route_base, icon, display_name)
   → per ogni plugin: lookup nel registro generato per name
-      → trovato: registra route (lazy) + voce sidebar (se scraper) + carica namespace locales
+      → trovato: registra route (lazy) + voce sidebar (se scraper) + carica namespace i18n
       → assente: log console "plugin X richiede rebuild" (FDISC-R4)
 ```
 

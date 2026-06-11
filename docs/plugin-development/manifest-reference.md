@@ -16,10 +16,10 @@ Il `manifest.json` è il contratto dichiarativo del plugin: tutto ciò che il si
 | `enabled` | bool | ✅ | **Unica source of truth** dell'attivazione. `false` = ignorato del tutto (nessun import). Cambiarlo richiede rebuild + restart. |
 | `icon` | path | consigliato | Relativo alla cartella del plugin. SVG (o PNG ≥48px) quadrata; resa a 24×24 nelle celle di provenienza. Assente = icona neutra. |
 | `backend.entry` | path | ✅ | **Relativo alla cartella del plugin** (es. `backend/__init__.py`). Deve esportare l'istanza del plugin. |
-| `backend.locales` | path | notifier | Cartella dei file lingua backend (testi delle notifiche). |
+| `backend.i18n` | path | notifier | Cartella dei file lingua backend (testi delle notifiche). `en.json` **sempre presente** (è il fallback). |
 | `frontend.entry` | path | ✅* | Relativo; esporta `default { component }`. *Omissibile solo per plugin senza UI propria (raro). |
 | `frontend.route_base` | string | ✅* | Base delle route del plugin (es. `/plugins/nome-plugin`, kebab-case). **Unica fonte della route**: l'entry frontend non la ridichiara. |
-| `frontend.locales` | path | ✅* | Cartella traduzioni UI (namespace dedicato al plugin). |
+| `frontend.i18n` | path | ✅* | Cartella traduzioni UI (namespace dedicato al plugin). `en.json` **sempre presente** (è il fallback). |
 
 ## Esempio completo
 
@@ -35,7 +35,7 @@ Il `manifest.json` è il contratto dichiarativo del plugin: tutto ciò che il si
   "backend":  { "entry": "backend/__init__.py" },
   "frontend": { "entry": "frontend/index.ts",
                 "route_base": "/plugins/esempio-store",
-                "locales": "frontend/locales" }
+                "i18n": "frontend/i18n" }
 }
 ```
 

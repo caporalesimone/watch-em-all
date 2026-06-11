@@ -24,7 +24,8 @@ class MioNotifier(NotifierPlugin):
         # config = merge admin+utente GIÀ fatto (e filtrato) dal core
         # 1. formatta in base a notification.kind (digest = diff, summary = snapshot,
         #    *_message = titolo + body Markdown: rendi con context.markdown, MAI parsing tuo)
-        # 2. traduci con i TUOI file lingua backend (backend/locales/{locale}.json)
+        # 2. traduci con i TUOI file lingua backend (backend/i18n/{locale}.json,
+        #    fallback su en.json — che deve SEMPRE esistere)
         # 3. invia sul canale via context.http (o protocollo dedicato, es. SMTP)
         # 4. errori transitori: riprova 2-3 volte con backoff; poi solleva
         #    NotifierDeliveryError("motivo leggibile") — il core registra l'esito
@@ -92,7 +93,7 @@ Pochi tentativi, backoff, poi un errore **descrittivo**: finisce nello storico d
 
 ## Traduzioni backend
 
-`backend/locales/it.json`, `en.json`: i testi delle notifiche (oggetti, intestazioni, etichette dei tag). `locale` arriva alla `send`; fallback sulla lingua di default se il file manca. Le traduzioni della tua eventuale UI stanno invece in `frontend/locales/`.
+`backend/i18n/en.json`: i testi delle notifiche (oggetti, intestazioni, etichette dei tag) — **English-first**: `en.json` è obbligatorio e sempre completo; le altre lingue si aggiungeranno in futuro nella stessa cartella. `locale` arriva alla `send`; se la lingua richiesta manca nel plugin, **fallback su `en`**. Le traduzioni della tua eventuale UI stanno invece in `frontend/i18n/`.
 
 ## Prima del rilascio
 

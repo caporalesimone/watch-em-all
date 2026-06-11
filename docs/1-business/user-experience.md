@@ -6,7 +6,7 @@ Il racconto dell'esperienza, dal primo accesso alla notifica che chiude il cerch
 
 ## Il primo accesso
 
-L'utente riceve dall'amministratore le credenziali (username e password temporanea). Al primo accesso il sistema impone il cambio password e propone la scelta della lingua. L'interfaccia è una applicazione web moderna, con tema scuro di default (commutabile in chiaro) e una barra di navigazione laterale sempre presente: Dashboard, Product Picker, Carrelli, Storico prezzi, Storico alert, Profilo e — in fondo, in un gruppo a parte — l'elenco dei siti supportati (gli scraper).
+L'utente riceve dall'amministratore le credenziali (username e password temporanea). Al primo accesso il sistema impone il cambio password. (L'interfaccia è in inglese: la scelta della lingua è prevista dall'impianto ma non offerta nella prima versione.) L'interfaccia è una applicazione web moderna, con tema scuro di default (commutabile in chiaro) e una barra di navigazione laterale sempre presente: Dashboard, Product Picker, Carrelli, Storico prezzi, Storico alert, Profilo e — in fondo, in un gruppo a parte — l'elenco dei siti supportati (gli scraper).
 
 La Dashboard accoglie l'utente con lo stato dei suoi carrelli e, finché non ha configurato un canale di notifica, un avviso gentile: *"Nessun notifier configurato — non riceverai notifiche (le trovi comunque nello Storico alert)"*.
 

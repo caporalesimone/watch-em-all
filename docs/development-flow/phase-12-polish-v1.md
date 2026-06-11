@@ -23,12 +23,12 @@ Chiudere il perimetro della v1: il secondo canale di notifica (che dimostra la b
 
 ### Trasversali
 
-- [ ] **12.T1 — i18n completa** (~3h): audit delle stringhe — core it/en, namespace dei plugin (frontend), testi delle notifiche (backend dei notifier); nessuna stringa cablata (FE-13). *Verifica: app e notifiche complete in entrambe le lingue.*
+- [ ] **12.T1 — Audit i18n English-first** (~3h): audit delle stringhe — `en.json` completo nelle cartelle `i18n/` di core e plugin (frontend e backend dei notifier); nessuna stringa cablata né concatenata (FE-13); fallback su `en` verificato. *Verifica: app e notifiche complete in inglese; nessuna chiave mancante a runtime.*
 - [ ] **12.T2 — Doc allineata + release** (~2h): verifica documentazione vs implementato (DOC-8), changelog, tag `v1.0`, prova di installazione da zero seguendo solo [deployment](../infrastructure/deployment.md). *Verifica: un'installazione pulita riesce senza conoscenze esterne.*
 
 ## Definition of Done
 
-- [ ] I due [use case fondanti](../1-business/use-cases.md) girano end-to-end su installazione pulita, in entrambe le lingue, su entrambi i canali.
+- [ ] I due [use case fondanti](../1-business/use-cases.md) girano end-to-end su installazione pulita, su entrambi i canali (lingua: `en`, English-first).
 - [ ] CI completa verde; checklist plugin passata da Dragon Store, Email e Discord.
 - [ ] Tutte le checkbox di questo flusso spuntate: la v1 è chiusa.
 

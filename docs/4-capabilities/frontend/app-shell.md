@@ -18,19 +18,19 @@ src/frontend/src/
 │   ├── api/           # client tipizzati per endpoint (usa lib/auth)
 │   └── auth/          # Auth Manager
 ├── generated/         # plugin-registry.ts (GENERATO, mai a mano)
-└── locales/           # it.json, en.json (core); i plugin hanno i propri namespace
+└── i18n/              # file di lingua del core: V1 solo en.json (le lingue future si aggiungono qui); i plugin hanno le proprie cartelle i18n
 ```
 
 ## Shell e navigazione
 
 - **Sidebar sinistra persistente**: Dashboard · Product Picker · Carrelli · Storico prezzi · Storico alert (badge non letti) · Profilo · *(separatore)* · gruppo **SCRAPERS** collassabile (default aperto), **ultimo** così cresce senza spostare le voci core; voci dinamiche da `GET /api/plugins` con icona e route del plugin.
-- **Header**: toggle tema e lingua. I notifier **non** sono in nav (stanno in Profilo).
+- **Header**: toggle tema (il selettore lingua è previsto ma non esposto in V1, English-only). I notifier **non** sono in nav (stanno in Profilo).
 - **Area admin**: sezione separata visibile solo con ruolo admin (dashboard di sistema, utenti, scheduler, monitoraggio, config plugin, log, impostazioni).
 
 ## Tema e lingua
 
 - Tema chiaro/scuro, **default scuro**; preferenza per-browser in `localStorage`, applicata **prima del primo render** (niente flash). Dark mode Tailwind con classe su `<html>`.
-- Lingua: per-account (`users.locale`), ricevuta al login e applicata al boot; il toggle in header la persiste via `PATCH /api/me`. Le traduzioni dei plugin vivono in namespace dedicati caricati con i loro componenti.
+- Lingua: per-account (`users.locale`), ricevuta al login e applicata al boot. **V1 è English-only**: `locale` fisso a `en`, selettore non esposto; l'intera macchina (chiavi, file di lingua, namespace dei plugin, risoluzione per-utente) resta in piedi — attivare una seconda lingua = tradurre i file e mostrare il selettore ([future improvement](../../future-improvements/platform.md)).
 
 ## Pagine utente (mappa di responsabilità)
 
@@ -53,7 +53,7 @@ src/frontend/src/
 | Scheduler scrapers | slot 1..N per scraper, sospensione, impostazioni globali (pool, timeout, retention) |
 | Monitoraggio scrapers | ultima run, trend, elenco run, drill-down per utente |
 | Config plugin | pagine admin dei plugin (form dinamici + Test Scraper / test canale) |
-| Notifiche agli utenti | composizione Markdown con anteprima live, invio a tutti/un utente, elenco inviati con esiti ([admin-notifications](../../3-features/admin/admin-notifications.md)) |
+| Notifiche agli utenti | composizione Markdown con anteprima live, invio a tutti/un utente, elenco inviati con esiti; tab **messaggi di sistema**: catalogo template con override/ripristino, stesso editor ([admin-notifications](../../3-features/admin/admin-notifications.md)) |
 | Log di sistema | polling incrementale con cursore, filtri, heartbeat del worker evidenziato |
 | Manutenzione | purge storico alert per data |
 

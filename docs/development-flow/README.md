@@ -37,7 +37,7 @@
 - [ ] **Fase 11 — Summary, analisi prezzi, export** → [phase-11-insights.md](phase-11-insights.md)
   *Risultato: report periodico, badge minimo storico e convenienza, export dei dati.*
 - [ ] **Fase 12 — Rifinitura e v1.0** → [phase-12-polish-v1.md](phase-12-polish-v1.md)
-  *Risultato: secondo canale (Discord), i18n completa, CI piena: release 1.0.*
+  *Risultato: secondo canale (Discord), audit i18n English-first, CI piena: release 1.0.*
 
 ## La logica dell'ordine
 

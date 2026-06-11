@@ -10,7 +10,7 @@ La pagina Profilo concentra tutto ciò che riguarda l'account e la consegna dell
 
 ### Account
 - **PROF-R1** — Cambio password (vecchia + nuova, requisiti minimi di lunghezza); il cambio invalida tutte le sessioni attive.
-- **PROF-R2** — Scelta della **lingua** dell'interfaccia, persistita sul profilo: usata dalla UI a ogni login e dal core per generare il testo delle **notifiche**. Default di sistema per i nuovi utenti.
+- **PROF-R2** — Scelta della **lingua** dell'interfaccia, persistita sul profilo: usata dalla UI a ogni login e dal core per generare il testo delle **notifiche**. Default di sistema per i nuovi utenti. **V1 English-only**: `locale` fisso a `en`, selettore non esposto; l'impianto (campo, chiavi, risoluzione per-utente) resta attivo per il [multilingua futuro](../../future-improvements/platform.md).
 - **PROF-R3** — Il tema (chiaro/scuro) è una preferenza **di browser** (non di account), ricordata localmente; default scuro. Scelta dichiarata: il tema è estetica del dispositivo, la lingua è identità dell'utente.
 
 ### Notifiche

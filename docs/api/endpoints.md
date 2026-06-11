@@ -18,7 +18,7 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 | Metodo | Path | Ruolo | Body / Query | Risposta | Note |
 |---|---|---|---|---|---|
 | GET | `/api/me` | 👤🛡 | — | `{id, username, role, locale, must_change_password}` | |
-| PATCH | `/api/me` | 👤🛡 | `{locale?}` | 200 | persiste la lingua (toggle in header) |
+| PATCH | `/api/me` | 👤🛡 | `{locale?}` | 200 | persiste la lingua (V1 English-only: unico valore accettato `en`, selettore non esposto) |
 | GET | `/api/me/alert-schedule` | 👤 | — | `AlertSchedule` | |
 | PUT | `/api/me/alert-schedule` | 👤 | `{scheduled_time, weekdays}` | 200 | weekdays []=off; cambia stato → effetti baseline dichiarati nella risposta |
 | GET | `/api/me/summary-config` | 👤 | — | `SummaryConfig` | |
@@ -129,6 +129,9 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 |---|---|---|---|---|
 | POST | `/api/admin/messages` | 🛡 | `{title, body, user_id?}` | body in **Markdown** (AEV-R7); invio a tutti gli utenti attivi (user_id assente) o a uno specifico; sempre in storico, consegna sui canali abilitati del destinatario |
 | GET | `/api/admin/messages` | 🛡 | `?page=` | messaggi inviati con esiti di consegna per destinatario/canale; mai lo stato letto/non letto (ADMSG-R5) |
+| GET | `/api/admin/message-templates` | 🛡 | — | catalogo completo: per ogni chiave default, placeholder dichiarati, eventuale override (ADMSG-R7) |
+| PUT | `/api/admin/message-templates/{key}` | 🛡 | `{title, body}` | imposta/aggiorna l'override (body Markdown; placeholder sconosciuti segnalati, ADMSG-R8) |
+| DELETE | `/api/admin/message-templates/{key}` | 🛡 | — | ripristina il default (cancella l'override, ADMSG-R9) |
 
 ## Health — [deployment](../infrastructure/deployment.md)
 

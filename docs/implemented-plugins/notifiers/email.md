@@ -17,7 +17,7 @@ Consegna digest e summary via **email (SMTP)**. È il canale di riferimento: fun
 
 - **Digest** (`alert_digest`): oggetto sintetico ("Watch 'Em All — N carrelli con novità"); corpo HTML con una sezione per carrello: badge degli eventi, tabella prodotti con provenienza (icona/nome scraper), prezzo prima → dopo, sconto, link; totali e barra soglia. Fallback text/plain.
 - **Summary** (`summary`): oggetto "Riepilogo periodico"; corpo con lo stato di tutti i carrelli.
-- Lingua: dai file `backend/locales/{it,en}.json` del plugin, secondo la lingua dell'utente.
+- Lingua: dai file `backend/i18n/` del plugin (V1: solo `en.json`), secondo la lingua dell'utente, con fallback su `en`.
 
 ## Errori e retry
 

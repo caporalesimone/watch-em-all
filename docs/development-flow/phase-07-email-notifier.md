@@ -16,7 +16,7 @@ L'admin configura l'SMTP dalla sua pagina; l'utente mette il suo indirizzo nel P
 
 - [ ] **7.B1 — Contratto notifier + dispatch** (~3h): `NotifierPlugin`, dispatch dai canali attivi con merge filtrato sullo schema utente, `alert_delivery` per-canale (delivered/failed/skipped) ([notifier-plugin](../3-features/plugins/notifier-plugin.md), [dispatch](../4-capabilities/core/alert-engine.md#consegna-ai-canali)). *Verifica: senza canali → `skipped_no_notifier` nello storico.*
 - [ ] **7.B2 — API config a due livelli** (~2h): endpoint admin/user dei notifier (whitelist chiavi per schema, `is_set` dei secret), flag `enabled` per-utente, `send_test` ([endpoints](../api/endpoints.md#notifier-utente--profile-and-notifiers)). *Verifica: chiave admin iniettata dall'utente → scartata.*
-- [ ] **7.B3 — Plugin Email** (~4h): invio SMTP (smtplib, STARTTLS), digest HTML + fallback testo con prezzi/provenienza/soglia, retry con backoff → `NotifierDeliveryError`, traduzioni backend it/en ([email](../implemented-plugins/notifiers/email.md)). *Verifica: email reale ricevuta e leggibile su un client comune.*
+- [ ] **7.B3 — Plugin Email** (~4h): invio SMTP (smtplib, STARTTLS), digest HTML + fallback testo con prezzi/provenienza/soglia, retry con backoff → `NotifierDeliveryError`, stringhe backend dietro chiavi i18n (V1: solo `en.json`) ([email](../implemented-plugins/notifiers/email.md)). *Verifica: email reale ricevuta e leggibile su un client comune.*
 
 ### Frontend
 

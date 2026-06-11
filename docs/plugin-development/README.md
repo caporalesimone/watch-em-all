@@ -22,12 +22,12 @@ src/plugins/<scrapers|notifiers>/<nome_plugin>/
 │   ├── __init__.py        # esporta l'istanza del plugin
 │   ├── plugin.py          # la classe (ScraperPlugin / NotifierPlugin)
 │   ├── routes.py          # router FastAPI del plugin (se serve)
-│   └── locales/           # solo notifier: testi delle notifiche (it.json, en.json)
+│   └── i18n/              # solo notifier: testi delle notifiche (V1: en.json, sempre presente)
 └── frontend/
     ├── index.ts           # export default { component }
     ├── *.svelte           # le tue pagine/componenti
     ├── assets/icon.svg    # icona del plugin (provenienza in UI)
-    └── locales/           # traduzioni UI (namespace dedicato)
+    └── i18n/              # traduzioni UI, namespace dedicato (V1: en.json, sempre presente)
 ```
 
 ## Il manifest
@@ -44,7 +44,7 @@ src/plugins/<scrapers|notifiers>/<nome_plugin>/
   "backend":  { "entry": "backend/__init__.py" },
   "frontend": { "entry": "frontend/index.ts",
                 "route_base": "/plugins/nome-plugin",
-                "locales": "frontend/locales" }
+                "i18n": "frontend/i18n" }
 }
 ```
 

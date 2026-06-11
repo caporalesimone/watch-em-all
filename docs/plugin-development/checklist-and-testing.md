@@ -39,7 +39,7 @@ class TestMioScraper(ScraperContractSuite):
 | Body Markdown reso via helper del contesto, degradato e mai bloccante | NOT-R8 |
 | `send_test` funziona con config minima valida | NOT-R6 |
 | Errore permanente → `NotifierDeliveryError` con messaggio non vuoto | NOT-R5 |
-| Traduzioni presenti per le lingue del core (it, en) | NOT-R4 |
+| `backend/i18n/en.json` presente e completo (fallback obbligatorio), tutte le stringhe dietro chiavi | NOT-R4 |
 
 ## Test propri del plugin (raccomandati)
 
@@ -49,7 +49,8 @@ class TestMioScraper(ScraperContractSuite):
 
 ## Checklist manuale di rilascio
 
-- [ ] Manifest completo (`api_version` corrente, icona, locales)
+- [ ] Manifest completo (`api_version` corrente, icona, cartelle i18n)
+- [ ] Cartelle `i18n/` con `en.json` presente e completo (è il fallback obbligatorio)
 - [ ] Dry-run dalla UI: risultati sensati, **nessuna riga scritta** (verifica con Adminer in dev)
 - [ ] Pagina utente: selezione → entry negli input; pagina admin: parametri + test funzionante
 - [ ] Run completa in dev: prodotti a catalogo, provenienza visibile nel Product Picker

@@ -43,6 +43,7 @@ Piccole deroghe (snippet di configurazione, esempi minimi per chiarezza) sono am
 - **Multi-tenant**: ogni dato operativo ha `user_id`; isolamento completo tra utenti.
 - **Pydantic ovunque**: tutti i modelli di I/O usano Pydantic v2.
 - **Config DB-first**: la configurazione operativa vive nel DB ed è editabile dalla UI; `config.yaml` solo per il bootstrap.
+- **English-first**: lo sviluppo avviene **in inglese**; alle traduzioni si penserà in futuro. L'impalcatura i18n è però obbligatoria fin dal primo giorno: ogni stringa statica vive dietro una chiave nelle cartelle **`i18n/`** (core e ogni singolo plugin), che inizialmente contengono il solo `en.json` — le lingue future si aggiungono lì. **`en.json` deve sempre esistere ed essere completo**: è il fallback quando una lingua di sistema manca. Mai stringhe cablate o costruite per concatenazione. Multilingua completo: [future improvement](future-improvements/platform.md).
 - **Ogni plugin è configurabile a due livelli**: amministratore (parametri di sistema, uguali per tutti) e utente (parametri personali).
 - **Requisiti con ID prefissati** (es. `CART-R3`, `CRON-R9`): citabili in commit, issue e test.
 

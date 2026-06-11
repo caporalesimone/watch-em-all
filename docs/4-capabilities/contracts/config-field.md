@@ -33,7 +33,7 @@ class ConfigField(BaseModel):
 ## Regole
 
 - **CFG-R1** — Ogni plugin espone `get_admin_config_schema()` e `get_user_config_schema()` come `list[ConfigField]`; il core genera i form dal solo schema.
-- **CFG-R2** — Le etichette sono **chiavi di traduzione** risolte nel namespace locales del plugin (frontend): i form sono multilingua senza testo cablato nel backend.
+- **CFG-R2** — Le etichette sono **chiavi di traduzione** risolte nel namespace i18n del plugin (frontend): i form sono multilingua senza testo cablato nel backend.
 - **CFG-R3** — Campi `secret`: mascherati, write-only — il server **non rispedisce mai** il valore; un valore già impostato è segnalato con un flag `is_set`, e l'assenza del campo nel salvataggio significa "non modificare".
 - **CFG-R4** — Validazione UI da `type`/`required`/`options`; la validazione **autoritativa** è nel backend del plugin.
 - **CFG-R5** — Al salvataggio della config **utente**, il backend **filtra le chiavi sullo schema utente** (chiavi estranee scartate e loggate): un utente non può iniettare chiavi admin. Stessa regola, simmetrica, per l'admin.

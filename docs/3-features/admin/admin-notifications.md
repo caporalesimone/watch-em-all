@@ -44,6 +44,25 @@ La garanzia chiave è ereditata dal design esistente (ALERT-R13: storico scritto
 - **ADMSG-R5** — L'admin vede l'elenco dei messaggi **che ha inviato** con gli **esiti di consegna** per destinatario e canale (consegnata / fallita / solo in-app). Non vede lo stato letto/non letto degli utenti né il resto del loro storico.
 - **ADMSG-R6** — Il messaggio inviato è **immutabile** (niente modifica o richiamo); un errore si corregge inviando un nuovo messaggio. La purge globale per data ([manutenzione](system-logs-and-maintenance.md)) si applica anche alle notifiche admin.
 
+## Messaggi di sistema personalizzabili
+
+I messaggi testuali che il **core** invia agli utenti (`system_message` — es. l'avviso di account disabilitato o marcato per cancellazione, USR-R11) non sono cablati: vivono in un **catalogo di template** che l'admin può personalizzare.
+
+- Ogni template ha una **chiave stabile** (es. `user.disabled`, `user.marked_for_deletion`), un **default** fornito dal core (in inglese, nei file di lingua come ogni stringa statica) e **placeholder dichiarati** (es. `{username}`).
+- La pagina admin mostra la **lista completa** dei template; per ciascuno: il default, l'eventuale **override** (stesso editor Markdown con anteprima live dei messaggi admin) e il **ripristino al default**.
+- Il sistema è **dinamico by design**: il DB persiste **solo gli override** — assenza di riga = default. Un nuovo messaggio aggiunto al core compare in lista da solo (nessuna migrazione); il ripristino è la cancellazione dell'override.
+
+### Risoluzione e cucitura di traduzione
+
+La risoluzione di un messaggio testuale segue sempre lo stesso ordine: **template (override se esiste, altrimenti default) → punto di traduzione → riempimento placeholder → storico + consegna**. Il *punto di traduzione* oggi restituisce il testo invariato (**V1 English-only**): è la cucitura dove un domani si innesta un traduttore per-lingua ([future improvement](../../future-improvements/platform.md)) — per questo i placeholder si riempiono **dopo**, così la traduzione resta una per lingua e mai una per utente.
+
+### Requisiti
+
+- **ADMSG-R7** — Catalogo dei messaggi di sistema: ogni template ha chiave stabile, default del core e placeholder dichiarati; la pagina admin li elenca tutti con stato (default/override).
+- **ADMSG-R8** — Override per-template con l'editor Markdown ad anteprima live; i placeholder disponibili sono mostrati nell'editor e un placeholder sconosciuto nell'override è segnalato (resta letterale, mai errore a runtime). Ripristino al default in un click.
+- **ADMSG-R9** — Persistenza **solo degli override** (assenza = default): l'aggiunta di un nuovo template al core non richiede migrazioni e appare automaticamente in lista.
+- **ADMSG-R10** — La risoluzione passa sempre dal **punto di traduzione** (V1: identità) **prima** del riempimento dei placeholder; il testo risolto è poi scritto in storico e consegnato — una sola risoluzione per destinatario, mai logica di formato nei call-site.
+
 ## Interazione con i poteri di governo dei canali
 
 L'admin **abilita o disabilita ogni notifier per tutti gli utenti** a runtime ([plugin-configuration](plugin-configuration.md), PCFG-R8) — speculare alla sospensione globale di uno scraper (SCHED-R2). Un canale disabilitato globalmente non consegna nulla, nemmeno i messaggi admin: in quel caso vale la garanzia dello storico in-app.

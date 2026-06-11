@@ -25,7 +25,7 @@
 
 ## i18n e formati
 
-- **FE-13** — Nessuna stringa cablata nei componenti: tutto da chiavi di traduzione (core o namespace del plugin). Lingue del core: `it`, `en` — ogni stringa nuova nasce in entrambe.
+- **FE-13** — Nessuna stringa cablata nei componenti: tutto da chiavi di traduzione nelle cartelle **`i18n/`** (core o namespace del plugin). **V1 spedisce solo `en`** (English-first): ogni stringa nuova nasce in `en.json`, che deve sempre esistere ed essere completo (è il **fallback** quando una lingua manca); le altre lingue sono riempimento futuro dei file, mai refactor. Mai costruire frasi per concatenazione di chiavi (l'ordine delle parole cambia tra lingue): sempre template interi con placeholder.
 - **FE-14** — Date con Day.js; prezzi formattati da un'unica utility (simbolo valuta, 2 decimali); attenzione alla convenzione weekday (0=lunedì dal backend ↔ `getDay()` JS parte da domenica: si mappa in un solo punto).
 
 ## Plugin frontend

@@ -18,8 +18,8 @@ Ogni plugin dichiara nel proprio `manifest.json` tutto ciò che il sistema deve 
 | `backend.entry` | Entry point Python | **Relativo alla cartella del plugin** |
 | `frontend.entry` | Entry point Svelte | Relativo; esporta il componente |
 | `frontend.route_base` | Base delle route del plugin | Unica fonte della route (l'entry non la ridichiara) |
-| `frontend.locales` | Cartella traduzioni frontend | Namespace dedicato per plugin |
-| `backend.locales` | Cartella traduzioni backend (notifier) | Testi delle notifiche nella lingua dell'utente |
+| `frontend.i18n` | Cartella traduzioni frontend | Namespace dedicato per plugin; `en.json` sempre presente (fallback) |
+| `backend.i18n` | Cartella traduzioni backend (notifier) | Testi delle notifiche nella lingua dell'utente; `en.json` sempre presente (fallback) |
 
 ## Discovery backend (web e worker, identica)
 
