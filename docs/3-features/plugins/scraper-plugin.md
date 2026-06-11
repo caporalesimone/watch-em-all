@@ -48,6 +48,9 @@ Un produttore **stateless** e **internamente mono-thread** di prodotti: legge i 
 ### Adjustments
 - **SCR-R13** — Lo scraper espone il calcolo degli **adjustments** per i carrelli a lui legati: dato il totale, restituisce le voci correttive secondo le regole del sito (sconti a soglia, spedizione). Il core le applica senza conoscerne la logica. Contratto: [adjustment](../../4-capabilities/contracts/adjustment.md).
 
+### Cancellazione dati utente
+- **SCR-R14** — Lo scraper implementa `delete_user_data(context, user_id)`: elimina **tutte** le righe di quell'utente dalle proprie tabelle (input, parametri personali), in modo **idempotente** (invocabile più volte senza errore). È invocato dal core durante il purge di un account, **prima** della cascata sui dati centrali ([user-management](../admin/user-management.md), USR-R10).
+
 ## Flusso di una run (vista contrattuale)
 
 ```mermaid

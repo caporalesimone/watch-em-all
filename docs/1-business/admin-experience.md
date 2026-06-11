@@ -12,6 +12,10 @@ L'amministratore installa il sistema (un comando, vedi la documentazione di [inf
 
 Non esiste auto-registrazione: è l'admin a creare ogni account, assegnando username e una password temporanea che l'utente dovrà cambiare al primo accesso. Dalla stessa pagina può disabilitare un account (con effetto immediato sulle sessioni) o reimpostarne la password.
 
+La **cancellazione è in due fasi**, come un cestino: "cancella" in realtà disattiva l'account e lo marca **in cancellazione** — nessun dato viene perso, e l'account può essere ritrovato e ripristinato (prima a disabilitato, poi riattivato). La perdita vera avviene solo con il **purge definitivo**: un'azione dedicata, irreversibile, sul singolo account o in blocco su tutti i marcati (con l'opzione "solo quelli in cancellazione da più di 30 giorni"). Al purge viene eliminato **tutto**: prima ogni plugin cancella i propri dati di quell'utente, poi il sistema elimina quelli centrali — cataloghi, carrelli, storici, recapiti dei canali.
+
+L'utente è avvisato con una notifica di cortesia quando viene disabilitato o marcato (sui suoi canali attivi: chi non ne ha non riceve nulla); il purge definitivo non avvisa nessuno. Se un utente disabilitato o in cancellazione prova a entrare, il sistema gli dice che l'accesso non è più possibile e di contattare l'amministratore.
+
 ## Governare gli scraper
 
 È la responsabilità più importante. Per ogni scraper installato l'admin decide:

@@ -25,6 +25,7 @@ class TestMioScraper(ScraperContractSuite):
 | Lista deduplicata con input sovrapposti | SCR-R8 |
 | `run_test` non invoca mai `update_catalog` né scrive su tabelle | SCR-R11 |
 | Tutto l'I/O di rete passa da `context.http` | CTX-R1 |
+| `delete_user_data` rimuove ogni riga dell'utente dalle tabelle del plugin, idempotente | SCR-R14 |
 | Schemi config validi (`ConfigField`), chiavi uniche | CFG-R1 |
 | `get_adjustments` restituisce `list[Adjustment]` coerente (0 ok) | SCR-R13 |
 | Manifest valido (campi, path relativi, icona esistente) | manifest-reference |

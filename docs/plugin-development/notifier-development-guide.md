@@ -15,6 +15,10 @@ class MioNotifier(NotifierPlugin):
     def initialize(self, context: PluginContext) -> None:
         ...   # di solito niente tabelle: la config la persiste il core
 
+    # delete_user_data(context, user_id): default no-op della base — va implementato
+    # SOLO se crei tabelle tue con dati per-utente (i recapiti in notifier_user_config
+    # li cancella il core durante il purge dell'account)
+
     def send(self, notification: AlertEvent | SummaryReport | TextMessageEvent,
              config: dict, locale: str) -> None:
         # config = merge admin+utente GIÀ fatto (e filtrato) dal core

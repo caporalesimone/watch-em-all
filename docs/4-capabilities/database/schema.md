@@ -8,7 +8,7 @@ Motore **PostgreSQL 16**, accesso via SQLAlchemy, validazione I/O Pydantic v2. S
 
 | Tabella | Colonne | Note |
 |---|---|---|
-| `users` | id, username **UNIQUE**, password_hash, role (`admin`\|`user`), is_active, locale, must_change_password, token_version, refresh_jti, created_at | [auth](../core/auth.md): refresh_jti = ultimo refresh emesso (rotazione); token_version = invalidazione globale |
+| `users` | id, username **UNIQUE**, password_hash, role (`admin`\|`user`), is_active, deletion_marked_at (timestamptz, null), locale, must_change_password, token_version, refresh_jti, created_at | [auth](../core/auth.md): refresh_jti = ultimo refresh emesso (rotazione); token_version = invalidazione globale; deletion_marked_at ≠ null = in cancellazione (sempre con is_active=false; USR-R7) |
 
 ## Catalogo e storico
 
@@ -55,7 +55,7 @@ Naming `plugin_<nomeplugin>_<nometabella>` (underscore: gli identificatori SQL c
 ## Regole trasversali
 
 - **DB-R1** — Ogni tabella operativa ha `user_id`: ogni query applicativa filtra per l'utente del token (multi-tenancy).
-- **DB-R2** — Cancellazione utente → cascata completa dei suoi dati.
+- **DB-R2** — Purge di un utente → cascata completa dei suoi dati core, **dopo** che ogni plugin ha eliminato i propri (`delete_user_data`, in sequenza; solo se tutti completano si procede — USR-R10). La marcatura "in cancellazione" non elimina nulla.
 - **DB-R3** — Serializzazione nei campi `*_json`: `Decimal` come stringa, `datetime` ISO-8601 UTC; i confronti "è cambiato?" avvengono sul dato deserializzato.
 - **DB-R4** — **Migrazioni V1**: schema additivo con `CREATE ... IF NOT EXISTS`; per i breaking change, script SQL manuali documentati nel changelog — **mai** drop&recreate dell'intero schema: `price_history` non è ricostruibile. (Alembic: [future improvement](../../future-improvements/README.md).)
 - **DB-R5** — Backup: dump del DB o snapshot del volume, responsabilità dell'host ([deployment](../../infrastructure/deployment.md)).

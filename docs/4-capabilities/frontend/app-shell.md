@@ -49,7 +49,7 @@ src/frontend/src/
 | Pagina | Responsabilità |
 |---|---|
 | Dashboard di sistema | statistiche globali e ranking per utente — solo aggregati, mai contenuti ([admin-dashboard](../../3-features/admin/admin-dashboard.md)) |
-| Utenti | CRUD account, reset password, disabilitazione |
+| Utenti | CRUD account, reset password, icone abilita/disabilita e cancella (soft), toggle vista "in cancellazione" con ripristino, purge definitivo e bulk delete (tutti / >30gg) |
 | Scheduler scrapers | slot 1..N per scraper, sospensione, impostazioni globali (pool, timeout, retention) |
 | Monitoraggio scrapers | ultima run, trend, elenco run, drill-down per utente |
 | Config plugin | pagine admin dei plugin (form dinamici + Test Scraper / test canale) |

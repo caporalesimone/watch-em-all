@@ -12,7 +12,7 @@ Le notifiche hanno **due categorie**, e per ora solo due:
 
 | Categoria | Origine | Tipi (`kind`) |
 |---|---|---|
-| **Sistema** | generate dal motore (alert engine, summary, messaggi testuali del core) | `alert_digest`, `summary`, `system_message` |
+| **Sistema** | generate dal motore (alert engine, summary, messaggi testuali del core — es. avviso di account disabilitato o marcato per cancellazione, USR-R11) | `alert_digest`, `summary`, `system_message` |
 | **Admin** | scritte da un amministratore | `admin_message` |
 
 I messaggi testuali — admin (`admin_message`) e di sistema (`system_message`) — condividono lo **stesso payload** (titolo + body) e la stessa pipeline di render: il body è **Markdown** ([alert-event](../../4-capabilities/contracts/alert-event.md), AEV-R7), reso da ogni canale tramite gli helper del core. Una sola macchina di formattazione per tutto ciò che è testo.

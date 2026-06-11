@@ -84,11 +84,14 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 
 | Metodo | Path | Ruolo | Body | Note |
 |---|---|---|---|---|
-| GET | `/api/admin/users` | 🛡 | — | elenco con stato |
+| GET | `/api/admin/users` | 🛡 | `?pending=true` | elenco con stato e data marcatura; pending=true → solo account in cancellazione |
 | POST | `/api/admin/users` | 🛡 | `{username, role, temp_password}` | must_change_password attivo |
-| PATCH | `/api/admin/users/{id}` | 🛡 | `{is_active?, role?}` | disabilitazione → invalidazione token |
+| PATCH | `/api/admin/users/{id}` | 🛡 | `{is_active?, role?}` | disabilitazione → invalidazione token + notifica di cortesia (USR-R11) |
 | POST | `/api/admin/users/{id}/reset-password` | 🛡 | `{temp_password}` | + cambio forzato + invalidazione |
-| DELETE | `/api/admin/users/{id}` | 🛡 | — | cascata completa; conferma lato UI |
+| DELETE | `/api/admin/users/{id}` | 🛡 | — | **soft**: disattiva + marca in cancellazione, notifica di cortesia; nessun dato eliminato (USR-R7) |
+| POST | `/api/admin/users/{id}/restore` | 🛡 | — | in cancellazione → disabilitato (mai direttamente attivo, USR-R8) |
+| DELETE | `/api/admin/users/{id}/purge` | 🛡 | — | **definitivo, irreversibile**: plugin prima, core dopo (USR-R10); nessuna notifica |
+| POST | `/api/admin/users/purge` | 🛡 | `{scope: "all"\|"older_than_30d"}` | bulk delete dei marcati; stesso ordine per ciascuno; esiti per utente |
 
 ## Admin — scraper e sistema
 

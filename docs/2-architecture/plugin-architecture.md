@@ -14,6 +14,7 @@ classDiagram
         <<abstract>>
         initialize(context)
         register_routes(router)
+        delete_user_data(context, user)
     }
     class ScraperPlugin {
         <<abstract>>
@@ -38,6 +39,8 @@ classDiagram
 ```
 
 I plugin concreti (un esempio di scraper reale e i notifier email/Discord) sono documentati a parte in [implemented-plugins/](../implemented-plugins/): **tutta la documentazione generica descrive solo i contratti astratti**, senza dipendere da alcun sito o canale reale.
+
+`delete_user_data(context, user)` è il gancio del **purge utente** ([user-management](../3-features/admin/user-management.md), USR-R10): ogni plugin elimina **idempotentemente** le righe di quell'utente dalle proprie tabelle. Default no-op nella base (molti notifier non hanno tabelle); chi possiede dati per-utente **deve** implementarlo — il core non conosce le tabelle dei plugin e non può farlo al posto loro.
 
 ## Integrazione dinamica — backend
 
