@@ -104,6 +104,13 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 | GET | `/api/admin/logs` | 🛡 | `?since=<id>&level=&source=` | polling incrementale: righe con id > since |
 | DELETE | `/api/admin/alerts` | 🛡 | `?before=<date>` | purge globale storico alert per data |
 
+## Admin — dashboard di sistema — [admin-dashboard](../3-features/admin/admin-dashboard.md)
+
+| Metodo | Path | Ruolo | Body / Query | Note |
+|---|---|---|---|---|
+| GET | `/api/admin/dashboard` | 🛡 | `?days=30` | statistiche globali: dimensione (utenti, prodotti, carrelli, storico), run e richieste HTTP del periodo, notifiche con esiti aggregati |
+| GET | `/api/admin/dashboard/users` | 🛡 | `?days=30&sort=` | ranking per utente: dati caricati, carico per scraper (richieste, durate), notifiche per canale — solo conteggi e metadati, mai contenuti (DASH-R6) |
+
 ## Admin — notifier (config di sistema)
 
 | Metodo | Path | Ruolo | Body | Note |

@@ -25,7 +25,7 @@ src/frontend/src/
 
 - **Sidebar sinistra persistente**: Dashboard · Product Picker · Carrelli · Storico prezzi · Storico alert (badge non letti) · Profilo · *(separatore)* · gruppo **SCRAPERS** collassabile (default aperto), **ultimo** così cresce senza spostare le voci core; voci dinamiche da `GET /api/plugins` con icona e route del plugin.
 - **Header**: toggle tema e lingua. I notifier **non** sono in nav (stanno in Profilo).
-- **Area admin**: sezione separata visibile solo con ruolo admin (utenti, scheduler, monitoraggio, config plugin, log, impostazioni).
+- **Area admin**: sezione separata visibile solo con ruolo admin (dashboard di sistema, utenti, scheduler, monitoraggio, config plugin, log, impostazioni).
 
 ## Tema e lingua
 
@@ -48,6 +48,7 @@ src/frontend/src/
 
 | Pagina | Responsabilità |
 |---|---|
+| Dashboard di sistema | statistiche globali e ranking per utente — solo aggregati, mai contenuti ([admin-dashboard](../../3-features/admin/admin-dashboard.md)) |
 | Utenti | CRUD account, reset password, disabilitazione |
 | Scheduler scrapers | slot 1..N per scraper, sospensione, impostazioni globali (pool, timeout, retention) |
 | Monitoraggio scrapers | ultima run, trend, elenco run, drill-down per utente |

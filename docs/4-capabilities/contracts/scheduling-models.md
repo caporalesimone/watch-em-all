@@ -65,6 +65,7 @@ class ScrapeUserLog(BaseModel):        # UNA riga per utente per run
     products_found: int
     products_new: int
     price_changes: int
+    http_requests: int                 # quota della run attribuita a questo utente
     status: Literal["ok", "error"]
     error_message: str | None
 ```

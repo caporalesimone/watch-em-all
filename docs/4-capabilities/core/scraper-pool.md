@@ -13,7 +13,7 @@ Eseguire le run degli scraper **in parallelo tra loro** (mai internamente) entro
 - **POOL-R3** — Un job esegue: apertura `scrape_run` → iterazione utenti (`run_for_user`) con riga `scrape_user_log` per ciascuno → chiusura run con contatori, stato e durata wall-clock.
 - **POOL-R4** — **Timeout**: oltre `scraper_run_timeout` il job è terminato e la run marcata `timeout`. Il lock è sempre rilasciato (anche su errore: try/finally; gli advisory lock decadono comunque con la sessione).
 - **POOL-R5** — L'errore su un utente non ferma gli altri: la run prosegue e chiude `partial`.
-- **POOL-R6** — Il client HTTP del contesto impone il **ritardo di politeness** per-scraper e **conta le richieste** della run (`http_requests`).
+- **POOL-R6** — Il client HTTP del contesto impone il **ritardo di politeness** per-scraper e **conta le richieste** della run (`http_requests`), attribuendole anche all'utente in lavorazione (la run è mono-thread: un utente alla volta).
 - **POOL-R7** — Lo scrape-now (web) esegue un job ridotto a un solo utente, con stessi lock, timeout e record (trigger `manual`).
 
 ## Pseudocodice del job
@@ -53,7 +53,7 @@ def scraper_job(scraper_id, slot, only_user=None, trigger="scheduled"):
 | `users_processed` | numero di `scrape_user_log` |
 | `products_found / new / removed`, `price_changes` | restituiti dal Catalog Update Service per ogni `update_catalog` e sommati |
 | `products_excluded` | dichiarati dal plugin (esclusioni specifiche del sito) |
-| `http_requests` | client HTTP instrumentato (POOL-R6) |
+| `http_requests` | client HTTP instrumentato (POOL-R6); contato anche per-utente su `scrape_user_log` |
 | durata | `finished_at − started_at` (wall-clock) |
 
 ## Note implementative

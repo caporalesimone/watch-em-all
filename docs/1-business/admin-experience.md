@@ -30,6 +30,12 @@ L'admin ha bisogno di sapere **quanto lavorano** gli scraper e **se stanno bene*
 - il **registro di sistema** in tempo quasi reale: esecuzioni, recuperi dopo un fermo, esecuzioni saltate perché la precedente era ancora in corso, errori — con filtri per gravità e per origine;
 - un segnale di **vita del motore di pianificazione**: se il componente che orchestra le esecuzioni si ferma, l'admin lo vede subito.
 
+## Misurare il carico
+
+Accanto alla salute degli scraper, l'admin ha una **dashboard con i numeri dell'installazione**: quanti prodotti e carrelli esistono in totale, quali utenti hanno caricato più dati, quanto carico genera ciascun utente su ogni scraper (richieste verso i siti, tempi di lavorazione), e quante notifiche escono dal sistema — in totale, per utente e per canale, con le medie del periodo.
+
+Sono sempre e soltanto numeri: la dashboard dice che un utente ha trecento prodotti e quattro carrelli, **mai quali**. Serve a capire chi e cosa fa lavorare il sistema, e a regolare di conseguenza orari, limiti e — quando serve — una conversazione con l'utente dalla configurazione esagerata.
+
 ## Configurare i canali di notifica
 
 I canali di consegna (email, Discord…) hanno due livelli di configurazione: l'admin imposta la parte **di sistema** (ad esempio il server di posta in uscita e le sue credenziali), ogni utente aggiunge la propria parte **personale** (il proprio indirizzo). Senza la parte di sistema il canale non è utilizzabile da nessuno; l'interfaccia lo segnala.
@@ -42,4 +48,4 @@ I canali di consegna (email, Discord…) hanno due livelli di configurazione: l'
 
 ## Cosa l'admin non può fare
 
-Non vede i carrelli, i cataloghi né le notifiche degli utenti. Configura il sistema, non i contenuti. Se serve aiutare un utente, lo fa guidandolo — non entrando nei suoi dati.
+Non vede i carrelli, i cataloghi né le notifiche degli utenti: dei loro dati conosce **solo i numeri** (quanti prodotti, quanti carrelli, quante notifiche — la dashboard del carico), mai i contenuti. Configura il sistema, non i contenuti. Se serve aiutare un utente, lo fa guidandolo — non entrando nei suoi dati.

@@ -30,13 +30,14 @@ erDiagram
         int user "quale utente"
         datetime started_finished "durata per utente"
         int found_new_changed "contatori per utente"
+        int http_requests "richieste attribuite all'utente"
         string status "ok / partial / error"
         string error "messaggio se fallito"
     }
 ```
 
 - La **durata della run è wall-clock** (inizio→fine reale), non la somma dei tempi per utente.
-- `http_requests` è contato dal client HTTP del core (il plugin non deve fare nulla): è la misura diretta del carico imposto al sito, quella che l'admin guarda per regolare politeness e numero di slot.
+- `http_requests` è contato dal client HTTP del core (il plugin non deve fare nulla): è la misura diretta del carico imposto al sito, quella che l'admin guarda per regolare politeness e numero di slot. È contato anche **per utente** (la run processa un utente alla volta): è la base del ranking di carico nella [dashboard di sistema](admin-dashboard.md).
 - Semantica degli stati: `ok` = tutti gli utenti processati; `partial` = almeno un utente ok e almeno uno fallito; `error` = nessun utente completato; `timeout` = terminata dal sistema oltre il tempo massimo.
 
 ## Pagina di monitoraggio

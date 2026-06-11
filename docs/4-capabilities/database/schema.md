@@ -43,7 +43,7 @@ Motore **PostgreSQL 16**, accesso via SQLAlchemy, validazione I/O Pydantic v2. S
 |---|---|---|
 | `scraper_schedule` | scraper_id PK, times (time[]), enabled, last_slot (timestamptz) | 1..N slot/giorno; last_slot = ultimo slot eseguito |
 | `scrape_run` | run_id, scraper_id, trigger, slot, started_at, finished_at, status, users_processed, products_found, products_new, price_changes, products_removed, products_excluded, http_requests, error_message | una riga per run; INDEX (scraper_id, started_at); retention |
-| `scrape_user_log` | run_id FK **CASCADE**, user_id, started_at, finished_at, products_found, products_new, price_changes, status, error_message | dettaglio per utente; retention |
+| `scrape_user_log` | run_id FK **CASCADE**, user_id, started_at, finished_at, products_found, products_new, price_changes, http_requests, status, error_message | dettaglio per utente; http_requests attribuite all'utente in lavorazione (run mono-thread); retention |
 | `system_settings` | key PK, value_json, updated_at | impostazioni runtime ([SystemSettings](../contracts/scheduling-models.md)); seed dei default al primo avvio |
 | `system_log` | id (PK incrementale, cursore del polling), created_at, level, source (`worker`\|`scraper`\|`notifier`\|`alert`\|`summary`), message, context_json | INDEX (id); retention; mai contenuti operativi degli utenti |
 
