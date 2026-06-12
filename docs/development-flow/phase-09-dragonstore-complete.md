@@ -28,6 +28,7 @@ Incolli l'URL di una categoria, vedi l'anteprima in dry-run, confermi: decine di
 - [ ] Monitoraggio per categoria operativo nelle run schedulate, con contatori coerenti nel monitoring.
 - [ ] I punti aperti DRG-Q1..Q7 risolti o aggiornati nella doc del plugin.
 - [ ] Idempotenza confermata anche con categorie (seconda run senza cambi → zero delta).
+- [ ] [docs-eng](../../docs-eng/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti
 

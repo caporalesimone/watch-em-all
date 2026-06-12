@@ -31,6 +31,7 @@ Chiudere il perimetro della v1: il secondo canale di notifica (che dimostra la b
 - [ ] I due [use case fondanti](../1-business/use-cases.md) girano end-to-end su installazione pulita, su entrambi i canali (lingua: `en`, English-first).
 - [ ] CI completa verde; checklist plugin passata da Dragon Store, Email e Discord.
 - [ ] Tutte le checkbox di questo flusso spuntate: la v1 è chiusa.
+- [ ] [docs-eng](../../docs-eng/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti
 

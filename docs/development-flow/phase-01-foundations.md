@@ -27,12 +27,17 @@ Lo scheletro vivo: stack su Docker, database, autenticazione, shell della SPA. T
 ### Trasversali
 
 - [ ] **1.T1 — CI minima** (~2h): GitHub Actions con ruff, mypy, eslint/svelte-check, build frontend ([ci](../infrastructure/ci.md)). *Verifica: PR con errore di lint → rossa.*
+- [ ] **1.T2 — Dev container** (~2h): `.devcontainer/` (Dockerfile con Python 3.12+Poetry, Node LTS+npm, git, docker CLI; socket Docker dell'host; devcontainer.json con forward 8080/8081) ([dev-container](../infrastructure/dev-container.md), INF-15). *Verifica: "Reopen in Container" su host con solo Docker → poetry/npm/compose funzionano da dentro; nessuna toolchain richiesta sull'host.*
+- [ ] **1.T3 — Script backup/export/restore** (~2h): `ops/backup.sh`, `ops/export.sh`, `ops/restore.sh` montati nel container `db`, mount di `backups/` (gitignorata) e dei file di bootstrap ([backup-and-restore](../infrastructure/backup-and-restore.md), INF-16). *Verifica: backup → `down -v` → `up` → restore → login con gli stessi dati e config; restore con stack web/worker attivo → rifiuta.*
 
 ## Definition of Done
 
 - [ ] Da zero: `cp .env.example .env` + compose up + login + cambio password, senza toccare altro.
+- [ ] Su un host Linux/WSL2 con il **solo Docker** si sviluppa (dev container) e si hosta: nessun altro software richiesto (INF-15).
+- [ ] Il ciclo backup → distruzione volume → restore riproduce un'installazione identica.
 - [ ] Swagger mostra Auth/Me/Health con modelli tipizzati.
 - [ ] CI verde su `main`.
+- [ ] [docs-eng](../../docs-eng/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti
 

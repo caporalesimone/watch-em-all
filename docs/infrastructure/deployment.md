@@ -2,6 +2,10 @@
 
 > **Infrastruttura** · Audience: DevOps, system engineer. Snippet di configurazione ammessi (deroga dichiarata alle regole di layer).
 
+## Requisiti dell'host
+
+Il portale è hostato su **Linux**: in locale dentro **WSL2** oppure su un **server dedicato**. L'unico prerequisito è **Docker Engine + Compose plugin** — sull'host non si installa alcun software di sviluppo o runtime (niente Python, Node, psql: tutto vive nei container, INF-15). Per lo sviluppo vale lo stesso principio tramite il [dev container](dev-container.md); le immagini di hosting sono multi-stage e autosufficienti (frontend buildato dentro l'immagine `web`, INF-5).
+
 ## Servizi
 
 | Servizio | Ruolo | Esposizione |
@@ -23,7 +27,12 @@ services:
       POSTGRES_USER: "${POSTGRES_USER}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
       POSTGRES_DB: "${POSTGRES_DB}"
-    volumes: ["pgdata:/var/lib/postgresql/data"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./ops:/ops:ro                    # script di backup/export/restore (backup-and-restore.md)
+      - ./backups:/backups               # destinazione archivi (gitignorata)
+      - ./config.yaml:/host/config.yaml:ro
+      - ./.env:/host/.env:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
@@ -103,15 +112,17 @@ watchemall.example.com {
 }
 ```
 
-## Backup
+## Backup, export e ripristino
 
-L'unico dato non ricostruibile è il DB (in particolare lo **storico prezzi**). Backup consigliato, a cura dell'host:
+Script versionati in `ops/`, montati nel container `db` ed eseguiti **a mano** — dettagli, regole e cosa contengono gli archivi in [backup-and-restore.md](backup-and-restore.md):
 
 ```bash
-docker compose exec db pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" | gzip > backup-$(date +%F).sql.gz
+docker compose exec db /ops/backup.sh        # archivio completo: dump + config.yaml + .env
+docker compose exec db /ops/export.sh        # dump SQL leggibile, per ispezione/migrazione
+docker compose exec db /ops/restore.sh /backups/watchemall-backup-<data>.tar.gz
 ```
 
-In cron settimanale (o quotidiano se lo storico è prezioso). In alternativa: snapshot del volume `pgdata` a stack fermo.
+Il dump copre **anche tutte le configurazioni** (config DB-first). Cadenza consigliata: settimanale, quotidiana se lo storico è prezioso (un cron dell'host che invoca `backup.sh` è sufficiente).
 
 ## Aggiornamenti e plugin
 

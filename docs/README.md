@@ -22,12 +22,13 @@ Piccole deroghe (snippet di configurazione, esempi minimi per chiarezza) sono am
 | Sezione | Contenuto | Audience |
 |---|---|---|
 | [`api/`](api/) | Convenzioni API, integrazione Swagger, **catalogo completo degli endpoint** | Developer, integratori |
-| [`infrastructure/`](infrastructure/) | Deployment Docker, configurazione, build system, CI | DevOps, system engineer |
+| [`infrastructure/`](infrastructure/) | Deployment Docker, dev container, configurazione, build system, backup/restore, CI | DevOps, system engineer |
 | [`plugin-development/`](plugin-development/) | Guida per chi sviluppa nuovi plugin (scraper e notifier) | Plugin developer |
 | [`implemented-plugins/`](implemented-plugins/) | Documentazione dei plugin reali: Dragon Store, Email, Discord | Developer |
 | [`developer-rules/`](developer-rules/) | Regole di codice e qualità: backend, frontend, infrastruttura, plugin, docs | Tutti i developer |
 | [`development-flow/`](development-flow/README.md) | Il piano di sviluppo per piccoli MVP: fasi ordinate, checkbox di avanzamento | Developer, owner |
 | [`future-improvements/`](future-improvements/) | Miglioramenti rimandati, con motivazione e prerequisiti | Architetti, owner |
+| [`../docs-eng/`](../docs-eng/) | **Documentazione inglese incrementale**: l'equivalente di `docs/` per la sola parte implementata, aggiornata alla chiusura di ogni fase (DOC-12) | Developer, utenti internazionali |
 
 ## Percorsi di lettura consigliati
 

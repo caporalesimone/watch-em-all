@@ -11,6 +11,7 @@
 5. Se durante una fase emerge lavoro non previsto: o è un MVP nuovo nella fase giusta, o un [future improvement](../future-improvements/README.md). Mai scope-creep silenzioso.
 6. Le stime sono in ore di sviluppo concentrato; sforare non è un dramma, **spezzare l'MVP sì** (significa che era troppo grosso).
 7. In ogni fase gli MVP sono separati in **Backend** (`N.B*`), **Frontend** (`N.F*`) ed eventuali **Trasversali** (`N.T*`). Gli MVP frontend dipendono dagli endpoint dei corrispondenti backend, ma possono partire in parallelo sviluppando contro il contratto documentato in [api/endpoints.md](../api/endpoints.md) (l'API nasce nel catalogo prima dell'implementazione).
+8. **Docs inglesi a fine fase** (DOC-12): la chiusura di una fase include l'aggiornamento di `docs-eng/` (root del repo) con l'equivalente inglese della documentazione della **sola parte implementata**, stessa alberatura di `docs/`. È un item della Definition of Done di ogni fase.
 
 ## Avanzamento
 

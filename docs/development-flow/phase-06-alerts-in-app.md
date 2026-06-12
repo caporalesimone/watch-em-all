@@ -31,6 +31,7 @@ Attivi gli alert su un carrello, un prezzo cambia, e all'orario scelto trovi nel
 - [ ] Scenario completo: abilita alert → scrape cambia un prezzo → all'orario di cadenza il digest è nello storico, una sola notifica per quanti carrelli ci siano.
 - [ ] Nessuna ripetizione: run successiva senza cambi → nessuna notifica.
 - [ ] Il digest contiene tutto per decidere (ALERT-R7): prezzi, provenienza, soglia.
+- [ ] [docs-eng](../../docs-eng/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti
 

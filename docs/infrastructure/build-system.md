@@ -6,6 +6,7 @@
 
 ```
 watch-em-all/
+├── .devcontainer/   # ambiente di sviluppo zero-install (dev-container.md)
 ├── src/
 │   ├── core/        # moduli core backend
 │   ├── web/         # app FastAPI (API + static SPA)
@@ -17,6 +18,10 @@ watch-em-all/
 ├── packages/
 │   ├── web/         # pyproject.toml + Dockerfile del container web
 │   └── worker/      # pyproject.toml + Dockerfile del container worker
+├── ops/             # script backup/export/restore (backup-and-restore.md)
+├── backups/         # archivi prodotti dagli script (gitignorata)
+├── docs/            # documentazione di progetto (italiano, source of truth)
+├── docs-eng/        # documentazione inglese incrementale (DOC-12)
 ├── config.yaml
 └── .env(.example)
 ```

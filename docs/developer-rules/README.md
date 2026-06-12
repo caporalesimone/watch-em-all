@@ -20,3 +20,5 @@
 4. **API-first**: un endpoint nuovo nasce in [api/endpoints.md](../api/endpoints.md) prima dell'implementazione.
 5. **Niente TODO anonimi**: ogni `TODO` nel codice ha un riferimento (issue o punto aperto documentato).
 6. **Le semplificazioni si dichiarano**: questo è un hobby project e le leggerezze sono ammesse ([security posture](../2-architecture/security-posture.md)) — ma sempre per iscritto, mai implicite.
+7. **Docs inglesi a fine fase**: alla chiusura di ogni fase del [development flow](../development-flow/README.md), `docs-eng/` si aggiorna con l'equivalente inglese della sola parte implementata (DOC-12) — la documentazione inglese cresce insieme al sito.
+8. **Zero-install**: niente software di sviluppo sull'host, di dev o di hosting — solo Docker; si sviluppa nel [dev container](../infrastructure/dev-container.md) (INF-15).
