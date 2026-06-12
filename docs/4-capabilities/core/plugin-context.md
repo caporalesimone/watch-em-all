@@ -59,7 +59,7 @@ Consegna per-utente della lista corrente di [Product](../contracts/product.md); 
 
 ## `config`
 
-Solo la sezione **admin** del plugin (persistita nel DB e gestita dalla UI admin via [ConfigField](../contracts/config-field.md)); i parametri di sistema riservati (politeness, timeout, emivita della cache) sono letti dal core, non dal plugin. La config **utente** degli scraper vive nelle tabelle del plugin; quella dei notifier arriva già mergeata alla `send()`.
+Solo la sezione **admin** del plugin (persistita nelle tabelle core `scraper_admin_config`/`notifier_admin_config` e gestita dalla UI admin via [ConfigField](../contracts/config-field.md)); i parametri di sistema riservati (politeness, timeout, emivita della cache) stanno nella stessa riga ma sono letti dal core, non dal plugin. La config **utente** degli scraper vive nelle tabelle del plugin; quella dei notifier arriva già mergeata alla `send()`.
 
 ## `markdown`
 
