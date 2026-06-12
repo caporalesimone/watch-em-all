@@ -19,7 +19,7 @@
 
 ## Dipendenze
 
-- **INF-10** — Backend: Poetry con lock committato; dipendenze nuove motivate nella PR (preferire la standard library quando ragionevole — es. l'invio SMTP). Dipendenze dei plugin nei gruppi opzionali dei package `web`/`worker`.
+- **INF-10** — Backend: **un solo `pyproject.toml` alla root** con **un solo `poetry.lock` committato** (niente lockfile per-package: web e worker condividono l'ambiente e i plugin); dipendenze nuove motivate nella PR (preferire la standard library quando ragionevole — es. l'invio SMTP). Dipendenze dei plugin in **gruppi opzionali** del pyproject unico, installati dai Dockerfile che li servono.
 - **INF-11** — Frontend: `package-lock.json` committato; niente dipendenze UI che dupplicano il design system.
 - **INF-12** — Aggiornamenti di dipendenze in PR dedicate (non mescolati alle feature).
 

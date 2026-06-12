@@ -102,4 +102,4 @@ Sotto `/api/plugins/dragon-store` ([convenzione](../../api/endpoints.md#rotte-pl
 | DRG-Q6 | Spese di spedizione come adjustment | da decidere (regole del negozio da leggere) |
 | DRG-Q7 | La scheda prodotto (`.gp`) espone JSON-LD `Product`? (parsing più robusto del DOM) | nuovo — da verificare nello studio ad hoc |
 
-> "Chiuso (provvisorio)" = verificato su una pagina campione: lo studio ad hoc pre-implementazione deve confermarlo su più categorie e sulla scheda prodotto. Se servisse il browser headless, la dipendenza va dichiarata nei `pyproject.toml` dei package `web` e `worker` ([build-system](../../infrastructure/build-system.md)); il vincolo di mono-thread resta.
+> "Chiuso (provvisorio)" = verificato su una pagina campione: lo studio ad hoc pre-implementazione deve confermarlo su più categorie e sulla scheda prodotto. Se servisse il browser headless, la dipendenza va dichiarata in un gruppo opzionale del `pyproject.toml` unico alla root ([build-system](../../infrastructure/build-system.md)); il vincolo di mono-thread resta.

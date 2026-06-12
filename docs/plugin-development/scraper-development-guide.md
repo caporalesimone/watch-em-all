@@ -92,7 +92,7 @@ Se lo stesso prodotto emerge da più input (un URL singolo + una categoria che l
 
 - Solo `context.http`: cadenza (politeness), timeout, retry, **conteggio richieste** e **cache di scrape** (CTX-R9: una `get` ripetuta entro l'emivita arriva dalla cache, senza toccare il sito — per te è invisibile) sono gestiti lì. Se usi una libreria tua, rompi il monitoraggio, la cache e le regole di buona educazione.
 - Pagina per pagina, con calma: il tuo job è mono-thread per contratto. Anche il sistema esegue gli scraper uno alla volta, ciascuno al proprio orario: nessun parallelismo, né dentro né fuori.
-- Browser headless: lecito se il sito lo richiede (dichiara la dipendenza nei package `web`/`worker`); resta il vincolo di sequenzialità.
+- Browser headless: lecito se il sito lo richiede (dichiara la dipendenza in un gruppo opzionale del `pyproject.toml` unico alla root); resta il vincolo di sequenzialità.
 
 ## La tua UI
 

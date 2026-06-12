@@ -16,8 +16,8 @@ watch-em-all/
 │       ├── scrapers/<nome>/   # manifest.json, backend/, frontend/
 │       └── notifiers/<nome>/
 ├── packages/
-│   ├── web/         # pyproject.toml + Dockerfile del container web
-│   ├── worker/      # pyproject.toml + Dockerfile del container worker
+│   ├── web/         # Dockerfile + entrypoint del container web
+│   ├── worker/      # Dockerfile + entrypoint del container worker
 │   └── ops/         # Dockerfile dell'immagine ops (postgres:16 + script)
 ├── ops/             # script backup/export/restore (backup-and-restore.md)
 ├── deploy/
@@ -26,13 +26,16 @@ watch-em-all/
 ├── docs/            # documentazione di progetto (italiano, source of truth)
 ├── docs-eng/        # documentazione inglese incrementale (DOC-12)
 ├── docker-compose.yml  # compose di sviluppo (build: dai sorgenti)
+├── pyproject.toml   # UNICO, alla root: dipendenze backend + gruppi opzionali
+├── poetry.lock      # un solo lockfile per tutto il backend
 ├── config.yaml      # default, cucinato nelle immagini; override locale via mount
 └── .env(.example)
 ```
 
 Le **immagini pubblicate** (`watch-em-all-web`, `-worker`, `-ops`) sono buildate e pushate su GHCR dal workflow di publish a ogni tag ([ci](ci.md)); l'utente finale installa con il solo deploy kit, senza sorgenti ([deployment](deployment.md), INF-17).
 
-- I **plugin non sono package** formali: cartelle auto-scoperte dal registry. Le loro dipendenze Python (es. un browser headless) si dichiarano nel `pyproject.toml` dei package che li caricano (`web` e `worker`), in gruppo opzionale.
+- **Un solo `pyproject.toml` alla root** (un solo `poetry.lock`): `web` e `worker` condividono lo stesso ambiente Python e caricano gli stessi plugin, quindi le dipendenze sono uniche — un secondo lockfile creerebbe solo drift da tenere allineato a mano. I Dockerfile dei package installano dalla root, ciascuno selezionando i **gruppi opzionali** che gli servono.
+- I **plugin non sono package** formali: cartelle auto-scoperte dal registry. Le loro dipendenze Python (es. un browser headless) si dichiarano nel `pyproject.toml` unico, in un **gruppo opzionale** dedicato.
 - Stack backend: Python 3.12+, Poetry, FastAPI, SQLAlchemy, Pydantic v2.
 
 ## Build frontend unificato
