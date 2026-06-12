@@ -28,12 +28,15 @@ Lo scheletro vivo: stack su Docker, database, autenticazione, shell della SPA. T
 
 - [ ] **1.T1 — CI minima** (~2h): GitHub Actions con ruff, mypy, eslint/svelte-check, build frontend ([ci](../infrastructure/ci.md)). *Verifica: PR con errore di lint → rossa.*
 - [ ] **1.T2 — Dev container** (~2h): `.devcontainer/` (Dockerfile con Python 3.12+Poetry, Node LTS+npm, git, docker CLI; socket Docker dell'host; devcontainer.json con forward 8080/8081) ([dev-container](../infrastructure/dev-container.md), INF-15). *Verifica: "Reopen in Container" su host con solo Docker → poetry/npm/compose funzionano da dentro; nessuna toolchain richiesta sull'host.*
-- [ ] **1.T3 — Script backup/export/restore** (~2h): `ops/backup.sh`, `ops/export.sh`, `ops/restore.sh` montati nel container `db`, mount di `backups/` (gitignorata) e dei file di bootstrap ([backup-and-restore](../infrastructure/backup-and-restore.md), INF-16). *Verifica: backup → `down -v` → `up` → restore → login con gli stessi dati e config; restore con stack web/worker attivo → rifiuta.*
+- [ ] **1.T3 — Immagine ops: backup/export/restore** (~2h): `ops/backup.sh`, `ops/export.sh`, `ops/restore.sh`; immagine `ops` (`postgres:16` + script, `packages/ops/Dockerfile`); servizio effimero nel compose con mount di `backups/` (gitignorata) e dei file di bootstrap locali ([backup-and-restore](../infrastructure/backup-and-restore.md), INF-16). *Verifica: backup → `down -v` → `up` → restore → login con gli stessi dati e config; restore con stack web/worker attivo → rifiuta.*
+- [ ] **1.T4 — Pipeline di publish + deploy kit** (~3h): workflow su tag `v*` → build e push di `web`/`worker`/`ops` su GHCR; `deploy/compose.yml` (immagini, niente `build:`, `config.yaml` di default nelle immagini con mount di override commentato) e `.env.example` con `WEA_VERSION`, allegati alla release; README del repo con le istruzioni complete di install e manutenzione ([ci](../infrastructure/ci.md), [deployment](../infrastructure/deployment.md), INF-17/INF-18). *Verifica: tag `v0.1.0-alpha` → su una macchina pulita con il **solo Docker**, scaricando i due file del kit: `pull` + `up` → login funzionante, **senza sorgenti**.*
 
 ## Definition of Done
 
 - [ ] Da zero: `cp .env.example .env` + compose up + login + cambio password, senza toccare altro.
 - [ ] Su un host Linux/WSL2 con il **solo Docker** si sviluppa (dev container) e si hosta: nessun altro software richiesto (INF-15).
+- [ ] **Distribuzione provata**: un tag pubblica le immagini e il deploy kit; l'installazione pull-based (due file, nessun sorgente) funziona su macchina pulita (INF-17).
+- [ ] Il README del repo basta da solo per installare e manutenere (INF-18).
 - [ ] Il ciclo backup → distruzione volume → restore riproduce un'installazione identica.
 - [ ] Swagger mostra Auth/Me/Health con modelli tipizzati.
 - [ ] CI verde su `main`.

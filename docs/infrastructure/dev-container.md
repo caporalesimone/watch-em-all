@@ -56,4 +56,4 @@ flowchart LR
 
 ## Hosting
 
-Il deployment su server o su WSL2 usa lo **stesso compose di produzione** ([deployment](deployment.md)) e non richiede il dev container: le immagini `web` e `worker` contengono già tutto (build multi-stage, frontend cucinato nell'immagine). L'unico prerequisito dell'host resta Docker.
+Il deployment su server o su WSL2 **non richiede il dev container né i sorgenti**: è pull-based — deploy kit (compose di release + `.env`) e immagini pubblicate su GHCR ([deployment](deployment.md)). Il dev container usa invece il **compose di sviluppo** del repo (`docker-compose.yml`, con `build:`): stessa forma, sorgenti locali. L'unico prerequisito dell'host, in entrambi i casi, resta Docker.

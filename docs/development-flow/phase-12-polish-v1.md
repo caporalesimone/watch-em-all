@@ -24,7 +24,7 @@ Chiudere il perimetro della v1: il secondo canale di notifica (che dimostra la b
 ### Trasversali
 
 - [ ] **12.T1 — Audit i18n English-first** (~3h): audit delle stringhe — `en.json` completo nelle cartelle `i18n/` di core e plugin (frontend e backend dei notifier); nessuna stringa cablata né concatenata (FE-13); fallback su `en` verificato. *Verifica: app e notifiche complete in inglese; nessuna chiave mancante a runtime.*
-- [ ] **12.T2 — Doc allineata + release** (~2h): verifica documentazione vs implementato (DOC-8), changelog, tag `v1.0`, prova di installazione da zero seguendo solo [deployment](../infrastructure/deployment.md). *Verifica: un'installazione pulita riesce senza conoscenze esterne.*
+- [ ] **12.T2 — Doc allineata + release** (~2h): verifica documentazione vs implementato (DOC-8), audit del README come manuale operativo completo — install, update, backup/restore, tutti i comandi e script (INF-18), changelog, tag `v1.0` → publish su GHCR + deploy kit in release ([ci](../infrastructure/ci.md), INF-17); prova di installazione pull-based da zero seguendo **solo il README**. *Verifica: macchina pulita con solo Docker + i due file del kit → sito su e manutenibile senza conoscenze esterne.*
 
 ## Definition of Done
 

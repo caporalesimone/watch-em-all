@@ -17,7 +17,7 @@ Il registro degli eventi operativi del sistema, consultabile in near-real-time d
 - **MNT-R2** — **Retention automatica dei log operativi**: log di sistema e record delle run sono puliti automaticamente oltre la finestra configurata (default 90 giorni). Lo **storico prezzi non ha retention**: è il valore del sistema e si conserva per sempre.
 - **MNT-R3** — **Impostazioni di sistema** modificabili da UI senza riavvio: `scraper_run_timeout`, soglia di ritardo per i recuperi, giorni di retention, periodo di grazia della cancellazione utenti (`user_deletion_retention_days`). Persistite nel DB (config DB-first), con default sicuri al primo avvio.
 - **MNT-R4** — **Salute**: l'app espone un controllo di vita (applicazione + raggiungibilità del DB) usato dal monitoraggio dei container; il worker è sorvegliato tramite heartbeat ([scraper-monitoring](scraper-monitoring.md)).
-- **MNT-R5** — **Backup**: script di backup/export/ripristino versionati nel repo (`ops/`) ed eseguibili a mano nel container `db`; l'archivio include dump completo (dati + configurazioni DB-first) e file di bootstrap ([backup-and-restore](../../infrastructure/backup-and-restore.md)). Lo storico prezzi non è ricostruibile: la cadenza la decide chi hosta.
+- **MNT-R5** — **Backup**: script di backup/export/ripristino versionati nel repo (`ops/`), distribuiti con l'immagine `ops` ed eseguibili a mano come container effimero; l'archivio include dump completo (dati + configurazioni DB-first) e file di bootstrap locali ([backup-and-restore](../../infrastructure/backup-and-restore.md)). Lo storico prezzi non è ricostruibile: la cadenza la decide chi hosta.
 
 ## Vista d'insieme
 

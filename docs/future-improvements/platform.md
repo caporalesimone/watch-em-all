@@ -30,6 +30,6 @@ Il dispatcher assume replica singola (CRON-R9); i lock per-scraper già reggono 
 
 Il runner è **seriale** per scelta (SCHED-R6): un solo scraper alla volta, carico prevedibile, vista calendario fedele. **Miglioria**: reintrodurre un pool con limite di parallelismo configurabile (la storia del progetto lo conosce già). **Rimandato perché**: a poche decine di run al giorno la serialità non costa nulla e semplifica tutto. **Trigger**: la vista calendario non ha più spazi liberi — gli slot dovuti si accodano sistematicamente oltre l'orario utile.
 
-## Auto-update / immagini pubblicate
+## Auto-update delle installazioni
 
-Oggi il deploy è `git pull && build`. **Miglioria**: immagini versionate su un registry + watchtower o equivalente. **Trigger**: più di una installazione da mantenere.
+Le immagini versionate su GHCR e il deploy kit esistono già ([deployment](../infrastructure/deployment.md), INF-17); l'aggiornamento resta però manuale (`WEA_VERSION` + `pull`). **Miglioria**: aggiornamento automatico con watchtower o equivalente. **Rimandato perché**: su un'installazione personale l'update va scelto, non subìto. **Trigger**: più installazioni da mantenere che restano indietro di versione.

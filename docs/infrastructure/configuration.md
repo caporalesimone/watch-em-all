@@ -8,7 +8,7 @@ La configurazione **operativa** vive nel DB ed è editabile dalla UI **senza ria
 
 | Livello | Dove | Esempi | Cambia con |
 |---|---|---|---|
-| Bootstrap | `config.yaml` | URL DB, durate token, locale default | restart |
+| Bootstrap | `config.yaml` (default **nell'immagine**; override locale via mount) | URL DB, durate token, locale default | restart |
 | Segreti | `.env` | credenziali Postgres, SECRET_KEY, password admin iniziale | restart |
 | Operativa di sistema | DB `system_settings` | timeout run, retention, periodo di grazia cancellazione utenti | UI admin, a caldo |
 | Schedule | DB `scraper_schedule` etc. | slot degli scraper, cadenze | UI, a caldo |
@@ -28,6 +28,8 @@ core:
 ```
 
 L'interpolazione `${VAR}` è risolta dal **loader applicativo** all'avvio leggendo l'ambiente. Niente parametri di plugin qui, niente `enabled` qui: il manifest è l'unica source of truth dell'attivazione.
+
+Il file di default è **incluso nelle immagini** `web` e `worker` (l'installazione pull-based non richiede alcun file locale, [deployment](deployment.md)): chi vuole personalizzarlo crea `config.yaml` accanto al compose e lo **monta sopra** quello dell'immagine (`./config.yaml:/app/config.yaml:ro`) — il mount vince, l'immagine resta il fallback. L'override locale, se presente, entra nell'[archivio di backup](backup-and-restore.md).
 
 ## `.env` / `.env.example`
 

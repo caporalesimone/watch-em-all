@@ -17,14 +17,20 @@ watch-em-all/
 │       └── notifiers/<nome>/
 ├── packages/
 │   ├── web/         # pyproject.toml + Dockerfile del container web
-│   └── worker/      # pyproject.toml + Dockerfile del container worker
+│   ├── worker/      # pyproject.toml + Dockerfile del container worker
+│   └── ops/         # Dockerfile dell'immagine ops (postgres:16 + script)
 ├── ops/             # script backup/export/restore (backup-and-restore.md)
+├── deploy/
+│   └── compose.yml  # compose di release (immagini GHCR): allegato alla release come deploy kit
 ├── backups/         # archivi prodotti dagli script (gitignorata)
 ├── docs/            # documentazione di progetto (italiano, source of truth)
 ├── docs-eng/        # documentazione inglese incrementale (DOC-12)
-├── config.yaml
+├── docker-compose.yml  # compose di sviluppo (build: dai sorgenti)
+├── config.yaml      # default, cucinato nelle immagini; override locale via mount
 └── .env(.example)
 ```
+
+Le **immagini pubblicate** (`watch-em-all-web`, `-worker`, `-ops`) sono buildate e pushate su GHCR dal workflow di publish a ogni tag ([ci](ci.md)); l'utente finale installa con il solo deploy kit, senza sorgenti ([deployment](deployment.md), INF-17).
 
 - I **plugin non sono package** formali: cartelle auto-scoperte dal registry. Le loro dipendenze Python (es. un browser headless) si dichiarano nel `pyproject.toml` dei package che li caricano (`web` e `worker`), in gruppo opzionale.
 - Stack backend: Python 3.12+, Poetry, FastAPI, SQLAlchemy, Pydantic v2.
