@@ -13,7 +13,17 @@ Pipeline minima (GitHub Actions) su ogni push/PR: esegue i tool già scelti dal 
 | Test backend | `pytest` (unit + contratto; integrazione con Postgres service) | bloccante |
 | Lint frontend | `eslint` · `prettier --check` · `svelte-check` | bloccante |
 | Build frontend | `npm run build` (include `build:plugins`) | bloccante |
-| Build immagini | `docker compose build` (senza push) | bloccante |
+| Build immagini | build di `web`/`worker`/`ops`; **su PR** push come `dev-<branch>` (vedi *Immagini dev*) | bloccante |
+
+## Immagini dev (su PR)
+
+Per **provare il container prima del merge**, un workflow costruisce le immagini a ogni **apertura/aggiornamento di PR** (anche draft) e le pubblica su GHCR con tag **`dev-<branch>`** (nome del branch sanificato), **sovrascritto** a ogni push: punta sempre all'ultima build di quel ramo. Più rami in volo → tag distinti, nessuna collisione.
+
+- **Branch senza PR**: trigger manuale (`workflow_dispatch` con il branch in input) per generare `dev-<branch>` on-demand.
+- **Niente tag per-commit**: per fissare una build esatta si usa il **digest** (`@sha256:…`), sempre disponibile.
+- Le immagini `dev-*` sono **effimere** (ripulite periodicamente); permanenti solo i tag di release `vX.Y.Z`.
+
+Come installare una dev per provarla: [deployment](deployment.md#provare-unimmagine-di-sviluppo).
 
 ## Publish (su tag)
 
@@ -24,7 +34,7 @@ Workflow separato, attivato dai **tag `v*`** (INF-17): builda le tre immagini mu
 | Build & push | `watch-em-all-web`, `watch-em-all-worker`, `watch-em-all-ops` → `ghcr.io/<owner>/…:<tag>` (es. `v1.2.0`; mai `latest`, INF-1) |
 | Release + kit | allega alla release `compose.yml` (il compose di release) e `.env.example` — i **soli due file** che servono per installare ([deployment](deployment.md)) |
 
-Il tag è l'unico trigger di pubblicazione: `main` verde non pubblica nulla — si pubblica una versione quando lo si decide.
+Il tag è l'unico trigger di pubblicazione: `main` verde non pubblica nulla — si pubblica una versione quando lo si decide. I **package GHCR sono pubblici** (come il repo): il pull lato utente è anonimo, nessuna autenticazione.
 
 ### Versioning del prodotto
 
@@ -36,7 +46,7 @@ Il prodotto segue **SemVer** (`MAJOR.MINOR.PATCH`) con una **versione unica per 
 | **MINOR** | nuove feature retrocompatibili (tipicamente la chiusura di una fase del [flow](../development-flow/README.md)) |
 | **PATCH** | fix retrocompatibili |
 
-- `0.x` durante lo sviluppo (**0.1** alla fase 7, **1.0** alla fase 12, come già nel flow); il tag `vX.Y.Z` è **deliberato**, non automatico a ogni merge: a chiusura di fase o quando un gruppo di MVP forma un incremento utile.
+- `0.x` durante lo sviluppo (**0.1** alla fase 7, **1.0** alla fase 12 — milestone notevoli lungo la strada); **ogni PR** porta un bump di versione + voce `CHANGELOG.md`, e **al merge** l'owner crea il tag `vX.Y.Z` corrispondente che genera l'immagine di release (**1 MVP = 1 PR = 1 versione**).
 - `CHANGELOG.md` aggiornato nella **stessa PR** che porta al tag.
 - **Distinta** da: il `version` del manifest di un plugin (informativo, per-plugin) e l'`api_version` (intero, gate di compatibilità del contratto plugin) — entrambi ortogonali alla versione del prodotto.
 

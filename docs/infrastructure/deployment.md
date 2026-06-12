@@ -25,7 +25,7 @@ cp .env.example .env                  # poi compilare i valori
 docker compose pull && docker compose up -d
 ```
 
-Le immagini pubblicate (pinnate per versione, mai `latest` — INF-1):
+Repo e package GHCR sono **pubblici**: il `pull` è **anonimo**, nessun `docker login` necessario (scelta di distribuzione, Q6). Le immagini pubblicate (pinnate per versione, mai `latest` — INF-1):
 
 | Immagine | Contenuto |
 |---|---|
@@ -166,3 +166,15 @@ Il dump copre **anche tutte le configurazioni** (config DB-first). Cadenza consi
 
 - **Aggiornare il sistema**: nuova versione in `.env` (`WEA_VERSION`) → `docker compose pull && docker compose up -d`. Niente sorgenti, niente build.
 - **Il set di plugin è quello dell'immagine** (tutti i first-party, vedi sopra): la governance è runtime — sospensione degli scraper dallo scheduler, interruttore globale dei notifier (PCFG-R8). Un set diverso richiede la build da sorgenti ([build-system](build-system.md)).
+
+## Provare un'immagine di sviluppo
+
+Oltre alle release puoi installare un'immagine **dev** per provare un branch **prima del merge** ([ci](ci.md#immagini-dev-su-pr)): basta puntare `WEA_VERSION` al tag dev del branch.
+
+```bash
+# nel .env
+WEA_VERSION=dev-<branch>     # es. dev-catalog
+docker compose pull && docker compose up -d
+```
+
+`dev-<branch>` è **sovrascritto** a ogni push sul branch (punti sempre all'ultima build). Per inchiodare una build esatta usa il **digest** (`image: ghcr.io/<owner>/watch-em-all-web@sha256:…`). Le immagini `dev-*` sono effimere: per l'uso normale resta su una release `vX.Y.Z`.
