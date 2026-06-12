@@ -31,6 +31,38 @@ The end goal is always the same: **letting the user know that their carts are on
 - It does not buy anything on the user's behalf: it stops at the alert.
 - It is not a multi-organization cloud service: it is a single private installation, meant for yourself and a few other users (family or friends).
 
+## Operations manual
+
+> ⚠️ **Under development.** This README is the complete operations manual for the product: every deploy or maintenance command lands here in the same PR that introduces it. The sections below fill up as development progresses ([development flow](docs/development-flow/README.md)).
+
+### Requirements
+
+A Linux host (WSL2 or a dedicated server) with **Docker Engine + the Compose plugin**. Nothing else is ever installed on the host: everything runs in containers.
+
+### Installation (pull-based)
+
+*Coming with phase 0 — the deploy kit (a `compose.yml` and a `.env.example` attached to each release) will be all you need: no sources, no build.*
+
+### Updating
+
+*Coming with phase 0.*
+
+### Trying a dev image
+
+*Coming with phase 0.*
+
+### Backup, export and restore
+
+*Coming with phase 1.*
+
+### Troubleshooting
+
+*Coming with phase 1.*
+
+## Development
+
+Development happens entirely inside the [dev container](docs/infrastructure/dev-container.md) — the host only needs Docker (coming with phase 0).
+
 ## Documentation
 
-The full documentation lives in the [docs/](docs/README.md) folder, organized by layers: business, architecture, features, technical capabilities, API, and plugin development guides.
+The full documentation lives in the [docs/](docs/README.md) folder, organized by layers: business, architecture, features, technical capabilities, API, and plugin development guides. It is written in Italian (source of truth); an English equivalent grows phase by phase under [docs-eng/](docs-eng/).
