@@ -26,6 +26,20 @@ Workflow separato, attivato dai **tag `v*`** (INF-17): builda le tre immagini mu
 
 Il tag è l'unico trigger di pubblicazione: `main` verde non pubblica nulla — si pubblica una versione quando lo si decide.
 
+### Versioning del prodotto
+
+Il prodotto segue **SemVer** (`MAJOR.MINOR.PATCH`) con una **versione unica per l'intero bundle** (core + plugin first-party, spediti insieme nelle immagini); è la regola INF-19.
+
+| Parte | Quando si incrementa |
+|---|---|
+| **MAJOR** | breaking dell'API HTTP pubblica **o** schema DB non puramente additivo (migrazione manuale, DB-R4) |
+| **MINOR** | nuove feature retrocompatibili (tipicamente la chiusura di una fase del [flow](../development-flow/README.md)) |
+| **PATCH** | fix retrocompatibili |
+
+- `0.x` durante lo sviluppo (**0.1** alla fase 7, **1.0** alla fase 12, come già nel flow); il tag `vX.Y.Z` è **deliberato**, non automatico a ogni merge: a chiusura di fase o quando un gruppo di MVP forma un incremento utile.
+- `CHANGELOG.md` aggiornato nella **stessa PR** che porta al tag.
+- **Distinta** da: il `version` del manifest di un plugin (informativo, per-plugin) e l'`api_version` (intero, gate di compatibilità del contratto plugin) — entrambi ortogonali alla versione del prodotto.
+
 ## Note
 
 - Il job di test backend usa un service container Postgres 16: i test di integrazione (catalog delta, alert engine, auth) girano su un DB reale effimero.

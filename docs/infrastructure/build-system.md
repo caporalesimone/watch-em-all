@@ -28,6 +28,7 @@ watch-em-all/
 ├── docker-compose.yml  # compose di sviluppo (build: dai sorgenti)
 ├── pyproject.toml   # UNICO, alla root: dipendenze backend + gruppi opzionali
 ├── poetry.lock      # un solo lockfile per tutto il backend
+├── CHANGELOG.md     # storia delle release (SemVer, INF-19)
 ├── config.yaml      # default, cucinato nelle immagini; override locale via mount
 └── .env(.example)
 ```
