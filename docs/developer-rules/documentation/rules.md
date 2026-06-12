@@ -6,12 +6,14 @@
 
 | Layer | Cartella | Può contenere | NON può contenere |
 |---|---|---|---|
-| **1 — Business/UX** | `1-business/` | Solo **testo descrittivo** ad alto livello; tabelle semplici | Diagrammi, codice, pseudocodice, nomi di tabelle/endpoint |
+| **1 — Business/UX** | `1-business/` | Solo **testo descrittivo** ad alto livello; tabelle semplici; **fino a 3 diagrammi Mermaid di alto livello** in tutto il layer (eccezione dichiarata, vedi sotto) | Codice, pseudocodice, nomi di tabelle/endpoint, diagrammi di dettaglio (sequenze tecniche, ER, flussi interni) |
 | **2 — Architettura** | `2-architecture/` | Testo + **diagrammi Mermaid**; tabelle | Codice e pseudocodice |
 | **3 — Feature** | `3-features/` | Testo + **Mermaid**; requisiti con ID; tabelle normative | Codice e pseudocodice |
 | **4 — Capability** | `4-capabilities/` | Tutto: **pseudocodice**, modelli Pydantic, riferimenti al codice | — |
 
 **Deroghe ammesse** (al minimo indispensabile e dichiarate): snippet di **configurazione** nei documenti di infrastruttura; un esempio minimo dove il testo da solo sarebbe ambiguo. Una deroga che diventa la norma è un documento nel layer sbagliato.
+
+**Eccezione diagrammi per il Layer 1** (DOC-12 bis): sono ammessi **al massimo 3 diagrammi Mermaid di alto livello in tutto il Layer 1** — tipicamente il **diagramma di contesto** (attori + sistema + mondi esterni), il **flusso di valore** end-to-end e la **mappa dei ruoli**. Devono restare comprensibili a uno stakeholder e **privi di dettaglio tecnico**: niente nomi di tabella/endpoint, pseudocodice o sequenze interne. Il dettaglio vive dal Layer 2 in giù.
 
 ## Regole di scrittura
 

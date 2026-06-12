@@ -6,6 +6,16 @@
 
 Calcolare statistiche e indicatori di convenienza **on-demand** da `price_history`. Nessuna tabella nuova, nessun job: a questa scala (storici di decine/centinaia di entry per prodotto) il calcolo al volo è immediato e sempre fresco.
 
+```mermaid
+flowchart TD
+    REQ[richiesta stats / convenienza] --> H[leggi price_history]
+    H --> SUF{storico sufficiente?<br/>≥ 30gg e ≥ 3 entry}
+    SUF -->|no| INS[insufficient_history<br/>mai numeri fuorvianti]
+    SUF -->|sì| STAT[min/max · medie pesate sul tempo ·<br/>% in offerta · is_all_time_low]
+    STAT --> CONV[segnali di convenienza → score → etichetta]
+    CONV --> OUT[verdetto + SEMPRE i numeri<br/>che lo generano]
+```
+
 ## Statistiche di prodotto
 
 ```

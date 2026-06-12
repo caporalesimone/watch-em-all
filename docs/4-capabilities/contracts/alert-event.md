@@ -6,6 +6,43 @@
 
 Il payload che il core consegna ai notifier e registra nello storico. Confine tra valutazione (core) e formattazione/invio (plugin).
 
+```mermaid
+classDiagram
+    AlertEvent "1" o-- "1..*" CartAlert : cart_alerts
+    CartAlert "1" o-- "0..*" ProductAlert : products
+    CartAlert "1" o-- "0..1" ThresholdInfo : threshold
+    class AlertEvent {
+        kind ALERT_DIGEST
+        user_id
+        generated_at
+    }
+    class CartAlert {
+        cart_name
+        mode
+        cart_events
+    }
+    class ProductAlert {
+        name
+        plugin_id
+        tags
+        price_previous
+        price_current
+    }
+    class ThresholdInfo {
+        pct
+        target
+        current
+        excluded
+    }
+    class TextMessageEvent {
+        kind
+        title
+        body_markdown
+    }
+```
+
+Due famiglie di payload sullo **stesso canale**, distinte dal `kind`: il **digest** strutturato — `AlertEvent` (tag `CART_*` su `cart_events`, `PRODUCT_*` su `tags`) e l'analogo `SummaryReport` — e il **messaggio testuale** piatto `TextMessageEvent` (`kind` = `ADMIN_MESSAGE` o `SYSTEM_MESSAGE`, body Markdown).
+
 ## Enum
 
 ```python

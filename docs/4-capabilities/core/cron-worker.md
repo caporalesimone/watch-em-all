@@ -6,6 +6,24 @@
 
 Processo del container `worker` che fa da **dispatcher temporale**: ogni minuto valuta i tre schedule e sottomette i job dovuti; una volta al giorno esegue la **manutenzione** (purge utenti scaduti, retention). **Non esegue mai lavoro lungo nel proprio loop**: gli scraper vanno al [runner seriale](scraper-pool.md); alert e summary sono run brevi eseguite inline.
 
+```mermaid
+flowchart TD
+    T[tick ogni minuto] --> HB[heartbeat]
+    HB --> MNT{nuovo giorno?}
+    MNT -->|sì| PURGE[purge utenti scaduti<br/>+ retention log/run]
+    MNT -->|no| SCR
+    PURGE --> SCR{per scraper:<br/>slot dovuto > ultimo eseguito?}
+    SCR -->|sì| Q[accoda al runner seriale]
+    SCR --> AL{per utente:<br/>alert dovuto oggi?}
+    Q --> AL
+    AL -->|sì| RAE[run alert engine inline]
+    AL --> SU{summary dovuto?}
+    RAE --> SU
+    SU -->|sì| RS[run summary inline]
+    SU --> T
+    RS --> T
+```
+
 ## Requisiti
 
 - **CRON-R1** — Tick ogni minuto; granularità al minuto.

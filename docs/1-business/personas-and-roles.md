@@ -4,6 +4,23 @@
 
 Il sistema conosce due soli ruoli, con responsabilità nettamente separate. La separazione è una scelta deliberata: l'amministratore governa il sistema, l'utente governa i propri dati, e i due ambiti non si sovrappongono.
 
+```mermaid
+flowchart TB
+    subgraph A["Amministratore — governa il sistema"]
+        A1[Crea e gestisce gli account]
+        A2[Pianifica e sorveglia gli scraper]
+        A3[Configura i canali a livello di sistema]
+        A4[Vede solo numeri aggregati]
+    end
+    subgraph U["Utente — possiede i propri dati"]
+        U1[Sceglie cosa osservare]
+        U2[Crea carrelli e soglie di risparmio]
+        U3[Riceve avvisi e report]
+        U4[Catalogo, storico e notifiche isolati]
+    end
+    A -. confine invalicabile:<br/>l'admin non vede i dati operativi dell'utente .-> U
+```
+
 ## L'utente
 
 È la persona che vuole essere avvisata quando conviene comprare. Le sue responsabilità:
@@ -20,7 +37,7 @@ L'utente vede **solo i propri dati**: catalogo, carrelli, notifiche e storici so
 È la persona che ospita e governa l'installazione (spesso coincide fisicamente con uno degli utenti, ma con un account separato). Le sue responsabilità:
 
 - **Gestire gli utenti**: crea gli account (non esiste auto-registrazione), assegna i ruoli, disabilita gli account, reimposta le password.
-- **Governare gli scraper**: decide **quante volte al giorno** e **a che ora** gira ciascuno scraper, quanti scraper possono lavorare contemporaneamente, e i limiti di "buona educazione" verso i siti osservati (il sistema non deve mai martellare un sito di richieste).
+- **Governare gli scraper**: decide **quante volte al giorno** e **a che ora** gira ciascuno scraper (orari indipendenti, esecuzione uno alla volta) e i limiti di "buona educazione" verso i siti osservati (il sistema non deve mai martellare un sito di richieste).
 - **Sorvegliare il lavoro**: per ogni scraper vede statistiche di esecuzione — durata, prodotti trovati, variazioni rilevate, errori — e un registro degli eventi di sistema in tempo quasi reale.
 - **Configurare i plugin a livello di sistema**: i parametri condivisi di scraper e notifier (es. il server di posta in uscita per le email) sono responsabilità dell'admin; ogni utente aggiunge poi i propri parametri personali.
 - **Manutenzione**: pulizia degli storici per data, parametri operativi globali.

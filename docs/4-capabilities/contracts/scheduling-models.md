@@ -2,6 +2,22 @@
 
 > **Layer 4 — Contratto** · Audience: developer · Pseudocodice ammesso. Feature: [scraper-scheduling-and-limits](../../3-features/admin/scraper-scheduling-and-limits.md), [scraper-monitoring](../../3-features/admin/scraper-monitoring.md).
 
+Tre schedule con owner diversi più le impostazioni globali, letti dal dispatcher; le run schedulate degli scraper producono i record di esecuzione:
+
+```mermaid
+flowchart TB
+    subgraph ADM["Admin"]
+        SS[ScraperSchedule<br/>times[], enabled, last_slot]
+        SET[SystemSettings<br/>timeout · retention · grazia cancellazione]
+    end
+    subgraph USR["Per-utente"]
+        AS[AlertSchedule<br/>weekdays, time, last_run_date]
+        SC[SummaryConfig<br/>weekly/monthly, last_run_date]
+    end
+    CRON[Cron Worker<br/>tick/min] --> SS & AS & SC
+    SS --> REC[ScrapeRun + ScrapeUserLog<br/>record di esecuzione]
+```
+
 ## Schedule
 
 ```python

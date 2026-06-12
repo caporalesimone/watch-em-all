@@ -6,6 +6,23 @@
 
 Unico punto in cui i dati degli scraper diventano stato persistente: riceve la lista corrente dei prodotti per utente (callback `update_catalog`), calcola i **delta** e scrive solo i cambiamenti. Lo scraper è stateless: storico, disponibilità e delisting si decidono interamente qui.
 
+```mermaid
+flowchart TD
+    IN[lista prodotti correnti<br/>per utente] --> RES[risolvi prezzi mancanti]
+    RES --> LOOP{per ogni prodotto}
+    LOOP --> FIND{identità trovata?<br/>user + plugin + external_id}
+    FIND -->|no| NEW[insert: prodotto nuovo]
+    FIND -->|sì| UPD[update campi mutabili<br/>removed→false se ricomparso]
+    NEW --> HIST{prezzo o disponibilità<br/>cambiati?}
+    UPD --> HIST
+    HIST -->|sì| APP[append a price_history]
+    HIST -->|no| SEEN[segna come visto]
+    APP --> SEEN
+    SEEN --> LOOP
+    LOOP -->|fine| DEL[righe non viste → removed=true<br/>delisting]
+    DEL --> CNT[ritorna i contatori del delta]
+```
+
 ## Requisiti
 
 - **CATSVC-R1** — Espone ai plugin il callback `update_catalog(user_id, products)` via Plugin Context; è l'**unica via di scrittura** del catalogo (lo scraper non tocca mai le tabelle core).

@@ -6,6 +6,20 @@
 
 Eseguire le run degli scraper **una alla volta** (nessuna concorrenza tra scraper, né interna), con lock anti-overlap, timeout, pulizia della cache scaduta e produzione dei record di monitoraggio. Usato dal worker (run schedulate) e — per lo scrape-now — dal web, che condivide lock e regole.
 
+```mermaid
+flowchart TD
+    J[job: scraper, slot] --> LK{advisory lock<br/>per-scraper?}
+    LK -->|no| SKIP[skip + warning<br/>run precedente in corso]
+    LK -->|sì| PC[elimina cache scaduta]
+    PC --> OPEN[apri scrape_run]
+    OPEN --> LOOP{per ogni utente}
+    LOOP --> RU[run_for_user<br/>cache hit oppure rete]
+    RU --> UL[riga scrape_user_log]
+    UL --> LOOP
+    LOOP -->|fine o timeout| CLOSE[chiudi run:<br/>stato, contatori, durata]
+    CLOSE --> REL[rilascia lock]
+```
+
 ## Requisiti
 
 - **POOL-R1** — **Esecutore seriale**: un singolo thread di esecuzione; i job dovuti attendono in **coda FIFO** e girano uno alla volta (SCHED-R6). Nessun parametro di parallelismo.

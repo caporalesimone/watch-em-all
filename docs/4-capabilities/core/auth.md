@@ -6,6 +6,25 @@
 
 Autenticazione JWT stateless con invalidazione leggera, due ruoli, gestione account by-admin. Dimensionata per ≤5 utenti: niente OAuth/SSO/MFA.
 
+La rotazione del refresh è il punto delicato: ogni refresh emette una coppia nuova e invalida la precedente; il riuso di un refresh vecchio è trattato come furto.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant API as Auth
+    participant DB as users
+    C->>API: POST /refresh {refresh_token}
+    API->>API: verifica firma, exp, typ=refresh
+    API->>DB: jti == refresh_jti? tv == token_version?
+    alt jti combacia
+        API->>DB: nuova coppia, refresh_jti = nuovo jti
+        API-->>C: access + refresh (ruotati)
+    else jti vecchio (riuso sospetto)
+        API->>DB: token_version += 1 (logout globale)
+        API-->>C: 401
+    end
+```
+
 ## Requisiti
 
 - **AUTH-R1** — `access_token` (15 min) verificato **senza DB** (firma + scadenza + tipo); `refresh_token` (7 giorni) verificato **con DB** al solo refresh. Durate configurabili da bootstrap.

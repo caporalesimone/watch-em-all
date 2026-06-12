@@ -6,6 +6,14 @@
 
 Una voce correttiva sul totale di un carrello **scraper-specific**, calcolata dal plugin secondo le regole del suo sito (sconti a soglia, spedizione, …) senza che il core ne conosca la logica.
 
+```mermaid
+flowchart LR
+    CT[totale scontato<br/>prodotti attivi] --> GA["get_adjustments(total)<br/>plugin — regole del sito"]
+    GA --> V["voci Adjustment<br/>+amount = sconto<br/>−amount = costo"]
+    V --> CORE["core: stima finale =<br/>scontato − Σ amount"]
+    CORE --> TH[confronto con la soglia<br/>CART-R11]
+```
+
 ## Modello
 
 ```python

@@ -6,6 +6,20 @@
 
 Montare dinamicamente i frontend dei plugin abilitati senza modifiche manuali a build o routing.
 
+```mermaid
+flowchart TB
+    subgraph BUILD["Build time"]
+        MAN[manifest.json dei plugin] --> GEN["build:plugins → plugin-registry.ts"]
+        GEN --> VITE[build Vite unificato app + plugin]
+    end
+    subgraph RUN["Runtime"]
+        API["GET /api/plugins<br/>abilitati e caricati"] --> LK{presente nel<br/>registro generato?}
+        LK -->|sì| MOUNT[route lazy + voce sidebar + i18n]
+        LK -->|no| WARN["escluso + log 'rebuild necessario'"]
+    end
+    VITE -. bundle .-> API
+```
+
 ## Requisiti
 
 - **FDISC-R1** — Il registro `src/generated/plugin-registry.ts` è **generato** dallo step `build:plugins` (legge i manifest, filtra `enabled` con `frontend.entry`), mai scritto a mano.

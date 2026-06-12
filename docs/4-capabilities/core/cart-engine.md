@@ -6,6 +6,22 @@
 
 Calcolare lo stato economico dei carrelli: totali, adjustments, stima finale, stato della soglia. È una pura funzione di lettura dello stato corrente (catalogo + definizione del carrello): non persiste risultati, li calcola on demand per UI, alert engine e summary.
 
+```mermaid
+flowchart TD
+    M[membri del carrello] --> A{attivo?<br/>available e non removed}
+    A -->|sì| ACT[attivi]
+    A -->|no| EXC[esclusi]
+    ACT --> TF[totale pieno = Σ price_original]
+    ACT --> TD[totale scontato = Σ price_current]
+    TD --> ADJ{scraper_specific?}
+    ADJ -->|sì| GA[+ get_adjustments del plugin]
+    ADJ -->|no| FIN
+    GA --> FIN[stima finale = scontato − Σ amount]
+    FIN --> TH{soglia impostata<br/>e attivi presenti?}
+    TH -->|sì| RES[reached = finale ≤ target<br/>partial se ci sono esclusi]
+    TH -->|no| NO[nessuna valutazione soglia]
+```
+
 ## Definizioni
 
 - **Prodotto attivo** = membro del carrello con `is_available = true` e `removed = false`. Solo gli attivi entrano nei totali.

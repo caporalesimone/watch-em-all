@@ -4,6 +4,27 @@
 
 Motore **PostgreSQL 16**, accesso via SQLAlchemy, validazione I/O Pydantic v2. Schema creato idempotentemente all'avvio da web e worker; tabelle dei plugin create dai plugin stessi.
 
+Le relazioni principali del core (le tabelle di sola configurazione — `system_settings`, `system_message_template`, `notifier_admin_config`, `scrape_cache` — e le tabelle dei plugin stanno fuori dal grafo):
+
+```mermaid
+erDiagram
+    users ||--o{ products : possiede
+    users ||--o{ carts : possiede
+    users ||--o{ alert_log : riceve
+    users ||--o| alert_schedule : ha
+    users ||--o| summary_config : ha
+    users ||--o{ notifier_user_config : configura
+    products ||--o{ price_history : "storico (CASCADE)"
+    products ||--o{ cart_members : "membership (CASCADE)"
+    carts ||--o{ cart_members : contiene
+    carts ||--o{ cart_alert_types : "tipi abilitati (CASCADE)"
+    carts ||--o| alert_snapshot : "baseline per-carrello"
+    alert_log ||--o{ alert_delivery : "esiti per canale (CASCADE)"
+    admin_message ||--o{ alert_log : "una riga per destinatario"
+    scraper_schedule ||--o{ scrape_run : pianifica
+    scrape_run ||--o{ scrape_user_log : "dettaglio per utente (CASCADE)"
+```
+
 ## Auth
 
 | Tabella | Colonne | Note |

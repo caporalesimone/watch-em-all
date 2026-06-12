@@ -10,7 +10,7 @@ La documentazione è stratificata per **audience**: ogni layer ha regole precise
 
 | Layer | Cartella | Contenuto | Regole | Audience |
 |---|---|---|---|---|
-| **1** | [`1-business/`](1-business/) | Business, use case, esperienza utente/admin | **Solo testo descrittivo** ad alto livello. Niente diagrammi, niente codice. | Stakeholder, chiunque |
+| **1** | [`1-business/`](1-business/) | Business, use case, esperienza utente/admin | **Solo testo descrittivo** ad alto livello; al più **3 diagrammi Mermaid di alto livello** (eccezione dichiarata). Niente codice. | Stakeholder, chiunque |
 | **2** | [`2-architecture/`](2-architecture/) | Architettura di sistema, feature ad alto livello | Testo + **diagrammi Mermaid**. Niente codice. | Architetti SW, system engineer |
 | **3** | [`3-features/`](3-features/) | Feature dettagliate (user / admin / plugin) | Testo + **diagrammi Mermaid**. Niente codice. | Architetti, analisti, developer |
 | **4** | [`4-capabilities/`](4-capabilities/) | Capability tecniche, contratti, schema dati | **Unico layer con pseudocodice** e riferimenti al codice. | Developer |

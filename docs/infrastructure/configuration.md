@@ -22,7 +22,7 @@ La configurazione **operativa** vive nel DB ed è editabile dalla UI **senza ria
 core:
   database_url: "postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
   secret_key: "${SECRET_KEY}"
-  default_locale: "it"        # lingua dei nuovi utenti
+  default_locale: "en"        # lingua dei nuovi utenti (V1 English-first)
   access_token_ttl_min: 15
   refresh_token_ttl_days: 7
 ```

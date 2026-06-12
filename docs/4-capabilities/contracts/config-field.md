@@ -6,6 +6,16 @@
 
 Descrivere dichiarativamente un campo di configurazione, così che il core renderizzi i form di **admin** e **utente** di qualunque plugin senza conoscerne i campi. Un solo componente form nel design system, riusato ovunque.
 
+```mermaid
+flowchart LR
+    PLUG["plugin:<br/>get_admin/user_config_schema()"] --> CF["list[ConfigField]<br/>type · required · secret · default"]
+    CF --> CORE[core: un solo componente form]
+    CORE --> FA[Form admin]
+    CORE --> FU[Form utente]
+    FU -->|salvataggio| FILT["filtro chiavi sullo schema utente<br/>CFG-R5"]
+    FILT --> DB[(config persistita)]
+```
+
 ## Modello
 
 ```python

@@ -27,6 +27,7 @@
 - **BE-12** — Niente thread/process spawn fuori dallo [Scraper Runner](../../4-capabilities/core/scraper-pool.md); la concorrenza è una proprietà del sistema, non delle feature — e tra scraper non esiste: l'esecuzione è seriale (SCHED-R6).
 - **BE-13** — `datetime.now(tz=UTC)` o l'orologio applicativo iniettabile; mai `utcnow()` naïve. Le comparazioni di schedule usano l'ora server documentata.
 - **BE-14** — Hash deterministici (SHA-256) per qualunque identità persistita; **mai** `hash()` built-in.
+- **BE-21** — **Backend sincrono.** Endpoint `def` (eseguiti da FastAPI nel suo threadpool), `Session` SQLAlchemy classica, psycopg in modalità sincrona; **niente `async def`/asyncio** nel core né nei plugin (i metodi del contratto plugin — `run_for_user`, `send`, `run_test` — sono sincroni, e `context.http` è un client sincrono). La concorrenza vive **solo** dove è una proprietà del sistema: il threadpool del web e il [runner a thread](../../4-capabilities/core/scraper-pool.md) del worker. Scelta dichiarata per la postura ≤5-10 utenti: a questa scala l'async non dà throughput e complicherebbe runner, advisory lock e contratto plugin; si scala con il tuning di threadpool e pool di connessioni, e l'evoluzione verso async/parallelismo è un [future improvement](../../future-improvements/platform.md) se il progetto cresce. Il dispatcher resta non bloccante accodando al runner (CRON-R5), non con asyncio.
 
 ## Test
 

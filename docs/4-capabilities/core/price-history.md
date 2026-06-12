@@ -6,6 +6,14 @@
 
 Persistere le variazioni di prezzo **e disponibilità** in una sola tabella append-only e servire le serie per i grafici (prodotto e carrello). Design deliberatamente semplice: una entry solo quando qualcosa cambia, nessuna tabella ausiliaria.
 
+```mermaid
+flowchart LR
+    CAT[Catalog Update Service] -->|prezzo o disponibilità<br/>cambiati CATSVC-R4| APP[append entry]
+    APP --> T[(price_history<br/>append-only · nessuna retention)]
+    T --> PS[serie prodotto<br/>a gradini, gap se non disponibile]
+    T --> CS[serie carrello<br/>somma a gradini, composizione corrente]
+```
+
 ## Schema della entry
 
 | Campo | Note |

@@ -6,6 +6,20 @@
 
 Unico modulo del frontend che conosce i token: cache, header automatico, refresh con retry, logout. UI e domain layer non vedono mai un token.
 
+```mermaid
+flowchart TD
+    REQ[richiesta API] --> B[allega Bearer access]
+    B --> R{risposta}
+    R -->|≠ 401| OK[ritorna]
+    R -->|401| SF{refresh già in volo?}
+    SF -->|sì| WAIT[attendi quello in corso]
+    SF -->|no| DOREF[un solo refresh → nuova coppia ruotata]
+    WAIT --> RETRY[riprova UNA volta]
+    DOREF --> RETRY
+    DOREF -->|fallito| LOGOUT[pulisci token + redirect login]
+    RETRY --> OK
+```
+
 ## Requisiti
 
 - **FAUTH-R1** — Conserva `access_token` e `refresh_token`. Scelta dichiarata (postura hobby): access in memoria, refresh in `localStorage` per sopravvivere al reload. Il rischio XSS è accettato: app dietro login, nessun contenuto di terzi renderizzato.

@@ -59,6 +59,8 @@ class MioScraper(ScraperPlugin):
 
 Il core fornisce `run()` di default (= loop di `run_for_user` sugli utenti configurati): di norma **non** la sovrascrivi. Allo stesso modo `normalize_url`, l'hashing e `external_id_for` sono `final`: non li tocchi.
 
+> **Tutti i metodi sono sincroni** (`def`, mai `async def`): il backend è sync (BE-21) e `context.http` è un client sincrono. Scrivi codice sequenziale — niente asyncio, la cadenza e la concorrenza le gestisce il core.
+
 ## I punti dove si sbaglia davvero
 
 ### 1. `external_id` (il più importante)

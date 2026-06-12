@@ -6,6 +6,18 @@
 
 Il contesto consegnato a ogni plugin in `initialize()`: tutto ciò che il plugin può usare, e per convenzione **nient'altro**. È disciplina architetturale (confini chiari, testabilità), non un confine di sicurezza: i plugin sono codice first-party fidato.
 
+```mermaid
+flowchart LR
+    PLUGIN[Plugin] --> CTX[PluginContext]
+    CTX --> DB[(db: solo tabelle proprie<br/>plugin_nome_*)]
+    CTX --> HTTP[http: politeness,<br/>conteggio, cache di scrape]
+    CTX --> LOG[logger → system_log]
+    CTX --> CFG[config: sezione admin del plugin]
+    CTX --> UC[update_catalog<br/>solo scraper]
+    CTX --> MD[markdown: to_html / strip]
+    CTX --> LOC[locale_of]
+```
+
 ## Contratto
 
 ```python

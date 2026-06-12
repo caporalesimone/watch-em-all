@@ -6,6 +6,20 @@
 
 Scoprire, validare e caricare i plugin all'avvio (in `web` e `worker`, stessa sequenza), registrando route e contesti. Deterministico e statico: nessun plugin switching a runtime.
 
+```mermaid
+flowchart TD
+    SCAN[scan scrapers/ e notifiers/] --> M[leggi manifest.json]
+    M --> V{validazioni:<br/>type/cartella · api_version ·<br/>name univoco · plugin_id}
+    V -->|fallisce| REJ[rifiutato: log error<br/>il resto procede]
+    V -->|ok| EN{enabled?}
+    EN -->|no| SKIP[ignorato, nessun import]
+    EN -->|sì| IMP[import entry backend]
+    IMP -->|eccezione| REJ
+    IMP --> INIT["initialize(context)<br/>crea le proprie tabelle"]
+    INIT --> RT[registra router<br/>/api/plugins/route_base]
+    RT --> OK[plugin attivo]
+```
+
 ## Requisiti
 
 - **REG-R1** — Scan di `src/plugins/scrapers/*` e `src/plugins/notifiers/*`; per ogni cartella, lettura e validazione del `manifest.json`.

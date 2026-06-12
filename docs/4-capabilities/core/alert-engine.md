@@ -6,6 +6,20 @@
 
 All'orario di alert dell'utente: calcolare il **diff** di ogni carrello con alert attivi rispetto alla **baseline**, aggregare gli eventi in un solo digest, registrarlo nello storico, consegnarlo ai canali attivi, avanzare la baseline.
 
+```mermaid
+flowchart TD
+    START["run(user_id)"] --> LOOP{per ogni carrello<br/>con alert attivi}
+    LOOP --> SNAP[carica baseline<br/>alert_snapshot]
+    SNAP -->|mai seminata| SEED[seed silenzioso] --> LOOP
+    SNAP --> EVAL[cart_engine.evaluate]
+    EVAL --> DIFF[diff prodotti + eventi carrello<br/>vs baseline, filtra sui tipi abilitati]
+    DIFF --> ADV[salva snapshot:<br/>la baseline avanza sempre] --> LOOP
+    LOOP -->|fine| AGG{ci sono eventi?}
+    AGG -->|sì| LOG[salva AlertEvent in storico<br/>sempre, prima della consegna]
+    LOG --> DISP[consegna ai canali attivi<br/>esiti per canale]
+    AGG -->|no| END[nessuna notifica]
+```
+
 ## Input / Output
 
 | | |

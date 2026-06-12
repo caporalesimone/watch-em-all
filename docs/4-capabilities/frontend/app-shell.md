@@ -21,6 +21,20 @@ src/frontend/src/
 └── i18n/              # file di lingua del core: V1 solo en.json (le lingue future si aggiungono qui); i plugin hanno le proprie cartelle i18n
 ```
 
+## Sequenza di boot
+
+```mermaid
+flowchart TD
+    BOOT[boot SPA] --> THEME[applica tema da localStorage<br/>prima del primo render]
+    THEME --> AUTH{token valido?}
+    AUTH -->|no| LOGIN[pagina login]
+    AUTH -->|sì| ME[GET /api/me]
+    ME --> MCP{must_change_password?}
+    MCP -->|sì| CHG[cambio password forzato]
+    MCP -->|no| PLUG["GET /api/plugins<br/>monta route + voci sidebar"]
+    PLUG --> SHELL[shell: sidebar + area utente/admin]
+```
+
 ## Shell e navigazione
 
 - **Sidebar sinistra persistente**: Dashboard · Product Picker · Carrelli · Storico prezzi · Storico alert (badge non letti) · Profilo · *(separatore)* · gruppo **SCRAPERS** collassabile (default aperto), **ultimo** così cresce senza spostare le voci core; voci dinamiche da `GET /api/plugins` con icona e route del plugin.

@@ -45,6 +45,16 @@ Insieme a `plugin_id` e `user_id` forma l'identità nel catalogo (UNIQUE sul DB)
 
 La derivazione è un **template method**: la base separa ciò che è site-specific (il **seme**, che il plugin **deve** fornire) da ciò che dev'essere identico ovunque (l'**hashing/normalizzazione**, che la base impone e il plugin non può sovrascrivere). Così tutti gli scraper condividono la stessa logica di identità ad alto livello, e l'unico bug davvero pericoloso — un hashing non deterministico tra processi (`worker` vs `web`) — diventa impossibile per costruzione, non solo "testato".
 
+```mermaid
+flowchart LR
+    RAW[raw item dal sito] --> SEED["identity_seed(raw)<br/>plugin — astratto"]
+    SEED -->|SKU/ID nativo| SD[seme]
+    SEED -->|None| URL["normalize_url(url)<br/>base — final"]
+    URL --> SD
+    SD --> HASH["_stable_id: SHA-256 → 16 hex<br/>base — final"]
+    HASH --> EID[external_id<br/>stabile e univoco]
+```
+
 ```python
 class ScraperPlugin(ABC):
 

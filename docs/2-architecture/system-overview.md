@@ -92,6 +92,29 @@ graph LR
 | Auth | JWT (access breve + refresh ruotato), ruoli | [L4](../4-capabilities/core/auth.md) |
 | Notification Dispatch | Consegna ai notifier abilitati, registrazione esiti per canale | [Notification architecture](notification-architecture.md) |
 
+## Modello di esecuzione (concorrenza)
+
+Il backend è **sincrono** (scelta dichiarata, [BE-21](../developer-rules/backend/rules.md); razionale nella tabella delle decisioni in fondo): nessun asyncio nel core né nei plugin. La concorrenza esiste solo in due punti, entrambi proprietà del sistema e non delle feature — il **threadpool** con cui FastAPI serve gli endpoint sincroni nel container `web`, e il **runner a thread singolo** del `worker` (un solo scraper alla volta, SCHED-R6). I plugin restano codice sequenziale semplice da scrivere.
+
+```mermaid
+flowchart TB
+    subgraph WEB["Container web — sincrono"]
+        direction TB
+        REQ[Richieste API<br/>≤5-10 utenti] --> TP[Threadpool FastAPI<br/>~N worker sync]
+        TP --> S1[Session SQLAlchemy<br/>psycopg sync]
+    end
+    subgraph WK["Container worker — sincrono"]
+        direction TB
+        TICK[Dispatcher<br/>tick/min, mai bloccante] --> Q[Coda FIFO dei job dovuti]
+        Q --> RUN[Runner: 1 thread<br/>uno scraper alla volta]
+        RUN --> S2[Session dedicata<br/>+ advisory lock per-scraper]
+    end
+    S1 --> DB[(PostgreSQL<br/>pool di connessioni)]
+    S2 --> DB
+```
+
+Le manopole di scalabilità a parità di architettura sono due e di sola configurazione: dimensione del **threadpool** del web e del **pool di connessioni** verso Postgres. Oltre la postura attuale (decine→centinaia di richieste concorrenti, parallelismo tra scraper), l'evoluzione verso async e/o pool di esecuzione è un [future improvement](../future-improvements/platform.md).
+
 ## Confini core ↔ plugin
 
 Il core comunica con i plugin **solo** attraverso contratti dichiarativi:
@@ -137,5 +160,6 @@ sequenceDiagram
 | Stato dei plugin | **Tabelle dedicate per plugin** | Nessuna tabella generica condivisa; il core non le conosce |
 | Frontend | **SPA client-side** (no SSR) | App dietro login, niente SEO; il mounting dinamico dei plugin è naturale lato client |
 | Notifiche mancate | **Storico interno sempre scritto** | Il notifier è un canale aggiuntivo, mai un single point of failure informativo |
+| Modello di esecuzione backend | **Sincrono** (endpoint nel threadpool, psycopg sync, plugin sync) | A ≤5-10 utenti l'async non dà throughput; il runner è già a thread e i plugin restano semplici; si scala con tuning di threadpool/pool DB, async è un'evoluzione futura — vedi [Modello di esecuzione](#modello-di-esecuzione-concorrenza) |
 | Concorrenza scraper | **Esecuzione seriale (un solo scraper alla volta); scraper internamente mono-thread** | Carico prevedibile, niente parametri di parallelismo da tarare; gli orari indipendenti per scraper distribuiscono il lavoro; vedi [scheduling-and-execution.md](scheduling-and-execution.md) |
 | Riuso dei dati di scrape | **Cache per query con emivita per-plugin** | La stessa ricerca, tra utenti o run ravvicinate, costa una sola visita al sito; vedi [scheduling-and-execution.md](scheduling-and-execution.md) |

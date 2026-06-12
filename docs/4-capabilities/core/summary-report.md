@@ -6,6 +6,18 @@
 
 Generare lo **snapshot periodico** dei carrelli dell'utente e consegnarlo con lo stesso meccanismo dei digest. Nessuna baseline, nessun diff: fotografia dello stato corrente.
 
+```mermaid
+flowchart LR
+    R["run(user_id)"] --> LOOP{per ogni carrello<br/>con membri}
+    LOOP --> EV[cart_engine.evaluate<br/>stato corrente, nessun diff]
+    EV --> SC[SummaryCart + prodotti<br/>con tag di stato]
+    SC --> LOOP
+    LOOP -->|fine| ANY{almeno un carrello?}
+    ANY -->|sì| LOG[salva in storico, kind=summary]
+    LOG --> DISP[consegna ai canali<br/>stesso meccanismo del digest]
+    ANY -->|no| END[niente]
+```
+
 ## Modello del payload
 
 ```python
