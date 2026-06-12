@@ -14,14 +14,16 @@ Si crea una cartella con un manifest e due file: al rebuild il plugin **appare d
 
 ### Backend
 
-- [ ] **2.B1 — Manifest e registry** (~3h): parser+validazioni del manifest (type/cartella, api_version, name univoco, `plugin_id` coincidente), load isolato con rifiuto esplicito ([plugin-registry](../4-capabilities/core/plugin-registry.md), [manifest-reference](../plugin-development/manifest-reference.md)). *Verifica: manifest rotto → log error, app su.*
-- [ ] **2.B2 — Plugin Context minimo** (~2h): db (tabelle proprie), logger, config; niente http per ora ([plugin-context](../4-capabilities/core/plugin-context.md)). *Verifica: il demo crea una sua tabella in `initialize()`.*
-- [ ] **2.B3 — Discovery API + route plugin** (~2h): `GET /api/plugins` (senza path interni), router del demo sotto `/api/plugins/demo` con tag Swagger. *Verifica: endpoint del demo visibile e funzionante in Swagger.*
+- [ ] **2.B1 — Parser del manifest** (~1h): parsing + validazioni (type/cartella, `api_version`, name univoco, `plugin_id` coincidente) ([manifest-reference](../plugin-development/manifest-reference.md)). *Verifica: unit test su manifest validi e rotti.*
+- [ ] **2.B2 — Registry con load isolato** (~1h): caricamento dei plugin abilitati, rifiuto esplicito del singolo plugin rotto senza far cadere l'app ([plugin-registry](../4-capabilities/core/plugin-registry.md)). *Verifica: manifest rotto → log error, app su, gli altri plugin vivi.*
+- [ ] **2.B3 — Plugin Context minimo** (~1h): db (tabelle proprie), logger, config; niente http per ora ([plugin-context](../4-capabilities/core/plugin-context.md)). *Verifica: il demo crea una sua tabella in `initialize()`.*
+- [ ] **2.B4 — Discovery API + route plugin** (~1h): `GET /api/plugins` (senza path interni), router del demo sotto `/api/plugins/demo` con tag Swagger. *Verifica: endpoint del demo visibile e funzionante in Swagger.*
 
 ### Frontend
 
-- [ ] **2.F1 — Registro generato dal build** (~2h): step `build:plugins` → `plugin-registry.ts` generato dai manifest ([build-system](../infrastructure/build-system.md)). *Verifica: plugin abilitato/disabilitato → registro coerente al rebuild.*
-- [ ] **2.F2 — Discovery runtime e mounting** (~3h): fetch `/api/plugins`, route dinamica, voce in sidebar con icona, gestione mismatch bundle/runtime ([plugin-discovery](../4-capabilities/frontend/plugin-discovery.md)). *Verifica: pagina del demo raggiungibile dalla sidebar.*
+- [ ] **2.F1 — Registro generato dal build** (~1h): step `build:plugins` → `plugin-registry.ts` generato dai manifest ([build-system](../infrastructure/build-system.md)). *Verifica: plugin abilitato/disabilitato → registro coerente al rebuild.*
+- [ ] **2.F2 — Route dinamica + sidebar** (~1h): fetch `/api/plugins`, route dinamica, voce in sidebar con icona ([plugin-discovery](../4-capabilities/frontend/plugin-discovery.md)). *Verifica: pagina del demo raggiungibile dalla sidebar.*
+- [ ] **2.F3 — Gestione mismatch bundle/runtime** (~1h): plugin nel bundle ma assente a runtime (voce nascosta) e viceversa (segnalazione esplicita). *Verifica: i due casi di mismatch gestiti senza errori in console.*
 
 ## Definition of Done
 

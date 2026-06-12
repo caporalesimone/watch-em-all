@@ -14,6 +14,9 @@ Pipeline minima (GitHub Actions) su ogni push/PR: esegue i tool già scelti dal 
 | Lint frontend | `eslint` · `prettier --check` · `svelte-check` | bloccante |
 | Build frontend | `npm run build` (include `build:plugins`) | bloccante |
 | Build immagini | build di `web`/`worker`/`ops`; **su PR** push come `dev-<branch>` (vedi *Immagini dev*) | bloccante |
+| Guardia CHANGELOG | la PR deve aggiornare `CHANGELOG.md` (ogni PR = una versione, INF-19) | bloccante |
+
+La pipeline nasce in **fase 0** del [development flow](../development-flow/phase-00-pipeline.md) (build immagini, guardia CHANGELOG, publish dev e su tag) e **cresce col flusso**: linter e typecheck con il primo codice (fase 1), test di contratto e integrazione a regime (fase 12).
 
 ## Immagini dev (su PR)
 

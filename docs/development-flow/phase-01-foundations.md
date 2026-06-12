@@ -1,10 +1,10 @@
 # Fase 1 — Fondamenta
 
-> Stato: ☐ da iniziare · Prerequisiti: nessuno · [Indice del flusso](README.md)
+> Stato: ☐ da iniziare · Prerequisiti: Fase 0 · [Indice del flusso](README.md)
 
 ## Obiettivo
 
-Lo scheletro vivo: stack su Docker, database, autenticazione, shell della SPA. Tutto ciò che le fasi successive danno per scontato.
+Lo scheletro vivo: l'app vera al posto degli stub di fase 0 — database, autenticazione, shell della SPA. Tutto ciò che le fasi successive danno per scontato. La pipeline c'è già (fase 0): ogni MVP qui sotto nasce come PR con la sua immagine `dev-<branch>` da provare.
 
 ## Risultato apprezzabile
 
@@ -14,32 +14,36 @@ Lo scheletro vivo: stack su Docker, database, autenticazione, shell della SPA. T
 
 ### Backend
 
-- [ ] **1.B1 — Skeleton e compose** (~3h): monorepo ([struttura](../infrastructure/build-system.md)), compose `db`+`web` con healthcheck, loader config (`config.yaml` + `.env`), `GET /api/health`. *Verifica: compose up, health verde.*
-- [ ] **1.B2 — Utenti e bootstrap** (~2h): tabella `users` ([schema](../4-capabilities/database/schema.md)), hashing bcrypt, creazione admin iniziale da `.env` con `must_change_password`. *Verifica: riga admin nel DB via Adminer (profilo dev).*
-- [ ] **1.B3 — Auth JWT** (~4h): login/refresh/logout/change-password con `typ`, rotazione jti, `token_version`, rate limit sul login ([auth](../4-capabilities/core/auth.md)). *Verifica: flusso completo da Swagger, refresh riusato → 401.*
-- [ ] **1.B4 — Endpoint profilo** (~1h): `GET/PATCH /api/me` (lingua), 403 dedicato per `must_change_password`. *Verifica: da Swagger.*
+- [ ] **1.B1 — Loader di configurazione** (~1h): lettura `config.yaml` + `.env`, interpolazione `${VAR}`, validazione all'avvio ([configuration](../infrastructure/configuration.md)). *Verifica: unit test del loader (chiave mancante → errore chiaro).*
+- [ ] **1.B2 — App FastAPI + health** (~1h): app vera nel container `web` (sostituisce lo stub 0.T3), `GET /api/health` con check del DB, Swagger su `/api/docs`. *Verifica: compose up → health verde; DB giù → 503.*
+- [ ] **1.B3 — Utenti e bootstrap** (~1h): tabella `users` ([schema](../4-capabilities/database/schema.md)), hashing bcrypt, creazione admin iniziale da `.env` con `must_change_password`. *Verifica: riga admin nel DB via Adminer (profilo dev).*
+- [ ] **1.B4 — Login e logout** (~1h): `POST /api/auth/login` (JWT `typ=access`) + logout. **Mock**: niente refresh — la sessione dura quanto l'access token; lo sostituisce 1.B5. *Verifica: login da Swagger → token valido sulle route protette.*
+- [ ] **1.B5 — Refresh con rotazione** (~1h): refresh token, rotazione `jti`, `token_version`, riuso → 401 ([auth](../4-capabilities/core/auth.md)). *Verifica: refresh riusato → 401; logout invalida la famiglia.*
+- [ ] **1.B6 — Change-password + rate limit** (~1h): cambio password, 403 dedicato per `must_change_password`, rate limit sul login. *Verifica: flusso completo da Swagger; brute-force → 429.*
+- [ ] **1.B7 — Endpoint profilo** (~1h): `GET/PATCH /api/me` (lingua). *Verifica: da Swagger.*
 
 ### Frontend
 
-- [ ] **1.F1 — Shell SPA** (~4h): SvelteKit SPA, pagina login, [Auth Manager](../4-capabilities/frontend/auth-manager.md) (single-flight sul refresh), sidebar statica, tema scuro/chiaro senza flash ([app-shell](../4-capabilities/frontend/app-shell.md)). *Verifica: login da browser, reload mantiene la sessione.*
-- [ ] **1.F2 — Cambio password forzato + profilo minimo** (~2h): intercettazione del 403 dedicato → pagina di cambio obbligato; pagina profilo con cambio password e lingua. *Verifica: primo login admin → cambio obbligato.*
+- [ ] **1.F1 — Scaffold SPA + i18n + tema** (~1h): SvelteKit SPA, **svelte-i18n con `en.json` (+ `it.json`)** fin dalla prima pagina — nessuna stringa cablata (FE-13) —, tema scuro/chiaro senza flash ([app-shell](../4-capabilities/frontend/app-shell.md)). *Verifica: pagina segnaposto tradotta, nei due temi, senza flash al reload.*
+- [ ] **1.F2 — Login + Auth Manager** (~1h): pagina login, [Auth Manager](../4-capabilities/frontend/auth-manager.md) con single-flight sul refresh. *Verifica: login da browser, reload mantiene la sessione.*
+- [ ] **1.F3 — Shell con sidebar** (~1h): layout protetto, sidebar statica, route guard. *Verifica: senza sessione → redirect al login; navigazione fluida.*
+- [ ] **1.F4 — Cambio password forzato** (~1h): intercettazione del 403 dedicato → pagina di cambio obbligato. *Verifica: primo login admin → cambio obbligato, poi accesso normale.*
+- [ ] **1.F5 — Pagina profilo minima** (~1h): cambio password e lingua. *Verifica: cambio lingua → UI tradotta subito.*
 
 ### Trasversali
 
-- [ ] **1.T1 — CI minima** (~2h): GitHub Actions con ruff, mypy, eslint/svelte-check, build frontend ([ci](../infrastructure/ci.md)). *Verifica: PR con errore di lint → rossa.*
-- [ ] **1.T2 — Dev container** (~2h): `.devcontainer/` (Dockerfile con Python 3.12+Poetry, Node LTS+npm, git, docker CLI; socket Docker dell'host; devcontainer.json con forward 8080/8081) ([dev-container](../infrastructure/dev-container.md), INF-15). *Verifica: "Reopen in Container" su host con solo Docker → poetry/npm/compose funzionano da dentro; nessuna toolchain richiesta sull'host.*
-- [ ] **1.T3 — Immagine ops: backup/export/restore** (~2h): `ops/backup.sh`, `ops/export.sh`, `ops/restore.sh`; immagine `ops` (`postgres:16` + script, `packages/ops/Dockerfile`); servizio effimero nel compose con mount di `backups/` (gitignorata) e dei file di bootstrap locali ([backup-and-restore](../infrastructure/backup-and-restore.md), INF-16). *Verifica: backup → `down -v` → `up` → restore → login con gli stessi dati e config; restore con stack web/worker attivo → rifiuta.*
-- [ ] **1.T4 — Pipeline di publish + deploy kit** (~3h): workflow su tag `v*` → build e push di `web`/`worker`/`ops` su GHCR; `deploy/compose.yml` (immagini, niente `build:`, `config.yaml` di default nelle immagini con mount di override commentato) e `.env.example` con `WEA_VERSION`, allegati alla release; README del repo con le istruzioni complete di install e manutenzione ([ci](../infrastructure/ci.md), [deployment](../infrastructure/deployment.md), INF-17/INF-18). *Verifica: tag `v0.1.0-alpha` → su una macchina pulita con il **solo Docker**, scaricando i due file del kit: `pull` + `up` → login funzionante, **senza sorgenti**.*
+- [ ] **1.T1 — CI: lint e typecheck** (~1h): ruff, mypy, eslint/svelte-check e build frontend nel workflow di fase 0 ([ci](../infrastructure/ci.md)). *Verifica: PR con errore di lint → rossa.*
+- [ ] **1.T2 — `backup.sh` + `export.sh` reali** (~1h): sostituiscono i segnaposto di 0.T4 — dump + `.env` (+ `config.yaml` se override locale) in archivio datato su `backups/` ([backup-and-restore](../infrastructure/backup-and-restore.md), INF-16). *Verifica: archivio creato con dump e file di bootstrap dentro.*
+- [ ] **1.T3 — `restore.sh` reale** (~1h): verifica dell'archivio, conferma esplicita, rifiuto se lo stack web/worker è attivo. *Verifica: backup → `down -v` → `up` → restore → login con gli stessi dati e config.*
 
 ## Definition of Done
 
 - [ ] Da zero: `cp .env.example .env` + compose up + login + cambio password, senza toccare altro.
-- [ ] Su un host Linux/WSL2 con il **solo Docker** si sviluppa (dev container) e si hosta: nessun altro software richiesto (INF-15).
-- [ ] **Distribuzione provata**: un tag pubblica le immagini e il deploy kit; l'installazione pull-based (due file, nessun sorgente) funziona su macchina pulita (INF-17).
-- [ ] Il README del repo basta da solo per installare e manutenere (INF-18).
+- [ ] Gli stub di fase 0 per `web` e per gli script `ops` sono **sostituiti dall'app reale** (resta stub solo il worker, fino alla fase 4).
+- [ ] Una release di questa fase, installata pull-based dal deploy kit, mostra il login reale (INF-17).
 - [ ] Il ciclo backup → distruzione volume → restore riproduce un'installazione identica.
 - [ ] Swagger mostra Auth/Me/Health con modelli tipizzati.
-- [ ] CI verde su `main`.
+- [ ] CI verde su `main` con i linter attivi.
 - [ ] [docs-eng](../../docs-eng/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti

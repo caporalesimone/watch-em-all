@@ -14,17 +14,25 @@ Chiudere il perimetro della v1: il secondo canale di notifica (che dimostra la b
 
 ### Backend
 
-- [ ] **12.B1 — Notifier Discord** (~4h): webhook per-utente (config solo utente), embed per digest e summary con limiti gestiti, gestione 404/429 ([discord](../implemented-plugins/notifiers/discord.md), chiude DSC-Q1/Q2). *Verifica: digest su un canale Discord reale; secondo canale attivo insieme all'email.*
-- [ ] **12.B2 — CI piena + test di contratto** (~4h): suite di contratto per scraper e notifier in CI per ogni plugin abilitato, test d'integrazione su Postgres effimero, coverage dei moduli critici ([checklist-and-testing](../plugin-development/checklist-and-testing.md), [ci](../infrastructure/ci.md)). *Verifica: rompere un contratto di plugin → CI rossa.*
+- [ ] **12.B1 — Discord: invio del digest** (~1h): webhook per-utente (config solo utente), embed per il digest ([discord](../implemented-plugins/notifiers/discord.md)). *Verifica: digest su un canale Discord reale; secondo canale attivo insieme all'email.*
+- [ ] **12.B2 — Discord: summary e limiti** (~1h): embed del summary, gestione dei limiti di lunghezza degli embed. *Verifica: digest molto lungo → spezzato/troncato in modo leggibile.*
+- [ ] **12.B3 — Discord: errori del webhook** (~1h): gestione 404 (webhook revocato) e 429 (rate limit) — chiude DSC-Q1/Q2. *Verifica: webhook revocato → esito failed con motivo chiaro all'utente.*
+- [ ] **12.B4 — Test di contratto: scraper** (~1h): suite di contratto eseguita in CI per ogni scraper abilitato ([checklist-and-testing](../plugin-development/checklist-and-testing.md)). *Verifica: rompere il contratto di Dragon Store → CI rossa.*
+- [ ] **12.B5 — Test di contratto: notifier** (~1h): idem per i notifier (Email, Discord). *Verifica: rompere un contratto notifier → CI rossa.*
+- [ ] **12.B6 — Integrazione su Postgres effimero** (~1h): test d'integrazione in CI su Postgres effimero, coverage dei moduli critici ([ci](../infrastructure/ci.md)). *Verifica: suite verde in CI, rossa su regressione DB.*
 
 ### Frontend
 
-- [ ] **12.F1 — UX polish** (~3h): stati vuoti curati (FE-12), conferme distruttive con conseguenze (FE-11), responsive di base, revisione dark/light su tutte le pagine. *Verifica: giro completo dell'app da utente nuovo senza momenti "e adesso?".*
+- [ ] **12.F1 — Stati vuoti** (~1h): stati vuoti curati su tutte le pagine (FE-12). *Verifica: giro da utente nuovo senza momenti "e adesso?".*
+- [ ] **12.F2 — Conferme distruttive + responsive** (~1h): conferme con conseguenze esplicite (FE-11), responsive di base. *Verifica: ogni azione distruttiva dichiara cosa cancella.*
+- [ ] **12.F3 — Revisione dark/light** (~1h): passata su tutte le pagine nei due temi. *Verifica: nessun elemento illeggibile nei due temi.*
 
 ### Trasversali
 
-- [ ] **12.T1 — Audit i18n English-first** (~3h): audit delle stringhe — `en.json` completo nelle cartelle `i18n/` di core e plugin (frontend e backend dei notifier); nessuna stringa cablata né concatenata (FE-13); fallback su `en` verificato. *Verifica: app e notifiche complete in inglese; nessuna chiave mancante a runtime.*
-- [ ] **12.T2 — Doc allineata + release** (~2h): verifica documentazione vs implementato (DOC-8), audit del README come manuale operativo completo — install, update, backup/restore, tutti i comandi e script (INF-18), changelog, tag `v1.0` → publish su GHCR + deploy kit in release ([ci](../infrastructure/ci.md), INF-17); prova di installazione pull-based da zero seguendo **solo il README**. *Verifica: macchina pulita con solo Docker + i due file del kit → sito su e manutenibile senza conoscenze esterne.*
+- [ ] **12.T1 — Audit i18n: backend e notifier** (~1h): `en.json` completo nelle cartelle `i18n/` di core e plugin backend (notifier inclusi); nessuna stringa cablata né concatenata. *Verifica: notifiche complete in inglese, nessuna chiave mancante a runtime.*
+- [ ] **12.T2 — Audit i18n: frontend** (~1h): `en.json` completo per core e plugin frontend (FE-13), fallback su `en` verificato. *Verifica: app completa in inglese.*
+- [ ] **12.T3 — Doc allineata + audit README** (~1h): verifica documentazione vs implementato (DOC-8); audit del README come manuale operativo completo — install, update, backup/restore, tutti i comandi e script (INF-18). *Verifica: nessuna divergenza doc/codice nota; README autosufficiente.*
+- [ ] **12.T4 — Release 1.0** (~1h): changelog, tag `v1.0.0` → publish su GHCR + deploy kit in release ([ci](../infrastructure/ci.md), INF-17); prova di installazione pull-based da zero seguendo **solo il README**. *Verifica: macchina pulita con solo Docker + i due file del kit → sito su e manutenibile senza conoscenze esterne.*
 
 ## Definition of Done
 

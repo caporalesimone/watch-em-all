@@ -14,13 +14,15 @@ Dal Product Picker apri il grafico di un prodotto: linea a gradini del prezzo, b
 
 ### Backend
 
-- [ ] **8.B1 — Serie prodotto** (~2h): `GET /api/products/{id}/history?range=` a gradini con flag disponibilità, inclusa l'entry-prima-del-range ([price-history capability](../4-capabilities/core/price-history.md)). *Verifica: serie corretta su fixture con gap.*
-- [ ] **8.B2 — Serie carrello** (~2h): somma a gradini della composizione corrente (semplificazione HIST-R4), `GET /api/carts/{id}/history`. *Verifica: il totale della serie "oggi" coincide col totale della card.*
+- [ ] **8.B1 — Serie prodotto** (~1h): `GET /api/products/{id}/history?range=` a gradini con flag disponibilità, inclusa l'entry-prima-del-range ([price-history capability](../4-capabilities/core/price-history.md)). *Verifica: serie corretta su fixture con gap.*
+- [ ] **8.B2 — Serie carrello** (~1h): somma a gradini della composizione corrente (semplificazione HIST-R4), `GET /api/carts/{id}/history`. *Verifica: il totale della serie "oggi" coincide col totale della card.*
 
 ### Frontend
 
-- [ ] **8.F1 — Componente grafico** (~4h): **unico componente** del design system: gradini, gap espliciti, selettori, tooltip (data, prezzo, disponibilità), entrambi i temi. *Verifica: vista prodotto conforme a [price-history (feature)](../3-features/user/price-history.md).*
-- [ ] **8.F2 — Pagina Storico prezzi + accessi** (~3h): navigazione per prodotto e per carrello (stesso componente), accesso dal Product Picker e dalla card del carrello. *Verifica: pagina completa da sidebar e dai punti di accesso.*
+- [ ] **8.F1 — Componente grafico: gradini e gap** (~1h): linea a gradini, gap di disponibilità espliciti e non interpolati — **un componente unico** del design system. **Mock**: alimentato da una serie statica finché non è collegato (8.F3). *Verifica: resa conforme a [price-history (feature)](../3-features/user/price-history.md) sulla serie di prova.*
+- [ ] **8.F2 — Componente grafico: range, tooltip, temi** (~1h): selettori Week/Month/All, tooltip (data, prezzo, disponibilità), entrambi i temi. *Verifica: interazioni fluide nei due temi.*
+- [ ] **8.F3 — Pagina Storico prezzi** (~1h): navigazione per prodotto e per carrello (stesso componente, due sorgenti dati reali). *Verifica: pagina completa da sidebar.*
+- [ ] **8.F4 — Accessi dal Picker e dalla card** (~1h): apertura del grafico dal Product Picker e dalla card del carrello. *Verifica: i punti di accesso portano al grafico giusto.*
 
 ## Definition of Done
 

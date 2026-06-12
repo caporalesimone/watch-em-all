@@ -1,6 +1,6 @@
 # Development Flow — Indice e stato di avanzamento
 
-> Come si sviluppa Watch 'Em All: **per piccoli MVP apprezzabili**. Ogni MVP richiede **al massimo qualche ora** di sviluppo; ogni **fase** si chiude con qualcosa di **utilizzabile e dimostrabile** — mai "lavoro a metà" che vive solo nei branch.
+> Come si sviluppa Watch 'Em All: **per piccoli MVP apprezzabili**. Ogni MVP si risolve in **al massimo un'ora** di sviluppo; ogni **fase** si chiude con qualcosa di **utilizzabile e dimostrabile** — mai "lavoro a metà" che vive solo nei branch.
 
 ## Le regole del flusso
 
@@ -9,12 +9,15 @@
 3. **Una fase è chiusa solo se la sua *Definition of Done* è vera** provandola da utente, non leggendo il codice.
 4. **Le checkbox si aggiornano nella stessa PR** che completa l'MVP (questo indice + il documento di fase).
 5. Se durante una fase emerge lavoro non previsto: o è un MVP nuovo nella fase giusta, o un [future improvement](../future-improvements/README.md). Mai scope-creep silenzioso.
-6. Le stime sono in ore di sviluppo concentrato; sforare non è un dramma, **spezzare l'MVP sì** (significa che era troppo grosso).
-7. In ogni fase gli MVP sono separati in **Backend** (`N.B*`), **Frontend** (`N.F*`) ed eventuali **Trasversali** (`N.T*`). Gli MVP frontend dipendono dagli endpoint dei corrispondenti backend, ma possono partire in parallelo sviluppando contro il contratto documentato in [api/endpoints.md](../api/endpoints.md) (l'API nasce nel catalogo prima dell'implementazione).
-8. **Docs inglesi a fine fase** (DOC-12): la chiusura di una fase include l'aggiornamento di `docs-eng/` (root del repo) con l'equivalente inglese della documentazione della **sola parte implementata**, stessa alberatura di `docs/`. È un item della Definition of Done di ogni fase.
+6. **Un MVP = al massimo un'ora** di sviluppo concentrato: se in fase di analisi (o a metà lavoro) si capisce che non ci sta, **si spezza prima di iniziare** — un MVP più lungo di un'ora era due MVP.
+7. **I mock sono ammessi** per chiudere un MVP nell'ora — purché **dichiarati**: il documento di fase (e la PR) dicono esplicitamente *cosa* è mockato e *quale MVP* lo sostituirà. Mai mock silenziosi.
+8. In ogni fase gli MVP sono separati in **Backend** (`N.B*`), **Frontend** (`N.F*`) ed eventuali **Trasversali** (`N.T*`). Gli MVP frontend dipendono dagli endpoint dei corrispondenti backend, ma possono partire in parallelo sviluppando contro il contratto documentato in [api/endpoints.md](../api/endpoints.md) (l'API nasce nel catalogo prima dell'implementazione).
+9. **Docs inglesi a fine fase** (DOC-12): la chiusura di una fase include l'aggiornamento di `docs-eng/` (root del repo) con l'equivalente inglese della documentazione della **sola parte implementata**, stessa alberatura di `docs/`. È un item della Definition of Done di ogni fase.
 
 ## Avanzamento
 
+- [ ] **Fase 0 — Pipeline e processo** → [phase-00-pipeline.md](phase-00-pipeline.md)
+  *Risultato: container (stub), workflow GitHub, immagine dev sul branch, release sul tag: il processo è rodato end-to-end prima di qualsiasi codice di prodotto.*
 - [ ] **Fase 1 — Fondamenta** → [phase-01-foundations.md](phase-01-foundations.md)
   *Risultato: l'app parte con Docker, si fa login, la shell c'è.*
 - [ ] **Fase 2 — Plugin system** → [phase-02-plugin-system.md](phase-02-plugin-system.md)
@@ -44,11 +47,12 @@
 
 ```mermaid
 flowchart LR
-    F1[1 Fondamenta] --> F2[2 Plugin system] --> F3[3 Primo scrape] --> F4[4 Worker]
+    F0[0 Pipeline] --> F1[1 Fondamenta] --> F2[2 Plugin system] --> F3[3 Primo scrape] --> F4[4 Worker]
     F4 --> F5[5 Carrelli] --> F6[6 Alert in-app] --> F7[7 Email 🎉 v0.1]
     F7 --> F8[8 Grafici] --> F9[9 DragonStore full] --> F10[10 Admin] --> F11[11 Insight] --> F12[12 v1.0]
 ```
 
+- La fase 0 costruisce e **roda il processo** (CI, immagini dev sul branch, release sul tag, deploy kit) con container stub: **prima che esista il prodotto, esiste il suo flusso di rilascio** — ogni fase successiva ne beneficia dalla prima PR.
 - Le fasi 1-7 percorrono la **catena del valore minima** del prodotto (login → plugin → dati → automazione → carrelli → alert → consegna): alla fase 7 il sistema fa già, per intero, il suo mestiere su prodotti singoli.
 - Le fasi 8-11 **arricchiscono** (grafici, categorie, governo, insight) su un prodotto che già si usa tutti i giorni — ogni fase è valore visibile, non infrastruttura.
 - La fase 12 chiude il perimetro della [v1](../1-business/product-overview.md).
