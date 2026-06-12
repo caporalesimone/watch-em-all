@@ -61,6 +61,50 @@ flowchart LR
 3. Dentro il container: `cp .env.example .env`, `docker compose --profile dev up`.
 4. Test, lint, build: sempre dal terminale del dev container — mai dall'host.
 
+## Architettura completa
+
+La vista d'insieme del docker-outside-of-docker: un solo engine (dell'host), il dev container come fratello — non genitore — dei container applicativi, e l'editor che è solo UI.
+
+```mermaid
+flowchart TB
+    DEV["👤 Sviluppatore"]
+    BROWSER["🌐 Browser<br/>localhost:8080 / 8081"]
+
+    subgraph HOST["Host Linux / WSL2 — installato: SOLO Docker"]
+        EDITOR["VS Code<br/>(UI sull'host, nessuna toolchain)"]
+
+        ENGINE["⚙️ Docker Engine<br/>l'unico daemon, dell'host<br/>/var/run/docker.sock"]
+
+        subgraph CONTAINERS["container — tutti fratelli, sullo stesso engine"]
+            subgraph DC["🛠️ dev container"]
+                TOOLS["toolchain<br/>Python 3.12 + Poetry<br/>Node 22 + npm<br/>git · gh · docker CLI"]
+                SRC["📁 /workspace<br/>repo (bind mount)"]
+            end
+            DB[("db<br/>PostgreSQL 16")]
+            WEB["web<br/>FastAPI + SPA"]
+            WK["worker"]
+            ADM["adminer<br/>(profilo dev)"]
+        end
+
+        GHVOL[("volume<br/>watchemall-gh-config<br/>auth di gh persistente")]
+    end
+
+    GITHUB["☁️ GitHub<br/>repo · PR · GHCR"]
+
+    DEV --> EDITOR
+    EDITOR -- "attach (Dev Containers)" --> DC
+    TOOLS -- "docker compose up<br/>via socket montato" --> ENGINE
+    ENGINE -- "crea e governa" --> DB & WEB & WK & ADM
+    WEB --- DB
+    WK --- DB
+    ADM --- DB
+    GHVOL -. "mount ~/.config/gh" .-> DC
+    TOOLS -- "git push · gh pr create" --> GITHUB
+    BROWSER -- "forward 8080 (web) · 8081 (adminer)" --> WEB & ADM
+```
+
+Da leggere nel disegno: i container applicativi creati da dentro il dev container nascono **accanto** a lui (un `docker ps` dall'host vede tutto, dev container incluso); l'unico stato che sopravvive ai rebuild è il volume dell'auth `gh`; verso l'esterno escono solo le porte forwardate e il traffico git/gh.
+
 ## Hosting
 
 Il deployment su server o su WSL2 **non richiede il dev container né i sorgenti**: è pull-based — deploy kit (compose di release + `.env`) e immagini pubblicate su GHCR ([deployment](deployment.md)). Il dev container usa invece il **compose di sviluppo** del repo (`docker-compose.yml`, con `build:`): stessa forma, sorgenti locali. L'unico prerequisito dell'host, in entrambi i casi, resta Docker.

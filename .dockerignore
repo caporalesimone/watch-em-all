@@ -1,0 +1,11 @@
+# Build context hygiene: images are built from the repo root.
+.git/
+.devcontainer/
+docs/
+docs-eng/
+backups/
+deploy/
+node_modules/
+**/__pycache__/
+.venv/
+.env
