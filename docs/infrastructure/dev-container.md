@@ -18,20 +18,24 @@ La cartella `.devcontainer/` alla radice del repo definisce l'ambiente di svilup
 ```
 .devcontainer/
 ├── devcontainer.json    # entrypoint per l'editor
-└── Dockerfile           # toolchain: Python 3.12 + Poetry, Node 22 LTS + npm, git, docker CLI
+├── Dockerfile           # toolchain: Python 3.12 + Poetry, Node 22 LTS + npm, git, docker CLI, gh
+└── post-create.sh       # install tollerante: si attiva da solo quando i file toolchain esistono
 ```
 
 ```jsonc
-// .devcontainer/devcontainer.json (forma di riferimento)
+// .devcontainer/devcontainer.json
 {
   "name": "watch-em-all-dev",
   "build": { "dockerfile": "Dockerfile" },
   "mounts": [
     // docker-outside-of-docker: il dev container comanda il Docker dell'host
-    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
+    // l'auth di gh sopravvive ai rebuild del container (gh auth login una volta sola)
+    "source=watchemall-gh-config,target=/root/.config/gh,type=volume"
   ],
   "forwardPorts": [8080, 8081],
-  "postCreateCommand": "poetry install && npm install"
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "remoteUser": "root"
 }
 ```
 
@@ -39,6 +43,9 @@ Scelte dichiarate:
 
 - **docker-outside-of-docker**: il dev container monta il socket Docker dell'host e lancia `docker compose` da dentro — i container applicativi (`db`, `web`, `worker`, `adminer`) girano sull'engine dell'host, non annidati. Più semplice e leggero del Docker-in-Docker.
 - La toolchain del dev container (Python+Poetry, Node+npm) **rispecchia gli stage di build** dei Dockerfile dei package: stessa versione maggiore, così "funziona nel dev container" implica "builda nell'immagine".
+- **GitHub CLI (`gh`) nel container**: le PR si aprono dal terminale del dev container (sull'host non c'è nulla, INF-15). L'autenticazione si fa una volta (`gh auth login`) e persiste nei rebuild grazie al volume nominato su `~/.config/gh`.
+- **Utente `root` nel container** (semplificazione dichiarata): l'accesso al socket Docker da non-root richiederebbe l'allineamento del GID del gruppo `docker` dell'host; dentro un dev container locale il root è prassi accettata e azzera quella complessità.
+- **Post-create tollerante**: `post-create.sh` installa le dipendenze solo se i file toolchain esistono (`pyproject.toml` arriva con 1.B1, `src/frontend/package.json` con 1.F1) — il dev container nasce in fase 0, prima del codice, senza fallire.
 - Il flusso quotidiano non cambia: `docker compose --profile dev up` (dal terminale **dentro** il dev container), hot-reload tramite i bind-mount del profilo dev.
 
 ## Flusso di lavoro
