@@ -37,6 +37,7 @@ Le **immagini pubblicate** (`watch-em-all-web`, `-worker`, `-ops`) sono buildate
 - **Un solo `pyproject.toml` alla root** (un solo `poetry.lock`): `web` e `worker` condividono lo stesso ambiente Python e caricano gli stessi plugin, quindi le dipendenze sono uniche — un secondo lockfile creerebbe solo drift da tenere allineato a mano. I Dockerfile dei package installano dalla root, ciascuno selezionando i **gruppi opzionali** che gli servono.
 - I **plugin non sono package** formali: cartelle auto-scoperte dal registry. Le loro dipendenze Python (es. un browser headless) si dichiarano nel `pyproject.toml` unico, in un **gruppo opzionale** dedicato.
 - Stack backend: Python 3.12+, Poetry, FastAPI, SQLAlchemy, Pydantic v2.
+- Stack frontend: **Node 22 LTS**, **SvelteKit 2** (Svelte 5, runes), **Tailwind CSS 4**, **svelte-i18n**, Vite. Versioni major fissate al giorno 1 (progetto nuovo, nessun debito di migrazione).
 
 ## Build frontend unificato
 

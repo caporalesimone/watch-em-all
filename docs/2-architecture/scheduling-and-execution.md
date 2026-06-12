@@ -88,6 +88,6 @@ sequenceDiagram
 
 ## Assunzioni temporali (V1)
 
-- Granularità al **minuto**; orari confrontati con l'ora del **server**.
-- Server e utenti nello **stesso fuso orario** (multi-fuso: [future improvement](../future-improvements/README.md)).
+- Granularità al **minuto**; gli orari inseriti sono interpretati nel **fuso configurato dell'installazione** (`TZ`, default `Europe/Rome` — [configuration](../infrastructure/configuration.md)), i timestamp persistiti restano in UTC.
+- **Un solo fuso** per tutta l'installazione, configurabile ma non per-utente (multi-fuso per-utente: [future improvement](../future-improvements/README.md)).
 - I cambi ora legale/solare possono spostare di un'ora la percezione di uno slot due volte l'anno: accettato e documentato, nessuna gestione speciale.

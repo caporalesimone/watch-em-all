@@ -4,7 +4,7 @@
 
 ## Multi-timezone
 
-Gli orari (slot scraper, cadenze alert) sono confrontati con l'ora del server; si assume che server e utenti condividano il fuso. **Miglioria**: timezone per-utente sul profilo, schedule valutati nel fuso dell'utente; gestione DST esplicita. **Rimandato perché**: installazione casalinga, utenti nello stesso fuso. **Trigger**: il primo utente in un fuso diverso.
+L'installazione ha **un solo fuso configurabile** (`TZ`, default `Europe/Rome`): gli orari inseriti sono interpretati lì, i timestamp salvati sono UTC. **Miglioria**: timezone **per-utente** sul profilo, schedule valutati nel fuso di ciascun utente; gestione DST esplicita. **Rimandato perché**: installazione casalinga, utenti nello stesso fuso. **Trigger**: il primo utente in un fuso diverso da quello dell'installazione.
 
 ## Multi-lingua
 

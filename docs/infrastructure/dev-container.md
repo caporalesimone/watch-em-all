@@ -18,7 +18,7 @@ La cartella `.devcontainer/` alla radice del repo definisce l'ambiente di svilup
 ```
 .devcontainer/
 ├── devcontainer.json    # entrypoint per l'editor
-└── Dockerfile           # toolchain: Python 3.12 + Poetry, Node LTS + npm, git, docker CLI
+└── Dockerfile           # toolchain: Python 3.12 + Poetry, Node 22 LTS + npm, git, docker CLI
 ```
 
 ```jsonc

@@ -4,7 +4,7 @@
 
 ## Stile e tipi
 
-- **FE-1** — TypeScript **strict**; `eslint`, `prettier` e `svelte-check` puliti in CI. Niente `any` nei moduli condivisi.
+- **FE-1** — TypeScript **strict**; `eslint`, `prettier` e `svelte-check` puliti in CI. Niente `any` nei moduli condivisi. Baseline fissata: **SvelteKit 2 (Svelte 5, runes)**, **Tailwind CSS 4**, **Node 22 LTS** ([build-system](../../infrastructure/build-system.md)).
 - **FE-2** — Componenti piccoli e a responsabilità unica; la logica non banale vive in moduli TS testabili, non negli script dei componenti.
 - **FE-3** — Naming: `PascalCase.svelte` per i componenti, `camelCase` per funzioni/store, kebab-case per le route.
 
@@ -25,7 +25,7 @@
 
 ## i18n e formati
 
-- **FE-13** — Nessuna stringa cablata nei componenti: tutto da chiavi di traduzione nelle cartelle **`i18n/`** (core o namespace del plugin). **V1 spedisce solo `en`** (English-first): ogni stringa nuova nasce in `en.json`, che deve sempre esistere ed essere completo (è il **fallback** quando una lingua manca); le altre lingue sono riempimento futuro dei file, mai refactor. Mai costruire frasi per concatenazione di chiavi (l'ordine delle parole cambia tra lingue): sempre template interi con placeholder.
+- **FE-13** — Nessuna stringa cablata nei componenti: tutto da chiavi di traduzione nelle cartelle **`i18n/`** (core o namespace del plugin), via **svelte-i18n** (dizionari registrati a runtime, namespace per-plugin caricati lazy). **V1 spedisce solo `en`** (English-first): ogni stringa nuova nasce in `en.json`, che deve sempre esistere ed essere completo (è il **fallback** quando una lingua manca); le altre lingue sono riempimento futuro dei file, mai refactor. Mai costruire frasi per concatenazione di chiavi (l'ordine delle parole cambia tra lingue): sempre template interi con placeholder.
 - **FE-14** — Date con Day.js; prezzi formattati da un'unica utility (simbolo valuta, 2 decimali); attenzione alla convenzione weekday (0=lunedì dal backend ↔ `getDay()` JS parte da domenica: si mappa in un solo punto).
 
 ## Plugin frontend

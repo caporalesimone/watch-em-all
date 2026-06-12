@@ -44,9 +44,13 @@ POSTGRES_DB=watchemall
 SECRET_KEY=change-me
 # Admin iniziale (cambio forzato al primo login)
 ADMIN_INITIAL_PASSWORD=change-me
+# Fuso orario dell'installazione (orari inseriti interpretati qui; timestamp salvati in UTC)
+TZ=Europe/Rome
 ```
 
-Solo segreti **core**: i parametri dei notifier (es. SMTP) **non** stanno qui — vivono nel DB, impostati dall'admin dalla UI (compromesso dichiarato: configurabilità da UI > purezza dei segreti, accettabile su installazione privata; i campi secret sono mascherati e write-only).
+Oltre ai segreti, il `.env` porta alcune **variabili d'ambiente non segrete** consumate dai container: **`TZ`** (fuso dell'installazione) e `WEA_VERSION` (versione delle immagini, [deployment](deployment.md)). `TZ` definisce il **fuso unico** dell'installazione: gli orari inseriti da admin/utente (slot degli scraper, orari di alert e summary) sono **interpretati in questo fuso**, mentre i timestamp **persistiti restano UTC** (BE-13); l'app fa le conversioni in modo esplicito (`zoneinfo`), senza affidarsi all'ora locale ambigua del processo. Default `Europe/Rome`; un solo fuso per tutta l'installazione (per-utente: [future improvement](../future-improvements/platform.md)).
+
+Quanto ai segreti veri: i parametri dei notifier (es. SMTP) **non** stanno qui — vivono nel DB, impostati dall'admin dalla UI (compromesso dichiarato: configurabilità da UI > purezza dei segreti, accettabile su installazione privata; i campi secret sono mascherati e write-only).
 
 ## Impostazioni di sistema (UI admin, default al primo avvio)
 

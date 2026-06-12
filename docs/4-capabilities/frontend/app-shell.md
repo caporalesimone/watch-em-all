@@ -4,7 +4,7 @@
 
 ## Stack
 
-SvelteKit in modalità **SPA** (CSR, adapter-static con fallback; nessun SSR: app dietro login, plugin montati dinamicamente lato client), TypeScript strict, Tailwind CSS (dark mode a classe), Svelte stores, Fetch API via Auth Manager, Zod per la validazione client, Day.js, markdown-it + DOMPurify per il render dei messaggi testuali (stessa famiglia di parser del backend: anteprima e consegna identiche). Build unificato app+plugin ([build-system](../../infrastructure/build-system.md)).
+**SvelteKit 2** (Svelte 5, runes) in modalità **SPA** (CSR, adapter-static con fallback; nessun SSR: app dietro login, plugin montati dinamicamente lato client), TypeScript strict, **Tailwind CSS 4** (dark mode a classe), store Svelte per lo stato condiviso (runes per lo stato locale dei componenti), Fetch API via Auth Manager, Zod per la validazione client, **svelte-i18n** (dizionari registrati a runtime: namespace per-plugin caricati lazy, fallback su `en`), Day.js, markdown-it + DOMPurify per il render dei messaggi testuali (stessa famiglia di parser del backend: anteprima e consegna identiche). Toolchain **Node 22 LTS**; build unificato app+plugin ([build-system](../../infrastructure/build-system.md)).
 
 ## Struttura
 
