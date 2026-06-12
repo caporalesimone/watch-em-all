@@ -37,7 +37,7 @@ Workflow separato, attivato dai **tag `v*`** (INF-17): builda le tre immagini mu
 | Build & push | `watch-em-all-web`, `watch-em-all-worker`, `watch-em-all-ops` → `ghcr.io/<owner>/…:<tag>` (es. `v1.2.0`; mai `latest`, INF-1) |
 | Release + kit | allega alla release `compose.yml` (il compose di release) e `.env.example` — i **soli due file** che servono per installare ([deployment](deployment.md)) |
 
-Il tag è l'unico trigger di pubblicazione: `main` verde non pubblica nulla — si pubblica una versione quando lo si decide. I **package GHCR sono pubblici** (come il repo): il pull lato utente è anonimo, nessuna autenticazione.
+Il tag è l'unico trigger di pubblicazione: `main` verde non pubblica nulla — e il tag arriva **automaticamente alla chiusura di una fase** (vedi *Tag di fine fase* sotto). I **package GHCR sono pubblici** (come il repo): il pull lato utente è anonimo, nessuna autenticazione.
 
 ### Versioning del prodotto
 
@@ -49,8 +49,16 @@ Il prodotto segue **SemVer** (`MAJOR.MINOR.PATCH`) con una **versione unica per 
 | **MINOR** | nuove feature retrocompatibili (tipicamente la chiusura di una fase del [flow](../development-flow/README.md)) |
 | **PATCH** | fix retrocompatibili |
 
-- `0.x` durante lo sviluppo (**0.1** alla fase 7, **1.0** alla fase 12 — milestone notevoli lungo la strada); **ogni PR** porta un bump di versione + voce `CHANGELOG.md`, e **al merge** l'owner crea il tag `vX.Y.Z` corrispondente che genera l'immagine di release (**1 MVP = 1 PR = 1 versione**).
-- `CHANGELOG.md` aggiornato nella **stessa PR** che porta al tag.
+- `0.x` durante lo sviluppo (**0.1** alla chiusura della fase 7, **1.0** alla fase 12 — milestone scelte nella PR che chiude quelle fasi); **ogni PR** porta un bump di versione + voce `CHANGELOG.md` (**1 MVP = 1 PR = 1 versione**), ma **i tag non sono per-PR**: nascono **solo alla chiusura di una fase** (vedi sotto), così il repo non si riempie di tag.
+- `CHANGELOG.md` aggiornato nella **stessa PR** (è la guardia CHANGELOG della CI a imporlo).
+
+### Tag di fine fase (automatico)
+
+Il tag `vX.Y.Z` lo crea **un workflow**, non una persona: al push su `main` legge l'**ultima voce** di `CHANGELOG.md` e, **solo se** contiene il marker di chiusura fase — la riga **`Closes phase N.`** — crea il tag con la versione di quella voce. Implementato in fase 0 (0.T8).
+
+- **13 fasi = 13 tag**: una release per ogni fase chiusa del [development flow](../development-flow/README.md); le versioni intermedie (per-PR) esistono solo nel CHANGELOG, senza tag.
+- La PR che chiude una fase è quindi anche la PR di release: include il marker, e può alzare MINOR/MAJOR quando la milestone lo merita (0.1.0 alla fase 7, 1.0.0 alla 12).
+- Merge senza marker → nessun tag, nessuna release: il flusso quotidiano resta leggero.
 - **Distinta** da: il `version` del manifest di un plugin (informativo, per-plugin) e l'`api_version` (intero, gate di compatibilità del contratto plugin) — entrambi ortogonali alla versione del prodotto.
 
 ## Note
