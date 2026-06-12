@@ -1,6 +1,6 @@
 # Fase 0 — Pipeline e processo
 
-> Stato: ☐ da iniziare · Prerequisiti: nessuno · [Indice del flusso](README.md)
+> Stato: 🔄 in corso · Prerequisiti: nessuno · [Indice del flusso](README.md)
 
 ## Obiettivo
 
@@ -24,7 +24,7 @@ I tre container applicativi sono **stub**: nessuna logica di prodotto.
 
 ### Trasversali
 
-- [ ] **0.T1 — Skeleton del repo + CHANGELOG** (~1h): alberatura del monorepo ([struttura](../infrastructure/build-system.md)), `.gitignore`, `CHANGELOG.md` inizializzato, README stub con le sezioni operative segnaposto (si riempiono man mano, INF-18). *Verifica: struttura committata, `main` protetto da PR.*
+- [x] **0.T1 — Skeleton del repo + CHANGELOG** (~1h): alberatura del monorepo ([struttura](../infrastructure/build-system.md)), `.gitignore`, `CHANGELOG.md` inizializzato, README stub con le sezioni operative segnaposto (si riempiono man mano, INF-18). *Verifica: struttura committata, `main` protetto da PR.*
 - [ ] **0.T2 — Dev container** (~1h): `.devcontainer/` (Dockerfile con Python 3.12+Poetry, Node 22+npm, git, docker CLI; socket Docker dell'host; forward 8080/8081) ([dev-container](../infrastructure/dev-container.md), INF-15). *Verifica: "Reopen in Container" su host con solo Docker → poetry/npm/compose funzionano da dentro.*
 - [ ] **0.T3 — Container stub `web`** (~1h): Dockerfile multi-stage minimale (INF-5) che serve la pagina segnaposto e `GET /api/health`. **Mock**: health sempre 200, nessuna app. *Verifica: `docker run` → pagina e health raggiungibili.*
 - [ ] **0.T4 — Container stub `worker` e `ops`** (~1h): worker = loop heartbeat (file + log); ops = `postgres:16` + script segnaposto in `ops/`. **Mock**: nessuna logica reale. *Verifica: heartbeat avanza; `run --rm ops backup.sh` → messaggio chiaro "non ancora implementato".*
@@ -32,11 +32,11 @@ I tre container applicativi sono **stub**: nessuna logica di prodotto.
 - [ ] **0.T6 — CI di base su PR** (~1h): workflow GitHub Actions che builda le tre immagini a ogni PR + **guardia CHANGELOG** (PR rossa se `CHANGELOG.md` non è aggiornato, INF-19) ([ci](../infrastructure/ci.md)). I linter arrivano col codice (1.T1). *Verifica: PR senza voce CHANGELOG → rossa; con voce → verde.*
 - [ ] **0.T7 — Immagini dev sul branch** (~1h): job che pubblica `web`/`worker`/`ops` su GHCR con tag **`dev-<branch>`** (mutabile, su PR e `workflow_dispatch`) ([ci — immagini dev](../infrastructure/ci.md#immagini-dev-su-pr)). *Verifica: push sul branch → `docker pull` anonimo di `dev-<branch>` funziona.*
 - [ ] **0.T8 — Publish su tag + deploy kit** (~1h): workflow su tag `v*` → push delle tre immagini versionate su GHCR + release GitHub con `deploy/compose.yml` (immagini, niente `build:`, mount di override `config.yaml` commentato) e `.env.example` con `WEA_VERSION` allegati ([ci — publish](../infrastructure/ci.md), INF-17). *Verifica: tag → release con i due file, immagini taggate `vX.Y.Z`.*
-- [ ] **0.T9 — Rodaggio end-to-end del processo** (~1h): il giro completo, una volta per intero: branch → PR con bump+CHANGELOG → prova dell'immagine `dev-<branch>` via `WEA_VERSION` → merge dell'owner → tag **`v0.0.1`** → install pull-based su macchina pulita (due file, nessun sorgente); README aggiornato con i comandi usati (INF-18). *Verifica: segnaposto raggiungibile sulla macchina pulita partendo dal solo deploy kit.*
+- [ ] **0.T9 — Rodaggio end-to-end del processo** (~1h): il giro completo, una volta per intero: branch → PR con bump+CHANGELOG → prova dell'immagine `dev-<branch>` via `WEA_VERSION` → merge dell'owner → tag della **versione corrente** (ogni PR ha già bumpato la sua) → install pull-based su macchina pulita (due file, nessun sorgente); README aggiornato con i comandi usati (INF-18). *Verifica: segnaposto raggiungibile sulla macchina pulita partendo dal solo deploy kit.*
 
 ## Definition of Done
 
-- [ ] Il ciclo **branch → PR (bump+CHANGELOG) → immagine `dev-<branch>` → merge dell'owner → tag → release → install pull-based** è stato percorso per intero almeno una volta (`v0.0.1`).
+- [ ] Il ciclo **branch → PR (bump+CHANGELOG) → immagine `dev-<branch>` → merge dell'owner → tag → release → install pull-based** è stato percorso per intero almeno una volta (con la versione corrente del rodaggio — il numero cresce a ogni PR).
 - [ ] Su una macchina pulita con il **solo Docker**, i due file del deploy kit bastano per tirare su lo stack (INF-17) — anche se l'app è un segnaposto.
 - [ ] Il dev container funziona: da qui in poi **tutto lo sviluppo avviene lì dentro** (INF-15).
 - [ ] Ogni stub è dichiarato (tabella sopra) e ha l'MVP che lo sostituirà.
