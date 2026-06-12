@@ -15,7 +15,8 @@ Un produttore **stateless** e **internamente mono-thread** di prodotti: legge i 
 | Sapere cosa osservare per ogni utente (input propri) | ✅ | — |
 | Strategia di scraping (DOM, chiamate interne, browser) | ✅ | — |
 | Concetto di categoria, paginazione, filtri del sito | ✅ | — |
-| Identità stabile del prodotto (`external_id`) | ✅ (garantirla) | usa |
+| Identità del prodotto: **seme** (`identity_seed`) | ✅ (fornirlo) | usa |
+| Identità del prodotto: **hashing/normalizzazione** in `external_id` | — | ✅ (imposto, uniforme) |
 | Decidere la disponibilità (`is_available`) | ✅ | — |
 | Esclusioni specifiche del sito (stati speciali del prodotto) | ✅ | — |
 | Calcolo adjustments del carrello (regole del sito) | ✅ | applica |
@@ -40,7 +41,7 @@ Un produttore **stateless** e **internamente mono-thread** di prodotti: legge i 
 
 ### Identità del prodotto (il punto più delicato)
 - **SCR-R9** — Ogni prodotto porta un **`external_id` stabile tra run e univoco** nello spazio del plugin. È l'aggancio di tutto: riconoscimento, storico, disponibilità, delisting. Se cambia, il core vede un prodotto nuovo e lo storico si spezza.
-- **SCR-R10** — Derivazione raccomandata, in ordine: l'**identificativo nativo** del sito (SKU/ID prodotto) se esiste; altrimenti un **hash deterministico dell'URL normalizzato** (il core fornisce gli helper). Mai usare titoli o descrizioni come seme: cambiano.
+- **SCR-R10** — La derivazione è un **template method** ([product](../../4-capabilities/contracts/product.md)): il plugin **deve** implementare il solo **seme** (`identity_seed`, metodo astratto — SKU/ID nativo se esiste, altrimenti `None` per il fallback all'URL; mai titoli o descrizioni); l'**hashing e la normalizzazione** sono imposti dalla base (`final`, non sovrascrivibili) e identici per tutti gli scraper. Il plugin non riempie mai `external_id` a mano e non reimplementa l'hashing — è ciò che garantisce stabilità e uniformità senza affidarsi alla buona volontà del plugin. Uno scraper che non fornisce il seme non si carica (l'astratto fallisce al load).
 
 ### Dry-run / Test
 - **SCR-R11** — Ogni scraper implementa una funzione di **test**: uno scrape on-demand che restituisce i prodotti trovati **senza scrivere nulla** (né catalogo né input). Parametrizzata dall'input raccolto dalla UI del plugin.

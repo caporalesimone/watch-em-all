@@ -47,26 +47,35 @@ class MioScraper(ScraperPlugin):
         # tue tabelle, in modo idempotente. Il core cancella i suoi dati solo dopo.
         ...
 
+    def identity_seed(self, raw) -> str | None:
+        # OBBLIGATORIO (astratto): SKU/ID nativo del sito, o None per derivare dall'URL.
+        # È l'unico punto site-specific dell'identità. Mai titoli/descrizioni.
+        # external_id lo costruisce la base via self.external_id_for(raw, url).
+        ...
+
     def get_admin_config_schema(self) -> list[ConfigField]: ...
     def get_user_config_schema(self)  -> list[ConfigField]: ...
 ```
 
-Il core fornisce `run()` di default (= loop di `run_for_user` sugli utenti configurati): di norma **non** la sovrascrivi.
+Il core fornisce `run()` di default (= loop di `run_for_user` sugli utenti configurati): di norma **non** la sovrascrivi. Allo stesso modo `normalize_url`, l'hashing e `external_id_for` sono `final`: non li tocchi.
 
 ## I punti dove si sbaglia davvero
 
 ### 1. `external_id` (il più importante)
 
-Stabile tra run, univoco nel tuo spazio. In ordine di preferenza:
+Stabile tra run, univoco nel tuo spazio. Implementi **solo** il seme; l'hashing lo fa la base. In ordine di preferenza per il seme:
 
 ```python
-# 1) il sito ha uno SKU/ID nativo → usalo
-external_id = sku
-# 2) altrimenti: hash deterministico dell'URL normalizzato
-external_id = self.stable_id(self.normalize_url(product_url))   # 16 hex, SHA-256
+def identity_seed(self, raw) -> str | None:
+    # 1) il sito ha uno SKU/ID nativo → restituiscilo
+    return raw.sku
+    # 2) altrimenti: return None → la base usa stable_id(normalize_url(url))
+
+# quando costruisci il Product, l'id lo dà la base (mai a mano):
+external_id = self.external_id_for(raw, product_url)
 ```
 
-Mai derivarlo da titolo/descrizione (cambiano → identità rotta → storico spezzato per i tuoi utenti). Se il sito cambia struttura URL, preoccupati: è un breaking change per i tuoi dati.
+Mai derivare il seme da titolo/descrizione (cambiano → identità rotta → storico spezzato per i tuoi utenti). Mai reimplementare l'hashing o riempire `external_id` a mano (`external_id_for`/`stable_id` sono `final`). Se il sito cambia struttura URL, preoccupati: è un breaking change per i tuoi dati.
 
 ### 2. Disponibilità ed esclusioni
 

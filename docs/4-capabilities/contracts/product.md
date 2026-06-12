@@ -43,21 +43,36 @@ class Product(BaseModel):
 
 Insieme a `plugin_id` e `user_id` forma l'identità nel catalogo (UNIQUE sul DB). Obblighi del contratto: **stabile** tra run (stesso prodotto → sempre lo stesso id; se cambia, il core vede un prodotto nuovo e lo storico si spezza) e **univoco** nello spazio del plugin.
 
-Derivazione (responsabilità del plugin, helper della base):
+La derivazione è un **template method**: la base separa ciò che è site-specific (il **seme**, che il plugin **deve** fornire) da ciò che dev'essere identico ovunque (l'**hashing/normalizzazione**, che la base impone e il plugin non può sovrascrivere). Così tutti gli scraper condividono la stessa logica di identità ad alto livello, e l'unico bug davvero pericoloso — un hashing non deterministico tra processi (`worker` vs `web`) — diventa impossibile per costruzione, non solo "testato".
 
 ```python
-class ScraperPlugin:
+class ScraperPlugin(ABC):
+
+    @abstractmethod
+    def identity_seed(self, raw) -> str | None:
+        """Seme dell'identità, ESCLUSIVO punto site-specific. OBBLIGATORIO.
+        Restituisce lo SKU/ID nativo del sito (preferito, stabile per costruzione),
+        oppure None per derivare dall'URL. MAI titoli/descrizioni: cambiano."""
+
+    # --- logica uniforme: FINAL, mai sovrascritta dal plugin ---
+    @final
     @staticmethod
     def normalize_url(url: str) -> str:
         # rimuove query/fragment volatili, trailing slash, normalizza il case dell'host
         ...
 
+    @final
     @staticmethod
-    def stable_id(seed: str) -> str:
+    def _stable_id(seed: str) -> str:
         # stringa qualunque → id FISSO di 16 hex (64 bit), deterministico tra processi
         import hashlib
         return hashlib.sha256(seed.encode("utf-8")).hexdigest()[:16]
         # MAI hash() built-in: randomizzata da PYTHONHASHSEED
+
+    @final
+    def external_id_for(self, raw, url: str) -> str:
+        # l'orchestrazione: seme del plugin → fallback URL → hashing uniforme
+        return self._stable_id(self.identity_seed(raw) or self.normalize_url(url))
 ```
 
-Ordine di preferenza per il seme: **SKU/ID nativo del sito** → `stable_id(normalize_url(url))`. Mai titoli o descrizioni (cambiano → identità rotta).
+Il plugin **non riempie mai `external_id` a mano**: lo ottiene da `external_id_for(...)` quando costruisce il `Product`. L'unica scelta che gli resta è il **seme** (`identity_seed`); il resto è imposto. Essendo `identity_seed` astratto, uno scraper che lo dimentica **non istanzia** (fallimento al load nel registry, non in produzione a storico già spezzato).

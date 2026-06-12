@@ -62,7 +62,7 @@ Tutti i campi e le regole di validazione: [manifest-reference.md](manifest-refer
 
 1. **Usa solo il contesto**: HTTP solo via `context.http` (politeness e conteggi sono imposti lì), DB solo sulle tue tabelle, log via `context.logger`. Niente import di runtime globali.
 2. **Mai scrivere nel catalogo core**: per gli scraper l'unica via è `context.update_catalog(...)`.
-3. **L'`external_id` è sacro** (scraper): stabile e univoco, o lo storico dei tuoi utenti si spezza. Gli helper `normalize_url`/`stable_id` esistono per questo.
+3. **L'`external_id` è sacro** (scraper): stabile e univoco, o lo storico dei tuoi utenti si spezza. Tu implementi **solo** il seme (`identity_seed`); normalizzazione e hashing li impone la base, identici per tutti. Non riempire mai `external_id` a mano.
 
 ## Attivazione e test
 

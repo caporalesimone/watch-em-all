@@ -51,7 +51,7 @@ def get_adjustments(self, cart_total):
 
 ## Identità del prodotto
 
-**Pre-analisi (vedi sotto)**: il sito espone un **ID numerico nativo** per prodotto, presente sia nell'URL della scheda (`...gp.<id>.uw`, es. `gp.35880.uw`) sia nella card di listing (`id="r_35880"`, `data-id="prod_35880"`), oltre a un **codice articolo** (`Cod. art.`, es. `XRDCT21`). Strategia: `external_id = <id numerico nativo>` (stabile e univoco per costruzione); il codice articolo si conserva in `extra` come dato informativo. Fallback `stable_id(normalize_url(url))` solo se l'id non fosse estraibile in qualche contesto.
+**Pre-analisi (vedi sotto)**: il sito espone un **ID numerico nativo** per prodotto, presente sia nell'URL della scheda (`...gp.<id>.uw`, es. `gp.35880.uw`) sia nella card di listing (`id="r_35880"`, `data-id="prod_35880"`), oltre a un **codice articolo** (`Cod. art.`, es. `XRDCT21`). Strategia: `identity_seed` restituisce l'**id numerico nativo** (stabile e univoco per costruzione), o `None` se non estraibile in qualche contesto → la base applica il fallback `normalize_url(url)` e l'hashing (SCR-R10); `external_id` non è mai assegnato a mano. Il codice articolo si conserva in `extra` come dato informativo.
 
 ## Route del plugin
 

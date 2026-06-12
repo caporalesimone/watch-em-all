@@ -49,7 +49,7 @@ graph LR
     E[external_id<br/>ID stabile nel sito,<br/>garantito dallo scraper] --- I
 ```
 
-- L'`external_id` è prodotto **dallo scraper** e deve essere **stabile** tra run e **univoco** nel suo spazio; il core fornisce helper per derivarlo in modo sicuro. Se cambia, il sistema vede un prodotto nuovo e lo storico si spezza: è il punto più delicato di ogni scraper.
+- L'`external_id` deve essere **stabile** tra run e **univoco** nel suo spazio. Lo scraper fornisce solo il **seme** site-specific (un metodo astratto obbligatorio); la sua trasformazione in id — normalizzazione e hashing deterministico — è imposta dal core, identica per tutti gli scraper. Se il seme non è stabile, il sistema vede un prodotto nuovo e lo storico si spezza: è il punto più delicato di ogni scraper.
 - La chiave del database è solo un surrogato interno.
 - Conseguenza per i carrelli cross: lo "stesso" prodotto su due siti è — correttamente — **due righe distinte** del catalogo (plugin diversi ⇒ identità diverse), il che rende naturale inserirlo due volte in un carrello cross, una per sito.
 

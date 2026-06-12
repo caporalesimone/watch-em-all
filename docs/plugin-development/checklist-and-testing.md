@@ -19,6 +19,7 @@ class TestMioScraper(ScraperContractSuite):
 
 | Check | Contratto |
 |---|---|
+| `identity_seed` implementato (astratto); `external_id` ottenuto via `external_id_for`, mai a mano né con hashing reimplementato | SCR-R10 |
 | `external_id` **identico** su due run sugli stessi dati | SCR-R9 |
 | `external_id` univoci dentro una consegna | SCR-R9 |
 | Gli out-of-stock sono **presenti** con `is_available=False` | SCR-R7 |
