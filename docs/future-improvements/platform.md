@@ -24,7 +24,11 @@ Un solo client (la SPA della stessa release): nessuna esigenza di compatibilità
 
 ## Scaling del worker (repliche multiple)
 
-Il dispatcher assume replica singola (CRON-R9); i lock per-scraper già reggono la concorrenza con il web. **Miglioria**: lock estesi ai flussi alert/summary e dispatcher idempotente per N repliche. **Rimandato perché**: a ≤5 utenti un worker basta e avanza. **Trigger**: decine di scraper con slot fitti che saturano il pool.
+Il dispatcher assume replica singola (CRON-R9); i lock per-scraper già reggono la concorrenza con il web. **Miglioria**: lock estesi ai flussi alert/summary e dispatcher idempotente per N repliche. **Rimandato perché**: a ≤5 utenti un worker basta e avanza. **Trigger**: decine di scraper con slot fitti che saturano la coda seriale.
+
+## Esecuzione parallela tra scraper
+
+Il runner è **seriale** per scelta (SCHED-R6): un solo scraper alla volta, carico prevedibile, vista calendario fedele. **Miglioria**: reintrodurre un pool con limite di parallelismo configurabile (la storia del progetto lo conosce già). **Rimandato perché**: a poche decine di run al giorno la serialità non costa nulla e semplifica tutto. **Trigger**: la vista calendario non ha più spazi liberi — gli slot dovuti si accodano sistematicamente oltre l'orario utile.
 
 ## Auto-update / immagini pubblicate
 

@@ -10,9 +10,9 @@ L'amministratore installa il sistema (un comando, vedi la documentazione di [inf
 
 ## Creare gli utenti
 
-Non esiste auto-registrazione: è l'admin a creare ogni account, assegnando username e una password temporanea che l'utente dovrà cambiare al primo accesso. Dalla stessa pagina può disabilitare un account (con effetto immediato sulle sessioni) o reimpostarne la password.
+Non esiste auto-registrazione: è l'admin a creare ogni account, assegnando username e una password temporanea che l'utente dovrà cambiare al primo accesso. Dalla stessa pagina può disabilitare un account (con effetto immediato sulle sessioni) o reimpostarne la password. La lista mostra anche **l'ultimo accesso** di ciascun utente, ordinabile, così gli account inattivi saltano all'occhio; un filtro rapido separa con un click gli account **attivi**, **disabilitati** e **in cancellazione**.
 
-La **cancellazione è in due fasi**, come un cestino: "cancella" in realtà disattiva l'account e lo marca **in cancellazione** — nessun dato viene perso, e l'account può essere ritrovato e ripristinato (prima a disabilitato, poi riattivato). La perdita vera avviene solo con il **purge definitivo**: un'azione dedicata, irreversibile, sul singolo account o in blocco su tutti i marcati (con l'opzione "solo quelli in cancellazione da più di 30 giorni"). Al purge viene eliminato **tutto**: prima ogni plugin cancella i propri dati di quell'utente, poi il sistema elimina quelli centrali — cataloghi, carrelli, storici, recapiti dei canali.
+La **cancellazione è differita**, come un cestino con la data di svuotamento: "cancella" disattiva l'account, lo marca **in cancellazione** e fissa una **scadenza** (per default 30 giorni dopo, l'admin può cambiare la durata del periodo). Nessun dato viene perso in questa fase, e finché la scadenza non arriva un tasto **annulla la cancellazione** — l'account torna disabilitato (mai direttamente attivo), e disabilitato può restare per sempre: non c'è alcuna scadenza sugli account disabilitati. La perdita vera avviene **automaticamente**: una volta al giorno il sistema elimina gli account la cui scadenza è passata. A quel punto viene eliminato **tutto**: prima ogni plugin cancella i propri dati di quell'utente, poi il sistema elimina quelli centrali — cataloghi, carrelli, storici, recapiti dei canali.
 
 L'utente è avvisato con una notifica di cortesia quando viene disabilitato o marcato (sui suoi canali attivi: chi non ne ha non riceve nulla); il purge definitivo non avvisa nessuno. Se un utente disabilitato o in cancellazione prova a entrare, il sistema gli dice che l'accesso non è più possibile e di contattare l'amministratore.
 
@@ -20,9 +20,10 @@ L'utente è avvisato con una notifica di cortesia quando viene disabilitato o ma
 
 È la responsabilità più importante. Per ogni scraper installato l'admin decide:
 
-- **Quante volte al giorno e a che ora** lo scraper gira: da una a più esecuzioni quotidiane, ciascuna a un orario scelto. Un negozio con prezzi lampo può girare tre volte al giorno; uno statico, una sola.
-- **Quanto lavoro è ammesso in parallelo**: il sistema può eseguire più scraper contemporaneamente (ognuno internamente lavora da solo, con calma, un sito alla volta), ma l'admin fissa il numero massimo di scraper attivi nello stesso momento e il ritmo massimo delle richieste verso i siti. La regola di casa è ferma: **mai martellare un sito** — niente raffiche, niente decine di richieste simultanee.
-- **I parametri operativi** di ciascuno scraper (tempi di attesa, identificazione del client, regole di sconto del sito), dalla pagina di configurazione che ogni plugin fornisce.
+- **Quante volte al giorno e a che ora** lo scraper gira: da una a più esecuzioni quotidiane, ciascuna a un orario scelto, **indipendente da quello degli altri scraper**. Un negozio con prezzi lampo può girare tre volte al giorno; uno statico, una sola. Gli scraper non lavorano mai in parallelo tra loro: ognuno gira al suo orario, uno alla volta, con calma, un sito alla volta. La regola di casa è ferma: **mai martellare un sito** — niente raffiche, niente decine di richieste simultanee.
+- Per distribuire bene gli orari l'admin ha una **vista calendario della giornata**: tutte le esecuzioni pianificate di tutti gli scraper a colpo d'occhio, in sola lettura; un click su uno scraper porta alla sua pagina di configurazione.
+- **I parametri operativi** di ciascuno scraper (tempi di attesa, identificazione del client, regole di sconto del sito, durata della cache), dalla pagina di configurazione che ogni plugin fornisce.
+- La **cache delle ricerche**: se due utenti osservano la stessa cosa, o due esecuzioni ravvicinate ripetono la stessa ricerca, il sistema riusa i dati appena raccolti invece di tornare sul sito. L'admin decide per ogni scraper quanto a lungo i dati restano "freschi" e può svuotare la cache con un pulsante.
 - L'eventuale **interruttore di emergenza**: uno scraper può essere sospeso senza disinstallarlo.
 
 ## Sorvegliare il lavoro
@@ -53,7 +54,7 @@ L'admin può scrivere direttamente agli utenti attraverso il sistema stesso: una
 ## Manutenzione
 
 - **Pulizia degli storici**: l'admin applica regole globali per data ("elimina le notifiche di tutti più vecchie di 90 giorni") senza mai vedere il contenuto delle notifiche degli utenti.
-- **Parametri globali**: limiti di parallelismo, tempo massimo di un'esecuzione, conservazione dei log.
+- **Parametri globali**: tempo massimo di un'esecuzione, conservazione dei log, durata del periodo di grazia prima dell'eliminazione degli account cancellati.
 - **Salute del sistema**: un controllo di vita esposto dall'applicazione e lo stato dei contenitori; per l'ispezione diretta dei dati in sviluppo esiste uno strumento dedicato, mai attivo in produzione.
 
 ## Cosa l'admin non può fare

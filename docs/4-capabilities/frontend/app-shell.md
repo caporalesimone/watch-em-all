@@ -49,10 +49,10 @@ src/frontend/src/
 | Pagina | Responsabilità |
 |---|---|
 | Dashboard di sistema | statistiche globali e ranking per utente — solo aggregati, mai contenuti ([admin-dashboard](../../3-features/admin/admin-dashboard.md)) |
-| Utenti | CRUD account, reset password, icone abilita/disabilita e cancella (soft), toggle vista "in cancellazione" con ripristino, purge definitivo e bulk delete (tutti / >30gg) |
-| Scheduler scrapers | slot 1..N per scraper, sospensione, impostazioni globali (pool, timeout, retention) |
+| Utenti | CRUD account, reset password, colonna **ultimo accesso** ordinabile, filtro stato (attivo/disabilitato/in cancellazione), icone abilita/disabilita e cancella (soft con scadenza), **annulla cancellazione** (→ disabilitato) |
+| Scheduler scrapers | slot 1..N per scraper, sospensione, **vista calendario del giorno** (read-only, click → config dello scraper), impostazioni globali (timeout, retention, periodo cancellazione utenti) |
 | Monitoraggio scrapers | ultima run, trend, elenco run, drill-down per utente |
-| Config plugin | pagine admin dei plugin (form dinamici + Test Scraper / test canale) |
+| Config plugin | pagine admin dei plugin (form dinamici + Test Scraper / test canale + svuota cache per gli scraper) |
 | Notifiche agli utenti | composizione Markdown con anteprima live, invio a tutti/un utente, elenco inviati con esiti; tab **messaggi di sistema**: catalogo template con override/ripristino, stesso editor ([admin-notifications](../../3-features/admin/admin-notifications.md)) |
 | Log di sistema | polling incrementale con cursore, filtri, heartbeat del worker evidenziato |
 | Manutenzione | purge storico alert per data |

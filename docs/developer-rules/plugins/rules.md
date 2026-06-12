@@ -11,7 +11,7 @@
 
 ## Comportamento
 
-- **PLG-5** — Mono-thread per contratto: nessun threading/asyncio interno verso il sito. Il lavoro lungo dev'essere interrompibile (il timeout di run del pool deve poterti fermare).
+- **PLG-5** — Mono-thread per contratto: nessun threading/asyncio interno verso il sito. Il lavoro lungo dev'essere interrompibile (il timeout di run del runner deve poterti fermare — e con l'esecuzione seriale un job appeso trattiene anche la coda).
 - **PLG-6** — `run_test`/dry-run: **zero scritture**, di qualunque tipo. La CI lo verifica.
 - **PLG-7** — `external_id`: stabile e univoco (SCR-R9); la strategia di derivazione è documentata nella doc del plugin in `implemented-plugins/`. Cambiarla è un breaking change per i dati degli utenti: si fa solo con una nota di migrazione.
 - **PLG-8** — Idempotenza per-run: due run consecutive senza cambiamenti sul sito producono **zero** delta (è il check della checklist e il sintomo n.1 di `external_id` instabile).

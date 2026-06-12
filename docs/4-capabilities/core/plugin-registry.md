@@ -45,6 +45,6 @@ def load_plugins(app):
 
 ## Note
 
-- `worker` esegue la stessa load senza registrare i router HTTP (gli serve solo `initialize` + istanze per il pool).
+- `worker` esegue la stessa load senza registrare i router HTTP (gli serve solo `initialize` + istanze per il runner).
 - L'`icon` dichiarata nel manifest è servita come asset statico e referenziata dalla risposta di discovery: è la **provenienza** in tutta la UI.
-- Il registry mantiene la mappa `plugin_id → istanza` usata da pool, cart engine (adjustments) e dispatch notifiche.
+- Il registry mantiene la mappa `plugin_id → istanza` usata da runner, cart engine (adjustments) e dispatch notifiche.

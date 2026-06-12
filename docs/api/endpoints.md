@@ -84,14 +84,14 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 
 | Metodo | Path | Ruolo | Body | Note |
 |---|---|---|---|---|
-| GET | `/api/admin/users` | 🛡 | `?pending=true` | elenco con stato e data marcatura; pending=true → solo account in cancellazione |
+| GET | `/api/admin/users` | 🛡 | `?status=active\|disabled\|deleting&sort=&order=` | elenco con stato, **ultimo accesso** (`last_login_at`, ordinabile — USR-R13), data marcatura e scadenza; `status` = filtro rapido (USR-R14) |
 | POST | `/api/admin/users` | 🛡 | `{username, role, temp_password}` | must_change_password attivo |
 | PATCH | `/api/admin/users/{id}` | 🛡 | `{is_active?, role?}` | disabilitazione → invalidazione token + notifica di cortesia (USR-R11) |
 | POST | `/api/admin/users/{id}/reset-password` | 🛡 | `{temp_password}` | + cambio forzato + invalidazione |
-| DELETE | `/api/admin/users/{id}` | 🛡 | — | **soft**: disattiva + marca in cancellazione, notifica di cortesia; nessun dato eliminato (USR-R7) |
-| POST | `/api/admin/users/{id}/restore` | 🛡 | — | in cancellazione → disabilitato (mai direttamente attivo, USR-R8) |
-| DELETE | `/api/admin/users/{id}/purge` | 🛡 | — | **definitivo, irreversibile**: plugin prima, core dopo (USR-R10); nessuna notifica |
-| POST | `/api/admin/users/purge` | 🛡 | `{scope: "all"\|"older_than_30d"}` | bulk delete dei marcati; stesso ordine per ciascuno; esiti per utente |
+| DELETE | `/api/admin/users/{id}` | 🛡 | — | **soft con scadenza**: disattiva + marca in cancellazione + `deletion_due_at` = ora + periodo di grazia, notifica di cortesia; nessun dato eliminato (USR-R7) |
+| POST | `/api/admin/users/{id}/restore` | 🛡 | — | annulla la cancellazione: → disabilitato (mai direttamente attivo, USR-R8) |
+
+Il **purge definitivo non ha endpoint**: è il job giornaliero del worker a eliminare gli account scaduti (USR-R9, CRON-R10).
 
 ## Admin — scraper e sistema
 
@@ -99,11 +99,13 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 |---|---|---|---|---|
 | GET | `/api/admin/scrapers` | 🛡 | — | per scraper: schedule, stato (idle/queued/running/sospeso), ultima run |
 | PUT | `/api/admin/scrapers/{id}/schedule` | 🛡 | `{times: ["HH:MM",...], enabled}` | 1..N slot/giorno |
+| GET | `/api/admin/scrapers/calendar` | 🛡 | `?date=YYYY-MM-DD` | **vista calendario del giorno** (SCHED-R10): tutte le run pianificate di tutti gli scraper (slot + durata media recente per dimensionare i blocchi); read-only |
 | GET | `/api/admin/scrapers/{id}/runs` | 🛡 | `?page=` | elenco run con contatori |
 | GET | `/api/admin/runs/{run_id}` | 🛡 | — | dettaglio per-utente (`scrape_user_log`) |
 | GET | `/api/admin/scrapers/{id}/stats` | 🛡 | `?days=30` | serie per i trend (durate, richieste, variazioni) |
+| DELETE | `/api/admin/scrapers/{id}/cache` | 🛡 | — | **svuota la cache di scrape** del plugin (CTX-R9); pulsante nella pagina admin del plugin |
 | GET | `/api/admin/settings` | 🛡 | — | `SystemSettings` |
-| PUT | `/api/admin/settings` | 🛡 | `{max_concurrent_scrapers?, scraper_run_timeout_min?, catchup_warning_min?, log_retention_days?}` | effetto immediato, senza riavvio |
+| PUT | `/api/admin/settings` | 🛡 | `{scraper_run_timeout_min?, catchup_warning_min?, log_retention_days?, user_deletion_retention_days?}` | effetto immediato, senza riavvio |
 | GET | `/api/admin/logs` | 🛡 | `?since=<id>&level=&source=` | polling incrementale: righe con id > since |
 | DELETE | `/api/admin/alerts` | 🛡 | `?before=<date>` | purge globale storico alert per data |
 

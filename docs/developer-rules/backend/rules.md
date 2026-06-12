@@ -24,7 +24,7 @@
 
 ## Concorrenza e tempo
 
-- **BE-12** — Niente thread/process spawn fuori dallo [Scraper Pool](../../4-capabilities/core/scraper-pool.md); il parallelismo è una proprietà del sistema, non delle feature.
+- **BE-12** — Niente thread/process spawn fuori dallo [Scraper Runner](../../4-capabilities/core/scraper-pool.md); la concorrenza è una proprietà del sistema, non delle feature — e tra scraper non esiste: l'esecuzione è seriale (SCHED-R6).
 - **BE-13** — `datetime.now(tz=UTC)` o l'orologio applicativo iniettabile; mai `utcnow()` naïve. Le comparazioni di schedule usano l'ora server documentata.
 - **BE-14** — Hash deterministici (SHA-256) per qualunque identità persistita; **mai** `hash()` built-in.
 

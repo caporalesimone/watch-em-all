@@ -8,7 +8,7 @@ Motore **PostgreSQL 16**, accesso via SQLAlchemy, validazione I/O Pydantic v2. S
 
 | Tabella | Colonne | Note |
 |---|---|---|
-| `users` | id, username **UNIQUE**, password_hash, role (`admin`\|`user`), is_active, deletion_marked_at (timestamptz, null), locale, must_change_password, token_version, refresh_jti, created_at | [auth](../core/auth.md): refresh_jti = ultimo refresh emesso (rotazione); token_version = invalidazione globale; deletion_marked_at ≠ null = in cancellazione (sempre con is_active=false; USR-R7) |
+| `users` | id, username **UNIQUE**, password_hash, role (`admin`\|`user`), is_active, deletion_marked_at (timestamptz, null), deletion_due_at (timestamptz, null), last_login_at (timestamptz, null), locale, must_change_password, token_version, refresh_jti, created_at | [auth](../core/auth.md): refresh_jti = ultimo refresh emesso (rotazione); token_version = invalidazione globale; deletion_marked_at ≠ null = in cancellazione (sempre con is_active=false; USR-R7); deletion_due_at = scadenza fissata alla marcatura (purge automatico, USR-R9); last_login_at = ultimo login riuscito (USR-R13) |
 
 ## Catalogo e storico
 
@@ -44,8 +44,9 @@ Motore **PostgreSQL 16**, accesso via SQLAlchemy, validazione I/O Pydantic v2. S
 | Tabella | Colonne | Note |
 |---|---|---|
 | `scraper_schedule` | scraper_id PK, times (time[]), enabled, last_slot (timestamptz) | 1..N slot/giorno; last_slot = ultimo slot eseguito |
-| `scrape_run` | run_id, scraper_id, trigger, slot, started_at, finished_at, status, users_processed, products_found, products_new, price_changes, products_removed, products_excluded, http_requests, error_message | una riga per run; INDEX (scraper_id, started_at); retention |
-| `scrape_user_log` | run_id FK **CASCADE**, user_id, started_at, finished_at, products_found, products_new, price_changes, http_requests, status, error_message | dettaglio per utente; http_requests attribuite all'utente in lavorazione (run mono-thread); retention |
+| `scrape_run` | run_id, scraper_id, trigger, slot, started_at, finished_at, status, users_processed, products_found, products_new, price_changes, products_removed, products_excluded, http_requests, cache_hits, error_message | una riga per run; INDEX (scraper_id, started_at); retention |
+| `scrape_user_log` | run_id FK **CASCADE**, user_id, started_at, finished_at, products_found, products_new, price_changes, http_requests, cache_hits, status, error_message | dettaglio per utente; http_requests/cache_hits attribuite all'utente in lavorazione (run mono-thread); retention |
+| `scrape_cache` | id, plugin_id, cache_key, response_body, response_meta_json (status, content-type), fetched_at, expires_at | cache delle risposte di scrape ([plugin-context](../core/plugin-context.md), CTX-R9): cache_key = hash della richiesta normalizzata; **UNIQUE (plugin_id, cache_key)**; INDEX (expires_at); gli scaduti sono eliminati a inizio run, svuotamento manuale dalla pagina admin del plugin |
 | `system_settings` | key PK, value_json, updated_at | impostazioni runtime ([SystemSettings](../contracts/scheduling-models.md)); seed dei default al primo avvio |
 | `system_log` | id (PK incrementale, cursore del polling), created_at, level, source (`worker`\|`scraper`\|`notifier`\|`alert`\|`summary`), message, context_json | INDEX (id); retention; mai contenuti operativi degli utenti |
 
@@ -56,7 +57,7 @@ Naming `plugin_<nomeplugin>_<nometabella>` (underscore: gli identificatori SQL c
 ## Regole trasversali
 
 - **DB-R1** — Ogni tabella operativa ha `user_id`: ogni query applicativa filtra per l'utente del token (multi-tenancy).
-- **DB-R2** — Purge di un utente → cascata completa dei suoi dati core, **dopo** che ogni plugin ha eliminato i propri (`delete_user_data`, in sequenza; solo se tutti completano si procede — USR-R10). La marcatura "in cancellazione" non elimina nulla.
+- **DB-R2** — Purge di un utente (automatico, dal job giornaliero del worker sugli account con `deletion_due_at` scaduta — USR-R9) → cascata completa dei suoi dati core, **dopo** che ogni plugin ha eliminato i propri (`delete_user_data`, in sequenza; solo se tutti completano si procede — USR-R10). La marcatura "in cancellazione" non elimina nulla.
 - **DB-R3** — Serializzazione nei campi `*_json`: `Decimal` come stringa, `datetime` ISO-8601 UTC; i confronti "è cambiato?" avvengono sul dato deserializzato.
 - **DB-R4** — **Migrazioni V1**: schema additivo con `CREATE ... IF NOT EXISTS`; per i breaking change, script SQL manuali documentati nel changelog — **mai** drop&recreate dell'intero schema: `price_history` non è ricostruibile. (Alembic: [future improvement](../../future-improvements/README.md).)
 - **DB-R5** — Backup: dump del DB o snapshot del volume, responsabilità dell'host ([deployment](../../infrastructure/deployment.md)).

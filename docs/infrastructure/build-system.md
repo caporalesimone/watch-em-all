@@ -9,7 +9,7 @@ watch-em-all/
 ├── src/
 │   ├── core/        # moduli core backend
 │   ├── web/         # app FastAPI (API + static SPA)
-│   ├── worker/      # dispatcher + pool
+│   ├── worker/      # dispatcher + runner
 │   ├── frontend/    # app SvelteKit
 │   └── plugins/
 │       ├── scrapers/<nome>/   # manifest.json, backend/, frontend/

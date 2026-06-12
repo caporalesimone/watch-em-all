@@ -13,7 +13,7 @@ graph TB
     end
     subgraph "Docker host"
         WEB[web<br/>FastAPI + bundle statico SPA<br/>API, auth, scrape on-demand]
-        WORKER[worker<br/>dispatcher temporale +<br/>pool di esecuzione scraper]
+        WORKER[worker<br/>dispatcher temporale +<br/>runner seriale degli scraper]
         DB[(db<br/>PostgreSQL 16)]
         ADM[adminer<br/>solo profilo dev]
     end
@@ -33,7 +33,7 @@ graph TB
 | Container | Responsabilità | Note |
 |---|---|---|
 | `web` | API HTTP, autenticazione, serve la SPA buildata, esegue gli **scrape on-demand** (dry-run, scrape-now, test notifier) come task in background | Carica i plugin per esporre le loro route e i loro schemi di config |
-| `worker` | Dispatcher temporale (tick al minuto) + **pool di scraper** con limite di parallelismo gestito dall'admin; run di alert e summary; heartbeat | Carica i plugin per eseguirli |
+| `worker` | Dispatcher temporale (tick al minuto) + **runner seriale degli scraper** (uno alla volta, ciascuno al proprio orario); run di alert e summary; manutenzione giornaliera (purge utenti scaduti, retention); heartbeat | Carica i plugin per eseguirli |
 | `db` | PostgreSQL: unico stato condiviso del sistema | MVCC gestisce le scritture concorrenti di web e worker |
 | `adminer` | Ispezione del DB dal browser | Solo `--profile dev`, mai in produzione |
 
@@ -49,7 +49,7 @@ graph LR
         REG[Plugin Registry]
         CTX[Plugin Context]
         CRON[Cron Worker]
-        POOL[Scraper Pool]
+        POOL[Scraper Runner]
         CAT[Catalog Update Service]
         CART[Cart Engine]
         ALERT[Alert Engine]
@@ -82,8 +82,8 @@ graph LR
 |---|---|---|
 | Plugin Registry | Discovery, validazione manifest, caricamento, registrazione route | [L4](../4-capabilities/core/plugin-registry.md) |
 | Plugin Context | Sandbox soft: tutto ciò che un plugin può usare | [L4](../4-capabilities/core/plugin-context.md) |
-| Cron Worker | Dispatcher temporale dei tre flussi (scrape, alert, summary) | [L4](../4-capabilities/core/cron-worker.md) |
-| Scraper Pool | Esecuzione parallela controllata degli scraper (limiti admin) | [L4](../4-capabilities/core/scraper-pool.md) |
+| Cron Worker | Dispatcher temporale dei tre flussi (scrape, alert, summary) + manutenzione giornaliera | [L4](../4-capabilities/core/cron-worker.md) |
+| Scraper Runner | Esecuzione seriale degli scraper (uno alla volta, lock, timeout, cache) | [L4](../4-capabilities/core/scraper-pool.md) |
 | Catalog Update Service | Riceve i prodotti dagli scraper, calcola i delta, scrive lo storico | [L4](../4-capabilities/core/catalog-update-service.md) |
 | Cart Engine | Totali, adjustments, soglie dei carrelli | [L4](../4-capabilities/core/cart-engine.md) |
 | Alert Engine | Diff vs baseline → notifica aggregata | [L4](../4-capabilities/core/alert-engine.md) |
@@ -114,9 +114,9 @@ sequenceDiagram
     participant N as Notifier plugin
     participant U as Utente
 
-    A->>W: schedula scraper (1..N orari/giorno, limiti)
+    A->>W: schedula scraper (1..N orari/giorno, indipendenti)
     loop ogni slot dovuto
-        W->>S: run (nel pool, con lock per-scraper)
+        W->>S: run (seriale, uno scraper alla volta, lock per-scraper)
         S->>C: update_catalog(user, prodotti) per ogni utente
         C->>C: delta → storico prezzi/disponibilità
     end
@@ -137,4 +137,5 @@ sequenceDiagram
 | Stato dei plugin | **Tabelle dedicate per plugin** | Nessuna tabella generica condivisa; il core non le conosce |
 | Frontend | **SPA client-side** (no SSR) | App dietro login, niente SEO; il mounting dinamico dei plugin è naturale lato client |
 | Notifiche mancate | **Storico interno sempre scritto** | Il notifier è un canale aggiuntivo, mai un single point of failure informativo |
-| Concorrenza scraper | **Pool con limite admin; scraper internamente mono-thread** | Parallelismo tra siti diversi, mai verso lo stesso sito; vedi [scheduling-and-execution.md](scheduling-and-execution.md) |
+| Concorrenza scraper | **Esecuzione seriale (un solo scraper alla volta); scraper internamente mono-thread** | Carico prevedibile, niente parametri di parallelismo da tarare; gli orari indipendenti per scraper distribuiscono il lavoro; vedi [scheduling-and-execution.md](scheduling-and-execution.md) |
+| Riuso dei dati di scrape | **Cache per query con emivita per-plugin** | La stessa ricerca, tra utenti o run ravvicinate, costa una sola visita al sito; vedi [scheduling-and-execution.md](scheduling-and-execution.md) |

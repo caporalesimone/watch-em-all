@@ -4,7 +4,7 @@
 
 | Termine | Definizione |
 |---|---|
-| **Scraper** | Plugin che osserva un singolo sito e-commerce ed estrae prodotti (prezzi, disponibilità). Internamente lavora **in modo sequenziale** (un solo flusso di lavoro per scraper); è il sistema a poterne eseguire più d'uno in parallelo. |
+| **Scraper** | Plugin che osserva un singolo sito e-commerce ed estrae prodotti (prezzi, disponibilità). Internamente lavora **in modo sequenziale** (un solo flusso di lavoro per scraper); anche il sistema li esegue **uno alla volta**, ciascuno al proprio orario. |
 | **Notifier** | Plugin che consegna le notifiche su un canale (email, Discord, …). |
 | **Plugin** | Unità autonoma full-stack (backend + interfaccia) che estende il sistema. Due famiglie: scraper e notifier. Ogni plugin è configurabile a livello **admin** (parametri di sistema) e a livello **utente** (parametri personali). |
 | **Catalogo** | L'insieme dei prodotti estratti per un utente. Personale e isolato per utente. |
@@ -23,6 +23,8 @@
 | **Baseline** | Lo stato di riferimento con cui il sistema confronta per capire "cosa è cambiato" dall'ultima notifica. |
 | **Run (di scrape)** | Una singola esecuzione di uno scraper, che processa tutti gli utenti che lo hanno configurato. Programmata dall'admin, da 1 a N volte al giorno. |
 | **Slot** | Uno degli orari programmati di una run. Se il sistema era fermo, recupera lo slot più recente perso (uno solo). |
+| **Cache di scrape** | Il riuso dei risultati di una ricerca recente: la stessa query, tra utenti diversi o run ravvicinate, non torna sul sito finché l'**emivita** (durata di validità, configurata dall'admin per plugin) non scade. |
+| **Cancellazione differita** | La cancellazione di un account da parte dell'admin: l'account viene disabilitato e marcato **in cancellazione** con una **scadenza** (default 30 giorni); fino ad allora è annullabile con un tasto (torna disabilitato), dopo viene eliminato automaticamente con tutti i suoi dati. |
 | **Dry-run / Test** | Esecuzione di prova di uno scraper che mostra i prodotti trovati **senza salvare nulla**. |
 | **Core** | Il cuore del sistema: orchestra i plugin, possiede i dati, calcola carrelli e notifiche. Non conosce la logica interna dei plugin (né, ad esempio, il concetto di "categoria", che è interno agli scraper). |
 | **Worker** | Il processo che fa girare le cose al momento giusto: esecuzioni scraper, notifiche, report. |

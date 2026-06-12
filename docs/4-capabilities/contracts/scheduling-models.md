@@ -29,10 +29,11 @@ class AlertSchedule(BaseModel):
 
 ```python
 class SystemSettings(BaseModel):       # persistite in system_settings (key-value), editabili da UI
-    max_concurrent_scrapers: int = 2   # dimensione del pool
     scraper_run_timeout_min: int = 30  # oltre → run terminata, stato "timeout"
     catchup_warning_min: int = 10      # ritardo oltre cui un'esecuzione è loggata come recupero
     log_retention_days: int = 90       # system_log + scrape_run/scrape_user_log
+    user_deletion_retention_days: int = 30  # periodo di grazia prima del purge automatico (USR-R9);
+                                       # la scadenza è fissata alla marcatura: cambi solo pro-futuro
 ```
 
 ## Record di esecuzione (monitoraggio)
@@ -54,7 +55,8 @@ class ScrapeRun(BaseModel):            # UNA riga per run di scraper
     price_changes: int
     products_removed: int
     products_excluded: int             # esclusioni decise dal plugin (NON gli out-of-stock)
-    http_requests: int                 # contate dal client del core
+    http_requests: int                 # contate dal client del core (solo richieste reali al sito)
+    cache_hits: int                    # richieste servite dalla cache di scrape (CTX-R9)
     error_message: str | None
 
 class ScrapeUserLog(BaseModel):        # UNA riga per utente per run
@@ -66,6 +68,7 @@ class ScrapeUserLog(BaseModel):        # UNA riga per utente per run
     products_new: int
     price_changes: int
     http_requests: int                 # quota della run attribuita a questo utente
+    cache_hits: int                    # idem, riusi dalla cache
     status: Literal["ok", "error"]
     error_message: str | None
 ```

@@ -25,19 +25,21 @@ erDiagram
         int price_changes "variazioni registrate"
         int products_removed "delistati in questa run"
         int http_requests "richieste fatte al sito"
+        int cache_hits "riusi dalla cache di scrape"
     }
     SCRAPE_USER_LOG {
         int user "quale utente"
         datetime started_finished "durata per utente"
         int found_new_changed "contatori per utente"
         int http_requests "richieste attribuite all'utente"
+        int cache_hits "riusi attribuiti all'utente"
         string status "ok / partial / error"
         string error "messaggio se fallito"
     }
 ```
 
 - La **durata della run è wall-clock** (inizio→fine reale), non la somma dei tempi per utente.
-- `http_requests` è contato dal client HTTP del core (il plugin non deve fare nulla): è la misura diretta del carico imposto al sito, quella che l'admin guarda per regolare politeness e numero di slot. È contato anche **per utente** (la run processa un utente alla volta): è la base del ranking di carico nella [dashboard di sistema](admin-dashboard.md).
+- `http_requests` è contato dal client HTTP del core (il plugin non deve fare nulla) e conta solo le richieste **reali** al sito: è la misura diretta del carico imposto, quella che l'admin guarda per regolare politeness e numero di slot. `cache_hits` conta le richieste evitate grazie alla [cache di scrape](../../4-capabilities/core/plugin-context.md) (CTX-R9): un rapporto alto dice che l'emivita sta lavorando. Entrambi sono contati anche **per utente** (la run processa un utente alla volta): è la base del ranking di carico nella [dashboard di sistema](admin-dashboard.md).
 - Semantica degli stati: `ok` = tutti gli utenti processati; `partial` = almeno un utente ok e almeno uno fallito; `error` = nessun utente completato; `timeout` = terminata dal sistema oltre il tempo massimo.
 
 ## Pagina di monitoraggio
@@ -47,8 +49,8 @@ erDiagram
 | Elemento | Contenuto |
 |---|---|
 | Stato corrente | inattivo / in coda / **in esecuzione** (da quanto) / sospeso |
-| Ultima run | esito, durata, prodotti trovati/nuovi/variati/delistati, richieste HTTP |
-| Trend (grafici) | durata delle run nel tempo · richieste HTTP per run · variazioni di prezzo rilevate per run |
+| Ultima run | esito, durata, prodotti trovati/nuovi/variati/delistati, richieste HTTP, riusi dalla cache |
+| Trend (grafici) | durata delle run nel tempo · richieste HTTP (e cache hit) per run · variazioni di prezzo rilevate per run |
 | Contatori di periodo | run riuscite/fallite negli ultimi 7/30 giorni; run al giorno |
 
 ### Drill-down

@@ -27,12 +27,13 @@ Non è un dettaglio: è il punto in cui il core **impone** politeness e raccogli
 - **CTX-R2** — Timeout per-richiesta di default (configurabile); user-agent identificabile di default.
 - **CTX-R3** — **Contatore di richieste per run** (per `scrape_run.http_requests`): instrumentazione trasparente al plugin.
 - **CTX-R4** — Retry brevi su errori di rete transitori (configurabili), con backoff; mai più di pochi tentativi.
-- **CTX-R5** — Cooperazione col timeout di run del pool: il client rifiuta nuove richieste dopo la cancellazione del job.
+- **CTX-R5** — Cooperazione col timeout di run del runner: il client rifiuta nuove richieste dopo la cancellazione del job.
+- **CTX-R9** — **Cache di scrape, trasparente al plugin**: prima di ogni `get` il client cerca nella tabella `scrape_cache` un risultato per la **stessa query** (chiave = hash della richiesta normalizzata: metodo, URL, parametri ordinati, scope `plugin_id`). Entro l'**emivita** configurata dall'admin per il plugin → risponde dalla cache, **niente HTTP, niente attesa di politeness**, contato in `cache_hits`; scaduta o assente → richiesta reale e salvataggio del risultato. I record scaduti sono eliminati a inizio run (POOL-R3); svuotamento manuale dalla pagina admin del plugin (`DELETE /api/admin/scrapers/{id}/cache`). Emivita 0 = cache disattivata; `post` mai cachata. È così che il riuso vale sia tra utenti della stessa run sia tra run ravvicinate.
 
 ```python
 class HttpClient:
-    def get(self, url, **kw) -> Response: ...     # cadenzata, contata, con retry/timeout
-    def post(self, url, **kw) -> Response: ...
+    def get(self, url, **kw) -> Response: ...     # cache di scrape (CTX-R9), poi cadenzata, contata, con retry/timeout
+    def post(self, url, **kw) -> Response: ...    # mai cachata
 ```
 
 ## La sessione DB (`db`)
@@ -42,11 +43,11 @@ class HttpClient:
 
 ## `update_catalog`
 
-Consegna per-utente della lista corrente di [Product](../contracts/product.md); il core calcola i delta ([catalog-update-service](catalog-update-service.md)) e restituisce i contatori (usati dal pool per il record di run).
+Consegna per-utente della lista corrente di [Product](../contracts/product.md); il core calcola i delta ([catalog-update-service](catalog-update-service.md)) e restituisce i contatori (usati dal runner per il record di run).
 
 ## `config`
 
-Solo la sezione **admin** del plugin (persistita nel DB e gestita dalla UI admin via [ConfigField](../contracts/config-field.md)); i parametri di sistema riservati (politeness, timeout) sono letti dal core, non dal plugin. La config **utente** degli scraper vive nelle tabelle del plugin; quella dei notifier arriva già mergeata alla `send()`.
+Solo la sezione **admin** del plugin (persistita nel DB e gestita dalla UI admin via [ConfigField](../contracts/config-field.md)); i parametri di sistema riservati (politeness, timeout, emivita della cache) sono letti dal core, non dal plugin. La config **utente** degli scraper vive nelle tabelle del plugin; quella dei notifier arriva già mergeata alla `send()`.
 
 ## `markdown`
 

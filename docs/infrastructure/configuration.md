@@ -10,7 +10,7 @@ La configurazione **operativa** vive nel DB ed è editabile dalla UI **senza ria
 |---|---|---|---|
 | Bootstrap | `config.yaml` | URL DB, durate token, locale default | restart |
 | Segreti | `.env` | credenziali Postgres, SECRET_KEY, password admin iniziale | restart |
-| Operativa di sistema | DB `system_settings` | pool scraper, timeout run, retention | UI admin, a caldo |
+| Operativa di sistema | DB `system_settings` | timeout run, retention, periodo di grazia cancellazione utenti | UI admin, a caldo |
 | Schedule | DB `scraper_schedule` etc. | slot degli scraper, cadenze | UI, a caldo |
 | Plugin (admin) | DB `notifier_admin_config` / tabelle plugin | SMTP, politeness, regole sito | UI admin, a caldo |
 | Plugin (utente) | DB `notifier_user_config` / tabelle plugin | recapiti, cosa osservare | UI utente, a caldo |
@@ -50,10 +50,10 @@ Solo segreti **core**: i parametri dei notifier (es. SMTP) **non** stanno qui �
 
 | Chiave | Default | Effetto |
 |---|---|---|
-| `max_concurrent_scrapers` | 2 | dimensione del pool di esecuzione |
 | `scraper_run_timeout_min` | 30 | oltre → run terminata (`timeout`) |
 | `catchup_warning_min` | 10 | ritardo oltre cui un'esecuzione è loggata come recupero |
 | `log_retention_days` | 90 | retention di system_log e record delle run |
+| `user_deletion_retention_days` | 30 | periodo di grazia tra marcatura e purge automatico degli account (USR-R9) |
 
 ## Multi-lingua
 

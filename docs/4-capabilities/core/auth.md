@@ -27,6 +27,7 @@ POST /api/auth/login {username, password}
   → hash ok ma is_active=false o in cancellazione → 403 {code: "account_disabled"}  # AUTH-R10
   → hash errato → 401 generico (mai rivelare lo stato dell'account)
   → access(typ=access, tv) + refresh(typ=refresh, tv, jti=nuovo); users.refresh_jti = jti
+  → users.last_login_at = now()                     # ultimo accesso, mostrato all'admin (USR-R13)
   → { access_token, refresh_token, expires_at }     # expires_at = scadenza dell'ACCESS
 
 POST /api/auth/refresh {refresh_token}
@@ -59,4 +60,4 @@ def authenticate(request):
 
 ## Tabella `users` (campi auth)
 
-`username` (UNIQUE), `password_hash`, `role`, `is_active`, `locale`, `must_change_password`, `token_version`, `refresh_jti` — schema completo in [database/schema.md](../database/schema.md).
+`username` (UNIQUE), `password_hash`, `role`, `is_active`, `locale`, `must_change_password`, `token_version`, `refresh_jti`, `last_login_at` — schema completo in [database/schema.md](../database/schema.md).

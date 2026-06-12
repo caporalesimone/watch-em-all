@@ -13,7 +13,7 @@ Unico punto in cui i dati degli scraper diventano stato persistente: riceve la l
 - **CATSVC-R3** — Risolve i prezzi mancanti secondo il contratto Product (sotto).
 - **CATSVC-R4** — Scrive in `price_history` **solo** se cambia il **prezzo corrente** o la **disponibilità** rispetto all'ultima entry (append-only; ogni entry porta anche `is_available`).
 - **CATSVC-R5** — Aggiorna sul record di catalogo tutto ciò che può cambiare: `name`, `url`, `image_url`, `extra_json`, `is_available`, `removed` (un delistato che ricompare torna `removed = false`).
-- **CATSVC-R6** — Restituisce al chiamante i **contatori del delta** (found/new/price_changes/removed) per il record di run del pool.
+- **CATSVC-R6** — Restituisce al chiamante i **contatori del delta** (found/new/price_changes/removed) per il record di run del runner.
 - **CATSVC-R7** — Un prodotto non disponibile **non viene mai escluso**: resta con `is_available = false`. Le esclusioni specifiche del sito avvengono prima, nel plugin.
 
 ## Risoluzione prezzi (normativa)
@@ -66,6 +66,6 @@ def update_catalog(user_id, products: list[Product]) -> DeltaCounters:
 | Rimuovi delistati | DELETE delle righe `removed = true` dell'utente | cascata su membri carrello e storico |
 | Rimozione selettiva | DELETE delle righe indicate | idem; conferma con conseguenze |
 | Svuota catalogo | DELETE di tutte le righe dell'utente | idem |
-| Scrape ora | Solo a catalogo vuoto (il server **riverifica** e risponde 409 se non vuoto); job nel pool, trigger `manual`, un utente solo | [scraper-pool](scraper-pool.md) |
+| Scrape ora | Solo a catalogo vuoto (il server **riverifica** e risponde 409 se non vuoto); job con le regole del runner, trigger `manual`, un utente solo | [scraper-pool](scraper-pool.md) |
 
 La **cascata** (membri dei carrelli + storico) è una FK `ON DELETE CASCADE`: decisione presa, niente orfani; la UI dichiara le conseguenze prima della conferma.

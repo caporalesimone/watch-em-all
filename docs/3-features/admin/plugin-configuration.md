@@ -12,7 +12,7 @@ Ogni plugin — scraper o notifier — ha una parte di configurazione **di siste
 - **PCFG-R2** — La configurazione admin è salvata nel DB (config DB-first) ed è modificabile senza riavvio.
 - **PCFG-R3** — I campi **segreti** (es. credenziali del server di posta) sono mascherati, write-only, mai rispediti al client; un valore già presente è indicato senza rivelarlo.
 - **PCFG-R4** — La validazione autoritativa degli input è del **backend del plugin**; la UI valida solo per usabilità.
-- **PCFG-R5** — Per gli **scraper**, la pagina admin del plugin offre anche: i parametri operativi (timeout, identificazione client, ritmo di politeness, regole del sito come le soglie di sconto) e il **Test Scraper** (dry-run on-demand che mostra i prodotti trovati in tabella, **senza scrivere nulla**). La pagina admin del plugin è **distinta** dalla pagina utente: configura il comportamento, non sceglie cosa osservare.
+- **PCFG-R5** — Per gli **scraper**, la pagina admin del plugin offre anche: i parametri operativi (timeout, identificazione client, ritmo di politeness, **emivita della cache di scrape** — CTX-R9, regole del sito come le soglie di sconto), il **Test Scraper** (dry-run on-demand che mostra i prodotti trovati in tabella, **senza scrivere nulla**) e il pulsante **Svuota cache** (elimina i risultati cacheati del plugin). La pagina admin del plugin è **distinta** dalla pagina utente: configura il comportamento, non sceglie cosa osservare.
 - **PCFG-R6** — Per i **notifier**, la configurazione admin è il prerequisito del canale: finché manca, il canale risulta "non disponibile" per tutti gli utenti (lo stato è visibile sia all'admin sia agli utenti). Anche l'admin ha un bottone di **test** del canale.
 - **PCFG-R7** — L'**attivazione** di un plugin non è configurazione runtime: è dichiarata nel manifest e richiede rebuild + restart ([build system](../../infrastructure/build-system.md)). La **sospensione** di uno scraper (stop temporaneo delle esecuzioni) è invece runtime, dallo scheduler.
 - **PCFG-R8** — Speculare per i **notifier**: l'admin può **disabilitare/riabilitare un canale per tutti gli utenti** a runtime. Un canale disabilitato risulta "non disponibile" per tutti (stesso stato della config di sistema mancante, PCFG-R6) e non consegna nulla — nemmeno i [messaggi admin](admin-notifications.md); le configurazioni personali degli utenti **non vengono toccate** e tornano operative alla riattivazione.
@@ -45,7 +45,7 @@ La regola di sicurezza del merge: le chiavi inviate dall'utente sono **filtrate 
 
 | Plugin | Config admin (sistema) | Config utente (personale) |
 |---|---|---|
-| Scraper | timeout richieste, user-agent, ritardo di politeness, regole di sconto del sito | prodotti/categorie da osservare (vive nelle tabelle del plugin) |
+| Scraper | timeout richieste, user-agent, ritardo di politeness, emivita della cache, regole di sconto del sito | prodotti/categorie da osservare (vive nelle tabelle del plugin) |
 | Notifier email | host/porta/credenziali del server in uscita, mittente | indirizzo destinatario, flag attivo |
 | Notifier a webhook | eventuali default di sistema | URL del webhook personale, flag attivo |
 

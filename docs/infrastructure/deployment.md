@@ -8,7 +8,7 @@
 |---|---|---|
 | `db` | PostgreSQL 16, unico stato del sistema | solo rete interna |
 | `web` | FastAPI + bundle SPA; API, auth, scrape on-demand | `:8080` |
-| `worker` | Dispatcher + pool scraper, alert, summary | nessuna |
+| `worker` | Dispatcher + runner seriale scraper, alert, summary, manutenzione giornaliera | nessuna |
 | `adminer` | Ispezione DB dal browser | `:8081`, **solo profilo `dev`** |
 
 `web` e `worker` comunicano **solo tramite il DB**; entrambi attendono `db` healthy e garantiscono lo schema all'avvio (idempotente: non serve ordinarli tra loro).

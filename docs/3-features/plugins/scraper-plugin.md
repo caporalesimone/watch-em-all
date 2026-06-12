@@ -21,7 +21,8 @@ Un produttore **stateless** e **internamente mono-thread** di prodotti: legge i 
 | Calcolo adjustments del carrello (regole del sito) | ✅ | applica |
 | Storico, delta, delisting | — | ✅ |
 | Scrittura nel catalogo | — | ✅ (unica via: callback) |
-| Quando girare, parallelismo, politeness, timeout | — | ✅ |
+| Quando girare, serialità tra scraper, politeness, timeout | — | ✅ |
+| Cache delle risposte (riuso tra utenti e run ravvicinate) | — | ✅ (trasparente, nel client HTTP) |
 
 ## Requisiti del contratto
 
@@ -33,7 +34,7 @@ Un produttore **stateless** e **internamente mono-thread** di prodotti: legge i 
 ### Esecuzione
 - **SCR-R4** — L'unità di esecuzione è **per utente**: il core invoca lo scraper per ciascun utente configurato; la run schedulata itera tutti gli utenti, lo scrape-now uno solo. Lo scraper non decide mai *quando* girare.
 - **SCR-R5** — Lo scraper è **stateless**: produce solo lo stato corrente, non conosce lo storico né i delta (mestiere del core).
-- **SCR-R6** — Lo scraper è **internamente mono-thread**: nessun parallelismo interno verso il sito. Usa **esclusivamente il client HTTP fornito dal contesto**, che impone il ritmo (politeness) e conta le richieste per il monitoraggio.
+- **SCR-R6** — Lo scraper è **internamente mono-thread**: nessun parallelismo interno verso il sito. Usa **esclusivamente il client HTTP fornito dal contesto**, che impone il ritmo (politeness), conta le richieste per il monitoraggio e può servire una risposta dalla **cache di scrape** in modo trasparente (stessa query entro l'emivita → niente chiamata al sito, [plugin-context](../../4-capabilities/core/plugin-context.md) CTX-R9).
 - **SCR-R7** — Restituisce **anche i prodotti non disponibili** (marcati); non li filtra mai. Le esclusioni specifiche del sito (es. prodotti in stati speciali che l'utente non vuole) avvengono dentro il plugin, e i prodotti esclusi sono conteggiati per il monitoraggio.
 - **SCR-R8** — La lista consegnata è **piatta e deduplicata** sull'identità: se lo stesso prodotto emerge da più input (es. input singolo + categoria che lo contiene), compare una volta sola.
 
@@ -55,15 +56,15 @@ Un produttore **stateless** e **internamente mono-thread** di prodotti: legge i 
 
 ```mermaid
 sequenceDiagram
-    participant POOL as Pool (core)
+    participant RUN as Runner (core)
     participant S as Scraper
     participant SITE as Sito
     participant CAT as Catalog Update (core)
 
-    POOL->>S: esegui per utente U
+    RUN->>S: esegui per utente U
     S->>S: leggi input di U (tabelle proprie)
     loop per ogni input, una richiesta alla volta
-        S->>SITE: richiesta (via http del contesto, cadenzata)
+        S->>SITE: richiesta via http del contesto<br/>(cache valida? riusa : rete, cadenzata)
         SITE-->>S: pagina/dati
         S->>S: estrai, normalizza, assegna external_id
     end
