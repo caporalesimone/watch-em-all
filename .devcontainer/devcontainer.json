@@ -3,9 +3,7 @@
     "build": { "dockerfile": "Dockerfile" },
     "mounts": [
         // docker-outside-of-docker: the dev container drives the host's Docker engine
-        "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
-        // persist gh auth across container rebuilds (gh auth login once)
-        "source=watchemall-gh-config,target=/root/.config/gh,type=volume"
+        "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
     ],
     "forwardPorts": [8080, 8081],
     "postCreateCommand": "bash .devcontainer/post-create.sh",
