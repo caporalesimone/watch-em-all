@@ -24,20 +24,20 @@ Per **provare il container prima del merge**, un workflow costruisce le immagini
 
 - **Branch senza PR**: trigger manuale (`workflow_dispatch` con il branch in input) per generare `dev-<branch>` on-demand.
 - **Niente tag per-commit**: per fissare una build esatta si usa il **digest** (`@sha256:…`), sempre disponibile.
-- Le immagini `dev-*` sono **effimere** (ripulite periodicamente); permanenti solo i tag di release `vX.Y.Z`.
+- Le immagini `dev-*` sono **effimere** (ripulite periodicamente); permanenti solo i tag di release `x.y.z`.
 
 Come installare una dev per provarla: [deployment](deployment.md#provare-unimmagine-di-sviluppo).
 
 ## Publish (su tag)
 
-Workflow separato, attivato dai **tag `v*`** (INF-17): builda le tre immagini multi-stage e le pubblica su **GHCR**, poi crea la release GitHub con il **deploy kit** in allegato.
+Workflow separato, attivato dai **tag `x.y.z`** (SemVer puro, senza prefisso `v`; INF-17): builda le tre immagini multi-stage e le pubblica su **GHCR**, poi crea la release GitHub con il **deploy kit** in allegato.
 
 | Step | Cosa fa |
 |---|---|
-| Build & push | `watch-em-all-web`, `watch-em-all-worker`, `watch-em-all-ops` → `ghcr.io/<owner>/…:<tag>` (es. `v1.2.0`; mai `latest`, INF-1) |
+| Build & push | `watch-em-all-web`, `watch-em-all-worker`, `watch-em-all-ops` → `ghcr.io/<owner>/…:<tag>` (es. `1.2.0`; mai `latest`, INF-1) |
 | Release + kit | allega alla release `compose.yml` (il compose di release) e `.env.example` — i **soli due file** che servono per installare ([deployment](deployment.md)) |
 
-Il tag è l'unico trigger di pubblicazione: `main` verde non pubblica nulla — e il tag arriva **automaticamente alla chiusura di una fase** (vedi *Tag di fine fase* sotto). I **package GHCR sono pubblici** (come il repo): il pull lato utente è anonimo, nessuna autenticazione.
+Il tag è l'unico trigger di pubblicazione: `main` verde non pubblica nulla — e il tag lo crea **l'owner a mano**, quando vuole una release (vedi *Tag e release* sotto). I **package GHCR sono pubblici** (come il repo): il pull lato utente è anonimo, nessuna autenticazione.
 
 ### Versioning del prodotto
 
@@ -49,16 +49,15 @@ Il prodotto segue **SemVer** (`MAJOR.MINOR.PATCH`) con una **versione unica per 
 | **MINOR** | nuove feature retrocompatibili (tipicamente la chiusura di una fase del [flow](../development-flow/README.md)) |
 | **PATCH** | fix retrocompatibili |
 
-- `0.x` durante lo sviluppo (**0.1** alla chiusura della fase 7, **1.0** alla fase 12 — milestone scelte nella PR che chiude quelle fasi); **ogni PR** porta un bump di versione + voce `CHANGELOG.md` (**1 MVP = 1 PR = 1 versione**), ma **i tag non sono per-PR**: nascono **solo alla chiusura di una fase** (vedi sotto), così il repo non si riempie di tag.
+- `0.x` durante lo sviluppo (**0.1** alla chiusura della fase 7, **1.0** alla fase 12 — milestone scelte nella PR che chiude quelle fasi); **ogni PR** porta un bump di versione + voce `CHANGELOG.md` (**1 MVP = 1 PR = 1 versione**), ma **i tag non sono per-PR**: li crea **l'owner a mano** quando vuole una release (vedi sotto), così il repo non si riempie di tag.
 - `CHANGELOG.md` aggiornato nella **stessa PR** (è la guardia CHANGELOG della CI a imporlo).
 
-### Tag di fine fase (automatico)
+### Tag e release (manuali)
 
-Il tag `vX.Y.Z` lo crea **un workflow**, non una persona: al push su `main` legge l'**ultima voce** di `CHANGELOG.md` e, **solo se** contiene il marker di chiusura fase — la riga **`Closes phase N.`** — crea il tag con la versione di quella voce. Implementato in fase 0 (0.T8).
+Il tag `x.y.z` (SemVer puro, **senza prefisso `v`**) lo crea **l'owner a mano**, quando decide che è il momento di una release: **nessun workflow di auto-tag**. Il push del tag su GitHub innesca `publish.yml` (build+push delle immagini versionate su GHCR + release con il deploy kit allegato). Implementato in fase 0 (0.T9).
 
-- **13 fasi = 13 tag**: una release per ogni fase chiusa del [development flow](../development-flow/README.md); le versioni intermedie (per-PR) esistono solo nel CHANGELOG, senza tag.
-- La PR che chiude una fase è quindi anche la PR di release: include il marker, e può alzare MINOR/MAJOR quando la milestone lo merita (0.1.0 alla fase 7, 1.0.0 alla 12).
-- Merge senza marker → nessun tag, nessuna release: il flusso quotidiano resta leggero.
+- I tag **non sono per-PR**: l'owner ne crea **quando vuole**; le versioni intermedie (per-PR) vivono solo nel CHANGELOG, senza tag — così il repo non si riempie di tag.
+- La versione del tag è quella dell'ultima voce di `CHANGELOG.md` da pubblicare; può alzare MINOR/MAJOR quando la milestone lo merita (es. 0.1.0 alla fase 7, 1.0.0 alla 12).
 - **Distinta** da: il `version` del manifest di un plugin (informativo, per-plugin) e l'`api_version` (intero, gate di compatibilità del contratto plugin) — entrambi ortogonali alla versione del prodotto.
 
 ## Note
