@@ -29,8 +29,7 @@ Repo e package GHCR sono **pubblici**: il `pull` è **anonimo**, nessun `docker 
 
 | Immagine | Contenuto |
 |---|---|
-| `ghcr.io/<owner>/watch-em-all-web:<ver>` | FastAPI + SPA già buildata + tutti i plugin first-party |
-| `ghcr.io/<owner>/watch-em-all-worker:<ver>` | dispatcher + runner + manutenzione |
+| `ghcr.io/<owner>/watch-em-all:<ver>` | l'app: FastAPI + SPA buildata + tutti i plugin first-party + dispatcher/runner. **Un'unica immagine, due ruoli** scelti dal comando: `web` (API + SPA) e `worker` (scheduler + manutenzione) |
 | `ghcr.io/<owner>/watch-em-all-ops:<ver>` | `postgres:16` + script di [backup/export/restore](backup-and-restore.md) |
 
 **`config.yaml`**: il default è **dentro l'immagine** — non serve alcun file locale. Per personalizzarlo si crea una copia accanto al compose e la si monta sopra quella dell'immagine (`./config.yaml:/app/config.yaml:ro`, riga già pronta e commentata nel compose di release): il mount vince, l'immagine resta il fallback.
@@ -47,7 +46,7 @@ Repo e package GHCR sono **pubblici**: il `pull` è **anonimo**, nessun `docker 
 | `ops` | Script di backup/export/restore, **effimero** (`run --rm`, profilo `ops`) | nessuna |
 | `adminer` | Ispezione DB dal browser | `:8081`, **solo profilo `dev`** |
 
-`web` e `worker` comunicano **solo tramite il DB**; entrambi attendono `db` healthy e garantiscono lo schema all'avvio (idempotente: non serve ordinarli tra loro).
+`web` e `worker` sono **due servizi dalla stessa immagine** `watch-em-all` (ruolo scelto dal `command`); comunicano **solo tramite il DB**, entrambi attendono `db` healthy e garantiscono lo schema all'avvio (idempotente: non serve ordinarli tra loro).
 
 ## compose.yml (release, il file del deploy kit)
 
@@ -71,7 +70,8 @@ services:
       options: { max-size: "10m", max-file: "3" }
 
   web:
-    image: ghcr.io/<owner>/watch-em-all-web:${WEA_VERSION}
+    image: ghcr.io/<owner>/watch-em-all:${WEA_VERSION}
+    command: ["web"]
     ports: ["8080:8080"]
     # config.yaml di default incluso nell'immagine; per personalizzarlo:
     # volumes: ["./config.yaml:/app/config.yaml:ro"]
@@ -87,7 +87,8 @@ services:
     logging: *logging
 
   worker:
-    image: ghcr.io/<owner>/watch-em-all-worker:${WEA_VERSION}
+    image: ghcr.io/<owner>/watch-em-all:${WEA_VERSION}
+    command: ["worker"]
     # volumes: ["./config.yaml:/app/config.yaml:ro"]   # come per web, opzionale
     env_file: [.env]
     depends_on:
@@ -177,4 +178,4 @@ WEA_VERSION=dev-<branch>     # es. dev-catalog
 docker compose pull && docker compose up -d
 ```
 
-`dev-<branch>` è **sovrascritto** a ogni push sul branch (punti sempre all'ultima build). Per inchiodare una build esatta usa il **digest** (`image: ghcr.io/<owner>/watch-em-all-web@sha256:…`). Le immagini `dev-*` sono effimere: per l'uso normale resta su una release `x.y.z`.
+`dev-<branch>` è **sovrascritto** a ogni push sul branch (punti sempre all'ultima build). Per inchiodare una build esatta usa il **digest** (`image: ghcr.io/<owner>/watch-em-all@sha256:…`). Le immagini `dev-*` sono effimere: per l'uso normale resta su una release `x.y.z`.
