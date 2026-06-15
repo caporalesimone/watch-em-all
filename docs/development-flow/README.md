@@ -31,7 +31,7 @@
 - [ ] **Fase 6 — Alert in-app** → [phase-06-alerts-in-app.md](phase-06-alerts-in-app.md)
   *Risultato: cambio prezzo → notifica nello Storico alert alla cadenza scelta.*
 - [ ] **Fase 7 — Notifiche Email** 🎉 → [phase-07-email-notifier.md](phase-07-email-notifier.md)
-  *Risultato: **la mail col digest arriva in casella — il prodotto fa il suo mestiere (v0.1)**.*
+  *Risultato: **la mail col digest arriva in casella — il prodotto fa il suo mestiere (0.1)**.*
 - [ ] **Fase 8 — Grafici dello storico** → [phase-08-price-charts.md](phase-08-price-charts.md)
   *Risultato: grafici interattivi per prodotto e carrello.*
 - [ ] **Fase 9 — Dragon Store completo** → [phase-09-dragonstore-complete.md](phase-09-dragonstore-complete.md)
@@ -40,7 +40,7 @@
   *Risultato: plancia admin completa — statistiche, limiti, utenti, manutenzione.*
 - [ ] **Fase 11 — Summary, analisi prezzi, export** → [phase-11-insights.md](phase-11-insights.md)
   *Risultato: report periodico, badge minimo storico e convenienza, export dei dati.*
-- [ ] **Fase 12 — Rifinitura e v1.0** → [phase-12-polish-v1.md](phase-12-polish-v1.md)
+- [ ] **Fase 12 — Rifinitura e 1.0** → [phase-12-polish-v1.md](phase-12-polish-v1.md)
   *Risultato: secondo canale (Discord), audit i18n English-first, CI piena: release 1.0.*
 
 ## La logica dell'ordine
@@ -48,11 +48,11 @@
 ```mermaid
 flowchart LR
     F0[0 Pipeline] --> F1[1 Fondamenta] --> F2[2 Plugin system] --> F3[3 Primo scrape] --> F4[4 Worker]
-    F4 --> F5[5 Carrelli] --> F6[6 Alert in-app] --> F7[7 Email 🎉 v0.1]
-    F7 --> F8[8 Grafici] --> F9[9 DragonStore full] --> F10[10 Admin] --> F11[11 Insight] --> F12[12 v1.0]
+    F4 --> F5[5 Carrelli] --> F6[6 Alert in-app] --> F7[7 Email 🎉 0.1]
+    F7 --> F8[8 Grafici] --> F9[9 DragonStore full] --> F10[10 Admin] --> F11[11 Insight] --> F12[12 1.0]
 ```
 
 - La fase 0 costruisce e **roda il processo** (CI, immagini dev sul branch, release sul tag, deploy kit) con container stub: **prima che esista il prodotto, esiste il suo flusso di rilascio** — ogni fase successiva ne beneficia dalla prima PR.
 - Le fasi 1-7 percorrono la **catena del valore minima** del prodotto (login → plugin → dati → automazione → carrelli → alert → consegna): alla fase 7 il sistema fa già, per intero, il suo mestiere su prodotti singoli.
 - Le fasi 8-11 **arricchiscono** (grafici, categorie, governo, insight) su un prodotto che già si usa tutti i giorni — ogni fase è valore visibile, non infrastruttura.
-- La fase 12 chiude il perimetro della [v1](../1-business/product-overview.md).
+- La fase 12 chiude il perimetro della [1.0](../1-business/product-overview.md).

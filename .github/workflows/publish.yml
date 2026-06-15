@@ -1,0 +1,56 @@
+name: Publish
+
+# Phase 0 (0.T9): on an x.y.z tag — created by the owner by hand whenever a release
+# is wanted — build and push the three versioned images to GHCR and cut the GitHub
+# release with the deploy kit attached: compose.yml + .env.example, the only two
+# files an end user needs (deployment.md, INF-17). Tagging is manual; there is no
+# auto-tag workflow. Tags are plain SemVer, no `v` prefix.
+
+on:
+  push:
+    tags: ["[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [web, worker, ops]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Compute owner (lowercase for GHCR)
+        id: meta
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push ${{ matrix.image }} ${{ github.ref_name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: packages/${{ matrix.image }}/Dockerfile
+          push: true
+          tags: ghcr.io/${{ steps.meta.outputs.owner }}/watch-em-all-${{ matrix.image }}:${{ github.ref_name }}
+
+  release:
+    needs: images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create the GitHub release with the deploy kit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes "Automated release ${GITHUB_REF_NAME}. Deploy kit attached: compose.yml + .env.example (see docs/infrastructure/deployment.md). Set WEA_VERSION=${GITHUB_REF_NAME} in your .env." \
+            deploy/compose.yml '.env.example'

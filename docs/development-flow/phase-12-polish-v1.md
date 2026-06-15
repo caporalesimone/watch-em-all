@@ -1,10 +1,10 @@
-# Fase 12 — Rifinitura e v1.0
+# Fase 12 — Rifinitura e 1.0
 
 > Stato: ☐ da iniziare · Prerequisiti: tutte le precedenti · [Indice del flusso](README.md)
 
 ## Obiettivo
 
-Chiudere il perimetro della v1: il secondo canale di notifica (che dimostra la bontà del contratto notifier), l'internazionalizzazione completa, la qualità trasversale (UX degli stati vuoti, CI piena, doc allineata).
+Chiudere il perimetro della 1.0: il secondo canale di notifica (che dimostra la bontà del contratto notifier), l'internazionalizzazione completa, la qualità trasversale (UX degli stati vuoti, CI piena, doc allineata).
 
 ## Risultato apprezzabile
 
@@ -32,13 +32,13 @@ Chiudere il perimetro della v1: il secondo canale di notifica (che dimostra la b
 - [ ] **12.T1 — Audit i18n: backend e notifier** (~1h): `en.json` completo nelle cartelle `i18n/` di core e plugin backend (notifier inclusi); nessuna stringa cablata né concatenata. *Verifica: notifiche complete in inglese, nessuna chiave mancante a runtime.*
 - [ ] **12.T2 — Audit i18n: frontend** (~1h): `en.json` completo per core e plugin frontend (FE-13), fallback su `en` verificato. *Verifica: app completa in inglese.*
 - [ ] **12.T3 — Doc allineata + audit README** (~1h): verifica documentazione vs implementato (DOC-8); audit del README come manuale operativo completo — install, update, backup/restore, tutti i comandi e script (INF-18). *Verifica: nessuna divergenza doc/codice nota; README autosufficiente.*
-- [ ] **12.T4 — Release 1.0** (~1h): changelog, tag `v1.0.0` → publish su GHCR + deploy kit in release ([ci](../infrastructure/ci.md), INF-17); prova di installazione pull-based da zero seguendo **solo il README**. *Verifica: macchina pulita con solo Docker + i due file del kit → sito su e manutenibile senza conoscenze esterne.*
+- [ ] **12.T4 — Release 1.0** (~1h): changelog, tag `1.0.0` → publish su GHCR + deploy kit in release ([ci](../infrastructure/ci.md), INF-17); prova di installazione pull-based da zero seguendo **solo il README**. *Verifica: macchina pulita con solo Docker + i due file del kit → sito su e manutenibile senza conoscenze esterne.*
 
 ## Definition of Done
 
 - [ ] I due [use case fondanti](../1-business/use-cases.md) girano end-to-end su installazione pulita, su entrambi i canali (lingua: `en`, English-first).
 - [ ] CI completa verde; checklist plugin passata da Dragon Store, Email e Discord.
-- [ ] Tutte le checkbox di questo flusso spuntate: la v1 è chiusa.
+- [ ] Tutte le checkbox di questo flusso spuntate: la 1.0 è chiusa.
 - [ ] [docs-eng](../../docs-eng/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti

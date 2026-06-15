@@ -177,4 +177,4 @@ WEA_VERSION=dev-<branch>     # es. dev-catalog
 docker compose pull && docker compose up -d
 ```
 
-`dev-<branch>` è **sovrascritto** a ogni push sul branch (punti sempre all'ultima build). Per inchiodare una build esatta usa il **digest** (`image: ghcr.io/<owner>/watch-em-all-web@sha256:…`). Le immagini `dev-*` sono effimere: per l'uso normale resta su una release `vX.Y.Z`.
+`dev-<branch>` è **sovrascritto** a ogni push sul branch (punti sempre all'ultima build). Per inchiodare una build esatta usa il **digest** (`image: ghcr.io/<owner>/watch-em-all-web@sha256:…`). Le immagini `dev-*` sono effimere: per l'uso normale resta su una release `x.y.z`.

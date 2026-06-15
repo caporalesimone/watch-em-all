@@ -4,7 +4,7 @@
 
 ## Obiettivo
 
-Il primo canale di consegna reale: contratto notifier, configurazione a due livelli con form dinamici, plugin Email, tracking degli esiti per canale. **Chiude la catena del valore**: alla fine di questa fase il prodotto fa il suo mestiere — è la **v0.1**.
+Il primo canale di consegna reale: contratto notifier, configurazione a due livelli con form dinamici, plugin Email, tracking degli esiti per canale. **Chiude la catena del valore**: alla fine di questa fase il prodotto fa il suo mestiere — è la **0.1**.
 
 ## Risultato apprezzabile
 
@@ -32,7 +32,7 @@ L'admin configura l'SMTP dalla sua pagina; l'utente mette il suo indirizzo nel P
 
 ## Definition of Done
 
-- [ ] 🎉 **v0.1**: lo scenario UC-1/UC-2 gira per intero senza toccare nulla — scrape automatico → soglia raggiunta → email in casella.
+- [ ] 🎉 **0.1**: lo scenario UC-1/UC-2 gira per intero senza toccare nulla — scrape automatico → soglia raggiunta → email in casella.
 - [ ] Un canale rotto non perde nulla: digest nello storico, esito failed tracciato, warning nei log admin.
 - [ ] Nessuna riga di codice email nel core: tutto nel plugin, dietro il contratto.
 - [ ] [docs-eng](../../docs-eng/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
