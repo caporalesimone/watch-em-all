@@ -28,6 +28,12 @@ jobs:
           echo "tag=dev-$slug" >> "$GITHUB_OUTPUT"
           echo "Will delete tag: dev-$slug"
       - name: Delete the dev tag from the app and ops packages
+        # GitHub forbids deleting a package's LAST tagged version (you'd have to
+        # delete the whole package). That only happens transiently — before any
+        # release tag exists and the package holds a single dev tag. Tolerate it so
+        # closing a PR never fails; it self-resolves once a release tag (x.y.z) is a
+        # permanent second version. In steady state deletion always succeeds.
+        continue-on-error: true
         uses: dataaxiom/ghcr-cleanup-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
