@@ -1,4 +1,4 @@
-"""Stub worker — phase 0 placeholder (0.T4).
+"""Stub worker — phase 0 placeholder (worker role of the app image).
 
 Declared mock, replaced by the real worker in 4.B1: it only touches the
 heartbeat file and logs a tick every minute. The heartbeat file is the

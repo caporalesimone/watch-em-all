@@ -1,4 +1,4 @@
-"""Stub web server — phase 0 placeholder (0.T3).
+"""Stub web server — phase 0 placeholder (web role of the app image).
 
 Declared mock, replaced by the real FastAPI app in 1.B2: stdlib only,
 no framework, no dependencies, and /api/health always answers 200
