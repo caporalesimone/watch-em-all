@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images + GitHub release); intermediate per-PR versions live only in this file.
 
+## [0.0.9] - 2026-06-15
+
+### Added
+
+- Auto-cleanup of dev images (`.github/workflows/cleanup-dev-images.yml`): when a PR closes (merged or abandoned), the branch's `dev-<branch>` tag is deleted from the `watch-em-all` and `watch-em-all-ops` packages so GHCR does not fill up with stale dev tags. Only that tag is removed — release tags (`x.y.z`) are never touched. Uses the Actions `GITHUB_TOKEN` (falls back to a classic PAT with `delete:packages` if GitHub refuses to delete user-owned package versions)
+
 ## [0.0.8] - 2026-06-15
 
 ### Changed

@@ -24,7 +24,7 @@ Per **provare il container prima del merge**, un workflow costruisce le immagini
 
 - **Branch senza PR**: trigger manuale (`workflow_dispatch` con il branch in input) per generare `dev-<branch>` on-demand.
 - **Niente tag per-commit**: per fissare una build esatta si usa il **digest** (`@sha256:…`), sempre disponibile.
-- Le immagini `dev-*` sono **effimere** (ripulite periodicamente); permanenti solo i tag di release `x.y.z`.
+- Le immagini `dev-*` sono **effimere**: il tag `dev-<branch>` viene **eliminato automaticamente alla chiusura della PR** — merge o abbandono — dal workflow `cleanup-dev-images.yml`, così i package non si riempiono di tag morti. Permanenti solo i tag di release `x.y.z` (mai toccati dalla pulizia).
 
 Come installare una dev per provarla: [deployment](deployment.md#provare-unimmagine-di-sviluppo).
 
