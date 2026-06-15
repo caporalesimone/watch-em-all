@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images + GitHub release); intermediate per-PR versions live only in this file.
 
+## [0.0.14] - 2026-06-16
+
+### Changed
+
+- Publish workflow release step is now **idempotent**: if the release for the tag already exists (e.g. the tag was created by publishing a release from the GitHub UI), it only (re)attaches the deploy kit with `--clobber` instead of failing on `gh release create`. A tag pushed from the CLI still creates the release as before — so the owner can tag/release from the GitHub UI **or** the CLI. Docs aligned (ci.md); fixed a stale "three images" comment in the workflow header (it builds two)
+
 ## [0.0.13] - 2026-06-16
 
 ### Added

@@ -46,6 +46,7 @@ The product follows **SemVer** (`MAJOR.MINOR.PATCH`) with a **single version for
 The `x.y.z` tag (plain SemVer, **no `v` prefix**) is created **by the owner by hand**, when it is time for a release: **no auto-tag workflow**. Pushing the tag to GitHub triggers `publish.yml` (build+push of the versioned images to GHCR + a release with the deploy kit attached). Implemented in phase 0 (0.T9).
 
 - Tags are **not per-PR**: the owner creates them **whenever wanted**; the intermediate (per-PR) versions live only in the CHANGELOG, untagged.
+- The tag is created **from the CLI** (`git tag x.y.z && git push origin x.y.z`) **or from the GitHub UI** by publishing a release (GitHub cannot create bare tags: the tag is born with the release). The release step is **idempotent** — if the release already exists (created from the UI) it only attaches the deploy kit, otherwise it creates it — so both paths work.
 - The tag version is the latest `CHANGELOG.md` entry to publish; it can raise MINOR/MAJOR when the milestone warrants it.
 
 ## Notes

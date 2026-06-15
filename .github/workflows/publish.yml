@@ -1,10 +1,12 @@
 name: Publish
 
 # Phase 0 (0.T9): on an x.y.z tag — created by the owner by hand whenever a release
-# is wanted — build and push the three versioned images to GHCR and cut the GitHub
+# is wanted — build and push the two versioned images to GHCR and cut the GitHub
 # release with the deploy kit attached: compose.yml + .env.example, the only two
 # files an end user needs (deployment.md, INF-17). Tagging is manual; there is no
-# auto-tag workflow. Tags are plain SemVer, no `v` prefix.
+# auto-tag workflow. Tags are plain SemVer, no `v` prefix. The tag may be pushed
+# from the CLI or created by publishing a release from the GitHub UI — the release
+# step is idempotent and handles both.
 
 on:
   push:
@@ -49,11 +51,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Create the GitHub release with the deploy kit
+      - name: Create or update the GitHub release with the deploy kit
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            --title "$GITHUB_REF_NAME" \
-            --notes "Automated release ${GITHUB_REF_NAME}. Deploy kit attached: compose.yml + .env.example (see docs/infrastructure/deployment.md). Set WEA_VERSION=${GITHUB_REF_NAME} in your .env." \
-            deploy/compose.yml '.env.example'
+          # The tag can be created two ways: pushed from the CLI (no release yet) or
+          # by publishing a release from the GitHub UI (the release already exists).
+          # Be idempotent: if the release exists, only (re)attach the deploy kit —
+          # `gh release create` would fail on a duplicate. Otherwise create it.
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" deploy/compose.yml '.env.example' --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --title "$GITHUB_REF_NAME" \
+              --notes "Automated release ${GITHUB_REF_NAME}. Deploy kit attached: compose.yml + .env.example (see docs/infrastructure/deployment.md). Set WEA_VERSION=${GITHUB_REF_NAME} in your .env." \
+              deploy/compose.yml '.env.example'
+          fi
