@@ -37,11 +37,11 @@ I tre container applicativi sono **stub**: nessuna logica di prodotto. `web` e `
 
 ## Definition of Done
 
-- [ ] Il ciclo **branch → PR (bump+CHANGELOG) → immagine `dev-<branch>` → merge dell'owner → tag manuale dell'owner → release → install pull-based** è stato percorso per intero almeno una volta. I tag li crea **l'owner a mano** quando vuole una release; le versioni intermedie vivono nel CHANGELOG.
-- [ ] Su una macchina pulita con il **solo Docker**, i due file del deploy kit bastano per tirare su lo stack (INF-17) — anche se l'app è un segnaposto.
-- [ ] Il dev container funziona: da qui in poi **tutto lo sviluppo avviene lì dentro** (INF-15).
-- [ ] Ogni stub è dichiarato (tabella sopra) e ha l'MVP che lo sostituirà.
-- [ ] [docs-eng](../../docs-eng/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
+- [ ] Il ciclo **branch → PR (bump+CHANGELOG) → immagine `dev-<branch>` → merge dell'owner → tag manuale dell'owner → release → install pull-based** è stato percorso per intero almeno una volta. I tag li crea **l'owner a mano** quando vuole una release; le versioni intermedie vivono nel CHANGELOG. *(→ si completa col tag `0.0.13` post-merge; lo stack è già stato validato in locale col dev compose durante il rodaggio.)*
+- [ ] Su una macchina pulita con il **solo Docker**, i due file del deploy kit bastano per tirare su lo stack (INF-17) — anche se l'app è un segnaposto. *(→ rodaggio pull-based dopo il tag.)*
+- [x] Il dev container funziona: da qui in poi **tutto lo sviluppo avviene lì dentro** (INF-15).
+- [x] Ogni stub è dichiarato (tabella sopra) e ha l'MVP che lo sostituirà.
+- [x] [docs-eng](../../docs-eng/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti
 
