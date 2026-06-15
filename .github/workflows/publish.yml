@@ -1,25 +1,21 @@
 name: Publish
 
 # Phase 0 (0.T9): on an x.y.z tag — created by the owner by hand whenever a release
-# is wanted — build and push the two versioned images to GHCR and stage the GitHub
-# release with the deploy kit attached: compose.yml + .env.example, the only two
-# files an end user needs (deployment.md, INF-17). Tagging is manual; there is no
-# auto-tag workflow. Tags are plain SemVer, no `v` prefix.
+# is wanted — build and push the two versioned images to GHCR. Tags are plain SemVer,
+# no `v` prefix; there is no auto-tag workflow.
 #
-# GitHub immutable releases (the default) freeze a release's assets at publish time,
-# so the kit MUST be attached BEFORE publishing — and drafts don't trigger workflows.
-# So the flow is: push the tag from the CLI -> this workflow stages a DRAFT release
-# with the kit attached (drafts are mutable) and STOPS -> the owner reviews, writes
-# the notes and clicks Publish in the UI. DO NOT publish a release by hand from the
-# UI: it would lock an empty (kit-less) immutable release and burn that version (the
-# tag becomes permanently reserved). The release job below guards against that case.
+# The deploy kit (compose.yml + .env.example) is NOT attached as a release asset: it
+# lives in the repo and users fetch it from there (README install / deployment.md).
+# So this workflow only builds the images; the GitHub release itself, with its notes,
+# is created by the owner (GitHub UI or CLI) — no assets, so GitHub's immutable
+# releases impose no special handling here.
 
 on:
   push:
     tags: ["[0-9]+.[0-9]+.[0-9]+"]
 
 permissions:
-  contents: write
+  contents: read
   packages: write
 
 jobs:
@@ -51,37 +47,3 @@ jobs:
           push: true
           provenance: false   # no attestation manifest -> no "unknown/unknown" entry in GHCR
           tags: ghcr.io/${{ steps.meta.outputs.owner }}/${{ matrix.image }}:${{ github.ref_name }}
-
-  release:
-    needs: images
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Stage the release draft with the deploy kit (immutable-safe)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="$GITHUB_REF_NAME"
-          # Immutable releases freeze assets at publish time, so the kit must be attached
-          # while the release is still a DRAFT (mutable). Stage the draft and stop — the
-          # owner publishes it from the UI.
-          if state="$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null)"; then
-            if [ "$state" = "false" ]; then
-              # A PUBLISHED release already exists for this tag -> someone released by hand
-              # from the UI. It is immutable: the kit can no longer be attached and this
-              # version is now permanently reserved. Don't let it poison /releases/latest
-              # (best-effort flip to pre-release) and fail loudly with what to do next.
-              gh release edit "$TAG" --prerelease || true
-              echo "::error::Release $TAG is already PUBLISHED (released by hand from the UI?). Immutable releases can't receive the deploy kit afterwards and this version is now permanently reserved. Delete this release and re-release with the NEXT patch version via a CLI tag push (git tag x.y.z && git push origin x.y.z)."
-              exit 1
-            fi
-            # Our own draft from a previous run: refresh the kit (drafts are mutable).
-            gh release upload "$TAG" deploy/compose.yml '.env.example' --clobber
-          else
-            gh release create "$TAG" \
-              --draft \
-              --title "$TAG" \
-              --notes "Deploy kit attached: compose.yml + .env.example (see docs/infrastructure/deployment.md). Set WEA_VERSION=${TAG} in your .env. Edit these notes, then publish." \
-              deploy/compose.yml '.env.example'
-          fi
-          echo "Draft release $TAG staged with the deploy kit — review, write the notes and Publish it from the GitHub UI."

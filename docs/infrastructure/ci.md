@@ -30,14 +30,13 @@ Come installare una dev per provarla: [deployment](deployment.md#provare-unimmag
 
 ## Publish (su tag)
 
-Workflow separato, attivato dai **tag `x.y.z`** (SemVer puro, senza prefisso `v`; INF-17): builda le tre immagini multi-stage e le pubblica su **GHCR**, poi crea la release GitHub con il **deploy kit** in allegato.
+Workflow separato, attivato dai **tag `x.y.z`** (SemVer puro, senza prefisso `v`; INF-17): builda le **due** immagini multi-stage e le pubblica su **GHCR**. La **release GitHub** (con le note) la crea **l'owner** (UI o CLI); il **deploy kit non è allegato** alla release — vive nel repo e si scarica da lì ([deployment](deployment.md)).
 
 | Step | Cosa fa |
 |---|---|
 | Build & push | `watch-em-all` (app: ruoli web+worker) e `watch-em-all-ops` → `ghcr.io/<owner>/…:<tag>` (es. `1.2.0`; mai `latest`, INF-1) |
-| Release + kit | allega alla release `compose.yml` (il compose di release) e `.env.example` — i **soli due file** che servono per installare ([deployment](deployment.md)) |
 
-Il tag è l'unico trigger di pubblicazione: `main` verde non pubblica nulla — e il tag lo crea **l'owner a mano**, quando vuole una release (vedi *Tag e release* sotto). I **package GHCR sono pubblici** (come il repo): il pull lato utente è anonimo, nessuna autenticazione.
+Il tag è l'unico trigger di pubblicazione delle immagini: `main` verde non pubblica nulla — e il tag lo crea **l'owner a mano**, quando vuole una release (vedi *Tag e release* sotto). I **package GHCR sono pubblici** (come il repo): il pull lato utente è anonimo, nessuna autenticazione.
 
 ### Versioning del prodotto
 
@@ -54,10 +53,10 @@ Il prodotto segue **SemVer** (`MAJOR.MINOR.PATCH`) con una **versione unica per 
 
 ### Tag e release (manuali)
 
-Il tag `x.y.z` (SemVer puro, **senza prefisso `v`**) lo crea **l'owner a mano**, quando decide che è il momento di una release: **nessun workflow di auto-tag**. Il push del tag su GitHub innesca `publish.yml` (build+push delle immagini versionate su GHCR + release con il deploy kit allegato). Implementato in fase 0 (0.T9).
+Il tag `x.y.z` (SemVer puro, **senza prefisso `v`**) lo crea **l'owner a mano**, quando decide che è il momento di una release: **nessun workflow di auto-tag**. Il push del tag su GitHub innesca `publish.yml` (build+push delle immagini versionate su GHCR). Implementato in fase 0 (0.T9).
 
 - I tag **non sono per-PR**: l'owner ne crea **quando vuole**; le versioni intermedie (per-PR) vivono solo nel CHANGELOG, senza tag — così il repo non si riempie di tag.
-- **Procedura di release** (le *immutable releases* di GitHub sono attive di default: gli asset di una release pubblicata sono congelati): il tag si crea **da CLI** (`git tag x.y.z && git push origin x.y.z`) → la CI builda le immagini e **prepara una release in *bozza* con il kit già allegato** (la bozza è mutabile), poi si ferma → l'owner **scrive le note e clicca Publish dalla UI**. ⚠️ **Non** pubblicare una release a mano dalla UI: bloccheresti una release immutabile **senza kit**, e quella versione resterebbe **bruciata** (il tag diventa permanentemente riservato, non riusabile). Un guardrail nel workflow intercetta questo caso e fallisce con le istruzioni.
+- **Procedura di release**: il tag lo crea l'owner **dalla UI di GitHub** (pubblicando una release con le sue note) **o da CLI** (`git tag x.y.z && git push origin x.y.z`); il push del tag fa partire `publish.yml` che builda e pusha le immagini versionate. Il **deploy kit non è allegato alla release** — vive nel repo e l'utente lo scarica al tag della versione ([deployment](deployment.md)). Non essendoci asset sulla release, le *immutable releases* di GitHub non impongono nulla: la release si può creare liberamente dalla UI.
 - La versione del tag è quella dell'ultima voce di `CHANGELOG.md` da pubblicare; può alzare MINOR/MAJOR quando la milestone lo merita (es. 0.1.0 alla fase 7, 1.0.0 alla 12).
 - **Distinta** da: il `version` del manifest di un plugin (informativo, per-plugin) e l'`api_version` (intero, gate di compatibilità del contratto plugin) — entrambi ortogonali alla versione del prodotto.
 

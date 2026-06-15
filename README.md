@@ -41,18 +41,19 @@ A Linux host (WSL2 or a dedicated server) with **Docker Engine + the Compose plu
 
 ### Installation (pull-based)
 
-The deploy is **pull-based**: the CI publishes the images to GHCR on every release tag, and you never download the sources — only the **deploy kit**, the two files attached to each GitHub [release](https://github.com/caporalesimone/watch-em-all/releases): `compose.yml` (the release compose, image-based) and `.env.example` (secrets template + image version).
+The deploy is **pull-based**: the CI publishes the images to GHCR on every release tag, and you never download the sources — only the **deploy kit**, two files kept in the repo: `deploy/compose.yml` (the release compose, image-based) and `.env.example` (secrets template + image version). Fetch them at the release you want (a published `x.y.z` tag):
 
 ```bash
 mkdir watchemall && cd watchemall
-curl -LO https://github.com/caporalesimone/watch-em-all/releases/latest/download/compose.yml
-curl -LO https://github.com/caporalesimone/watch-em-all/releases/latest/download/.env.example
+VERSION=0.0.16        # the release you want (a published tag)
+curl -LO https://raw.githubusercontent.com/caporalesimone/watch-em-all/$VERSION/deploy/compose.yml
+curl -LO https://raw.githubusercontent.com/caporalesimone/watch-em-all/$VERSION/.env.example
 cp .env.example .env          # then fill in the values
 docker compose pull
 docker compose up -d
 ```
 
-Fill `.env` before starting: set `WEA_VERSION` to the release you want (e.g. `0.0.13`; never `latest`), pick strong `POSTGRES_*` values, and set `ADMIN_INITIAL_PASSWORD`. The repository and the GHCR packages are **public**, so the pull is anonymous — no `docker login`. Once up, the app answers on `http://<host>:8080` (in phase 0 this is a placeholder page; the real app arrives in phase 1).
+Fill `.env` before starting: set `WEA_VERSION` to the same release (`$VERSION`; never `latest`), pick strong `POSTGRES_*` values, and set `ADMIN_INITIAL_PASSWORD`. The repository and the GHCR packages are **public**, so both the file download and the image pull are anonymous — no auth. Once up, the app answers on `http://<host>:8080` (in phase 0 this is a placeholder page; the real app arrives in phase 1).
 
 ### Updating
 
@@ -93,19 +94,18 @@ Development happens entirely inside the [dev container](docs/infrastructure/dev-
 
 ## Releasing (maintainer)
 
-Releases are **manual** and rely on GitHub's immutable releases (assets are frozen at publish). To cut a release `x.y.z`:
+Releases are **manual**. To cut a release `x.y.z`:
 
 1. Make sure `main` is green and `CHANGELOG.md` has the entry for the version (one PR = one version).
-2. Create and push the tag **from the CLI** — the tag must exist first (a draft created in the UI does not trigger the pipeline):
+2. Create the release `x.y.z` (plain SemVer, no `v` prefix; matching the CHANGELOG) — either from the **GitHub UI** (write the notes; the tag is created on publish) or from the **CLI**:
    ```bash
    git checkout main && git pull
-   git tag x.y.z          # plain SemVer, no `v` prefix; matches the CHANGELOG
+   git tag x.y.z
    git push origin x.y.z
    ```
-3. The publish workflow builds the versioned images and **stages a draft release** with the deploy kit attached (`compose.yml` + `.env.example`).
-4. Open the draft on GitHub, write the release notes and click **Publish** → the release becomes immutable, with the kit.
+3. Pushing the tag triggers the publish workflow, which builds and pushes the versioned images (`watch-em-all`, `watch-em-all-ops`) to GHCR.
 
-> ⚠️ **Do not create or publish a release by hand from the GitHub UI.** Immutable releases freeze assets at publish time, so a hand-published release would be locked **without** the deploy kit and that version would be **permanently burned** (the tag can never be reused). Always start from a CLI tag push; the workflow guards against this mistake but cannot undo it.
+The deploy kit (`deploy/compose.yml` + `.env.example`) is **not** attached to the release — it lives in the repo, and users fetch it at the release tag (see [Installation](#installation-pull-based)). There is nothing else to attach, so a release can be created freely from the UI.
 
 ## Documentation
 

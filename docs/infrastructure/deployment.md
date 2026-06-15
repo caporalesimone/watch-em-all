@@ -10,18 +10,19 @@ Il portale è hostato su **Linux**: in locale dentro **WSL2** oppure su un **ser
 
 ## Installazione: pull, non build
 
-Il deploy è **pull-based** (INF-17): la CI pubblica le immagini su GHCR a ogni tag ([ci](ci.md)) e l'utente **non scarica mai i sorgenti** — solo il **deploy kit**, due file allegati alla release:
+Il deploy è **pull-based** (INF-17): la CI pubblica le immagini su GHCR a ogni tag ([ci](ci.md)) e l'utente **non scarica mai i sorgenti** — solo il **deploy kit**, due file che vivono **nel repo** (non allegati alla release) e si scaricano al tag della versione voluta:
 
 | File | Ruolo |
 |---|---|
-| `compose.yml` | il compose di release: referenzia le immagini pubblicate, nessun `build:` |
+| `deploy/compose.yml` | il compose di release: referenzia le immagini pubblicate, nessun `build:` |
 | `.env.example` | template dei segreti + versione delle immagini (`WEA_VERSION`) |
 
 ```bash
 mkdir watchemall && cd watchemall
-curl -LO https://github.com/<owner>/watch-em-all/releases/latest/download/compose.yml
-curl -LO https://github.com/<owner>/watch-em-all/releases/latest/download/.env.example
-cp .env.example .env                  # poi compilare i valori
+VERSION=0.0.16        # la release voluta (un tag pubblicato)
+curl -LO https://raw.githubusercontent.com/<owner>/watch-em-all/$VERSION/deploy/compose.yml
+curl -LO https://raw.githubusercontent.com/<owner>/watch-em-all/$VERSION/.env.example
+cp .env.example .env                  # poi compilare i valori (WEA_VERSION=$VERSION)
 docker compose pull && docker compose up -d
 ```
 

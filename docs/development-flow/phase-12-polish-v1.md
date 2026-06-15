@@ -32,7 +32,7 @@ Chiudere il perimetro della 1.0: il secondo canale di notifica (che dimostra la 
 - [ ] **12.T1 — Audit i18n: backend e notifier** (~1h): `en.json` completo nelle cartelle `i18n/` di core e plugin backend (notifier inclusi); nessuna stringa cablata né concatenata. *Verifica: notifiche complete in inglese, nessuna chiave mancante a runtime.*
 - [ ] **12.T2 — Audit i18n: frontend** (~1h): `en.json` completo per core e plugin frontend (FE-13), fallback su `en` verificato. *Verifica: app completa in inglese.*
 - [ ] **12.T3 — Doc allineata + audit README** (~1h): verifica documentazione vs implementato (DOC-8); audit del README come manuale operativo completo — install, update, backup/restore, tutti i comandi e script (INF-18). *Verifica: nessuna divergenza doc/codice nota; README autosufficiente.*
-- [ ] **12.T4 — Release 1.0** (~1h): changelog, tag `1.0.0` → publish su GHCR + deploy kit in release ([ci](../infrastructure/ci.md), INF-17); prova di installazione pull-based da zero seguendo **solo il README**. *Verifica: macchina pulita con solo Docker + i due file del kit → sito su e manutenibile senza conoscenze esterne.*
+- [ ] **12.T4 — Release 1.0** (~1h): changelog, tag `1.0.0` → publish delle immagini su GHCR (il deploy kit vive nel repo, scaricato al tag — [ci](../infrastructure/ci.md), INF-17); prova di installazione pull-based da zero seguendo **solo il README**. *Verifica: macchina pulita con solo Docker + i due file del kit → sito su e manutenibile senza conoscenze esterne.*
 
 ## Definition of Done
 
