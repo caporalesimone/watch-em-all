@@ -1,0 +1,36 @@
+name: Cleanup dev images
+
+# When a PR closes (merged OR abandoned), delete its dev-<branch> tag from GHCR so
+# the packages don't accumulate stale dev images (ci.md: dev-* are ephemeral).
+# Only the branch's own dev tag is removed — release tags (x.y.z) are never touched.
+#
+# Runs from the base branch (main) on the closed event, so it takes effect for PRs
+# closed after this workflow lands. Uses the Actions GITHUB_TOKEN (packages: write);
+# if GitHub refuses to delete user-owned package versions, switch `token` to a
+# classic PAT secret with the `delete:packages` scope.
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compute the dev tag for this branch
+        id: meta
+        run: |
+          slug="$(printf '%s' '${{ github.event.pull_request.head.ref }}' | sed 's#[^A-Za-z0-9_.-]#-#g')"
+          echo "tag=dev-$slug" >> "$GITHUB_OUTPUT"
+          echo "Will delete tag: dev-$slug"
+      - name: Delete the dev tag from the app and ops packages
+        uses: dataaxiom/ghcr-cleanup-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          packages: watch-em-all,watch-em-all-ops
+          delete-tags: ${{ steps.meta.outputs.tag }}
+          # only the listed tag is removed; missing tags are skipped, not an error
