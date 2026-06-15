@@ -1,10 +1,10 @@
-# Fase 12 — Rifinitura e v1.0
+# Fase 12 — Rifinitura e 1.0
 
 > Stato: ☐ da iniziare · Prerequisiti: tutte le precedenti · [Indice del flusso](README.md)
 
 ## Obiettivo
 
-Chiudere il perimetro della v1: il secondo canale di notifica (che dimostra la bontà del contratto notifier), l'internazionalizzazione completa, la qualità trasversale (UX degli stati vuoti, CI piena, doc allineata).
+Chiudere il perimetro della 1.0: il secondo canale di notifica (che dimostra la bontà del contratto notifier), l'internazionalizzazione completa, la qualità trasversale (UX degli stati vuoti, CI piena, doc allineata).
 
 ## Risultato apprezzabile
 
@@ -38,7 +38,7 @@ Chiudere il perimetro della v1: il secondo canale di notifica (che dimostra la b
 
 - [ ] I due [use case fondanti](../1-business/use-cases.md) girano end-to-end su installazione pulita, su entrambi i canali (lingua: `en`, English-first).
 - [ ] CI completa verde; checklist plugin passata da Dragon Store, Email e Discord.
-- [ ] Tutte le checkbox di questo flusso spuntate: la v1 è chiusa.
+- [ ] Tutte le checkbox di questo flusso spuntate: la 1.0 è chiusa.
 - [ ] [docs-eng](../../docs-eng/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti
