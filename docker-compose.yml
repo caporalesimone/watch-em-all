@@ -1,11 +1,11 @@
 # Development compose (0.T5) — the developer-path counterpart of the release
 # deploy kit (deploy/compose.yml, image-based). Same shape as the release compose
-# (docs/infrastructure/deployment.md): here every app service BUILDS from sources
-# (packages/*/Dockerfile, build context = repo root) instead of pulling from GHCR.
+# (docs/infrastructure/deployment.md): here the app service BUILDS from sources
+# (packages/app/Dockerfile, build context = repo root) instead of pulling from GHCR.
 #
-# Phase 0: web/worker/ops are declared stubs (no product logic). The DB env carries
-# dev defaults so `docker compose up` works out of the box inside the dev container;
-# override them via a local .env if needed.
+# web and worker are ONE image (watch-em-all), two roles selected by `command`;
+# only `web` builds it, `worker` reuses the same tag. `ops` is a separate image
+# (postgres:16 + scripts). Phase 0: all roles are declared stubs.
 #
 #   docker compose up -d                 # db + web + worker
 #   docker compose --profile dev up -d   # also adminer on :8081
@@ -35,7 +35,9 @@ services:
   web:
     build:
       context: .
-      dockerfile: packages/web/Dockerfile
+      dockerfile: packages/app/Dockerfile
+    image: watch-em-all:dev
+    command: ["web"]
     ports: ["8080:8080"]
     depends_on:
       db: { condition: service_healthy }
@@ -52,11 +54,11 @@ services:
     logging: *logging
 
   worker:
-    build:
-      context: .
-      dockerfile: packages/worker/Dockerfile
+    image: watch-em-all:dev          # same image as web, built by the web service
+    command: ["worker"]
     depends_on:
       db: { condition: service_healthy }
+      web: { condition: service_started }   # ensures the shared image is built first
     healthcheck:
       # Heartbeat: the worker touches this file every tick (CRON-R7); unhealthy if
       # it goes stale (> 180s). $$ escapes the $ so Compose passes it to the shell.

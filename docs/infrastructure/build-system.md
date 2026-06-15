@@ -16,8 +16,7 @@ watch-em-all/
 │       ├── scrapers/<nome>/   # manifest.json, backend/, frontend/
 │       └── notifiers/<nome>/
 ├── packages/
-│   ├── web/         # Dockerfile + entrypoint del container web
-│   ├── worker/      # Dockerfile + entrypoint del container worker
+│   ├── app/         # Dockerfile + entrypoint dell'immagine app (ruoli web|worker via command)
 │   └── ops/         # Dockerfile dell'immagine ops (postgres:16 + script)
 ├── ops/             # script backup/export/restore (backup-and-restore.md)
 ├── deploy/
@@ -33,9 +32,10 @@ watch-em-all/
 └── .env(.example)
 ```
 
-Le **immagini pubblicate** (`watch-em-all-web`, `-worker`, `-ops`) sono buildate e pushate su GHCR dal workflow di publish a ogni tag ([ci](ci.md)); l'utente finale installa con il solo deploy kit, senza sorgenti ([deployment](deployment.md), INF-17).
+Le **immagini pubblicate** sono **due** — `watch-em-all` (l'app: ruoli `web` e `worker`) e `watch-em-all-ops` (`postgres:16` + script) — buildate e pushate su GHCR dal workflow di publish a ogni tag ([ci](ci.md)); l'utente finale installa con il solo deploy kit, senza sorgenti ([deployment](deployment.md), INF-17).
 
-- **Un solo `pyproject.toml` alla root** (un solo `poetry.lock`): `web` e `worker` condividono lo stesso ambiente Python e caricano gli stessi plugin, quindi le dipendenze sono uniche — un secondo lockfile creerebbe solo drift da tenere allineato a mano. I Dockerfile dei package installano dalla root, ciascuno selezionando i **gruppi opzionali** che gli servono.
+- **Un'unica immagine app per `web` e `worker`** (`packages/app/`): condividono lo stesso codice, lo stesso `pyproject.toml`/`poetry.lock` e gli stessi plugin — sono **un'unica applicazione con due ruoli**, non due componenti. Il ruolo si sceglie col **comando d'avvio** (`command: ["web"]` / `["worker"]`), via un entrypoint che smista; così si builda e si versiona **un solo artefatto** invece di due quasi identici. `ops` resta separata perché ha una base diversa (`postgres:16`).
+- **Un solo `pyproject.toml` alla root** (un solo `poetry.lock`): le dipendenze del backend sono uniche — un secondo lockfile creerebbe solo drift da tenere allineato a mano. Il Dockerfile dell'app installa dalla root selezionando i **gruppi opzionali** che servono.
 - I **plugin non sono package** formali: cartelle auto-scoperte dal registry. Le loro dipendenze Python (es. un browser headless) si dichiarano nel `pyproject.toml` unico, in un **gruppo opzionale** dedicato.
 - Stack backend: Python 3.12+, Poetry, FastAPI, SQLAlchemy, Pydantic v2.
 - Stack frontend: **Node 22 LTS**, **SvelteKit 2** (Svelte 5, runes), **Tailwind CSS 4**, **svelte-i18n**, Vite. Versioni major fissate al giorno 1 (progetto nuovo, nessun debito di migrazione).

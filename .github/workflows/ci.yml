@@ -41,7 +41,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [web, worker, ops]
+        include:
+          - { image: watch-em-all, dockerfile: packages/app/Dockerfile }      # web + worker roles
+          - { image: watch-em-all-ops, dockerfile: packages/ops/Dockerfile }
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -62,6 +64,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: packages/${{ matrix.image }}/Dockerfile
+          file: ${{ matrix.dockerfile }}
           push: true
-          tags: ghcr.io/${{ steps.meta.outputs.owner }}/watch-em-all-${{ matrix.image }}:${{ steps.meta.outputs.tag }}
+          provenance: false   # no attestation manifest -> no "unknown/unknown" entry in GHCR
+          tags: ghcr.io/${{ steps.meta.outputs.owner }}/${{ matrix.image }}:${{ steps.meta.outputs.tag }}

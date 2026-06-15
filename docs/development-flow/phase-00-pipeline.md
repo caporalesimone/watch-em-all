@@ -12,13 +12,13 @@ Apri un branch e la CI pubblica `dev-<branch>` su GHCR; lo provi con il compose 
 
 ## Mock dichiarati
 
-I tre container applicativi sono **stub**: nessuna logica di prodotto.
+I tre container applicativi sono **stub**: nessuna logica di prodotto. `web` e `worker` sono **due ruoli della stessa immagine** `watch-em-all` (`packages/app/`, ruolo scelto dal `command`); `ops` è un'immagine separata (`postgres:16` + script). Immagini pubblicate: **due** (`watch-em-all`, `watch-em-all-ops`).
 
 | Stub | Cosa fa in questa fase | Chi lo sostituisce |
 |---|---|---|
-| `web` | pagina statica "coming soon" + `GET /api/health` che risponde sempre 200 | 1.B2 (app FastAPI reale) |
-| `worker` | loop che tocca il file di heartbeat e logga un tick al minuto | 4.B1 (worker reale) |
-| `ops` | `postgres:16` + `backup.sh`/`export.sh`/`restore.sh` segnaposto ("non ancora implementato", exit 1) | 1.T2/1.T3 (script reali) |
+| `web` (ruolo dell'immagine app) | pagina statica "coming soon" + `GET /api/health` che risponde sempre 200 | 1.B2 (app FastAPI reale) |
+| `worker` (ruolo dell'immagine app) | loop che tocca il file di heartbeat e logga un tick al minuto | 4.B1 (worker reale) |
+| `ops` (immagine separata) | `postgres:16` + `backup.sh`/`export.sh`/`restore.sh` segnaposto ("non ancora implementato", exit 1) | 1.T2/1.T3 (script reali) |
 
 ## MVP
 

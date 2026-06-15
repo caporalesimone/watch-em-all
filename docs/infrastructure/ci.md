@@ -13,7 +13,7 @@ Pipeline minima (GitHub Actions) su ogni push/PR: esegue i tool già scelti dal 
 | Test backend | `pytest` (unit + contratto; integrazione con Postgres service) | bloccante |
 | Lint frontend | `eslint` · `prettier --check` · `svelte-check` | bloccante |
 | Build frontend | `npm run build` (include `build:plugins`) | bloccante |
-| Build immagini | build di `web`/`worker`/`ops`; **su PR** push come `dev-<branch>` (vedi *Immagini dev*) | bloccante |
+| Build immagini | build di `watch-em-all` (app) e `watch-em-all-ops`; **su PR** push come `dev-<branch>` (vedi *Immagini dev*) | bloccante |
 | Guardia CHANGELOG | la PR deve aggiornare `CHANGELOG.md` (ogni PR = una versione, INF-19) | bloccante |
 
 La pipeline nasce in **fase 0** del [development flow](../development-flow/phase-00-pipeline.md) (build immagini, guardia CHANGELOG, publish dev e su tag) e **cresce col flusso**: linter e typecheck con il primo codice (fase 1), test di contratto e integrazione a regime (fase 12).
@@ -34,7 +34,7 @@ Workflow separato, attivato dai **tag `x.y.z`** (SemVer puro, senza prefisso `v`
 
 | Step | Cosa fa |
 |---|---|
-| Build & push | `watch-em-all-web`, `watch-em-all-worker`, `watch-em-all-ops` → `ghcr.io/<owner>/…:<tag>` (es. `1.2.0`; mai `latest`, INF-1) |
+| Build & push | `watch-em-all` (app: ruoli web+worker) e `watch-em-all-ops` → `ghcr.io/<owner>/…:<tag>` (es. `1.2.0`; mai `latest`, INF-1) |
 | Release + kit | allega alla release `compose.yml` (il compose di release) e `.env.example` — i **soli due file** che servono per installare ([deployment](deployment.md)) |
 
 Il tag è l'unico trigger di pubblicazione: `main` verde non pubblica nulla — e il tag lo crea **l'owner a mano**, quando vuole una release (vedi *Tag e release* sotto). I **package GHCR sono pubblici** (come il repo): il pull lato utente è anonimo, nessuna autenticazione.
