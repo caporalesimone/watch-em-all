@@ -91,6 +91,22 @@ docker compose up -d
 
 Development happens entirely inside the [dev container](docs/infrastructure/dev-container.md) — the host only needs Docker.
 
+## Releasing (maintainer)
+
+Releases are **manual** and rely on GitHub's immutable releases (assets are frozen at publish). To cut a release `x.y.z`:
+
+1. Make sure `main` is green and `CHANGELOG.md` has the entry for the version (one PR = one version).
+2. Create and push the tag **from the CLI** — the tag must exist first (a draft created in the UI does not trigger the pipeline):
+   ```bash
+   git checkout main && git pull
+   git tag x.y.z          # plain SemVer, no `v` prefix; matches the CHANGELOG
+   git push origin x.y.z
+   ```
+3. The publish workflow builds the versioned images and **stages a draft release** with the deploy kit attached (`compose.yml` + `.env.example`).
+4. Open the draft on GitHub, write the release notes and click **Publish** → the release becomes immutable, with the kit.
+
+> ⚠️ **Do not create or publish a release by hand from the GitHub UI.** Immutable releases freeze assets at publish time, so a hand-published release would be locked **without** the deploy kit and that version would be **permanently burned** (the tag can never be reused). Always start from a CLI tag push; the workflow guards against this mistake but cannot undo it.
+
 ## Documentation
 
 The full documentation lives in the [docs/](docs/README.md) folder, organized by layers: business, architecture, features, technical capabilities, API, and plugin development guides. It is written in Italian (source of truth); an English equivalent grows phase by phase under [docs-eng/](docs-eng/).

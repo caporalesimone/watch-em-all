@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images + GitHub release); intermediate per-PR versions live only in this file.
 
+## [0.0.15] - 2026-06-16
+
+### Changed
+
+- Publish workflow is now **immutable-releases-safe** (GitHub made immutable releases the default: a published release's assets are frozen). The release job no longer creates a published release and then uploads the kit (which fails with `422 Cannot upload assets to an immutable release`). Instead it **stages a draft release with the deploy kit attached** and stops; the owner reviews, writes the notes and publishes it from the UI — at which point the release becomes immutable *with* the kit. The tag must be pushed from the CLI (drafts don't trigger workflows). Supersedes the idempotent-upload approach from 0.0.14
+- Added a guardrail: if a **published** release already exists for the tag (released by hand from the UI), the job flips it to pre-release (best-effort, to avoid poisoning `/releases/latest`) and fails with clear instructions — a hand-published release can't receive the kit and that version is permanently reserved
+
+### Added
+
+- README **Releasing (maintainer)** section: a reminder of the manual release procedure (CLI tag → workflow stages the draft with the kit → publish from the UI) and the warning never to publish a release by hand from the UI
+
+### Docs
+
+- `ci.md` (IT + `docs-eng` mirror): the *tag and releases* section describes the new draft-staging procedure and the immutable-release caveat
+
 ## [0.0.14] - 2026-06-16
 
 ### Changed
