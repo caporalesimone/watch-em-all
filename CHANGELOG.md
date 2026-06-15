@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images + GitHub release); intermediate per-PR versions live only in this file.
 
+## [0.0.10] - 2026-06-16
+
+### Fixed
+
+- Dev-image cleanup no longer fails a PR close when the branch tag is the package's **only** version: GitHub forbids deleting the last tagged version of a package, so the cleanup step is now tolerant (`continue-on-error`). It's a transient case — it disappears once a release tag (`x.y.z`) is a permanent second version, after which dev-tag deletion always succeeds
+
 ## [0.0.9] - 2026-06-16
 
 ### Added
