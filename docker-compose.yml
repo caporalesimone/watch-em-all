@@ -1,0 +1,96 @@
+# Development compose (0.T5) — the developer-path counterpart of the release
+# deploy kit (deploy/compose.yml, image-based). Same shape as the release compose
+# (docs/infrastructure/deployment.md): here every app service BUILDS from sources
+# (packages/*/Dockerfile, build context = repo root) instead of pulling from GHCR.
+#
+# Phase 0: web/worker/ops are declared stubs (no product logic). The DB env carries
+# dev defaults so `docker compose up` works out of the box inside the dev container;
+# override them via a local .env if needed.
+#
+#   docker compose up -d                 # db + web + worker
+#   docker compose --profile dev up -d   # also adminer on :8081
+#   docker compose run --rm ops backup.sh
+#
+# No `version:` field (deprecated in Compose v2). Log rotation everywhere (INF-2).
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-watchemall}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-watchemall}"
+      POSTGRES_DB: "${POSTGRES_DB:-watchemall}"
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    logging: &logging
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  web:
+    build:
+      context: .
+      dockerfile: packages/web/Dockerfile
+    ports: ["8080:8080"]
+    depends_on:
+      db: { condition: service_healthy }
+    healthcheck:
+      # Stub image is stdlib-only (no curl): probe with Python, which is present.
+      # urlopen raises on non-2xx -> non-zero exit. Release compose keeps curl for
+      # the real image (deployment.md).
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/api/health')\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging: *logging
+
+  worker:
+    build:
+      context: .
+      dockerfile: packages/worker/Dockerfile
+    depends_on:
+      db: { condition: service_healthy }
+    healthcheck:
+      # Heartbeat: the worker touches this file every tick (CRON-R7); unhealthy if
+      # it goes stale (> 180s). $$ escapes the $ so Compose passes it to the shell.
+      test: ["CMD-SHELL", "test $$(($$(date +%s) - $$(stat -c %Y /tmp/worker-heartbeat))) -lt 180"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    logging: *logging
+
+  ops:
+    build:
+      context: .
+      dockerfile: packages/ops/Dockerfile
+    profiles: [ops]                       # ephemeral: docker compose run --rm ops <script>
+    environment:
+      # Standard libpq vars so the (real, 1.T2/1.T3) scripts reach the DB.
+      PGHOST: db
+      PGUSER: "${POSTGRES_USER:-watchemall}"
+      PGPASSWORD: "${POSTGRES_PASSWORD:-watchemall}"
+      PGDATABASE: "${POSTGRES_DB:-watchemall}"
+    volumes:
+      - ./backups:/backups                # archives destination
+    depends_on:
+      db: { condition: service_healthy }
+
+  adminer:
+    image: adminer:4
+    ports: ["8081:8080"]
+    profiles: [dev]                       # browser DB inspection, dev only
+    depends_on:
+      db: { condition: service_healthy }
+    restart: unless-stopped
+
+volumes:
+  pgdata:

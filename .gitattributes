@@ -1,3 +1,9 @@
 # Shell scripts run inside Linux containers: CRLF would break them,
 # no matter the OS of the machine that commits.
 *.sh text eol=lf
+
+# Compose files are consumed by Docker and carry embedded shell (healthchecks):
+# keep them LF so a Windows checkout never feeds CRLF into a Linux container.
+docker-compose.yml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
