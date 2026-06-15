@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images + GitHub release); intermediate per-PR versions live only in this file.
 
+## [0.0.12] - 2026-06-16
+
+### Changed
+
+- Healthchecks now use **curl everywhere** (dev + release compose): `curl` is installed in the app image (`packages/app/Dockerfile`, minimal — no recommends, apt lists wiped) and the `web` healthcheck switches from the Python stdlib probe to `curl -fsS http://localhost:8080/api/health`. One healthcheck command across dev and release — the previous python-in-dev / curl-in-release split is gone
+- Worker heartbeat file now lives on a **`tmpfs`** (`/tmp` in RAM) in both composes: the per-tick write (CRON-R7 liveness) stays in memory and never reaches the disk. Cadence unchanged (60s tick, 180s stale threshold)
+
 ## [0.0.11] - 2026-06-16
 
 ### Fixed

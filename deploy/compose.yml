@@ -41,10 +41,9 @@ services:
     depends_on:
       db: { condition: service_healthy }
     healthcheck:
-      # Phase 0 ships the stub image (stdlib only, no curl): probe with Python.
-      # Switches to `curl -fsS http://localhost:8080/api/health` with the real
-      # image (1.B2), as documented in deployment.md.
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/api/health')\""]
+      # curl ships in the app image (packages/app/Dockerfile); -f makes non-2xx
+      # exit non-zero. Same command as the dev compose — one healthcheck everywhere.
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -57,6 +56,9 @@ services:
     command: ["worker"]
     # volumes: ["./config.yaml:/app/config.yaml:ro"]   # same as web, optional
     env_file: [.env]
+    tmpfs:
+      - /tmp                          # heartbeat is ephemeral runtime state: keep it in
+                                      # RAM so the per-tick write never hits the disk
     depends_on:
       db: { condition: service_healthy }
     healthcheck:

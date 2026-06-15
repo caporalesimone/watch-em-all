@@ -79,7 +79,7 @@ services:
     depends_on:
       db: { condition: service_healthy }
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/health || exit 1"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -91,6 +91,8 @@ services:
     command: ["worker"]
     # volumes: ["./config.yaml:/app/config.yaml:ro"]   # come per web, opzionale
     env_file: [.env]
+    tmpfs:
+      - /tmp          # heartbeat in RAM: la scrittura per-tick non tocca il disco
     depends_on:
       db: { condition: service_healthy }
     healthcheck:

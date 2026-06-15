@@ -12,6 +12,12 @@ WORKDIR /build
 COPY packages/app/stub/ ./stub/
 
 FROM python:3.12-slim-bookworm
+# curl is the healthcheck probe (compose: curl -fsS .../api/health). Kept minimal:
+# no recommends, apt lists wiped in the same layer. The release compose uses the
+# same command, so dev and release share one healthcheck (no python/curl split).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 RUN useradd --system --no-create-home app
 WORKDIR /app
 COPY --from=build /build/stub/ ./stub/
