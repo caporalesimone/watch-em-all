@@ -41,15 +41,43 @@ A Linux host (WSL2 or a dedicated server) with **Docker Engine + the Compose plu
 
 ### Installation (pull-based)
 
-*Coming with phase 0 — the deploy kit (a `compose.yml` and a `.env.example` attached to each release) will be all you need: no sources, no build.*
+The deploy is **pull-based**: the CI publishes the images to GHCR on every release tag, and you never download the sources — only the **deploy kit**, the two files attached to each GitHub [release](https://github.com/caporalesimone/watch-em-all/releases): `compose.yml` (the release compose, image-based) and `.env.example` (secrets template + image version).
+
+```bash
+mkdir watchemall && cd watchemall
+curl -LO https://github.com/caporalesimone/watch-em-all/releases/latest/download/compose.yml
+curl -LO https://github.com/caporalesimone/watch-em-all/releases/latest/download/.env.example
+cp .env.example .env          # then fill in the values
+docker compose pull
+docker compose up -d
+```
+
+Fill `.env` before starting: set `WEA_VERSION` to the release you want (e.g. `0.0.13`; never `latest`), pick strong `POSTGRES_*` values, and set `ADMIN_INITIAL_PASSWORD`. The repository and the GHCR packages are **public**, so the pull is anonymous — no `docker login`. Once up, the app answers on `http://<host>:8080` (in phase 0 this is a placeholder page; the real app arrives in phase 1).
 
 ### Updating
 
-*Coming with phase 0.*
+No sources, no rebuild — just change the image version and pull:
+
+```bash
+# edit .env: WEA_VERSION=<new release>
+docker compose pull
+docker compose up -d
+```
+
+Only the images change; the database volume (`pgdata`) and your `.env` are untouched. Updating is always your choice — nothing is deployed automatically.
 
 ### Trying a dev image
 
-*Coming with phase 0.*
+Besides releases, you can run a **dev image** to try a branch **before it is merged**: point `WEA_VERSION` at the branch's dev tag instead of a release.
+
+```bash
+# in .env
+WEA_VERSION=dev-<branch>      # e.g. dev-catalog
+docker compose pull
+docker compose up -d
+```
+
+`dev-<branch>` is **overwritten on every push** to that branch (you always get its latest build) and exists **only while the branch's PR is open** — it is deleted when the PR closes. To pin an exact build use the digest (`watch-em-all@sha256:…`). For normal use, stay on a release `x.y.z`.
 
 ### Backup, export and restore
 
@@ -61,7 +89,7 @@ A Linux host (WSL2 or a dedicated server) with **Docker Engine + the Compose plu
 
 ## Development
 
-Development happens entirely inside the [dev container](docs/infrastructure/dev-container.md) — the host only needs Docker (coming with phase 0).
+Development happens entirely inside the [dev container](docs/infrastructure/dev-container.md) — the host only needs Docker.
 
 ## Documentation
 

@@ -9,4 +9,12 @@ This folder is the **English mirror of [`docs/`](../docs/README.md)** — but on
 - This documentation describes the **system as it exists**, never the system as it is planned: if a feature is not implemented yet, it does not appear here.
 - Updating this folder is part of the **Definition of Done** of every phase — it grows in lockstep with the product.
 
-> Currently empty (no development phase has been completed yet). The first content arrives with the closure of Phase 1 — Foundations.
+## Contents
+
+- **[infrastructure/](infrastructure/)** — the pipeline and process delivered in Phase 0:
+  - [build-system.md](infrastructure/build-system.md) — monorepo layout and the two-image build
+  - [dev-container.md](infrastructure/dev-container.md) — zero-install development environment
+  - [ci.md](infrastructure/ci.md) — CI, dev images, publish on tag, versioning
+  - [deployment.md](infrastructure/deployment.md) — pull-based deploy and the deploy kit
+
+The business/architecture/feature layers arrive with the closure of Phase 1 — Foundations.

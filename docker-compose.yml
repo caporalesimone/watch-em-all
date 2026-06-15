@@ -33,7 +33,7 @@ services:
       options: { max-size: "10m", max-file: "3" }
 
   web:
-    build:
+    build: &app-build
       context: .
       dockerfile: packages/app/Dockerfile
     image: watch-em-all:dev
@@ -53,14 +53,14 @@ services:
     logging: *logging
 
   worker:
-    image: watch-em-all:dev          # same image as web, built by the web service
-    command: ["worker"]
+    build: *app-build                # same image as web (watch-em-all:dev); built once,
+    image: watch-em-all:dev          # the second build is a cache hit. Both build so a
+    command: ["worker"]              # plain `up --build` never tries to pull this tag.
     tmpfs:
       - /tmp                          # heartbeat is ephemeral runtime state: keep it in
                                       # RAM so the per-tick write never hits the disk
     depends_on:
       db: { condition: service_healthy }
-      web: { condition: service_started }   # ensures the shared image is built first
     healthcheck:
       # Heartbeat: the worker touches this file every tick (CRON-R7); unhealthy if
       # it goes stale (> 180s). $$ escapes the $ so Compose passes it to the shell.

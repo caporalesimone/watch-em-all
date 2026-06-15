@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images + GitHub release); intermediate per-PR versions live only in this file.
 
+## [0.0.13] - 2026-06-16
+
+### Added
+
+- README operations manual (0.T10, INF-18): the phase-0 operational sections — **Installation (pull-based)**, **Updating**, **Trying a dev image** — are filled with the real, tested commands (download the deploy kit, set `WEA_VERSION`, `docker compose pull && up -d`)
+- English documentation (`docs-eng/infrastructure/`, DOC-12): English mirror of the four infrastructure docs implemented in phase 0 — `build-system`, `dev-container`, `ci`, `deployment` — describing only what exists (stub containers, the two-image build, CI/publish/cleanup, the pull-based deploy). `docs-eng` index updated accordingly
+
+### Fixed
+
+- Development compose: the `worker` service now **builds** the shared `watch-em-all:dev` image (via a YAML anchor on the `web` build) instead of only referencing it — a plain `docker compose up --build` no longer fails with `pull access denied` for the worker. The image is built once; the second build is a cache hit. Surfaced by the 0.T10 end-to-end dry run
+
 ## [0.0.12] - 2026-06-16
 
 ### Changed
