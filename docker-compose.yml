@@ -42,10 +42,9 @@ services:
     depends_on:
       db: { condition: service_healthy }
     healthcheck:
-      # Stub image is stdlib-only (no curl): probe with Python, which is present.
-      # urlopen raises on non-2xx -> non-zero exit. Release compose keeps curl for
-      # the real image (deployment.md).
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/api/health')\""]
+      # curl ships in the app image (Dockerfile); -f makes non-2xx exit non-zero.
+      # Same command as the release compose — one healthcheck everywhere.
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -56,6 +55,9 @@ services:
   worker:
     image: watch-em-all:dev          # same image as web, built by the web service
     command: ["worker"]
+    tmpfs:
+      - /tmp                          # heartbeat is ephemeral runtime state: keep it in
+                                      # RAM so the per-tick write never hits the disk
     depends_on:
       db: { condition: service_healthy }
       web: { condition: service_started }   # ensures the shared image is built first
