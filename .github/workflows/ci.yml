@@ -66,4 +66,5 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           push: true
+          provenance: false   # no attestation manifest -> no "unknown/unknown" entry in GHCR
           tags: ghcr.io/${{ steps.meta.outputs.owner }}/${{ matrix.image }}:${{ steps.meta.outputs.tag }}

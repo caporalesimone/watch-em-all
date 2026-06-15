@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Ship `web` and `worker` as a single image **`watch-em-all`** instead of two (`-web`/`-worker`): they share one codebase, one `pyproject`/lock and the same plugins — one application with two roles selected by the command (`web` | `worker`) via an entrypoint dispatcher. Published images drop from three to two (`watch-em-all` + `watch-em-all-ops`). `packages/web` + `packages/worker` merged into `packages/app`; both composes run web/worker from the same image via `command:`; CI and publish matrices updated (3 → 2); docs realigned (build-system, deployment, ci, developer-rules INF-17, phase-00)
 
+### Fixed
+
+- Disable buildx provenance attestations on push (`provenance: false` in CI and publish) — GHCR no longer shows a phantom `unknown/unknown` os/arch entry alongside each image
+
 ## [0.0.7] - 2026-06-15
 
 ### Added
