@@ -38,5 +38,8 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           packages: watch-em-all,watch-em-all-ops
-          delete-tags: ${{ steps.meta.outputs.tag }}
-          # only the listed tag is removed; missing tags are skipped, not an error
+          delete-tags: ${{ steps.meta.outputs.tag }}   # only this tag; release tags untouched
+          delete-untagged: true                        # also remove the orphan manifest left
+                                                        # after unlinking the tag (otherwise GHCR
+                                                        # keeps a phantom untagged sha version).
+                                                        # Safe here: images are single-arch.
