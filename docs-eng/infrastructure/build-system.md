@@ -22,7 +22,7 @@ watch-em-all/
 │   └── ops/         # Dockerfile of the ops image (postgres:16 + scripts)
 ├── ops/             # backup/export/restore scripts (backup-and-restore.md)
 ├── deploy/
-│   └── compose.yml  # release compose (GHCR images): attached to the release as the deploy kit
+│   └── compose.yml  # release compose (GHCR images): deploy kit in the repo, fetched at the tag
 ├── docs/            # project documentation (Italian, source of truth)
 ├── docs-eng/        # incremental English documentation (DOC-12)
 ├── docker-compose.yml  # development compose (build: from sources)

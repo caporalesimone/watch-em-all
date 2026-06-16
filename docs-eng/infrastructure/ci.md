@@ -25,12 +25,11 @@ How to install a dev image to try it: [deployment](deployment.md#trying-a-dev-im
 
 ## Publish (on tag)
 
-A separate workflow, triggered by **`x.y.z` tags** (plain SemVer, no `v` prefix; INF-17): it builds the two multi-stage images and pushes them to **GHCR**, then cuts the GitHub release with the **deploy kit** attached.
+A separate workflow, triggered by **`x.y.z` tags** (plain SemVer, no `v` prefix; INF-17): it builds the **two** multi-stage images and pushes them to **GHCR**. The **GitHub release** (with its notes) is created by the **owner** (UI or CLI); the **deploy kit is not attached** to the release — it lives in the repo and is fetched from there ([deployment](deployment.md)).
 
 | Step | What it does |
 |---|---|
 | Build & push | `watch-em-all` (app: web+worker roles) and `watch-em-all-ops` → `ghcr.io/<owner>/…:<tag>` (e.g. `1.2.0`; never `latest`, INF-1) |
-| Release + kit | attaches `compose.yml` (the release compose) and `.env.example` to the release — the **only two files** needed to install ([deployment](deployment.md)) |
 
 The tag is the only publish trigger: a green `main` publishes nothing — and the tag is created **by the owner by hand**, when a release is wanted (see *Tags and releases* below). The GHCR **packages are public** (like the repo): the user-side pull is anonymous, no authentication.
 
@@ -43,10 +42,10 @@ The product follows **SemVer** (`MAJOR.MINOR.PATCH`) with a **single version for
 
 ### Tags and releases (manual)
 
-The `x.y.z` tag (plain SemVer, **no `v` prefix**) is created **by the owner by hand**, when it is time for a release: **no auto-tag workflow**. Pushing the tag to GitHub triggers `publish.yml` (build+push of the versioned images to GHCR + a release with the deploy kit attached). Implemented in phase 0 (0.T9).
+The `x.y.z` tag (plain SemVer, **no `v` prefix**) is created **by the owner by hand**, when it is time for a release: **no auto-tag workflow**. Pushing the tag to GitHub triggers `publish.yml` (build+push of the versioned images to GHCR). Implemented in phase 0 (0.T9).
 
 - Tags are **not per-PR**: the owner creates them **whenever wanted**; the intermediate (per-PR) versions live only in the CHANGELOG, untagged.
-- **Release procedure** (GitHub *immutable releases* are on by default: a published release's assets are frozen): create the tag **from the CLI** (`git tag x.y.z && git push origin x.y.z`) → CI builds the images and **stages a *draft* release with the kit already attached** (drafts are mutable), then stops → the owner **writes the notes and clicks Publish from the UI**. ⚠️ Do **not** publish a release by hand from the UI: it would lock a kit-less immutable release and **burn** that version (the tag becomes permanently reserved, not reusable). A guardrail in the workflow catches this case and fails with instructions.
+- **Release procedure**: the owner creates the tag **from the GitHub UI** (by publishing a release with its notes) **or from the CLI** (`git tag x.y.z && git push origin x.y.z`); pushing the tag triggers `publish.yml`, which builds and pushes the versioned images. The **deploy kit is not attached to the release** — it lives in the repo and the user fetches it at the release tag ([deployment](deployment.md)). With no release assets, GitHub's *immutable releases* impose nothing: a release can be created freely from the UI.
 - The tag version is the latest `CHANGELOG.md` entry to publish; it can raise MINOR/MAJOR when the milestone warrants it.
 
 ## Notes

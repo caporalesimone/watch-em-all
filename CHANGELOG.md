@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images + GitHub release); intermediate per-PR versions live only in this file.
 
+## [0.0.16] - 2026-06-16
+
+### Changed
+
+- Deploy kit is **no longer attached as a release asset**: `deploy/compose.yml` and `.env.example` live in the repo and users fetch them at the release tag (raw URLs in the README install). This sidesteps GitHub's immutable releases entirely (no assets to freeze, no leading-dot asset-name issue) — a release can now be created freely from the **GitHub UI or the CLI**. The publish workflow's `release` job is **removed**: on a tag it only builds and pushes the two versioned images (`permissions` narrowed to `contents: read`). Supersedes the draft-staging approach from 0.0.15
+- Docs realigned to "kit in the repo, not attached": README (Installation + Releasing), `deployment.md`, `ci.md` (IT + `docs-eng` mirror), `build-system.md` (IT + mirror), `INF-17`/`INF-19`, `phase-00`/`phase-12`
+
 ## [0.0.15] - 2026-06-16
 
 ### Changed
