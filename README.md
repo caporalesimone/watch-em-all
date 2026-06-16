@@ -94,18 +94,21 @@ Development happens entirely inside the [dev container](docs/infrastructure/dev-
 
 ## Releasing (maintainer)
 
-Releases are **manual**. To cut a release `x.y.z`:
+Releases are **manual**, and the order matters: the **tag** triggers the image build, and the GitHub **release** is the announcement you make **once the images exist**. To cut a release `x.y.z`:
 
 1. Make sure `main` is green and `CHANGELOG.md` has the entry for the version (one PR = one version).
-2. Create the release `x.y.z` (plain SemVer, no `v` prefix; matching the CHANGELOG) — either from the **GitHub UI** (write the notes; the tag is created on publish) or from the **CLI**:
+2. Push the tag from the CLI (plain SemVer, no `v` prefix; matching the CHANGELOG):
    ```bash
    git checkout main && git pull
    git tag x.y.z
    git push origin x.y.z
    ```
-3. Pushing the tag triggers the publish workflow, which builds and pushes the versioned images (`watch-em-all`, `watch-em-all-ops`) to GHCR.
+3. The push triggers the publish workflow, which builds and pushes the versioned images (`watch-em-all`, `watch-em-all-ops`) to GHCR. **Wait for it to go green.**
+4. Once the images are up, create the GitHub release **on the existing tag** `x.y.z` (UI: *Draft a new release* → pick the existing tag → write the notes → *Publish*). This does not re-trigger the build.
 
-The deploy kit (`deploy/compose.yml` + `.env.example`) is **not** attached to the release — it lives in the repo, and users fetch it at the release tag (see [Installation](#installation-pull-based)). There is nothing else to attach, so a release can be created freely from the UI.
+> Create the tag **before** the release, not the other way around. Publishing a release from the UI with a *new* tag would announce the version before its images are built — a brief window where `docker compose pull` fails, or a published release pointing at a build that then failed. Tag → build → release keeps the release pointing only at images that already exist.
+
+The deploy kit (`deploy/compose.yml` + `.env.example`) is **not** attached to the release — it lives in the repo, and users fetch it at the release tag (see [Installation](#installation-pull-based)).
 
 ## Documentation
 

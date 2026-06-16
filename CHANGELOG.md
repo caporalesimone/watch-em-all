@@ -2,7 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images + GitHub release); intermediate per-PR versions live only in this file.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images on GHCR); the GitHub release is then created on that tag (no assets — the deploy kit lives in the repo). Intermediate per-PR versions live only in this file.
+
+## [0.0.17] - 2026-06-16
+
+### Changed
+
+- README **Releasing** section now spells out the correct order — **tag → build → release**: push the tag from the CLI, wait for the publish workflow to go green, then create the GitHub release on the *existing* tag. Publishing a release from the UI with a *new* tag would announce the version before its images are built (a window where `docker compose pull` fails). The deploy kit stays in the repo
+
+### Docs
+
+- **Phase 0 closed** (`phase-00-pipeline.md` → ✅, 0.T10 and the remaining DoD boxes ticked; flow index updated): the end-to-end pull-based cycle was exercised on `0.0.16` (tag → images on GHCR → release → clean install fetching the kit from the repo: `pull` + `up` → all healthy, `/api/health` 200)
 
 ## [0.0.16] - 2026-06-16
 

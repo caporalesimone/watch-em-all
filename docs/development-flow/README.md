@@ -16,8 +16,8 @@
 
 ## Avanzamento
 
-- [ ] **Fase 0 — Pipeline e processo** → [phase-00-pipeline.md](phase-00-pipeline.md)
-  *Risultato: container (stub), workflow GitHub, immagine dev sul branch, release sul tag: il processo è rodato end-to-end prima di qualsiasi codice di prodotto.*
+- [x] **Fase 0 — Pipeline e processo** → [phase-00-pipeline.md](phase-00-pipeline.md)
+  *Risultato: container (stub), workflow GitHub, immagine dev sul branch, release sul tag: il processo è rodato end-to-end prima di qualsiasi codice di prodotto. Chiusa, rodata su `0.0.16`.*
 - [ ] **Fase 1 — Fondamenta** → [phase-01-foundations.md](phase-01-foundations.md)
   *Risultato: l'app parte con Docker, si fa login, la shell c'è.*
 - [ ] **Fase 2 — Plugin system** → [phase-02-plugin-system.md](phase-02-plugin-system.md)
