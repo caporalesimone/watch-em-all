@@ -1,6 +1,6 @@
 # Fase 0 — Pipeline e processo
 
-> Stato: 🔄 in corso · Prerequisiti: nessuno · [Indice del flusso](README.md)
+> Stato: ✅ completata · Prerequisiti: nessuno · [Indice del flusso](README.md)
 
 ## Obiettivo
 
@@ -33,12 +33,12 @@ I tre container applicativi sono **stub**: nessuna logica di prodotto. `web` e `
 - [x] **0.T7 — Immagini dev sul branch** (~1h): job che pubblica `watch-em-all` (app) e `watch-em-all-ops` su GHCR con tag **`dev-<branch>`** (mutabile, su PR e `workflow_dispatch`); il tag viene **eliminato alla chiusura della PR** dal workflow `cleanup-dev-images.yml` (merge o abbandono) ([ci — immagini dev](../infrastructure/ci.md#immagini-dev-su-pr)). *Verifica: push sul branch → `docker pull` anonimo di `dev-<branch>` funziona; alla chiusura PR il tag sparisce.*
 - [x] **0.T8 — Tagging manuale** (deciso 2026-06-15, sostituisce l'auto-tag di fine fase): **niente workflow di auto-tag**. L'owner crea il tag `x.y.z` (SemVer puro, senza prefisso `v`) **a mano quando vuole** una release; il push del tag innesca `publish.yml` (0.T9). Nessun marker `Closes phase`, nessun vincolo 1-tag-per-fase ([ci — tag e release](../infrastructure/ci.md#tag-e-release-manuali), INF-19). *Verifica: push di un tag `x.y.z` → immagini versionate + release pubblicate.*
 - [x] **0.T9 — Publish su tag + deploy kit** (~1h): workflow su tag `x.y.z` → push delle **due** immagini versionate su GHCR. Il **deploy kit** (`deploy/compose.yml` — immagini, niente `build:`, mount di override `config.yaml` commentato — e `.env.example` con `WEA_VERSION`) **vive nel repo** e si scarica al tag; la release GitHub (con le note) la crea l'owner, senza allegati ([ci — publish](../infrastructure/ci.md), INF-17). *Verifica: tag → immagini taggate `x.y.z`; i due file del kit scaricabili dal repo al tag.*
-- [ ] **0.T10 — Rodaggio end-to-end del processo** (~1h): il giro completo, una volta per intero: branch → PR con bump+CHANGELOG → prova dell'immagine `dev-<branch>` via `WEA_VERSION` → merge dell'owner; la PR di rodaggio **chiude la fase 0**, poi l'owner crea il tag `x.y.z` **a mano** → publish (0.T9) → install pull-based su macchina pulita (due file, nessun sorgente); README aggiornato con i comandi usati (INF-18). *Verifica: segnaposto raggiungibile sulla macchina pulita partendo dal solo deploy kit.*
+- [x] **0.T10 — Rodaggio end-to-end del processo** (~1h): il giro completo, una volta per intero: branch → PR con bump+CHANGELOG → prova dell'immagine `dev-<branch>` via `WEA_VERSION` → merge dell'owner; la PR di rodaggio **chiude la fase 0**, poi l'owner crea il tag `x.y.z` **a mano** → publish (0.T9) → install pull-based su macchina pulita (due file dal repo, nessun sorgente); README aggiornato con i comandi usati (INF-18). *Verifica: segnaposto raggiungibile sulla macchina pulita partendo dal solo deploy kit.* **Rodato su `0.0.16`**: tag → immagini `:0.0.16` su GHCR → release → install pull-based dal repo (`pull` + `up` → stub healthy, `/api/health` 200).
 
 ## Definition of Done
 
-- [ ] Il ciclo **branch → PR (bump+CHANGELOG) → immagine `dev-<branch>` → merge dell'owner → tag manuale dell'owner → release → install pull-based** è stato percorso per intero almeno una volta. I tag li crea **l'owner a mano** quando vuole una release; le versioni intermedie vivono nel CHANGELOG. *(→ si completa col tag `0.0.13` post-merge; lo stack è già stato validato in locale col dev compose durante il rodaggio.)*
-- [ ] Su una macchina pulita con il **solo Docker**, i due file del deploy kit bastano per tirare su lo stack (INF-17) — anche se l'app è un segnaposto. *(→ rodaggio pull-based dopo il tag.)*
+- [x] Il ciclo **branch → PR (bump+CHANGELOG) → immagine `dev-<branch>` → merge dell'owner → tag manuale dell'owner → release → install pull-based** è stato percorso per intero almeno una volta. I tag li crea **l'owner a mano** quando vuole una release; le versioni intermedie vivono nel CHANGELOG. *(Rodato fino a `0.0.16`.)*
+- [x] Su una macchina pulita con il **solo Docker**, i due file del deploy kit bastano per tirare su lo stack (INF-17) — anche se l'app è un segnaposto. *(Verificato su `0.0.16`: kit scaricato dal repo + `docker compose pull` + `up` → tutti healthy, stub raggiungibile.)*
 - [x] Il dev container funziona: da qui in poi **tutto lo sviluppo avviene lì dentro** (INF-15).
 - [x] Ogni stub è dichiarato (tabella sopra) e ha l'MVP che lo sostituirà.
 - [x] [docs-eng](../../docs-eng/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
