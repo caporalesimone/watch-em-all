@@ -4,6 +4,24 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images on GHCR); the GitHub release is then created on that tag (no assets — the deploy kit lives in the repo). Intermediate per-PR versions live only in this file.
 
+## [0.0.26] - 2026-06-17
+
+### Added
+
+- **First and last name on every user**: `users` gains `first_name` / `last_name` (schema.md); `GET /api/me` returns them; the Profile page shows Username / Name / Surname / Role; the dashboard greets by first name ("Welcome, &lt;name&gt;"). Rule (documented): admin-created accounts must have both names filled (USR); the bootstrap admin starts with first name "Admin"
+- **Hidden username field** in the change-password forms (`autocomplete="username"`, visually hidden) so password managers associate the new credentials
+
+### Changed
+
+- **The forced first password change no longer asks for the current password** — it appears immediately after the first login, so requiring the current one is pointless. A **normal** change (from Profile) still always requires and verifies it. `POST /api/auth/change-password` now takes `old_password` as optional and enforces it only when `must_change_password` is false (`old_password_required` / `invalid_old_password` otherwise)
+- **`GET /api/me` is exempt from the must-change-password gate** (it drives the SPA boot and carries the user's name); the gate still blocks functional endpoints (e.g. `PATCH /api/me`). The frontend auth store reads `/api/me` directly to detect the forced-change state
+
+### Docs
+
+- Source of truth (`docs-ita`) updated: `auth.md` (AUTH-R7 exemptions + forced-change rule), `schema.md` (users name columns + both-required rule), `endpoints.md` (`/api/me` response, optional `old_password`), `app-shell.md` (profile fields, greeting), `user-management.md` (name + surname required)
+- **English documentation started under `docs/`** (DOC-12): the implemented phase-1 capabilities (auth, auth-manager, app-shell, the users schema, the implemented endpoints)
+- New **`docs/updates/`** folder (not linked): a per-phase, feature-level summary with **Good to know** and **Useful Commands** sections for whoever tests the build
+
 ## [0.0.25] - 2026-06-17
 
 ### Fixed

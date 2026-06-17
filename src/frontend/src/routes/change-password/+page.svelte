@@ -3,9 +3,8 @@
 	import { _ } from 'svelte-i18n';
 
 	import * as api from '$lib/api/client';
-	import { forceAnon } from '$lib/stores/auth';
+	import { auth, forceAnon } from '$lib/stores/auth';
 
-	let current = $state('');
 	let next = $state('');
 	let confirm = $state('');
 	let error = $state('');
@@ -23,7 +22,8 @@
 		}
 		busy = true;
 		try {
-			await api.changePassword(current, next);
+			// Forced first change: the current password is not required (auth.md).
+			await api.changePassword(next);
 			// AUTH-R5: the change is a global logout — sign in again with the new one.
 			forceAnon();
 			await goto('/login');
@@ -43,19 +43,22 @@
 	class="w-full max-w-sm space-y-4 rounded-lg border border-slate-200 p-6 dark:border-slate-800"
 >
 	<h1 class="text-xl font-semibold">{$_('changePassword.title')}</h1>
-	<p class="text-sm text-slate-500 dark:text-slate-400">{$_('changePassword.hint')}</p>
-	<label class="block text-sm">
-		<span class="mb-1 block text-slate-600 dark:text-slate-300">{$_('changePassword.current')}</span
-		>
-		<input
-			type="password"
-			name="current-password"
-			bind:value={current}
-			autocomplete="current-password"
-			required
-			class={field}
-		/>
-	</label>
+	{#if $auth.user}
+		<p class="text-sm text-slate-500 dark:text-slate-400">
+			{$_('changePassword.greeting', { values: { name: $auth.user.first_name } })}
+		</p>
+	{/if}
+	<!-- Hidden username field so password managers associate the new password. -->
+	<input
+		type="text"
+		name="username"
+		autocomplete="username"
+		value={$auth.user?.username ?? ''}
+		readonly
+		tabindex="-1"
+		aria-hidden="true"
+		class="sr-only"
+	/>
 	<label class="block text-sm">
 		<span class="mb-1 block text-slate-600 dark:text-slate-300">{$_('changePassword.new')}</span>
 		<input

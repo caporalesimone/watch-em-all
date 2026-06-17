@@ -1,7 +1,8 @@
 """End-to-end auth flow over the real app (TestClient + in-memory SQLite).
 
-Covers bootstrap admin, the forced password change gate, refresh rotation and
-reuse detection, profile, logout — the heart of phase-1 auth (auth.md)."""
+Covers bootstrap admin, the forced first change (no current password) vs the
+normal change (current password required), the must-change-password gate on
+functional endpoints, refresh rotation and reuse detection, logout."""
 
 from __future__ import annotations
 
@@ -10,6 +11,12 @@ from fastapi.testclient import TestClient
 
 def _auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+def _login(client: TestClient, password: str) -> str:
+    resp = client.post("/api/auth/login", json={"username": "admin", "password": password})
+    assert resp.status_code == 200, resp.text
+    return str(resp.json()["access_token"])
 
 
 def test_health_reports_version_and_db(client: TestClient) -> None:
@@ -27,52 +34,82 @@ def test_full_auth_flow(client: TestClient) -> None:
     assert bad.status_code == 401
     assert bad.json()["code"] == "invalid_credentials"
 
-    # Correct initial credentials → token pair; must_change_password is pending.
-    login = client.post("/api/auth/login", json={"username": "admin", "password": "initpass123"})
-    assert login.status_code == 200
-    access = login.json()["access_token"]
+    access = _login(client, "initpass123")
 
-    # AUTH-R7: a protected endpoint is gated until the password is changed.
-    me_gated = client.get("/api/me", headers=_auth(access))
-    assert me_gated.status_code == 403
-    assert me_gated.json()["code"] == "must_change_password"
-
-    # change-password works while gated (logout/change-password are exempt).
-    changed = client.post(
-        "/api/auth/change-password",
-        headers=_auth(access),
-        json={"old_password": "initpass123", "new_password": "newpass123"},
-    )
-    assert changed.status_code == 204
-
-    # Password change is a global logout (AUTH-R5): the old session must re-login.
-    relogin = client.post("/api/auth/login", json={"username": "admin", "password": "newpass123"})
-    assert relogin.status_code == 200
-    access2 = relogin.json()["access_token"]
-    refresh2 = relogin.json()["refresh_token"]
-
-    me = client.get("/api/me", headers=_auth(access2))
+    # /api/me is reachable during the forced-change state and reports it (it drives
+    # the SPA boot, so it is exempt from the gate).
+    me = client.get("/api/me", headers=_auth(access))
     assert me.status_code == 200
     profile = me.json()
     assert profile["username"] == "admin"
-    assert profile["role"] == "admin"
-    assert profile["must_change_password"] is False
+    assert profile["first_name"] == "Admin"
+    assert profile["must_change_password"] is True
 
-    # Profile locale: only 'en' accepted in V1.
+    # A gated functional endpoint (PATCH /me) is blocked during the forced change.
+    gated = client.patch("/api/me", headers=_auth(access), json={"locale": "en"})
+    assert gated.status_code == 403
+    assert gated.json()["code"] == "must_change_password"
+
+    # The forced first change does NOT require the current password.
+    changed = client.post(
+        "/api/auth/change-password", headers=_auth(access), json={"new_password": "newpass123"}
+    )
+    assert changed.status_code == 204
+
+    # Password change is a global logout (AUTH-R5): re-login with the new password.
+    access2 = _login(client, "newpass123")
+    me2 = client.get("/api/me", headers=_auth(access2))
+    assert me2.status_code == 200
+    assert me2.json()["must_change_password"] is False
+
+    # The gate is lifted now: PATCH /me works.
     assert client.patch("/api/me", headers=_auth(access2), json={"locale": "en"}).status_code == 200
-    bad_locale = client.patch("/api/me", headers=_auth(access2), json={"locale": "it"})
-    assert bad_locale.status_code == 400
-    assert bad_locale.json()["code"] == "unsupported_locale"
 
-    # Refresh rotates the pair.
-    rotated = client.post("/api/auth/refresh", json={"refresh_token": refresh2})
-    assert rotated.status_code == 200
-    assert rotated.json()["refresh_token"] != refresh2
-
-    # Reusing the now-stale refresh is treated as theft → 401 + global logout.
-    reuse = client.post("/api/auth/refresh", json={"refresh_token": refresh2})
+    # Refresh rotates; reusing the stale refresh is theft → 401 + global logout.
+    refresh2 = client.post("/api/auth/login", json={"username": "admin", "password": "newpass123"})
+    refresh_token = refresh2.json()["refresh_token"]
+    assert (
+        client.post("/api/auth/refresh", json={"refresh_token": refresh_token}).status_code == 200
+    )
+    reuse = client.post("/api/auth/refresh", json={"refresh_token": refresh_token})
     assert reuse.status_code == 401
     assert reuse.json()["code"] == "refresh_reuse"
+
+
+def test_normal_change_requires_and_verifies_current_password(client: TestClient) -> None:
+    # Clear the forced flag first (forced change needs no current password).
+    access = _login(client, "initpass123")
+    assert (
+        client.post(
+            "/api/auth/change-password", headers=_auth(access), json={"new_password": "newpass123"}
+        ).status_code
+        == 204
+    )
+    access2 = _login(client, "newpass123")
+
+    # Missing current password → 400 (a normal change requires it).
+    missing = client.post(
+        "/api/auth/change-password", headers=_auth(access2), json={"new_password": "another123"}
+    )
+    assert missing.status_code == 400
+    assert missing.json()["code"] == "old_password_required"
+
+    # Wrong current password → 400.
+    wrong = client.post(
+        "/api/auth/change-password",
+        headers=_auth(access2),
+        json={"old_password": "WRONG", "new_password": "another123"},
+    )
+    assert wrong.status_code == 400
+    assert wrong.json()["code"] == "invalid_old_password"
+
+    # Correct current password → 204.
+    ok = client.post(
+        "/api/auth/change-password",
+        headers=_auth(access2),
+        json={"old_password": "newpass123", "new_password": "another123"},
+    )
+    assert ok.status_code == 204
 
 
 def test_logout_then_refresh_is_rejected(client: TestClient) -> None:
@@ -82,6 +119,5 @@ def test_logout_then_refresh_is_rejected(client: TestClient) -> None:
 
     assert client.post("/api/auth/logout", headers=_auth(access)).status_code == 204
 
-    # token_version bumped by logout → the old refresh no longer validates.
     after = client.post("/api/auth/refresh", json={"refresh_token": refresh})
     assert after.status_code == 401

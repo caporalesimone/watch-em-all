@@ -11,26 +11,13 @@ export interface AuthState {
 
 export const auth = writable<AuthState>({ status: 'loading', user: null });
 
-async function loadMe(fallbackUsername?: string): Promise<void> {
+async function loadMe(): Promise<void> {
 	try {
+		// /api/me is reachable even while a password change is pending (it carries
+		// the must_change_password flag); the guard routes on it.
 		const user = await api.getMe();
 		auth.set({ status: 'authed', user });
-	} catch (err) {
-		// The forced-change gate (AUTH-R7) 403s /api/me; treat it as authenticated
-		// but pending a password change so the guard routes to /change-password.
-		if (err instanceof api.ApiErr && err.status === 403 && err.code === 'must_change_password') {
-			auth.set({
-				status: 'authed',
-				user: {
-					id: 0,
-					username: fallbackUsername ?? '',
-					role: '',
-					locale: 'en',
-					must_change_password: true
-				}
-			});
-			return;
-		}
+	} catch {
 		clearTokens();
 		auth.set({ status: 'anon', user: null });
 	}
@@ -47,7 +34,7 @@ export function bootstrap(): Promise<void> {
 
 export async function signIn(username: string, password: string): Promise<void> {
 	await api.login(username, password);
-	await loadMe(username);
+	await loadMe();
 }
 
 export async function signOut(): Promise<void> {

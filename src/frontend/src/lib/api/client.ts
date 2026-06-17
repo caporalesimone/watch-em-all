@@ -6,6 +6,8 @@ import { apiFetch, clearTokens, setTokens } from '$lib/auth/manager';
 export interface Me {
 	id: number;
 	username: string;
+	first_name: string;
+	last_name: string;
 	role: string;
 	locale: string;
 	must_change_password: boolean;
@@ -71,11 +73,15 @@ export function getMe(): Promise<Me> {
 	return apiFetch('/api/me').then(asJson<Me>);
 }
 
-export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+// oldPassword is required for a normal change and omitted for the forced first
+// change (must_change_password), which the backend accepts without it (auth.md).
+export async function changePassword(newPassword: string, oldPassword?: string): Promise<void> {
+	const payload: Record<string, string> = { new_password: newPassword };
+	if (oldPassword !== undefined) payload.old_password = oldPassword;
 	const res = await apiFetch('/api/auth/change-password', {
 		method: 'POST',
 		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ old_password: oldPassword, new_password: newPassword })
+		body: JSON.stringify(payload)
 	});
 	await asEmpty(res);
 }

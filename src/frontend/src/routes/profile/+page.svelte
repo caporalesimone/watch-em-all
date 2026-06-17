@@ -23,7 +23,8 @@
 		}
 		busy = true;
 		try {
-			await api.changePassword(current, next);
+			// Normal change: the current password is always required (auth.md).
+			await api.changePassword(next, current);
 			forceAnon(); // AUTH-R5: tokens invalidated → sign in again
 			await goto('/login');
 		} catch (err) {
@@ -47,6 +48,14 @@
 			<span>{$auth.user?.username}</span>
 		</div>
 		<div class="flex justify-between">
+			<span class="text-slate-500 dark:text-slate-400">{$_('profile.name')}</span>
+			<span>{$auth.user?.first_name}</span>
+		</div>
+		<div class="flex justify-between">
+			<span class="text-slate-500 dark:text-slate-400">{$_('profile.surname')}</span>
+			<span>{$auth.user?.last_name}</span>
+		</div>
+		<div class="flex justify-between">
 			<span class="text-slate-500 dark:text-slate-400">{$_('profile.role')}</span>
 			<span>{$auth.user?.role}</span>
 		</div>
@@ -58,6 +67,17 @@
 
 	<form onsubmit={submit} class="space-y-4">
 		<h2 class="font-medium">{$_('profile.changePassword')}</h2>
+		<!-- Hidden username field so password managers associate the new password. -->
+		<input
+			type="text"
+			name="username"
+			autocomplete="username"
+			value={$auth.user?.username ?? ''}
+			readonly
+			tabindex="-1"
+			aria-hidden="true"
+			class="sr-only"
+		/>
 		<label class="block text-sm">
 			<span class="mb-1 block text-slate-600 dark:text-slate-300"
 				>{$_('changePassword.current')}</span

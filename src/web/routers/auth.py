@@ -122,10 +122,18 @@ def change_password(body: ChangePasswordRequest, claims: ClaimsDep, db: SessionD
     user = db.get(User, claims.sub)
     if user is None:
         raise APIError(401, "invalid_token", "unknown user")
-    if not verify_password(body.old_password, user.password_hash):
-        raise APIError(400, "invalid_old_password", "the current password is not correct")
-    if body.new_password == body.old_password:
-        raise APIError(400, "password_unchanged", "the new password must differ from the old one")
+    # The forced first change (must_change_password) appears immediately after
+    # login and does NOT require the current password; a normal change always
+    # does (auth.md, AUTH-R7).
+    if not user.must_change_password:
+        if not body.old_password:
+            raise APIError(400, "old_password_required", "the current password is required")
+        if not verify_password(body.old_password, user.password_hash):
+            raise APIError(400, "invalid_old_password", "the current password is not correct")
+        if body.new_password == body.old_password:
+            raise APIError(
+                400, "password_unchanged", "the new password must differ from the old one"
+            )
 
     user.password_hash = hash_password(body.new_password)
     user.must_change_password = False

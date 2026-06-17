@@ -28,6 +28,10 @@ def ensure_initial_admin(
     session.add(
         User(
             username=username,
+            # The bootstrap admin starts with a first name only; the surname is
+            # completed later. Admin-created users require both filled (USR).
+            first_name="Admin",
+            last_name="",
             password_hash=hash_password(password),
             role="admin",
             is_active=True,

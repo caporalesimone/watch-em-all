@@ -25,6 +25,7 @@
 	},
 	"changePassword": {
 		"title": "Cambia la password",
+		"greeting": "Ciao {name}, scegli una nuova password per continuare.",
 		"hint": "Scegli una nuova password (almeno 8 caratteri).",
 		"current": "Password attuale",
 		"new": "Nuova password",
@@ -36,6 +37,8 @@
 	"profile": {
 		"title": "Profilo",
 		"account": "Account",
+		"name": "Nome",
+		"surname": "Cognome",
 		"role": "Ruolo",
 		"language": "Lingua",
 		"languageValue": "Inglese",
@@ -43,7 +46,7 @@
 	},
 	"dashboard": {
 		"title": "Dashboard",
-		"welcome": "Benvenuto, {username}.",
+		"welcome": "Benvenuto, {name}.",
 		"empty": "Il tuo watch-em-all è attivo. Catalogo e carrelli arrivano nelle prossime fasi."
 	},
 	"errors": {

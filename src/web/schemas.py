@@ -27,13 +27,17 @@ class TokenPair(BaseModel):
 
 
 class ChangePasswordRequest(BaseModel):
-    old_password: str = Field(min_length=1)
+    # old_password is required for a normal change; omitted for the forced first
+    # change (must_change_password), which appears right after login (auth.md).
+    old_password: str | None = None
     new_password: str = Field(min_length=8)  # AUTH-R6
 
 
 class MeResponse(BaseModel):
     id: int
     username: str
+    first_name: str
+    last_name: str
     role: str
     locale: str
     must_change_password: bool

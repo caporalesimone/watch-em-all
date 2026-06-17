@@ -6,7 +6,7 @@ from fastapi import APIRouter
 
 from src.core.errors import APIError
 from src.core.models import User
-from src.web.deps import SessionDep, UserDep
+from src.web.deps import ClaimsDep, SessionDep, UserDep
 from src.web.schemas import MePatch, MeResponse
 
 router = APIRouter(tags=["Me"])
@@ -16,6 +16,8 @@ def _to_response(user: User) -> MeResponse:
     return MeResponse(
         id=user.id,
         username=user.username,
+        first_name=user.first_name,
+        last_name=user.last_name,
         role=user.role,
         locale=user.locale,
         must_change_password=user.must_change_password,
@@ -23,7 +25,9 @@ def _to_response(user: User) -> MeResponse:
 
 
 @router.get("/me", response_model=MeResponse)
-def get_me(claims: UserDep, db: SessionDep) -> MeResponse:
+def get_me(claims: ClaimsDep, db: SessionDep) -> MeResponse:
+    # Exempt from the must-change-password gate (auth.md): the SPA boot reads /me
+    # to learn the user (and the must_change_password flag) and route accordingly.
     user = db.get(User, claims.sub)
     if user is None:
         raise APIError(401, "invalid_token", "unknown user")
