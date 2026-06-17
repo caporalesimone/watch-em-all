@@ -8,8 +8,10 @@ with the `{detail, code}` envelope (BE-11).
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -20,9 +22,13 @@ from src.core.config import get_settings
 from src.core.db import create_schema, init_engine, new_session
 from src.core.errors import APIError
 from src.web.routers import auth, health, me
+from src.web.spa import SpaStaticFiles
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
+
+# Built SPA baked into the web image (build-system.md); absent in dev/tests.
+STATIC_DIR = Path(os.environ.get("WEA_STATIC_DIR", "/app/static"))
 
 
 def create_app() -> FastAPI:
@@ -73,6 +79,11 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix="/api")
     app.include_router(auth.router, prefix="/api/auth")
     app.include_router(me.router, prefix="/api")
+
+    # Serve the built SPA last (catch-all) so /api routes take precedence.
+    if STATIC_DIR.is_dir():
+        app.mount("/", SpaStaticFiles(directory=STATIC_DIR, html=True), name="spa")
+
     return app
 
 

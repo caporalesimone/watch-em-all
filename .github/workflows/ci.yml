@@ -1,9 +1,9 @@
 name: CI
 
 # CI: on every PR, guard the CHANGELOG, run the backend checks (1.T1: ruff, mypy,
-# pytest) and build the two images, publishing them to GHCR as dev-<branch> so a
-# branch can be tried before merge (ci.md). workflow_dispatch covers branches
-# without an open PR. Frontend lint/build join with the SPA (1.F1).
+# pytest) and frontend checks (prettier, svelte-check, build), then build the two
+# images, publishing them to GHCR as dev-<branch> so a branch can be tried before
+# merge (ci.md). workflow_dispatch covers branches without an open PR.
 
 on:
   pull_request:
@@ -55,6 +55,27 @@ jobs:
         run: poetry run mypy
       - name: Pytest
         run: poetry run pytest
+
+  frontend-checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Prettier check
+        run: npm run format:check
+      - name: Svelte check
+        run: npm run check
+      - name: Build
+        run: npm run build
 
   build-images:
     runs-on: ubuntu-latest

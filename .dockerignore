@@ -8,6 +8,8 @@ docs-ita/
 backups/
 deploy/
 node_modules/
+src/frontend/.svelte-kit/
+src/frontend/build/
 **/__pycache__/
 .venv/
 .env

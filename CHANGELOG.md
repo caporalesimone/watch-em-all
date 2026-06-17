@@ -4,6 +4,23 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images on GHCR); the GitHub release is then created on that tag (no assets — the deploy kit lives in the repo). Intermediate per-PR versions live only in this file.
 
+## [0.0.22] - 2026-06-17
+
+### Added
+
+- **Phase 1 frontend — the SvelteKit SPA (1.F1–1.F5).** `src/frontend/` ships a SvelteKit 2 / Svelte 5 (runes) SPA (adapter-static, TypeScript strict, Tailwind 4 class-based dark mode, svelte-i18n):
+  - **1.F1 scaffold + i18n + theme**: every string comes from `i18n/en.json` (the complete fallback) + `it.json` (FE-13; selector not exposed — English-first); dark/light theme applied before first paint via an inline script (no flash, FE-9)
+  - **1.F2 login + Auth Manager**: `lib/auth/manager.ts` is the only token holder (access in memory, refresh in localStorage) — automatic Bearer, single-flight refresh with one retry on 401 and a proactive refresh near expiry (FAUTH-R1..R6); all calls go through the typed `lib/api` client (FE-4)
+  - **1.F3 shell + route guard**: persistent sidebar + header (theme toggle); the boot sequence restores the session from the refresh token, the guard redirects anon → /login
+  - **1.F4 forced password change**: the `must_change_password` 403 routes to a dedicated page; on success the global logout sends the user back to /login (AUTH-R5)
+  - **1.F5 profile**: account info + change-password form (language shown read-only, V1 English-only)
+- **The web image now serves the SPA**: a node build stage compiles the bundle into `/app/static` and FastAPI serves it with a client-side-routing fallback (`spa.py`); `/api` routes take precedence
+- **Frontend CI (1.T1, frontend half)**: a `frontend-checks` job runs `prettier --check`, `svelte-check` and the production build on every PR
+
+### Note
+
+- Verified locally: `svelte-check` 0 errors / 0 warnings and a green production build (run in a path without `#` — Vite cannot resolve modules under the local `D:\#Simone\…` path, an environment-only artifact). The full container build + `docker compose up` smoke is pending a Docker host (WSL)
+
 ## [0.0.21] - 2026-06-17
 
 ### Added

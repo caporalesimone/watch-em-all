@@ -1,18 +1,25 @@
 # Container app — web + worker roles (build-system.md). web runs the real FastAPI
-# app (1.B2); worker is still a stub until phase 4 (4.B1). One image, role chosen
-# by the entrypoint command. Multi-stage (INF-5): the build stage installs the
-# Python deps and derives the product version; the final image carries no build
-# tools, no git and no .git. Build context is the REPO ROOT:
-#   docker build -f packages/app/Dockerfile .
+# app (1.B2) and serves the built SPA (1.F*); worker is still a stub until phase 4
+# (4.B1). One image, role chosen by the entrypoint command. Multi-stage (INF-5):
+# a node stage builds the SPA, a python stage installs deps and derives the
+# version; the final image has no build tools, no node, no git, no .git.
+# Build context is the REPO ROOT: docker build -f packages/app/Dockerfile .
+
+FROM node:22-slim AS frontend
+# Build the SvelteKit SPA (adapter-static → /fe/build); baked into the image and
+# served by FastAPI (spa.py). Dependency layer first so source edits keep the cache.
+WORKDIR /fe
+COPY src/frontend/package.json src/frontend/package-lock.json ./
+RUN npm ci
+COPY src/frontend/ ./
+RUN npm run build
 
 FROM python:3.12-slim-bookworm AS build
 ENV PIP_NO_CACHE_DIR=1 \
     POETRY_VERSION=2.3.3 \
     POETRY_VIRTUALENVS_IN_PROJECT=true \
     POETRY_NO_INTERACTION=1
-# git: needed only here to derive the product version (single source of truth =
-# git tag, ci.md). git describe reads .git refs only; --dirty is omitted because
-# the build context is a filtered copy of the tree.
+# git: derive the product version (single source of truth = git tag, ci.md).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/*
@@ -37,11 +44,15 @@ RUN useradd --system --no-create-home app
 WORKDIR /app
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app
+    PYTHONPATH=/app \
+    WEA_STATIC_DIR=/app/static
 COPY --from=build /build/.venv /app/.venv
 COPY --from=build /build/VERSION /app/VERSION
+COPY --from=frontend /fe/build /app/static
 COPY config.yaml /app/config.yaml
-COPY src/ /app/src/
+COPY src/__init__.py /app/src/__init__.py
+COPY src/core /app/src/core
+COPY src/web /app/src/web
 COPY packages/app/stub/worker.py /app/stub/worker.py
 COPY --chmod=0755 packages/app/entrypoint.sh /app/entrypoint.sh
 USER app
