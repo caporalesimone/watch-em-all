@@ -4,7 +4,7 @@
 
 ## Requisiti
 
-- **USR-R1** — **Nessuna auto-registrazione**: gli account sono creati esclusivamente dall'admin (username, ruolo, password temporanea).
+- **USR-R1** — **Nessuna auto-registrazione**: gli account sono creati esclusivamente dall'admin (username, **nome, cognome**, ruolo, password temporanea).
 - **USR-R2** — Alla creazione l'admin imposta una **password temporanea** da comunicare all'utente; il sistema **forza il cambio al primo login** (flag sul profilo).
 - **USR-R3** — L'admin può **reimpostare la password** di un utente (nuova temporanea + cambio forzato): è il flusso di recupero per password dimenticata — non esiste reset self-service via email, scelta coerente con la postura hobby.
 - **USR-R4** — L'admin può **disabilitare/riabilitare** un account. La disabilitazione invalida le sessioni (con la tolleranza dichiarata di pochi minuti dell'access token, vedi [security posture](../../2-architecture/security-posture.md)).
@@ -21,6 +21,7 @@
 ### Visibilità e filtri
 - **USR-R13** — **Ultimo accesso**: la tabella mostra per ogni utente la data dell'ultimo login (`last_login_at`, vuota = mai entrato) e la colonna è **ordinabile**, per individuare a colpo d'occhio gli account inattivi.
 - **USR-R14** — **Filtro rapido per stato**: la lista è filtrabile con un click tra **attivo**, **disabilitato** e **in cancellazione**. Un account disabilitato resta tale **a tempo indefinito** (nessuna scadenza automatica): solo la cancellazione esplicita avvia il conto alla rovescia.
+- **USR-R15** — **Nome e cognome obbligatori**: ogni account ha **nome** (`first_name`) e **cognome** (`last_name`), **entrambi compilati**, impostati dall'admin alla creazione. Sono mostrati nel profilo dell'utente (sola lettura) e usati per i saluti nella UI (es. "Welcome, &lt;nome&gt;"). Eccezione di bootstrap: l'admin iniziale (USR-R6) nasce con `first_name="Admin"` e cognome vuoto, da completare.
 
 ## Flusso di vita di un account
 
@@ -44,6 +45,6 @@ stateDiagram-v2
 | Tabella account | username, ruolo, stato (attivo/disabilitato/**in cancellazione**/cambio password pendente), lingua, data creazione, **ultimo accesso** (colonna ordinabile, USR-R13), data marcatura e **scadenza** per i marcati |
 | Filtro stato | un click tra **attivo / disabilitato / in cancellazione** (USR-R14) |
 | Azioni per riga (icone) | reset password · **abilita/disabilita** · **cancella** (= marca con scadenza) · **annulla cancellazione** (solo per i marcati, → disabilitato) |
-| Creazione | form: username, ruolo, password temporanea (o generata) |
+| Creazione | form: username, **nome, cognome**, ruolo, password temporanea (o generata) |
 
 L'admin **non vede**: cataloghi, carrelli, notifiche, configurazioni personali dei canali.

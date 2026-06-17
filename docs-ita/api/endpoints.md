@@ -11,13 +11,13 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 | POST | `/api/auth/login` | 🌐 | `{username, password}` | `{access_token, refresh_token, expires_at}` | rate-limited; `expires_at` = scadenza access |
 | POST | `/api/auth/refresh` | 🌐 | `{refresh_token}` | nuova coppia | rotazione jti; riuso → 401 + invalidazione globale |
 | POST | `/api/auth/logout` | 👤🛡 | — | 204 | token_version += 1 (tutti i device) |
-| POST | `/api/auth/change-password` | 👤🛡 | `{old_password, new_password}` | 204 | azzera must_change_password; invalida i token |
+| POST | `/api/auth/change-password` | 👤🛡 | `{old_password?, new_password}` | 204 | `old_password` obbligatoria nel cambio **normale**, omessa nel cambio **forzato** (must_change_password); azzera must_change_password; invalida i token |
 
 ## Profilo (Me)
 
 | Metodo | Path | Ruolo | Body / Query | Risposta | Note |
 |---|---|---|---|---|---|
-| GET | `/api/me` | 👤🛡 | — | `{id, username, role, locale, must_change_password}` | |
+| GET | `/api/me` | 👤🛡 | — | `{id, username, first_name, last_name, role, locale, must_change_password}` | esente dal gate must_change_password (serve al boot della SPA) |
 | PATCH | `/api/me` | 👤🛡 | `{locale?}` | 200 | persiste la lingua (V1 English-only: unico valore accettato `en`, selettore non esposto) |
 | GET | `/api/me/alert-schedule` | 👤 | — | `AlertSchedule` | |
 | PUT | `/api/me/alert-schedule` | 👤 | `{scheduled_time, weekdays}` | 200 | weekdays []=off; cambia stato → effetti baseline dichiarati nella risposta |
@@ -85,7 +85,7 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 | Metodo | Path | Ruolo | Body | Note |
 |---|---|---|---|---|
 | GET | `/api/admin/users` | 🛡 | `?status=active\|disabled\|deleting&sort=&order=` | elenco con stato, **ultimo accesso** (`last_login_at`, ordinabile — USR-R13), data marcatura e scadenza; `status` = filtro rapido (USR-R14) |
-| POST | `/api/admin/users` | 🛡 | `{username, role, temp_password}` | must_change_password attivo |
+| POST | `/api/admin/users` | 🛡 | `{username, first_name, last_name, role, temp_password}` | nome e cognome obbligatori (USR-R15); must_change_password attivo |
 | PATCH | `/api/admin/users/{id}` | 🛡 | `{is_active?, role?}` | disabilitazione → invalidazione token + notifica di cortesia (USR-R11) |
 | POST | `/api/admin/users/{id}/reset-password` | 🛡 | `{temp_password}` | + cambio forzato + invalidazione |
 | DELETE | `/api/admin/users/{id}` | 🛡 | — | **soft con scadenza**: disattiva + marca in cancellazione + `deletion_due_at` = ora + periodo di grazia, notifica di cortesia; nessun dato eliminato (USR-R7) |

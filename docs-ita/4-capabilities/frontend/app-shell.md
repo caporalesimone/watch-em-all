@@ -35,6 +35,8 @@ flowchart TD
     PLUG --> SHELL[shell: sidebar + area utente/admin]
 ```
 
+Il **cambio password forzato** (CHG) mostra solo *nuova password* + *conferma*: la password attuale **non** è richiesta (la richiesta compare subito dopo il primo login, sarebbe ridondante); il cambio dal Profilo la richiede sempre. `GET /api/me` è **esente** dal gate `must_change_password`, così il boot può leggere nome e flag e instradare correttamente.
+
 ## Shell e navigazione
 
 - **Sidebar sinistra persistente**: Dashboard · Product Picker · Carrelli · Storico prezzi · Storico alert (badge non letti) · Profilo · *(separatore)* · gruppo **SCRAPERS** collassabile (default aperto), **ultimo** così cresce senza spostare le voci core; voci dinamiche da `GET /api/plugins` con icona e route del plugin.
@@ -50,12 +52,12 @@ flowchart TD
 
 | Pagina | Responsabilità | Feature di riferimento |
 |---|---|---|
-| Dashboard | stato carrelli, badge alert non letti, banner "nessun notifier attivo" | — |
+| Dashboard | saluto con il **nome** dell'utente ("Welcome, &lt;nome&gt;"), stato carrelli, badge alert non letti, banner "nessun notifier attivo" | — |
 | Product Picker | tabella catalogo paginata server-side; provenienza; azioni di pulizia; scrape-now a catalogo vuoto | [catalog](../../3-features/user/catalog-and-product-picker.md) |
 | Carrelli | card dei carrelli, creazione/modifica, tipi di alert, soglie | [carts](../../3-features/user/carts.md) |
 | Storico prezzi | **un componente grafico unico** (serie prodotto o carrello, selettori week/month/all, gap) | [price-history](../../3-features/user/price-history.md) |
 | Storico alert | elenco paginato, letto/non letto, categorie sistema/admin (notifiche admin con icona e colore dedicati), render Markdown dei messaggi testuali, dettaglio con esiti di consegna per canale | [alerts](../../3-features/user/alerts-and-notifications.md) |
-| Profilo | password, lingua, cadenza, summary, canali notifier (form dinamici + test + flag) | [profile](../../3-features/user/profile-and-notifiers.md) |
+| Profilo | **dati account** (username, nome, cognome, ruolo, in sola lettura), cambio password (richiede sempre la password attuale; campo `username` nascosto per i password manager), lingua, cadenza, summary, canali notifier (form dinamici + test + flag) | [profile](../../3-features/user/profile-and-notifiers.md) |
 | Pagine plugin | montate dinamicamente sotto la route del plugin | [plugin-discovery](plugin-discovery.md) |
 
 ## Pagine admin

@@ -29,7 +29,7 @@ erDiagram
 
 | Tabella | Colonne | Note |
 |---|---|---|
-| `users` | id, username **UNIQUE**, password_hash, role (`admin`\|`user`), is_active, deletion_marked_at (timestamptz, null), deletion_due_at (timestamptz, null), last_login_at (timestamptz, null), locale, must_change_password, token_version, refresh_jti, created_at | [auth](../core/auth.md): refresh_jti = ultimo refresh emesso (rotazione); token_version = invalidazione globale; deletion_marked_at ≠ null = in cancellazione (sempre con is_active=false; USR-R7); deletion_due_at = scadenza fissata alla marcatura (purge automatico, USR-R9); last_login_at = ultimo login riuscito (USR-R13) |
+| `users` | id, username **UNIQUE**, first_name, last_name, password_hash, role (`admin`\|`user`), is_active, deletion_marked_at (timestamptz, null), deletion_due_at (timestamptz, null), last_login_at (timestamptz, null), locale, must_change_password, token_version, refresh_jti, created_at | [auth](../core/auth.md): **first_name + last_name** = nome e cognome, **entrambi obbligatori** per gli account creati dall'admin (USR); l'admin iniziale di bootstrap nasce con `first_name="Admin"` e cognome da completare. refresh_jti = ultimo refresh emesso (rotazione); token_version = invalidazione globale; deletion_marked_at ≠ null = in cancellazione (sempre con is_active=false; USR-R7); deletion_due_at = scadenza fissata alla marcatura (purge automatico, USR-R9); last_login_at = ultimo login riuscito (USR-R13) |
 
 ## Catalogo e storico
 
