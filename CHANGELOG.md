@@ -4,6 +4,28 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images on GHCR); the GitHub release is then created on that tag (no assets — the deploy kit lives in the repo). Intermediate per-PR versions live only in this file.
 
+## [0.0.21] - 2026-06-17
+
+### Added
+
+- **Phase 1 backend — the real FastAPI app replaces the web stub.** A single root `pyproject.toml`/`poetry.lock` (INF-10) and a `config.yaml` bootstrap land, plus the `src/` backend:
+  - **Config loader (1.B1)**: reads `config.yaml` with `${VAR}` / `${VAR:-default}` interpolation from the environment, validates and fails fast on a missing required value, and reads the product version baked at build (`/app/VERSION`)
+  - **FastAPI app + health (1.B2)**: real `web` app with `GET /api/health` (DB check + product version) and Swagger at `/api/docs`; `{detail, code}` error envelope (BE-11)
+  - **Users + bootstrap (1.B3)**: `users` table (schema.md), bcrypt hashing, initial admin from the environment with a forced password change (AUTH-R8); idempotent schema creation at startup (DB-R4)
+  - **Auth (1.B4–1.B6)**: JWT HS256 login/logout, refresh with `jti` rotation and reuse → 401 + global logout (AUTH-R4), `token_version` invalidation (AUTH-R5), the `must_change_password` 403 gate (AUTH-R7), `account_disabled` (AUTH-R10) and an in-memory login rate limit (AUTH-R6). Access tokens carry an `mcp` claim so the gate needs no DB read (AUTH-R1)
+  - **Profile (1.B7)**: `GET/PATCH /api/me` (locale; V1 English-only)
+- **Backend CI (1.T1, backend half)**: a `backend-checks` job runs ruff, `ruff format --check`, `mypy --strict` and pytest on every PR. Frontend lint/build join with the SPA (1.F1)
+- **Real ops scripts (1.T2/1.T3)**: `backup.sh` (pg_dump custom + bootstrap files → dated tarball), `export.sh` (plain-SQL gz), `restore.sh` (verify archive, refuse while web/worker are connected, explicit confirm, recreate DB from the dump) — replacing the phase-0 placeholders (INF-16)
+- **Tests**: unit (config interpolation, JWT/password, rate limiter) and an end-to-end auth flow over the app on in-memory SQLite (login, forced-change gate, refresh rotation + reuse detection, logout). ruff + mypy + pytest all green locally
+
+### Changed
+
+- App image (`packages/app/Dockerfile`) now installs the Poetry deps and ships `src/` + `config.yaml`; `entrypoint.sh` runs uvicorn for the `web` role (the `worker` role stays a stub until phase 4). The dev compose passes the bootstrap env (with dev defaults) to web/worker; `.env.example` gains `SECRET_KEY` and `ADMIN_INITIAL_USERNAME`. The phase-0 web stub (`stub/server.py`, `stub/static/`) is removed
+
+### Note
+
+- Container-level verification (`docker compose up` → health green) is pending a build on a Docker host (WSL): this machine has no Docker. The backend logic is covered by the local test suite (ruff + mypy + pytest green)
+
 ## [0.0.20] - 2026-06-17
 
 ### Added

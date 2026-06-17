@@ -1,0 +1,14 @@
+# Bootstrap configuration (configuration.md). Only what is needed before the DB
+# is reachable: DB URL, secret key, token lifetimes, default locale. Operational
+# settings live in the DB and are edited from the UI without a restart.
+#
+# This default ships inside the web/worker image; to customise, mount a local
+# copy over it (./config.yaml:/app/config.yaml:ro). ${VAR} / ${VAR:-default}
+# references are resolved from the environment by the app loader at startup
+# (1.B1) — Docker does not interpolate inside this file.
+core:
+  database_url: "postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
+  secret_key: "${SECRET_KEY}"
+  default_locale: "en"          # locale of new users (V1 English-first)
+  access_token_ttl_min: 15      # AUTH-R1
+  refresh_token_ttl_days: 7     # AUTH-R1

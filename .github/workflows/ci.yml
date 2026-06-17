@@ -1,9 +1,9 @@
 name: CI
 
-# Phase 0 CI (0.T6 + 0.T7): on every PR, guard the CHANGELOG and build the three
-# images, publishing them to GHCR as dev-<branch> so a branch can be tried before
-# merge (ci.md). workflow_dispatch covers branches without an open PR.
-# Linters, typecheck and tests arrive with the first code (1.T1).
+# CI: on every PR, guard the CHANGELOG, run the backend checks (1.T1: ruff, mypy,
+# pytest) and build the two images, publishing them to GHCR as dev-<branch> so a
+# branch can be tried before merge (ci.md). workflow_dispatch covers branches
+# without an open PR. Frontend lint/build join with the SPA (1.F1).
 
 on:
   pull_request:
@@ -35,6 +35,26 @@ jobs:
             echo "::error::Every PR must add a CHANGELOG.md entry (one PR = one version, INF-19)."
             exit 1
           fi
+
+  backend-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pipx install poetry
+      - name: Install dependencies
+        run: poetry install
+      - name: Ruff lint
+        run: poetry run ruff check .
+      - name: Ruff format check
+        run: poetry run ruff format --check .
+      - name: Mypy (strict)
+        run: poetry run mypy
+      - name: Pytest
+        run: poetry run pytest
 
   build-images:
     runs-on: ubuntu-latest

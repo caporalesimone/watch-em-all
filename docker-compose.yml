@@ -38,6 +38,15 @@ services:
       dockerfile: packages/app/Dockerfile
     image: watch-em-all:dev
     command: ["web"]
+    environment: &app-env
+      # Consumed via config.yaml ${VAR} interpolation at startup (1.B1). Dev
+      # defaults so `docker compose up` works without a .env; override via .env.
+      SECRET_KEY: "${SECRET_KEY:-dev-secret-change-me-0123456789abcdef0123456789}"
+      POSTGRES_USER: "${POSTGRES_USER:-watchemall}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-watchemall}"
+      POSTGRES_DB: "${POSTGRES_DB:-watchemall}"
+      ADMIN_INITIAL_USERNAME: "${ADMIN_INITIAL_USERNAME:-admin}"
+      ADMIN_INITIAL_PASSWORD: "${ADMIN_INITIAL_PASSWORD:-admin12345}"
     ports: ["8080:8080"]
     depends_on:
       db: { condition: service_healthy }
@@ -56,6 +65,7 @@ services:
     build: *app-build                # same image as web (watch-em-all:dev); built once,
     image: watch-em-all:dev          # the second build is a cache hit. Both build so a
     command: ["worker"]              # plain `up --build` never tries to pull this tag.
+    environment: *app-env            # same env as web (config.yaml interpolation; stub today)
     tmpfs:
       - /tmp                          # heartbeat is ephemeral runtime state: keep it in
                                       # RAM so the per-tick write never hits the disk
