@@ -29,12 +29,12 @@
 		const state = $auth;
 		const path = $page.url.pathname;
 		if (state.status === 'anon') {
-			if (path !== '/login') void goto('/login');
+			if (path !== '/login') void goto('/login', { replaceState: true });
 		} else if (state.status === 'authed') {
 			if (state.user?.must_change_password) {
-				if (path !== '/change-password') void goto('/change-password');
+				if (path !== '/change-password') void goto('/change-password', { replaceState: true });
 			} else if (path === '/login' || path === '/change-password') {
-				void goto('/');
+				void goto('/', { replaceState: true });
 			}
 		}
 	});

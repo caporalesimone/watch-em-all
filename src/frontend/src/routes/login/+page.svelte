@@ -36,12 +36,13 @@
 	<h1 class="text-xl font-semibold">{$_('login.title')}</h1>
 	<label class="block text-sm">
 		<span class="mb-1 block text-slate-600 dark:text-slate-300">{$_('login.username')}</span>
-		<input bind:value={username} autocomplete="username" required class={field} />
+		<input name="username" bind:value={username} autocomplete="username" required class={field} />
 	</label>
 	<label class="block text-sm">
 		<span class="mb-1 block text-slate-600 dark:text-slate-300">{$_('login.password')}</span>
 		<input
 			type="password"
+			name="password"
 			bind:value={password}
 			autocomplete="current-password"
 			required

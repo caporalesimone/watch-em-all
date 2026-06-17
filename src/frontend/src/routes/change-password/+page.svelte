@@ -49,6 +49,7 @@
 		>
 		<input
 			type="password"
+			name="current-password"
 			bind:value={current}
 			autocomplete="current-password"
 			required
@@ -59,6 +60,7 @@
 		<span class="mb-1 block text-slate-600 dark:text-slate-300">{$_('changePassword.new')}</span>
 		<input
 			type="password"
+			name="new-password"
 			bind:value={next}
 			autocomplete="new-password"
 			required
@@ -71,6 +73,7 @@
 		>
 		<input
 			type="password"
+			name="confirm-password"
 			bind:value={confirm}
 			autocomplete="new-password"
 			required

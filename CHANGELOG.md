@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images on GHCR); the GitHub release is then created on that tag (no assets — the deploy kit lives in the repo). Intermediate per-PR versions live only in this file.
 
+## [0.0.25] - 2026-06-17
+
+### Fixed
+
+- **Frontend DevTools issues**: added a `<title>` (accessibility); removed the inline `style="display:contents"` wrapper (`%sveltekit.body%` mounts directly in `<body>` — no inline styles); gave the login / change-password / profile inputs `name` attributes; added the standard `text-size-adjust` next to Tailwind preflight's `-webkit-` one; guard redirects now use `replaceState` so they don't leave skippable history entries
+- **Missing assets no longer return the SPA HTML**: the SPA fallback serves `index.html` only for client routes (paths without a file extension), so `/favicon.ico` and other missing assets return a clean `404` instead of `text/html` (fixes the `content-type` DevTools warning)
+
 ## [0.0.24] - 2026-06-17
 
 ### Fixed
