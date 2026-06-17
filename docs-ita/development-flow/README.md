@@ -12,7 +12,7 @@
 6. **Un MVP = al massimo un'ora** di sviluppo concentrato: se in fase di analisi (o a metà lavoro) si capisce che non ci sta, **si spezza prima di iniziare** — un MVP più lungo di un'ora era due MVP.
 7. **I mock sono ammessi** per chiudere un MVP nell'ora — purché **dichiarati**: il documento di fase (e la PR) dicono esplicitamente *cosa* è mockato e *quale MVP* lo sostituirà. Mai mock silenziosi.
 8. In ogni fase gli MVP sono separati in **Backend** (`N.B*`), **Frontend** (`N.F*`) ed eventuali **Trasversali** (`N.T*`). Gli MVP frontend dipendono dagli endpoint dei corrispondenti backend, ma possono partire in parallelo sviluppando contro il contratto documentato in [api/endpoints.md](../api/endpoints.md) (l'API nasce nel catalogo prima dell'implementazione).
-9. **Docs inglesi a fine fase** (DOC-12): la chiusura di una fase include l'aggiornamento di `docs-eng/` (root del repo) con l'equivalente inglese della documentazione della **sola parte implementata**, stessa alberatura di `docs/`. È un item della Definition of Done di ogni fase.
+9. **Docs inglesi a fine fase** (DOC-12): la chiusura di una fase include l'aggiornamento della documentazione inglese in `docs/` (root del repo, la wiki canonica designata) con l'equivalente della documentazione della **sola parte implementata**, stessa alberatura di `docs-ita/`. È un item della Definition of Done di ogni fase.
 
 ## Avanzamento
 

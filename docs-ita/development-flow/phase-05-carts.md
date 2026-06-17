@@ -32,7 +32,7 @@ Crei "Wishlist giochi" (scraper-specific): la card mostra totale pieno barrato, 
 - [ ] UC-1 visibile: carrello con adjustments e barra della soglia che riflette i prezzi reali.
 - [ ] UC-2 visibile: carrello cross con lo stesso prodotto da fonti diverse, provenienza inequivocabile.
 - [ ] Prodotto indisponibile → grigiato, escluso dai totali, soglia in € ricalcolata (esempio normativo CART).
-- [ ] [docs-eng](../../docs-eng/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
+- [ ] [docs](../../docs/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti
 

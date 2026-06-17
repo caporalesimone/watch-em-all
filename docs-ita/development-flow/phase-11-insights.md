@@ -36,7 +36,7 @@ Ogni lunedì alle 9 arriva il riepilogo dei carrelli; nel grafico di un prodotto
 - [ ] I requisiti ANLZ-R1..R7, EXP-R1..R6 e SUM-R1..R6 verificabili da browser.
 - [ ] Con storico insufficiente gli indicatori dicono "storico insufficiente", mai numeri inventati.
 - [ ] L'export contiene tutto ciò che l'utente vede nell'app, e nulla che non gli appartenga.
-- [ ] [docs-eng](../../docs-eng/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
+- [ ] [docs](../../docs/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti
 

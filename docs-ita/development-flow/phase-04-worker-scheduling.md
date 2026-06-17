@@ -39,7 +39,7 @@ Imposti "Dragon Store alle 14:30" e alle 14:30 lo scrape parte da solo; nella pa
 - [ ] Scenari di resilienza provati: worker giù sullo slot (recupera), run oltre timeout (terminata e marcata, la coda riparte), errore su un utente (run `partial`).
 - [ ] La cache lavora: stessa query tra due utenti o due run entro l'emivita → una sola visita al sito (visibile dai contatori `http_requests`/`cache_hits`); l'emivita si governa dalla UI admin.
 - [ ] L'admin risponde a "quando ha girato? com'è andata? quanto ha fatto?" senza guardare il DB.
-- [ ] [docs-eng](../../docs-eng/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
+- [ ] [docs](../../docs/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti
 

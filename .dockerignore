@@ -2,7 +2,7 @@
 .git/
 .devcontainer/
 docs/
-docs-eng/
+docs-ita/
 backups/
 deploy/
 node_modules/

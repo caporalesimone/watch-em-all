@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images on GHCR); the GitHub release is then created on that tag (no assets — the deploy kit lives in the repo). Intermediate per-PR versions live only in this file.
 
+## [0.0.19] - 2026-06-17
+
+### Changed
+
+- **Documentation language pivot**: the documentation folders are swapped so English becomes the project's canonical wiki. `docs-eng/` → `docs/` (English, the destined canonical docs, growing phase by phase) and the former `docs/` → `docs-ita/` (Italian, which stays the **source of truth during the transition** and is retired once the English `docs/` is complete at v1). All cross-references realigned: the `docs/` mirror headers now point to `docs-ita/`; `docs-ita/`'s DOC-12/DOC-4, the developer-rules and development-flow process rules, the monorepo diagrams (build-system, IT + EN), both READMEs and the root README describe the new model; `.dockerignore` excludes `docs-ita/` instead of `docs-eng/`. Historical CHANGELOG entries are left untouched
+
 ## [0.0.18] - 2026-06-17
 
 ### Docs

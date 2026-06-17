@@ -35,7 +35,7 @@ L'admin configura l'SMTP dalla sua pagina; l'utente mette il suo indirizzo nel P
 - [ ] 🎉 **0.1**: lo scenario UC-1/UC-2 gira per intero senza toccare nulla — scrape automatico → soglia raggiunta → email in casella.
 - [ ] Un canale rotto non perde nulla: digest nello storico, esito failed tracciato, warning nei log admin.
 - [ ] Nessuna riga di codice email nel core: tutto nel plugin, dietro il contratto.
-- [ ] [docs-eng](../../docs-eng/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
+- [ ] [docs](../../docs/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti
 

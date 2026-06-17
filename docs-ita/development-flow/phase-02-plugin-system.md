@@ -30,7 +30,7 @@ Si crea una cartella con un manifest e due file: al rebuild il plugin **appare d
 - [ ] Il plugin demo è completamente dinamico: nessun riferimento a "demo" nel codice core o di build.
 - [ ] `enabled: false` + rebuild → il plugin non esiste da nessuna parte (API, sidebar, bundle).
 - [ ] Un secondo plugin demo copia-incollato appare anch'esso senza toccare nulla.
-- [ ] [docs-eng](../../docs-eng/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
+- [ ] [docs](../../docs/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti
 

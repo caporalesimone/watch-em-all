@@ -41,7 +41,7 @@ I tre container applicativi sono **stub**: nessuna logica di prodotto. `web` e `
 - [x] Su una macchina pulita con il **solo Docker**, i due file del deploy kit bastano per tirare su lo stack (INF-17) — anche se l'app è un segnaposto. *(Verificato su `0.0.16`: kit scaricato dal repo + `docker compose pull` + `up` → tutti healthy, stub raggiungibile.)*
 - [x] Il dev container funziona: da qui in poi **tutto lo sviluppo avviene lì dentro** (INF-15).
 - [x] Ogni stub è dichiarato (tabella sopra) e ha l'MVP che lo sostituirà.
-- [x] [docs-eng](../../docs-eng/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
+- [x] [docs](../../docs/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti
 

@@ -45,7 +45,7 @@ Lo scheletro vivo: l'app vera al posto degli stub di fase 0 — database, autent
 - [ ] Il ciclo backup → distruzione volume → restore riproduce un'installazione identica.
 - [ ] Swagger mostra Auth/Me/Health con modelli tipizzati.
 - [ ] CI verde su `main` con i linter attivi.
-- [ ] [docs-eng](../../docs-eng/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
+- [ ] [docs](../../docs/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti
 

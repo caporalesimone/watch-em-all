@@ -1,25 +1,27 @@
-# Dev container (sviluppo zero-install)
+# Dev container (zero-install development)
 
-> **Infrastruttura** · Audience: developer, DevOps. Snippet di configurazione ammessi.
+> **Infrastructure** · Audience: developer, DevOps. Config snippets allowed.
+>
+> English translation of the Italian reference [`docs-ita/infrastructure/dev-container.md`](../../docs-ita/infrastructure/dev-container.md), limited to what is implemented (DOC-12). The dev container is delivered in phase 0.
 
-## Principio: niente toolchain sull'host
+## Principle: no toolchain on the host
 
-Il portale è hostato su **Linux** — in locale dentro **WSL2**, oppure su un **server dedicato**. Su nessuna macchina (di sviluppo o di hosting) si installa software di sviluppo: **tutto vive nei container** (INF-15).
+The portal is hosted on **Linux** — locally inside **WSL2**, or on a **dedicated server**. On no machine (development or hosting) is development software installed: **everything lives in containers** (INF-15).
 
-| Macchina | Cosa serve sull'host | Cosa NON si installa |
+| Machine | Needed on the host | NOT installed |
 |---|---|---|
-| Dev (WSL2 o Linux) | Docker Engine + Compose plugin, un editor con supporto Dev Containers (es. VS Code) | Python, Poetry, Node, npm, psql, … |
-| Server di hosting | Docker Engine + Compose plugin | qualunque toolchain: le immagini sono multi-stage e autosufficienti (INF-5) |
+| Dev (WSL2 or Linux) | Docker Engine + Compose plugin, an editor with Dev Containers support (e.g. VS Code) | Python, Poetry, Node, npm, psql, … |
+| Hosting server | Docker Engine + Compose plugin | any toolchain: the images are multi-stage and self-contained (INF-5) |
 
-## Il dev container
+## The dev container
 
-La cartella `.devcontainer/` alla radice del repo definisce l'ambiente di sviluppo completo: l'editor si attacca al container, e lì dentro esistono tutti gli strumenti.
+The `.devcontainer/` folder at the repo root defines the full development environment: the editor attaches to the container, and every tool lives inside it.
 
 ```
 .devcontainer/
-├── devcontainer.json    # entrypoint per l'editor
+├── devcontainer.json    # entrypoint for the editor
 ├── Dockerfile           # toolchain: Python 3.12 + Poetry, Node 22 LTS + npm, git, docker CLI
-└── post-create.sh       # install tollerante: si attiva da solo quando i file toolchain esistono
+└── post-create.sh       # tolerant install: activates by itself once the toolchain files exist
 ```
 
 ```jsonc
@@ -28,7 +30,7 @@ La cartella `.devcontainer/` alla radice del repo definisce l'ambiente di svilup
   "name": "watch-em-all-dev",
   "build": { "dockerfile": "Dockerfile" },
   "mounts": [
-    // docker-outside-of-docker: il dev container comanda il Docker dell'host
+    // docker-outside-of-docker: the dev container drives the host's Docker
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
   ],
   "forwardPorts": [8080, 8081],
@@ -37,72 +39,28 @@ La cartella `.devcontainer/` alla radice del repo definisce l'ambiente di svilup
 }
 ```
 
-Scelte dichiarate:
+Declared choices:
 
-- **docker-outside-of-docker**: il dev container monta il socket Docker dell'host e lancia `docker compose` da dentro — i container applicativi (`db`, `web`, `worker`, `adminer`) girano sull'engine dell'host, non annidati. Più semplice e leggero del Docker-in-Docker.
-- La toolchain del dev container (Python+Poetry, Node+npm) **rispecchia gli stage di build** dei Dockerfile dei package: stessa versione maggiore, così "funziona nel dev container" implica "builda nell'immagine".
-- **Git e GitHub si usano dall'host, mai dal container**: il dev container serve a buildare ed eseguire; commit, push e PR (`git`, `gh`) si fanno **fuori**, dall'host — è l'unica eccezione dichiarata allo zero-install (la CLI `gh` si installa sull'host). Il binario `git` resta comunque nell'immagine perché poetry/npm ne hanno bisogno per le dipendenze da repository.
-- **Utente `root` nel container** (semplificazione dichiarata): l'accesso al socket Docker da non-root richiederebbe l'allineamento del GID del gruppo `docker` dell'host; dentro un dev container locale il root è prassi accettata e azzera quella complessità.
-- **Post-create tollerante**: `post-create.sh` installa le dipendenze solo se i file toolchain esistono (`pyproject.toml` arriva con 1.B1, `src/frontend/package.json` con 1.F1) — il dev container nasce in fase 0, prima del codice, senza fallire.
-- Il flusso quotidiano non cambia: `docker compose --profile dev up` (dal terminale **dentro** il dev container), hot-reload tramite i bind-mount del profilo dev.
+- **docker-outside-of-docker**: the dev container mounts the host's Docker socket and runs `docker compose` from inside — the application containers (`db`, `web`, `worker`, `adminer`) run on the host's engine, not nested. Simpler and lighter than Docker-in-Docker.
+- The dev container toolchain (Python+Poetry, Node+npm) **mirrors the build stages** of the package Dockerfiles: same major version, so "works in the dev container" implies "builds in the image".
+- **Git and GitHub are used from the host, never from the container**: the dev container is for building and running; commit, push and PR (`git`, `gh`) happen **outside**, on the host — the single declared exception to zero-install (the `gh` CLI is installed on the host). The `git` binary still ships in the image because Poetry/npm need it for repository dependencies.
+- **`root` user in the container** (declared simplification): non-root access to the Docker socket would require aligning the host `docker` group GID; inside a local dev container, root is accepted practice and removes that complexity.
+- **Tolerant post-create**: `post-create.sh` installs dependencies only if the toolchain files exist (`pyproject.toml` arrives with 1.B1, `src/frontend/package.json` with 1.F1) — the dev container is born in phase 0, before any code, without failing.
 
-## Flusso di lavoro
+## Workflow
 
 ```mermaid
 flowchart LR
-    E[Editor sull'host<br/>nessuna toolchain] -->|attach| DC[Dev container<br/>Python, Poetry, Node, npm, git]
-    DC -->|docker compose<br/>via socket| STACK[db / web / worker / adminer<br/>sull'engine dell'host]
+    E[Editor on the host<br/>no toolchain] -->|attach| DC[Dev container<br/>Python, Poetry, Node, npm, git]
+    DC -->|docker compose<br/>via socket| STACK[db / web / worker / adminer<br/>on the host engine]
 ```
 
-1. Clona il repo in WSL2 (o sul server di sviluppo Linux).
-2. Apri la cartella nell'editor → "Reopen in Container".
-3. Dentro il container: `cp .env.example .env`, `docker compose --profile dev up`.
-4. Test, lint, build: sempre dal terminale del dev container — mai dall'host.
-5. Commit, push e PR: **dall'host** (`git` e `gh` vivono fuori dal container).
-
-## Architettura completa
-
-La vista d'insieme del docker-outside-of-docker: un solo engine (dell'host), il dev container come fratello — non genitore — dei container applicativi, e l'editor che è solo UI.
-
-```mermaid
-flowchart TB
-    DEV["👤 Sviluppatore"]
-    BROWSER["🌐 Browser<br/>localhost:8080 / 8081"]
-
-    subgraph HOST["Host Linux / WSL2 — installato: Docker + git/gh"]
-        EDITOR["VS Code<br/>(UI sull'host, nessuna toolchain di build)"]
-        GIT["git · gh<br/>(operazioni VCS, solo host)"]
-
-        ENGINE["⚙️ Docker Engine<br/>l'unico daemon, dell'host<br/>/var/run/docker.sock"]
-
-        subgraph CONTAINERS["container — tutti fratelli, sullo stesso engine"]
-            subgraph DC["🛠️ dev container"]
-                TOOLS["toolchain<br/>Python 3.12 + Poetry<br/>Node 22 + npm<br/>docker CLI"]
-                SRC["📁 /workspace<br/>repo (bind mount)"]
-            end
-            DB[("db<br/>PostgreSQL 16")]
-            WEB["web<br/>FastAPI + SPA"]
-            WK["worker"]
-            ADM["adminer<br/>(profilo dev)"]
-        end
-    end
-
-    GITHUB["☁️ GitHub<br/>repo · PR · GHCR"]
-
-    DEV --> EDITOR
-    DEV --> GIT
-    EDITOR -- "attach (Dev Containers)" --> DC
-    TOOLS -- "docker compose up<br/>via socket montato" --> ENGINE
-    ENGINE -- "crea e governa" --> DB & WEB & WK & ADM
-    WEB --- DB
-    WK --- DB
-    ADM --- DB
-    GIT -- "commit · push · PR" --> GITHUB
-    BROWSER -- "forward 8080 (web) · 8081 (adminer)" --> WEB & ADM
-```
-
-Da leggere nel disegno: i container applicativi creati da dentro il dev container nascono **accanto** a lui (un `docker ps` dall'host vede tutto, dev container incluso); il confine è netto — **dentro** il container si builda, si testa e si esegue, **dall'host** si fanno commit, push e PR (`git`/`gh`, l'eccezione dichiarata allo zero-install); verso l'esterno escono solo le porte forwardate e il traffico VCS dell'host.
+1. Clone the repo in WSL2 (or on the Linux dev server).
+2. Open the folder in the editor → "Reopen in Container".
+3. Inside the container: `cp .env.example .env`, `docker compose --profile dev up`.
+4. Test, lint, build: always from the dev container terminal — never from the host.
+5. Commit, push and PR: **from the host** (`git` and `gh` live outside the container).
 
 ## Hosting
 
-Il deployment su server o su WSL2 **non richiede il dev container né i sorgenti**: è pull-based — deploy kit (compose di release + `.env`) e immagini pubblicate su GHCR ([deployment](deployment.md)). Il dev container usa invece il **compose di sviluppo** del repo (`docker-compose.yml`, con `build:`): stessa forma, sorgenti locali. L'unico prerequisito dell'host, in entrambi i casi, resta Docker.
+Deployment on a server or on WSL2 **needs neither the dev container nor the sources**: it is pull-based — the deploy kit (release compose + `.env`) and the images published on GHCR ([deployment](deployment.md)). The dev container instead uses the repo's **development compose** (`docker-compose.yml`, with `build:`): same shape, local sources. The host's only prerequisite, in both cases, stays Docker.

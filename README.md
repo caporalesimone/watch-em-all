@@ -112,4 +112,4 @@ The deploy kit (`deploy/compose.yml` + `.env.example`) is **not** attached to th
 
 ## Documentation
 
-The full documentation lives in the [docs/](docs/README.md) folder, organized by layers: business, architecture, features, technical capabilities, API, and plugin development guides. It is written in Italian (source of truth); an English equivalent grows phase by phase under [docs-eng/](docs-eng/).
+The project wiki lives in [docs/](docs/README.md) — **English**, growing phase by phase toward a complete documentation at v1 — organized by layers: business, architecture, features, technical capabilities, API, and plugin development guides. During the transition the **Italian** [docs-ita/](docs-ita/README.md) remains the complete reference (source of truth); once the English `docs/` is complete, `docs-ita/` is retired.

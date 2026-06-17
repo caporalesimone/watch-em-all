@@ -38,7 +38,7 @@ Incolli l'URL di un prodotto Dragon Store nella pagina del plugin → "Scrape or
 - [ ] Flusso end-to-end da browser: aggiungi URL → scrape-now → prodotto in tabella.
 - [ ] Idempotenza: secondo scrape senza cambi sul sito → zero nuovi prodotti, zero entry di storico.
 - [ ] Il core non contiene una riga specifica di Dragon Store.
-- [ ] [docs-eng](../../docs-eng/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
+- [ ] [docs](../../docs/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti
 
