@@ -3,6 +3,7 @@
 	import { _ } from 'svelte-i18n';
 
 	import { signOut } from '$lib/stores/auth';
+	import { version } from '$lib/stores/version';
 
 	const links = [
 		{ href: '/', key: 'nav.dashboard' },
@@ -31,4 +32,9 @@
 	>
 		{$_('nav.logout')}
 	</button>
+	{#if $version}
+		<p class="mt-1 px-3 text-[11px] break-all text-slate-400 dark:text-slate-600" title={$version}>
+			v{$version}
+		</p>
+	{/if}
 </aside>

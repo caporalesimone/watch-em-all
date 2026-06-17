@@ -6,11 +6,13 @@
 	import { page } from '$app/stores';
 	import { _ } from 'svelte-i18n';
 
+	import { getHealth } from '$lib/api/client';
 	import Header from '$lib/components/Header.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import { setupI18n } from '$lib/i18n';
 	import { auth, bootstrap } from '$lib/stores/auth';
 	import { theme } from '$lib/stores/theme';
+	import { version } from '$lib/stores/version';
 
 	let { children } = $props();
 	let ready = $state(false);
@@ -19,6 +21,10 @@
 		theme.init();
 		await setupI18n();
 		await bootstrap();
+		// Non-blocking: fill the version shown in the shell.
+		void getHealth()
+			.then((h) => version.set(h.version))
+			.catch(() => {});
 		ready = true;
 	});
 

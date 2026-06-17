@@ -19,6 +19,19 @@ interface TokenPair {
 	expires_at: string;
 }
 
+export interface Health {
+	status: string;
+	db: string;
+	version: string;
+	worker_heartbeat_age_s: number | null;
+}
+
+// Public endpoint; returns its body on 200 and 503 alike (we only want `version`).
+export async function getHealth(): Promise<Health> {
+	const res = await fetch('/api/health');
+	return (await res.json()) as Health;
+}
+
 export class ApiErr extends Error {
 	constructor(
 		readonly status: number,

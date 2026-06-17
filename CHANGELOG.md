@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images on GHCR); the GitHub release is then created on that tag (no assets — the deploy kit lives in the repo). Intermediate per-PR versions live only in this file.
 
+## [0.0.29] - 2026-06-17
+
+### Added
+
+- **Product version in the sidebar**: a small muted `v<version>` line under *Log out*, fetched from `GET /api/health` on boot — it shows the running product version (the `git describe` value baked into the image)
+
 ## [0.0.28] - 2026-06-17
 
 ### Fixed
