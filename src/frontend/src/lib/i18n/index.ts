@@ -11,9 +11,22 @@ import { addMessages, init, locale, waitLocale } from 'svelte-i18n';
 import en from '../../i18n/en.json';
 import it from '../../i18n/it.json';
 
+const SUPPORTED = ['en', 'it'];
+
+function initialLocale(): string {
+	// V1 is English-first and no language selector is exposed. As a testing aid, a
+	// `wea_lang` value in localStorage ('en' | 'it') previews a translation without
+	// a rebuild — set it from the console and reload. Defaults to 'en'.
+	if (typeof localStorage !== 'undefined') {
+		const stored = localStorage.getItem('wea_lang');
+		if (stored !== null && SUPPORTED.includes(stored)) return stored;
+	}
+	return 'en';
+}
+
 addMessages('en', en);
 addMessages('it', it);
-init({ fallbackLocale: 'en', initialLocale: 'en' });
+init({ fallbackLocale: 'en', initialLocale: initialLocale() });
 
 /** Await the active locale's dictionary (resolves immediately for bundled ones). */
 export function setupI18n(): Promise<void> {

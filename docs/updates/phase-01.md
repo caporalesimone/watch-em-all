@@ -30,6 +30,7 @@
 - After rebuilding the frontend, **hard-refresh** the browser (Ctrl+Shift+R): bundles are content-hashed and the old one may be cached.
 - Adding the name columns changed the DB schema; on an existing dev DB do a **`docker compose down -v`** so the fresh schema is created.
 - Chrome's "Issues" panel may show two **viewport** warnings (`maximum-scale` / `user-scalable`) — those come from a **browser extension**, not the app; untick "Include third-party issues" or test in incognito.
+- **Preview the Italian translation**: V1 is English-only (no language selector), but the `it` dictionary ships. In the browser console run `localStorage.setItem('wea_lang','it')` and reload to see the UI in Italian; `localStorage.removeItem('wea_lang')` (or set it to `'en'`) and reload to go back.
 - What works: login, forced change, normal change, profile, theme, health, Swagger. What's not here yet: catalog, carts, alerts, admin pages (later phases).
 
 ## Useful Commands

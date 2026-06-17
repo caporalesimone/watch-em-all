@@ -1,10 +1,12 @@
 # Release compose (the deploy kit) — pulls published images from GHCR, no build.
-# This is one of the two files an end user needs (the other is .env.example):
-# attached to every GitHub release by the publish workflow (0.T9, deployment.md).
+# This is one of the two files an end user needs (the other is .env.example). The
+# kit lives in the repo and is fetched at the release tag — it is NOT attached to
+# the GitHub release (INF-17, deployment.md):
 #
-#   curl -LO .../releases/latest/download/compose.yml
-#   curl -LO .../releases/latest/download/.env.example
-#   cp .env.example .env            # then fill in the values
+#   VERSION=x.y.z
+#   curl -LO https://raw.githubusercontent.com/caporalesimone/watch-em-all/$VERSION/deploy/compose.yml
+#   curl -LO https://raw.githubusercontent.com/caporalesimone/watch-em-all/$VERSION/.env.example
+#   cp .env.example .env            # then fill in the values (WEA_VERSION=$VERSION)
 #   docker compose pull && docker compose up -d
 #
 # web and worker are ONE image (watch-em-all), two roles selected by `command`;
