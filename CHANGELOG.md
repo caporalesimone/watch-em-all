@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - **Product version on the login page** too (small line under the form), fetched from `GET /api/health` — alongside the version already shown in the sidebar.
 - **`docs/updates/phase-02.md`**: the phase-2 companion doc, including the browser command to preview the Italian translation (`localStorage.setItem('wea_lang','it')` + reload).
+- **Autofocus** on the new-password field when the forced password-change page opens (verified: the focused element is `input[name=new-password]`).
 
 ### Changed
 

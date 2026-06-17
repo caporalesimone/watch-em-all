@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { _ } from 'svelte-i18n';
 
@@ -9,6 +10,10 @@
 	let confirm = $state('');
 	let error = $state('');
 	let busy = $state(false);
+	let newPasswordInput: HTMLInputElement | undefined = $state();
+
+	// Autofocus the first field (new password) when the forced-change page opens.
+	onMount(() => newPasswordInput?.focus());
 
 	const field =
 		'w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900';
@@ -65,6 +70,7 @@
 			type="password"
 			name="new-password"
 			bind:value={next}
+			bind:this={newPasswordInput}
 			autocomplete="new-password"
 			required
 			minlength="8"
