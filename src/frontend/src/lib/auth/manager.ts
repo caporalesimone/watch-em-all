@@ -68,8 +68,10 @@ function withBearer(init: RequestInit): RequestInit {
 }
 
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-	// Proactive refresh on the happy path (FAUTH-R5).
-	if (accessToken !== null && expiresAt - Date.now() < PROACTIVE_MS) {
+	// Proactive refresh (FAUTH-R5): when the access token is missing (e.g. right
+	// after a reload — it lives in memory) or near expiry, refresh first so the
+	// request already carries a Bearer and we avoid a throwaway 401 in the console.
+	if (refreshToken !== null && (accessToken === null || expiresAt - Date.now() < PROACTIVE_MS)) {
 		await refreshOnce();
 	}
 	const res = await fetch(path, withBearer(init));

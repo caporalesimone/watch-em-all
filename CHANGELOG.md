@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images on GHCR); the GitHub release is then created on that tag (no assets — the deploy kit lives in the repo). Intermediate per-PR versions live only in this file.
 
+## [0.0.28] - 2026-06-17
+
+### Fixed
+
+- **No more throwaway `GET /api/me 401` on reload.** The access token lives in memory and is lost on reload, so the first `/api/me` used to 401 before the Auth Manager refreshed and retried (it still worked — just a noisy console line). The manager now refreshes **proactively** when the access token is missing but a refresh token is present (extends FAUTH-R5), so after a reload the request already carries a Bearer: clean console, one fewer round-trip
+
 ## [0.0.27] - 2026-06-17
 
 ### Changed
