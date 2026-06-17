@@ -24,11 +24,11 @@
 
 ## Good to know
 
-- **Credentials (fresh DB)**: `admin` / `admin12345` → you are forced to set a new password, then sign in again with it. (Set your own in `.env` via `ADMIN_INITIAL_USERNAME` / `ADMIN_INITIAL_PASSWORD`.)
+- **First run**: `cp .env.example .env` (single config source), then start the dev stack. Default credentials from `.env.example`: `admin` / `change-me-please` → you are forced to set a new password, then sign in again with it. (Change them in `.env`: `ADMIN_INITIAL_USERNAME` / `ADMIN_INITIAL_PASSWORD`.)
 - A password change is a **global logout** (by design): after changing it you are sent back to login.
 - The **worker is still a stub** in this phase, so `/api/health` shows `worker_heartbeat_age_s: null` — expected (the real worker arrives in phase 4).
 - After rebuilding the frontend, **hard-refresh** the browser (Ctrl+Shift+R): bundles are content-hashed and the old one may be cached.
-- Adding the name columns changed the DB schema; on an existing dev DB do a **`docker compose down -v`** so the fresh schema is created.
+- Adding the name columns changed the DB schema; on an existing dev DB do a **`docker compose -f compose-dev.yml down -v`** so the fresh schema is created.
 - Chrome's "Issues" panel may show two **viewport** warnings (`maximum-scale` / `user-scalable`) — those come from a **browser extension**, not the app; untick "Include third-party issues" or test in incognito.
 - **Preview the Italian translation**: V1 is English-only (no language selector), but the `it` dictionary ships. In the browser console run `localStorage.setItem('wea_lang','it')` and reload to see the UI in Italian; `localStorage.removeItem('wea_lang')` (or set it to `'en'`) and reload to go back.
 - What works: login, forced change, normal change, profile, theme, health, Swagger. What's not here yet: catalog, carts, alerts, admin pages (later phases).
@@ -38,29 +38,31 @@
 Docker runs inside **WSL** (Ubuntu); the repo is at `/mnt/d/#Simone/watch-em-all`. Run these from a WSL shell in the repo (or wrap with `wsl.exe -d Ubuntu-24.04 -e bash -lc "cd '/mnt/d/#Simone/watch-em-all' && <cmd>"`).
 
 ```bash
+cp .env.example .env       # once: the single config source for the dev stack
+
 # fresh start (rebuild images + clean database)
-docker compose down -v
-docker compose up -d --build
+docker compose -f compose-dev.yml down -v
+docker compose -f compose-dev.yml up -d --build
 
 # rebuild just the app after a code change
-docker compose up -d --build web worker
+docker compose -f compose-dev.yml up -d --build web worker
 
 # logs / status
-docker compose ps
-docker compose logs -f web
+docker compose -f compose-dev.yml ps
+docker compose -f compose-dev.yml logs -f web
 
 # health (version + db)
 curl -s http://localhost:8080/api/health
 
-# quick auth probe (login → token)
+# quick auth probe (login → token) — password from your .env
 curl -s -X POST http://localhost:8080/api/auth/login \
-  -H 'content-type: application/json' -d '{"username":"admin","password":"admin12345"}'
+  -H 'content-type: application/json' -d '{"username":"admin","password":"change-me-please"}'
 
 # backup / restore (ops image; -T avoids stdin capture when scripted)
-docker compose run --rm -T ops backup.sh
-docker compose stop web worker
-docker compose run --rm -T -e RESTORE_ASSUME_YES=1 ops restore.sh /backups/watchemall-backup-<date>.tar.gz
-docker compose up -d web worker
+docker compose -f compose-dev.yml run --rm -T ops backup.sh
+docker compose -f compose-dev.yml stop web worker
+docker compose -f compose-dev.yml run --rm -T -e RESTORE_ASSUME_YES=1 ops restore.sh /backups/watchemall-backup-<date>.tar.gz
+docker compose -f compose-dev.yml up -d web worker
 ```
 
 Headless browser checks (run from a **Windows** shell — Chrome is installed there; WSL forwards `localhost`):

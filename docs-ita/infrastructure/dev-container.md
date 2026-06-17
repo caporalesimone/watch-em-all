@@ -44,7 +44,7 @@ Scelte dichiarate:
 - **Git e GitHub si usano dall'host, mai dal container**: il dev container serve a buildare ed eseguire; commit, push e PR (`git`, `gh`) si fanno **fuori**, dall'host — è l'unica eccezione dichiarata allo zero-install (la CLI `gh` si installa sull'host). Il binario `git` resta comunque nell'immagine perché poetry/npm ne hanno bisogno per le dipendenze da repository.
 - **Utente `root` nel container** (semplificazione dichiarata): l'accesso al socket Docker da non-root richiederebbe l'allineamento del GID del gruppo `docker` dell'host; dentro un dev container locale il root è prassi accettata e azzera quella complessità.
 - **Post-create tollerante**: `post-create.sh` installa le dipendenze solo se i file toolchain esistono (`pyproject.toml` arriva con 1.B1, `src/frontend/package.json` con 1.F1) — il dev container nasce in fase 0, prima del codice, senza fallire.
-- Il flusso quotidiano non cambia: `docker compose --profile dev up` (dal terminale **dentro** il dev container), hot-reload tramite i bind-mount del profilo dev.
+- Il flusso quotidiano non cambia: `docker compose -f compose-dev.yml --profile dev up` (dal terminale **dentro** il dev container), hot-reload tramite i bind-mount del profilo dev.
 
 ## Flusso di lavoro
 
@@ -56,7 +56,7 @@ flowchart LR
 
 1. Clona il repo in WSL2 (o sul server di sviluppo Linux).
 2. Apri la cartella nell'editor → "Reopen in Container".
-3. Dentro il container: `cp .env.example .env`, `docker compose --profile dev up`.
+3. Dentro il container: `cp .env.example .env`, `docker compose -f compose-dev.yml --profile dev up`.
 4. Test, lint, build: sempre dal terminale del dev container — mai dall'host.
 5. Commit, push e PR: **dall'host** (`git` e `gh` vivono fuori dal container).
 
@@ -105,4 +105,4 @@ Da leggere nel disegno: i container applicativi creati da dentro il dev containe
 
 ## Hosting
 
-Il deployment su server o su WSL2 **non richiede il dev container né i sorgenti**: è pull-based — deploy kit (compose di release + `.env`) e immagini pubblicate su GHCR ([deployment](deployment.md)). Il dev container usa invece il **compose di sviluppo** del repo (`docker-compose.yml`, con `build:`): stessa forma, sorgenti locali. L'unico prerequisito dell'host, in entrambi i casi, resta Docker.
+Il deployment su server o su WSL2 **non richiede il dev container né i sorgenti**: è pull-based — deploy kit (compose di release + `.env`) e immagini pubblicate su GHCR ([deployment](deployment.md)). Il dev container usa invece il **compose di sviluppo** del repo (`compose-dev.yml`, con `build:`): stessa forma, sorgenti locali. L'unico prerequisito dell'host, in entrambi i casi, resta Docker.

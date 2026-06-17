@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images on GHCR); the GitHub release is then created on that tag (no assets — the deploy kit lives in the repo). Intermediate per-PR versions live only in this file.
 
+## [0.0.27] - 2026-06-17
+
+### Changed
+
+- **Single source of configuration; both composes at the repo root.** Neither compose hardcodes env defaults anymore: both read `.env` (`env_file`), so `.env.example` is the **single source** of keys/defaults — no more drift between it and the compose files. The development compose moves to the root as **`compose-dev.yml`** (builds from sources); the release compose becomes the default **`compose.yml`** (pulls images); the **`deploy/` folder is removed**. `.env.example` now ships a valid dev-safe `SECRET_KEY` placeholder so `cp .env.example .env` runs the dev stack out of the box (regenerate for production: `openssl rand -hex 32`)
+- Dev usage is now `docker compose -f compose-dev.yml up -d --build` (the default `compose.yml` is the release one); the release install still fetches `compose.yml` + `.env.example` from the repo at the tag. Docs realigned (monorepo trees in build-system IT+EN, deployment, dev-container, README *Development*, `docs/updates`); fixed the stale "kit attached to the release" comment. Verified live: `cp .env.example .env` → `compose-dev.yml up --build` → health 200, login OK
+
 ## [0.0.26] - 2026-06-17
 
 ### Added

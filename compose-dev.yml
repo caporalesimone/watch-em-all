@@ -1,25 +1,22 @@
-# Development compose (0.T5) — the developer-path counterpart of the release
-# deploy kit (deploy/compose.yml, image-based). Same shape as the release compose
-# (docs/infrastructure/deployment.md): here the app service BUILDS from sources
-# (packages/app/Dockerfile, build context = repo root) instead of pulling from GHCR.
+# Development compose — builds the app image FROM SOURCES (packages/app/Dockerfile,
+# build context = repo root). The release counterpart is compose.yml (the default
+# file, which pulls published images from GHCR). Both read their configuration from
+# .env (single source — copy it from .env.example first); no inline defaults here.
+#
+#   cp .env.example .env
+#   docker compose -f compose-dev.yml up -d --build         # db + web + worker
+#   docker compose -f compose-dev.yml --profile dev up -d   # also adminer on :8081
+#   docker compose -f compose-dev.yml run --rm ops backup.sh
 #
 # web and worker are ONE image (watch-em-all), two roles selected by `command`;
 # only `web` builds it, `worker` reuses the same tag. `ops` is a separate image
-# (postgres:16 + scripts). Phase 0: all roles are declared stubs.
-#
-#   docker compose up -d                 # db + web + worker
-#   docker compose --profile dev up -d   # also adminer on :8081
-#   docker compose run --rm ops backup.sh
-#
-# No `version:` field (deprecated in Compose v2). Log rotation everywhere (INF-2).
+# (postgres:16 + scripts). No `version:` field (deprecated in Compose v2). Log
+# rotation everywhere (INF-2).
 
 services:
   db:
     image: postgres:16
-    environment:
-      POSTGRES_USER: "${POSTGRES_USER:-watchemall}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-watchemall}"
-      POSTGRES_DB: "${POSTGRES_DB:-watchemall}"
+    env_file: [.env]
     volumes: ["pgdata:/var/lib/postgresql/data"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -38,21 +35,7 @@ services:
       dockerfile: packages/app/Dockerfile
     image: watch-em-all:dev
     command: ["web"]
-    environment: &app-env
-      # Consumed via config.yaml ${VAR} interpolation at startup (1.B1). Dev
-      # defaults so `docker compose up` works without a .env; override via .env.
-      #
-      # SECRET_KEY — core secret for JWT signing (AUTH-R3, >=256 bit). Generate a
-      # real one with: openssl rand -hex 32. The default below is a throwaway dev
-      # placeholder (it lives in the repo, so it is public): never use it in
-      # production. Changing it invalidates every issued token (everyone is logged
-      # out). In a release this comes from the .env (deploy/compose.yml, env_file).
-      SECRET_KEY: "${SECRET_KEY:-dev-secret-change-me-0123456789abcdef0123456789}"
-      POSTGRES_USER: "${POSTGRES_USER:-watchemall}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-watchemall}"
-      POSTGRES_DB: "${POSTGRES_DB:-watchemall}"
-      ADMIN_INITIAL_USERNAME: "${ADMIN_INITIAL_USERNAME:-admin}"
-      ADMIN_INITIAL_PASSWORD: "${ADMIN_INITIAL_PASSWORD:-change-me-please}"
+    env_file: [.env]            # config from .env (config.yaml interpolation, 1.B1)
     ports: ["8080:8080"]
     depends_on:
       db: { condition: service_healthy }
@@ -71,7 +54,7 @@ services:
     build: *app-build                # same image as web (watch-em-all:dev); built once,
     image: watch-em-all:dev          # the second build is a cache hit. Both build so a
     command: ["worker"]              # plain `up --build` never tries to pull this tag.
-    environment: *app-env            # same env as web (config.yaml interpolation; stub today)
+    env_file: [.env]                 # same env as web (config.yaml interpolation; stub today)
     tmpfs:
       - /tmp                          # heartbeat is ephemeral runtime state: keep it in
                                       # RAM so the per-tick write never hits the disk
@@ -93,12 +76,7 @@ services:
       context: .
       dockerfile: packages/ops/Dockerfile
     profiles: [ops]                       # ephemeral: docker compose run --rm ops <script>
-    environment:
-      # Standard libpq vars so the (real, 1.T2/1.T3) scripts reach the DB.
-      PGHOST: db
-      PGUSER: "${POSTGRES_USER:-watchemall}"
-      PGPASSWORD: "${POSTGRES_PASSWORD:-watchemall}"
-      PGDATABASE: "${POSTGRES_DB:-watchemall}"
+    env_file: [.env]                      # POSTGRES_* for the scripts; they default PGHOST=db
     volumes:
       - ./backups:/backups                # archives destination
     depends_on:

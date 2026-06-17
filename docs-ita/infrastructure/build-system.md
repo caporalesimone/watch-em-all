@@ -19,12 +19,11 @@ watch-em-all/
 │   ├── app/         # Dockerfile + entrypoint dell'immagine app (ruoli web|worker via command)
 │   └── ops/         # Dockerfile dell'immagine ops (postgres:16 + script)
 ├── ops/             # script backup/export/restore (backup-and-restore.md)
-├── deploy/
-│   └── compose.yml  # compose di release (immagini GHCR): deploy kit nel repo, scaricato al tag
 ├── backups/         # archivi prodotti dagli script (gitignorata)
 ├── docs/            # documentazione inglese — cresce fase per fase (canonica a v1)
 ├── docs-ita/        # documentazione italiana — source of truth durante la transizione
-├── docker-compose.yml  # compose di sviluppo (build: dai sorgenti)
+├── compose.yml      # compose di release (immagini GHCR): il deploy kit, scaricato al tag
+├── compose-dev.yml  # compose di sviluppo (build: dai sorgenti)
 ├── pyproject.toml   # UNICO, alla root: dipendenze backend + gruppi opzionali
 ├── poetry.lock      # un solo lockfile per tutto il backend
 ├── CHANGELOG.md     # storia delle release (SemVer, INF-19)

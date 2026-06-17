@@ -14,13 +14,13 @@ Il deploy è **pull-based** (INF-17): la CI pubblica le immagini su GHCR a ogni 
 
 | File | Ruolo |
 |---|---|
-| `deploy/compose.yml` | il compose di release: referenzia le immagini pubblicate, nessun `build:` |
+| `compose.yml` | il compose di release: referenzia le immagini pubblicate, nessun `build:` |
 | `.env.example` | template dei segreti + versione delle immagini (`WEA_VERSION`) |
 
 ```bash
 mkdir watchemall && cd watchemall
 VERSION=0.0.16        # la release voluta (un tag pubblicato)
-curl -LO https://raw.githubusercontent.com/<owner>/watch-em-all/$VERSION/deploy/compose.yml
+curl -LO https://raw.githubusercontent.com/<owner>/watch-em-all/$VERSION/compose.yml
 curl -LO https://raw.githubusercontent.com/<owner>/watch-em-all/$VERSION/.env.example
 cp .env.example .env                  # poi compilare i valori (WEA_VERSION=$VERSION)
 docker compose pull && docker compose up -d
@@ -128,7 +128,7 @@ volumes:
   pgdata:
 ```
 
-Note: niente campo `version` (deprecato in Compose v2); immagini pinnate via `WEA_VERSION` nel `.env`; log rotation ovunque. L'interpolazione `${VAR}` **dentro** `config.yaml` è fatta dal loader applicativo all'avvio, non da Docker (che interpola solo il compose file). Nel repo esiste anche il **compose di sviluppo** (`docker-compose.yml`, con `build:` al posto di `image:`): è il percorso developer, usato dal [dev container](dev-container.md) — i due file condividono la stessa forma.
+Note: niente campo `version` (deprecato in Compose v2); immagini pinnate via `WEA_VERSION` nel `.env`; log rotation ovunque. L'interpolazione `${VAR}` **dentro** `config.yaml` è fatta dal loader applicativo all'avvio, non da Docker (che interpola solo il compose file). Nel repo esiste anche il **compose di sviluppo** (`compose-dev.yml`, con `build:` al posto di `image:`): è il percorso developer, usato dal [dev container](dev-container.md) — i due file condividono la stessa forma.
 
 ## Avvio
 

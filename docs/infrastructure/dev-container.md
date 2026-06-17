@@ -57,10 +57,10 @@ flowchart LR
 
 1. Clone the repo in WSL2 (or on the Linux dev server).
 2. Open the folder in the editor → "Reopen in Container".
-3. Inside the container: `cp .env.example .env`, `docker compose --profile dev up`.
+3. Inside the container: `cp .env.example .env`, `docker compose -f compose-dev.yml --profile dev up`.
 4. Test, lint, build: always from the dev container terminal — never from the host.
 5. Commit, push and PR: **from the host** (`git` and `gh` live outside the container).
 
 ## Hosting
 
-Deployment on a server or on WSL2 **needs neither the dev container nor the sources**: it is pull-based — the deploy kit (release compose + `.env`) and the images published on GHCR ([deployment](deployment.md)). The dev container instead uses the repo's **development compose** (`docker-compose.yml`, with `build:`): same shape, local sources. The host's only prerequisite, in both cases, stays Docker.
+Deployment on a server or on WSL2 **needs neither the dev container nor the sources**: it is pull-based — the deploy kit (release compose + `.env`) and the images published on GHCR ([deployment](deployment.md)). The dev container instead uses the repo's **development compose** (`compose-dev.yml`, with `build:`): same shape, local sources. The host's only prerequisite, in both cases, stays Docker.

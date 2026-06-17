@@ -21,11 +21,10 @@ watch-em-all/
 │   ├── app/         # Dockerfile + entrypoint of the app image (web|worker roles via command)
 │   └── ops/         # Dockerfile of the ops image (postgres:16 + scripts)
 ├── ops/             # backup/export/restore scripts (backup-and-restore.md)
-├── deploy/
-│   └── compose.yml  # release compose (GHCR images): deploy kit in the repo, fetched at the tag
 ├── docs/            # English documentation — grows phase by phase (canonical at v1)
 ├── docs-ita/        # Italian documentation — source of truth during the transition
-├── docker-compose.yml  # development compose (build: from sources)
+├── compose.yml      # release compose (GHCR images): the deploy kit, fetched at the tag
+├── compose-dev.yml  # development compose (build: from sources)
 ├── CHANGELOG.md     # release history (SemVer, INF-19)
 └── .env(.example)
 ```

@@ -14,13 +14,13 @@ The deploy is **pull-based** (INF-17): the CI publishes the images to GHCR on ev
 
 | File | Role |
 |---|---|
-| `deploy/compose.yml` | the release compose: references the published images, no `build:` |
+| `compose.yml` | the release compose: references the published images, no `build:` |
 | `.env.example` | secrets template + image version (`WEA_VERSION`) |
 
 ```bash
 mkdir watchemall && cd watchemall
 VERSION=0.0.16        # the release you want (a published tag)
-curl -LO https://raw.githubusercontent.com/<owner>/watch-em-all/$VERSION/deploy/compose.yml
+curl -LO https://raw.githubusercontent.com/<owner>/watch-em-all/$VERSION/compose.yml
 curl -LO https://raw.githubusercontent.com/<owner>/watch-em-all/$VERSION/.env.example
 cp .env.example .env                  # then fill in the values (WEA_VERSION=$VERSION)
 docker compose pull && docker compose up -d
@@ -119,7 +119,7 @@ volumes:
   pgdata:
 ```
 
-Notes: no `version` field (deprecated in Compose v2); images pinned via `WEA_VERSION` in `.env`; log rotation everywhere (INF-2). `curl` ships in the app image, so the same healthcheck is used by the development and release composes. The repo also has the **development compose** (`docker-compose.yml`, with `build:` instead of `image:`): the developer path used by the [dev container](dev-container.md) — the two files share the same shape.
+Notes: no `version` field (deprecated in Compose v2); images pinned via `WEA_VERSION` in `.env`; log rotation everywhere (INF-2). `curl` ships in the app image, so the same healthcheck is used by the development and release composes. The repo also has the **development compose** (`compose-dev.yml`, with `build:` instead of `image:`): the developer path used by the [dev container](dev-container.md) — the two files share the same shape.
 
 ## Updating
 

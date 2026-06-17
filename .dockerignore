@@ -6,7 +6,7 @@
 docs/
 docs-ita/
 backups/
-deploy/
+compose*.yml
 node_modules/
 src/frontend/.svelte-kit/
 src/frontend/build/

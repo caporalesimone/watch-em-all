@@ -4,7 +4,7 @@
 # the GitHub release (INF-17, deployment.md):
 #
 #   VERSION=x.y.z
-#   curl -LO https://raw.githubusercontent.com/caporalesimone/watch-em-all/$VERSION/deploy/compose.yml
+#   curl -LO https://raw.githubusercontent.com/caporalesimone/watch-em-all/$VERSION/compose.yml
 #   curl -LO https://raw.githubusercontent.com/caporalesimone/watch-em-all/$VERSION/.env.example
 #   cp .env.example .env            # then fill in the values (WEA_VERSION=$VERSION)
 #   docker compose pull && docker compose up -d
