@@ -48,7 +48,7 @@ Il prodotto segue **SemVer** (`MAJOR.MINOR.PATCH`) con una **versione unica per 
 | **MINOR** | nuove feature retrocompatibili (tipicamente la chiusura di una fase del [flow](../development-flow/README.md)) |
 | **PATCH** | fix retrocompatibili |
 
-- `0.x` durante lo sviluppo (**0.1** alla chiusura della fase 7, **1.0** alla fase 12 — milestone scelte nella PR che chiude quelle fasi); **ogni PR** porta un bump di versione + voce `CHANGELOG.md` (**1 MVP = 1 PR = 1 versione**), ma **i tag non sono per-PR**: li crea **l'owner a mano** quando vuole una release (vedi sotto), così il repo non si riempie di tag.
+- `0.x` durante lo sviluppo: la **chiusura di una fase** alza il **MINOR** (la fase 1 — Fondamenta — porta a **0.1.0**) e **1.0** segna la v1 (fase 12) — milestone decise nella PR che chiude la fase; **ogni PR** porta un bump di versione + voce `CHANGELOG.md` (**1 MVP = 1 PR = 1 versione**; una fase sviluppata in un colpo solo consolida le sue voci sotto la versione di fase), ma **i tag non sono per-PR**: li crea **l'owner a mano** quando vuole una release (vedi sotto), così il repo non si riempie di tag.
 - `CHANGELOG.md` aggiornato nella **stessa PR** (è la guardia CHANGELOG della CI a imporlo).
 
 ### Fonte unica della versione (source of truth)
@@ -70,7 +70,7 @@ Il tag `x.y.z` (SemVer puro, **senza prefisso `v`**) lo crea **l'owner a mano**,
 
 - I tag **non sono per-PR**: l'owner ne crea **quando vuole**; le versioni intermedie (per-PR) vivono solo nel CHANGELOG, senza tag — così il repo non si riempie di tag.
 - **Procedura di release**: il tag lo crea l'owner **dalla UI di GitHub** (pubblicando una release con le sue note) **o da CLI** (`git tag x.y.z && git push origin x.y.z`); il push del tag fa partire `publish.yml` che builda e pusha le immagini versionate. Il **deploy kit non è allegato alla release** — vive nel repo e l'utente lo scarica al tag della versione ([deployment](deployment.md)). Non essendoci asset sulla release, le *immutable releases* di GitHub non impongono nulla: la release si può creare liberamente dalla UI.
-- La versione del tag è quella dell'ultima voce di `CHANGELOG.md` da pubblicare; può alzare MINOR/MAJOR quando la milestone lo merita (es. 0.1.0 alla fase 7, 1.0.0 alla 12). **`publish.yml` verifica** che il tag coincida con quella voce e fallisce in caso di drift (vedi *Fonte unica della versione*).
+- La versione del tag è quella dell'ultima voce di `CHANGELOG.md` da pubblicare; può alzare MINOR/MAJOR quando la milestone lo merita (es. 0.1.0 alla fase 1, 1.0.0 alla fase 12). **`publish.yml` verifica** che il tag coincida con quella voce e fallisce in caso di drift (vedi *Fonte unica della versione*).
 - **Distinta** da: il `version` del manifest di un plugin (informativo, per-plugin) e l'`api_version` (intero, gate di compatibilità del contratto plugin) — entrambi ortogonali alla versione del prodotto.
 
 ## Note

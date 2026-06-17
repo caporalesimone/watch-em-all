@@ -4,123 +4,28 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images on GHCR); the GitHub release is then created on that tag (no assets — the deploy kit lives in the repo). Intermediate per-PR versions live only in this file.
 
-## [0.0.29] - 2026-06-17
+## [0.1.0] - 2026-06-17
+
+**Phase 1 — Foundations.** The live skeleton: the real application, authentication and the SPA shell replace the phase-0 stubs. (Developed as a single batch on `main`; this entry consolidates the whole phase.)
 
 ### Added
 
-- **Product version in the sidebar**: a small muted `v<version>` line under *Log out*, fetched from `GET /api/health` on boot — it shows the running product version (the `git describe` value baked into the image)
+- **Backend (FastAPI).** Config loader (1.B1): `config.yaml` + `.env` with `${VAR}` / `${VAR:-default}` interpolation, fail-fast validation, reads the baked product version. `GET /api/health` (1.B2): DB check + product version, Swagger at `/api/docs`, `{detail, code}` error envelope (BE-11). Users + initial-admin bootstrap (1.B3): `users` table with bcrypt hashing and **first/last name**, admin created from the environment with a forced password change. JWT auth (1.B4–1.B6): login/logout, refresh with `jti` rotation and reuse → 401 + global logout, `token_version` invalidation, the `must_change_password` gate (via an `mcp` access claim, no DB read), `account_disabled`, in-memory login rate limit. Profile (1.B7): `GET/PATCH /api/me` (id, username, first/last name, role, locale).
+- **Frontend (SvelteKit 2 / Svelte 5 SPA, 1.F1–1.F5).** Scaffold + svelte-i18n (`en` complete fallback + `it`) + dark/light theme with no flash; Auth Manager (access in memory, refresh in localStorage, single-flight + proactive refresh); login → route guard → protected shell (sidebar + header); forced first password change (no current password) and the normal change (current required), both with a hidden username field for password managers; dashboard greeting by first name; profile showing Username / Name / Surname / Role; the product version shown small under *Log out*. The `web` image builds and serves the SPA (`spa.py`, client-side-routing fallback).
+- **Version source of truth (1.T4).** The git tag: computed at build via `git describe` and baked into the image (`/app/VERSION`), exposed on `/api/health`; `pyproject.toml`/`package.json` keep an inert placeholder. A `publish.yml` guard verifies the tag matches the top CHANGELOG entry (the CHANGELOG is verified, not the source).
+- **CI (1.T1).** `backend-checks` (ruff, `ruff format --check`, `mypy --strict`, pytest) and `frontend-checks` (`prettier --check`, `svelte-check`, build) on every PR.
+- **Ops scripts (1.T2/1.T3).** Real `backup.sh` / `export.sh` / `restore.sh` (custom + plain dumps; restore verifies the archive, refuses while the app is connected, recreates the DB), replacing the phase-0 placeholders.
+- Dev affordance: a `wea_lang` localStorage override to preview the Italian translation (no selector exposed in V1).
 
-## [0.0.28] - 2026-06-17
+### Changed
+
+- **Documentation pivots to English.** `docs/` becomes the English canonical wiki (grows phase by phase; the implemented phase-1 capabilities are written there), `docs-ita/` is the Italian source of truth during the transition (retired at v1). New `docs/updates/` holds per-phase, feature-level summaries with *Good to know* and *Useful Commands* (not linked from the wiki).
+- **Single configuration source; composes at the repo root.** Both composes read `.env` (`env_file`), with no inline defaults — `.env.example` is the single source. `compose.yml` (the default) is the release/image compose; `compose-dev.yml` builds from sources; the `deploy/` folder is removed.
+- `GET /api/me` is exempt from the must-change-password gate (it drives the SPA boot and carries the user's name).
 
 ### Fixed
 
-- **No more throwaway `GET /api/me 401` on reload.** The access token lives in memory and is lost on reload, so the first `/api/me` used to 401 before the Auth Manager refreshed and retried (it still worked — just a noisy console line). The manager now refreshes **proactively** when the access token is missing but a refresh token is present (extends FAUTH-R5), so after a reload the request already carries a Bearer: clean console, one fewer round-trip
-
-## [0.0.27] - 2026-06-17
-
-### Changed
-
-- **Single source of configuration; both composes at the repo root.** Neither compose hardcodes env defaults anymore: both read `.env` (`env_file`), so `.env.example` is the **single source** of keys/defaults — no more drift between it and the compose files. The development compose moves to the root as **`compose-dev.yml`** (builds from sources); the release compose becomes the default **`compose.yml`** (pulls images); the **`deploy/` folder is removed**. `.env.example` now ships a valid dev-safe `SECRET_KEY` placeholder so `cp .env.example .env` runs the dev stack out of the box (regenerate for production: `openssl rand -hex 32`)
-- Dev usage is now `docker compose -f compose-dev.yml up -d --build` (the default `compose.yml` is the release one); the release install still fetches `compose.yml` + `.env.example` from the repo at the tag. Docs realigned (monorepo trees in build-system IT+EN, deployment, dev-container, README *Development*, `docs/updates`); fixed the stale "kit attached to the release" comment. Verified live: `cp .env.example .env` → `compose-dev.yml up --build` → health 200, login OK
-
-## [0.0.26] - 2026-06-17
-
-### Added
-
-- **First and last name on every user**: `users` gains `first_name` / `last_name` (schema.md); `GET /api/me` returns them; the Profile page shows Username / Name / Surname / Role; the dashboard greets by first name ("Welcome, &lt;name&gt;"). Rule (documented): admin-created accounts must have both names filled (USR); the bootstrap admin starts with first name "Admin"
-- **Hidden username field** in the change-password forms (`autocomplete="username"`, visually hidden) so password managers associate the new credentials
-
-### Changed
-
-- **The forced first password change no longer asks for the current password** — it appears immediately after the first login, so requiring the current one is pointless. A **normal** change (from Profile) still always requires and verifies it. `POST /api/auth/change-password` now takes `old_password` as optional and enforces it only when `must_change_password` is false (`old_password_required` / `invalid_old_password` otherwise)
-- **`GET /api/me` is exempt from the must-change-password gate** (it drives the SPA boot and carries the user's name); the gate still blocks functional endpoints (e.g. `PATCH /api/me`). The frontend auth store reads `/api/me` directly to detect the forced-change state
-
-### Docs
-
-- Source of truth (`docs-ita`) updated: `auth.md` (AUTH-R7 exemptions + forced-change rule), `schema.md` (users name columns + both-required rule), `endpoints.md` (`/api/me` response, optional `old_password`), `app-shell.md` (profile fields, greeting), `user-management.md` (name + surname required)
-- **English documentation started under `docs/`** (DOC-12): the implemented phase-1 capabilities (auth, auth-manager, app-shell, the users schema, the implemented endpoints)
-- New **`docs/updates/`** folder (not linked): a per-phase, feature-level summary with **Good to know** and **Useful Commands** sections for whoever tests the build
-
-## [0.0.25] - 2026-06-17
-
-### Fixed
-
-- **Frontend DevTools issues**: added a `<title>` (`👀 Watch 'em all!`, accessibility); removed the inline `style="display:contents"` wrapper (`%sveltekit.body%` mounts directly in `<body>` — no inline styles); gave the login / change-password / profile inputs `name` attributes; added the standard `text-size-adjust` next to Tailwind preflight's `-webkit-` one; guard redirects now use `replaceState` so they don't leave skippable history entries
-- **Missing assets no longer return the SPA HTML**: the SPA fallback serves `index.html` only for client routes (paths without a file extension), so `/favicon.ico` and other missing assets return a clean `404` instead of `text/html` (fixes the `content-type` DevTools warning)
-
-## [0.0.24] - 2026-06-17
-
-### Fixed
-
-- **Frontend i18n init order**: `addMessages` + `init` now run at module load (import side effect) instead of inside `onMount`, so the locale is set before any component formats a message. Fixes the runtime error `[svelte-i18n] Cannot format a message without first setting the initial locale` thrown on opening the app (the layout's loading text formatted a message before init had run)
-
-## [0.0.23] - 2026-06-17
-
-### Docs
-
-- **Phase 1 verified in the real stack (WSL)**; the `phase-01` MVP checkboxes and the met DoD items are ticked. `docker compose up --build` → all containers up, `/api/health` 200 reporting the git-described version (`0.0.16-7-g…`); login → the forced password-change gate (403 `must_change_password`) → change-password → re-login → `/api/me` 200; refresh rotation then reuse → 401 `refresh_reuse`; bad credentials → 401 `invalid_credentials`; the SPA served at `/` with a client-side-routing fallback; Swagger at `/api/docs`. Ops verified live: `backup.sh`/`export.sh` write archives, `restore.sh` refuses while web/worker are connected, and stop → restore → up restores an identical install (login works after). Still open for phase close: pull-based release (INF-17), green CI on `main`, the English DOC-12 translation
-
-## [0.0.22] - 2026-06-17
-
-### Added
-
-- **Phase 1 frontend — the SvelteKit SPA (1.F1–1.F5).** `src/frontend/` ships a SvelteKit 2 / Svelte 5 (runes) SPA (adapter-static, TypeScript strict, Tailwind 4 class-based dark mode, svelte-i18n):
-  - **1.F1 scaffold + i18n + theme**: every string comes from `i18n/en.json` (the complete fallback) + `it.json` (FE-13; selector not exposed — English-first); dark/light theme applied before first paint via an inline script (no flash, FE-9)
-  - **1.F2 login + Auth Manager**: `lib/auth/manager.ts` is the only token holder (access in memory, refresh in localStorage) — automatic Bearer, single-flight refresh with one retry on 401 and a proactive refresh near expiry (FAUTH-R1..R6); all calls go through the typed `lib/api` client (FE-4)
-  - **1.F3 shell + route guard**: persistent sidebar + header (theme toggle); the boot sequence restores the session from the refresh token, the guard redirects anon → /login
-  - **1.F4 forced password change**: the `must_change_password` 403 routes to a dedicated page; on success the global logout sends the user back to /login (AUTH-R5)
-  - **1.F5 profile**: account info + change-password form (language shown read-only, V1 English-only)
-- **The web image now serves the SPA**: a node build stage compiles the bundle into `/app/static` and FastAPI serves it with a client-side-routing fallback (`spa.py`); `/api` routes take precedence
-- **Frontend CI (1.T1, frontend half)**: a `frontend-checks` job runs `prettier --check`, `svelte-check` and the production build on every PR
-
-### Note
-
-- Verified locally: `svelte-check` 0 errors / 0 warnings and a green production build (run in a path without `#` — Vite cannot resolve modules under the local `D:\#Simone\…` path, an environment-only artifact). The full container build + `docker compose up` smoke is pending a Docker host (WSL)
-
-## [0.0.21] - 2026-06-17
-
-### Added
-
-- **Phase 1 backend — the real FastAPI app replaces the web stub.** A single root `pyproject.toml`/`poetry.lock` (INF-10) and a `config.yaml` bootstrap land, plus the `src/` backend:
-  - **Config loader (1.B1)**: reads `config.yaml` with `${VAR}` / `${VAR:-default}` interpolation from the environment, validates and fails fast on a missing required value, and reads the product version baked at build (`/app/VERSION`)
-  - **FastAPI app + health (1.B2)**: real `web` app with `GET /api/health` (DB check + product version) and Swagger at `/api/docs`; `{detail, code}` error envelope (BE-11)
-  - **Users + bootstrap (1.B3)**: `users` table (schema.md), bcrypt hashing, initial admin from the environment with a forced password change (AUTH-R8); idempotent schema creation at startup (DB-R4)
-  - **Auth (1.B4–1.B6)**: JWT HS256 login/logout, refresh with `jti` rotation and reuse → 401 + global logout (AUTH-R4), `token_version` invalidation (AUTH-R5), the `must_change_password` 403 gate (AUTH-R7), `account_disabled` (AUTH-R10) and an in-memory login rate limit (AUTH-R6). Access tokens carry an `mcp` claim so the gate needs no DB read (AUTH-R1)
-  - **Profile (1.B7)**: `GET/PATCH /api/me` (locale; V1 English-only)
-- **Backend CI (1.T1, backend half)**: a `backend-checks` job runs ruff, `ruff format --check`, `mypy --strict` and pytest on every PR. Frontend lint/build join with the SPA (1.F1)
-- **Real ops scripts (1.T2/1.T3)**: `backup.sh` (pg_dump custom + bootstrap files → dated tarball), `export.sh` (plain-SQL gz), `restore.sh` (verify archive, refuse while web/worker are connected, explicit confirm, recreate DB from the dump) — replacing the phase-0 placeholders (INF-16)
-- **Tests**: unit (config interpolation, JWT/password, rate limiter) and an end-to-end auth flow over the app on in-memory SQLite (login, forced-change gate, refresh rotation + reuse detection, logout). ruff + mypy + pytest all green locally
-
-### Changed
-
-- App image (`packages/app/Dockerfile`) now installs the Poetry deps and ships `src/` + `config.yaml`; `entrypoint.sh` runs uvicorn for the `web` role (the `worker` role stays a stub until phase 4). The dev compose passes the bootstrap env (with dev defaults) to web/worker; `.env.example` gains `SECRET_KEY` and `ADMIN_INITIAL_USERNAME`. The phase-0 web stub (`stub/server.py`, `stub/static/`) is removed
-
-### Note
-
-- Container-level verification (`docker compose up` → health green) is pending a build on a Docker host (WSL): this machine has no Docker. The backend logic is covered by the local test suite (ruff + mypy + pytest green)
-
-## [0.0.20] - 2026-06-17
-
-### Added
-
-- **Product version baked from the git tag (1.T4)**: the app image derives its version in the build stage via `git describe --tags --always` (git installed there only; `.git` kept in the build context) and bakes it to `/app/VERSION` — a bare `x.y.z` on a tag, `x.y.z-N-g<sha>` off a tag, never a `0.0.0` placeholder. The phase-0 stub `web` server reads it and reports it on `GET /api/health` (`version` field) so the plumbing is verifiable before the real app (1.B1/1.B2). `--dirty` is omitted on purpose (the build context is a filtered copy of the tree, so a working-tree dirty flag would be meaningless)
-- **`publish.yml` version-guard**: on a tag push, a job verifies the tag matches the top `CHANGELOG.md` entry and fails the publish on drift (the CHANGELOG is verified, not the source). The image build's checkout uses `fetch-depth: 0` so `git describe` sees the full history and tags; the CI dev-image build does the same
-
-### Changed
-
-- `.dockerignore` no longer ignores `.git/` — the in-image `git describe` needs the repo history in the build context (it stays in the build stage only; the final image carries just the version string)
-
-## [0.0.19] - 2026-06-17
-
-### Changed
-
-- **Documentation language pivot**: the documentation folders are swapped so English becomes the project's canonical wiki. `docs-eng/` → `docs/` (English, the destined canonical docs, growing phase by phase) and the former `docs/` → `docs-ita/` (Italian, which stays the **source of truth during the transition** and is retired once the English `docs/` is complete at v1). All cross-references realigned: the `docs/` mirror headers now point to `docs-ita/`; `docs-ita/`'s DOC-12/DOC-4, the developer-rules and development-flow process rules, the monorepo diagrams (build-system, IT + EN), both READMEs and the root README describe the new model; `.dockerignore` excludes `docs-ita/` instead of `docs-eng/`. Historical CHANGELOG entries are left untouched
-
-## [0.0.18] - 2026-06-17
-
-### Docs
-
-- **Version source of truth decided (phase 1, 1.T4)**: the product version's single source of truth is the **git tag**, computed at build from `git describe --tags --always` and baked into the image (`/app/VERSION`) — a bare `x.y.z` on a tag, `x.y.z-N-g<sha>` off a tag (never a `0.0.0` placeholder) — and exposed on `GET /api/health`. `CHANGELOG.md` is **only verified** (a `publish.yml` guard checks the tag matches the top entry), not the source; `pyproject.toml`/`package.json` keep an inert placeholder `version`. Documented across `ci.md` (new *Single source of truth for the version* section, IT + `docs-eng` mirror), `configuration.md`, `build-system.md` (IT + mirror), `INF-19`, and `phase-01` (1.B1/1.B2 + new transversal 1.T4)
+- Frontend polish: svelte-i18n initialised at module load (no "set the initial locale" error); a page `<title>`; form `name` attributes; missing assets return a clean 404 instead of the SPA HTML; `replaceState` guard redirects; no throwaway `GET /api/me` 401 on reload (proactive refresh on boot).
 
 ## [0.0.17] - 2026-06-16
 
