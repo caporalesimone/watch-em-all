@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
-- **Frontend DevTools issues**: added a `<title>` (accessibility); removed the inline `style="display:contents"` wrapper (`%sveltekit.body%` mounts directly in `<body>` — no inline styles); gave the login / change-password / profile inputs `name` attributes; added the standard `text-size-adjust` next to Tailwind preflight's `-webkit-` one; guard redirects now use `replaceState` so they don't leave skippable history entries
+- **Frontend DevTools issues**: added a `<title>` (`👀 Watch 'em all!`, accessibility); removed the inline `style="display:contents"` wrapper (`%sveltekit.body%` mounts directly in `<body>` — no inline styles); gave the login / change-password / profile inputs `name` attributes; added the standard `text-size-adjust` next to Tailwind preflight's `-webkit-` one; guard redirects now use `replaceState` so they don't leave skippable history entries
 - **Missing assets no longer return the SPA HTML**: the SPA fallback serves `index.html` only for client routes (paths without a file extension), so `/favicon.ico` and other missing assets return a clean `404` instead of `text/html` (fixes the `content-type` DevTools warning)
 
 ## [0.0.24] - 2026-06-17
