@@ -41,12 +41,18 @@ services:
     environment: &app-env
       # Consumed via config.yaml ${VAR} interpolation at startup (1.B1). Dev
       # defaults so `docker compose up` works without a .env; override via .env.
+      #
+      # SECRET_KEY — core secret for JWT signing (AUTH-R3, >=256 bit). Generate a
+      # real one with: openssl rand -hex 32. The default below is a throwaway dev
+      # placeholder (it lives in the repo, so it is public): never use it in
+      # production. Changing it invalidates every issued token (everyone is logged
+      # out). In a release this comes from the .env (deploy/compose.yml, env_file).
       SECRET_KEY: "${SECRET_KEY:-dev-secret-change-me-0123456789abcdef0123456789}"
       POSTGRES_USER: "${POSTGRES_USER:-watchemall}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-watchemall}"
       POSTGRES_DB: "${POSTGRES_DB:-watchemall}"
       ADMIN_INITIAL_USERNAME: "${ADMIN_INITIAL_USERNAME:-admin}"
-      ADMIN_INITIAL_PASSWORD: "${ADMIN_INITIAL_PASSWORD:-admin12345}"
+      ADMIN_INITIAL_PASSWORD: "${ADMIN_INITIAL_PASSWORD:-change-me-please}"
     ports: ["8080:8080"]
     depends_on:
       db: { condition: service_healthy }
