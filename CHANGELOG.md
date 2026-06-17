@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images on GHCR); the GitHub release is then created on that tag (no assets — the deploy kit lives in the repo). Intermediate per-PR versions live only in this file.
 
+## [0.0.24] - 2026-06-17
+
+### Fixed
+
+- **Frontend i18n init order**: `addMessages` + `init` now run at module load (import side effect) instead of inside `onMount`, so the locale is set before any component formats a message. Fixes the runtime error `[svelte-i18n] Cannot format a message without first setting the initial locale` thrown on opening the app (the layout's loading text formatted a message before init had run)
+
 ## [0.0.23] - 2026-06-17
 
 ### Docs
