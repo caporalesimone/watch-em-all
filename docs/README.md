@@ -16,5 +16,13 @@ This is the project's **English documentation**, the destined canonical wiki. It
   - [dev-container.md](infrastructure/dev-container.md) — zero-install development environment
   - [ci.md](infrastructure/ci.md) — CI, dev images, publish on tag, versioning
   - [deployment.md](infrastructure/deployment.md) — pull-based deploy and the deploy kit
+- **[api/](api/)** — HTTP API (Phase 1: Auth, Me, Health):
+  - [README.md](api/README.md) — conventions and Swagger
+  - [endpoints.md](api/endpoints.md) — the implemented endpoints
+- **[4-capabilities/](4-capabilities/)** — implemented capabilities (Phase 1 — Foundations):
+  - [core/auth.md](4-capabilities/core/auth.md) — JWT auth, refresh rotation, forced/normal password change, bootstrap
+  - [database/schema.md](4-capabilities/database/schema.md) — the `users` table
+  - [frontend/app-shell.md](4-capabilities/frontend/app-shell.md) — SPA shell, theme, i18n, pages
+  - [frontend/auth-manager.md](4-capabilities/frontend/auth-manager.md) — the token manager (single-flight refresh)
 
-The business/architecture/feature layers arrive with the closure of Phase 1 — Foundations.
+The remaining business/architecture/feature layers arrive as the corresponding features land in later phases.
