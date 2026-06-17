@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images on GHCR); the GitHub release is then created on that tag (no assets — the deploy kit lives in the repo). Intermediate per-PR versions live only in this file.
 
+## [0.0.18] - 2026-06-17
+
+### Docs
+
+- **Version source of truth decided (phase 1, 1.T4)**: the product version's single source of truth is the **git tag**, computed at build from `git describe --tags --always --dirty` and baked into the image (`/app/VERSION`) — a bare `x.y.z` on a tag, `x.y.z-N-g<sha>` off a tag (never a `0.0.0` placeholder) — and exposed on `GET /api/health`. `CHANGELOG.md` is **only verified** (a `publish.yml` guard checks the tag matches the top entry), not the source; `pyproject.toml`/`package.json` keep an inert placeholder `version`. Documented across `ci.md` (new *Single source of truth for the version* section, IT + `docs-eng` mirror), `configuration.md`, `build-system.md` (IT + mirror), `INF-19`, and `phase-01` (1.B1/1.B2 + new transversal 1.T4)
+
 ## [0.0.17] - 2026-06-16
 
 ### Changed

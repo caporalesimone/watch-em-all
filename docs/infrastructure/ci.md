@@ -51,13 +51,26 @@ Il prodotto segue **SemVer** (`MAJOR.MINOR.PATCH`) con una **versione unica per 
 - `0.x` durante lo sviluppo (**0.1** alla chiusura della fase 7, **1.0** alla fase 12 — milestone scelte nella PR che chiude quelle fasi); **ogni PR** porta un bump di versione + voce `CHANGELOG.md` (**1 MVP = 1 PR = 1 versione**), ma **i tag non sono per-PR**: li crea **l'owner a mano** quando vuole una release (vedi sotto), così il repo non si riempie di tag.
 - `CHANGELOG.md` aggiornato nella **stessa PR** (è la guardia CHANGELOG della CI a imporlo).
 
+### Fonte unica della versione (source of truth)
+
+La versione del prodotto ha **un'unica source of truth: il tag git**. Non è scritta a mano in alcun file versionato — `pyproject.toml` e `package.json` tengono un `version` **placeholder inerte** (non pubblichiamo pacchetti su PyPI/npm): la versione reale è **calcolata in build** da `git describe --tags --always --dirty` e **cucinata nell'immagine** (file `/app/VERSION`). Quindi:
+
+- **su un tag** (release): `git describe` restituisce il tag puro → `x.y.z`;
+- **fuori da un tag** (dev, branch, build locale): `x.y.z-N-g<sha>` ("N commit dopo la release `x.y.z`, al commit `<sha>`", con suffisso `-dirty` se l'albero di lavoro ha modifiche non committate) — così ogni build mostra una **versione reale e ricostruibile**, mai un placeholder come `0.0.0`.
+
+L'app **espone** questa versione a runtime: `GET /api/health` la riporta (e così il titolo di Swagger e il footer della UI). Una sola formula, calcolata in un solo punto (il Dockerfile), identica per release, dev e locale.
+
+Il **`CHANGELOG.md` non è la fonte: è solo verificato.** Una guardia in `publish.yml` controlla, al push del tag, che il tag coincida con la versione dell'**ultima voce** del `CHANGELOG.md`; se divergono la pubblicazione fallisce (impedisce il drift "taggo prima di aver finalizzato il changelog"). `WEA_VERSION` nel `.env` è cosa diversa ancora: è la **scelta dell'operatore** su quale immagine far girare (il tag da `pull`), non la versione del prodotto.
+
+> Note di build: `git describe` richiede la storia git nel contesto — `.git/` è incluso nel build context (non in `.dockerignore`) e i workflow fanno `fetch-depth: 0` (il checkout di default è shallow e senza tag). `git` è installato solo nello **stage di build** (multi-stage): l'immagine finale contiene solo la stringa di versione, non `.git`.
+
 ### Tag e release (manuali)
 
 Il tag `x.y.z` (SemVer puro, **senza prefisso `v`**) lo crea **l'owner a mano**, quando decide che è il momento di una release: **nessun workflow di auto-tag**. Il push del tag su GitHub innesca `publish.yml` (build+push delle immagini versionate su GHCR). Implementato in fase 0 (0.T9).
 
 - I tag **non sono per-PR**: l'owner ne crea **quando vuole**; le versioni intermedie (per-PR) vivono solo nel CHANGELOG, senza tag — così il repo non si riempie di tag.
 - **Procedura di release**: il tag lo crea l'owner **dalla UI di GitHub** (pubblicando una release con le sue note) **o da CLI** (`git tag x.y.z && git push origin x.y.z`); il push del tag fa partire `publish.yml` che builda e pusha le immagini versionate. Il **deploy kit non è allegato alla release** — vive nel repo e l'utente lo scarica al tag della versione ([deployment](deployment.md)). Non essendoci asset sulla release, le *immutable releases* di GitHub non impongono nulla: la release si può creare liberamente dalla UI.
-- La versione del tag è quella dell'ultima voce di `CHANGELOG.md` da pubblicare; può alzare MINOR/MAJOR quando la milestone lo merita (es. 0.1.0 alla fase 7, 1.0.0 alla 12).
+- La versione del tag è quella dell'ultima voce di `CHANGELOG.md` da pubblicare; può alzare MINOR/MAJOR quando la milestone lo merita (es. 0.1.0 alla fase 7, 1.0.0 alla 12). **`publish.yml` verifica** che il tag coincida con quella voce e fallisce in caso di drift (vedi *Fonte unica della versione*).
 - **Distinta** da: il `version` del manifest di un plugin (informativo, per-plugin) e l'`api_version` (intero, gate di compatibilità del contratto plugin) — entrambi ortogonali alla versione del prodotto.
 
 ## Note

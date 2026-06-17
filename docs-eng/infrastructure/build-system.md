@@ -35,6 +35,7 @@ The **published images** are **two** — `watch-em-all` (the app: `web` and `wor
 - **One app image for `web` and `worker`** (`packages/app/`): they share the same codebase and the same plugins — they are **one application with two roles**, not two components. The role is selected by the **start command** (`command: ["web"]` / `["worker"]`) through an entrypoint that dispatches; this way a **single artifact** is built and versioned instead of two near-identical ones. `ops` stays separate because it has a different base (`postgres:16`).
 - The image build context is the **repository root**: `docker build -f packages/app/Dockerfile .`. The Dockerfiles are **multi-stage from day one** (INF-5) and self-contained.
 - Stack (fixed at major versions on day one — new project, no migration debt): backend Python 3.12+, Poetry, FastAPI; frontend Node 22 LTS, SvelteKit 2. The build tooling (single root `pyproject.toml`, the unified Vite build, the plugin registry) lands with the first code (phase 1) and is documented here as it arrives.
+- The product **version** has a single source of truth in the **git tag**: it is not hand-written in any versioned file (`pyproject.toml`/`package.json` keep an inert placeholder `version`), but computed at build from `git describe` and baked into the image, exposed on `/api/health` ([ci](ci.md#single-source-of-truth-for-the-version)).
 
 ## Phase 0 — stub containers
 
