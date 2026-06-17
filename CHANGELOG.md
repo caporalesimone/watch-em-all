@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images on GHCR); the GitHub release is then created on that tag (no assets — the deploy kit lives in the repo). Intermediate per-PR versions live only in this file.
 
+## [0.0.23] - 2026-06-17
+
+### Docs
+
+- **Phase 1 verified in the real stack (WSL)**; the `phase-01` MVP checkboxes and the met DoD items are ticked. `docker compose up --build` → all containers up, `/api/health` 200 reporting the git-described version (`0.0.16-7-g…`); login → the forced password-change gate (403 `must_change_password`) → change-password → re-login → `/api/me` 200; refresh rotation then reuse → 401 `refresh_reuse`; bad credentials → 401 `invalid_credentials`; the SPA served at `/` with a client-side-routing fallback; Swagger at `/api/docs`. Ops verified live: `backup.sh`/`export.sh` write archives, `restore.sh` refuses while web/worker are connected, and stop → restore → up restores an identical install (login works after). Still open for phase close: pull-based release (INF-17), green CI on `main`, the English DOC-12 translation
+
 ## [0.0.22] - 2026-06-17
 
 ### Added
