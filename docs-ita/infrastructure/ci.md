@@ -53,16 +53,16 @@ Il prodotto segue **SemVer** (`MAJOR.MINOR.PATCH`) con una **versione unica per 
 
 ### Fonte unica della versione (source of truth)
 
-La versione del prodotto ha **un'unica source of truth: il tag git**. Non è scritta a mano in alcun file versionato — `pyproject.toml` e `package.json` tengono un `version` **placeholder inerte** (non pubblichiamo pacchetti su PyPI/npm): la versione reale è **calcolata in build** da `git describe --tags --always --dirty` e **cucinata nell'immagine** (file `/app/VERSION`). Quindi:
+La versione del prodotto ha **un'unica source of truth: il tag git**. Non è scritta a mano in alcun file versionato — `pyproject.toml` e `package.json` tengono un `version` **placeholder inerte** (non pubblichiamo pacchetti su PyPI/npm): la versione reale è **calcolata in build** da `git describe --tags --always` e **cucinata nell'immagine** (file `/app/VERSION`). Quindi:
 
 - **su un tag** (release): `git describe` restituisce il tag puro → `x.y.z`;
-- **fuori da un tag** (dev, branch, build locale): `x.y.z-N-g<sha>` ("N commit dopo la release `x.y.z`, al commit `<sha>`", con suffisso `-dirty` se l'albero di lavoro ha modifiche non committate) — così ogni build mostra una **versione reale e ricostruibile**, mai un placeholder come `0.0.0`.
+- **fuori da un tag** (dev, branch, build locale): `x.y.z-N-g<sha>` ("N commit dopo la release `x.y.z`, al commit `<sha>`") — così ogni build mostra una **versione reale e ricostruibile**, mai un placeholder come `0.0.0`.
 
 L'app **espone** questa versione a runtime: `GET /api/health` la riporta (e così il titolo di Swagger e il footer della UI). Una sola formula, calcolata in un solo punto (il Dockerfile), identica per release, dev e locale.
 
 Il **`CHANGELOG.md` non è la fonte: è solo verificato.** Una guardia in `publish.yml` controlla, al push del tag, che il tag coincida con la versione dell'**ultima voce** del `CHANGELOG.md`; se divergono la pubblicazione fallisce (impedisce il drift "taggo prima di aver finalizzato il changelog"). `WEA_VERSION` nel `.env` è cosa diversa ancora: è la **scelta dell'operatore** su quale immagine far girare (il tag da `pull`), non la versione del prodotto.
 
-> Note di build: `git describe` richiede la storia git nel contesto — `.git/` è incluso nel build context (non in `.dockerignore`) e i workflow fanno `fetch-depth: 0` (il checkout di default è shallow e senza tag). `git` è installato solo nello **stage di build** (multi-stage): l'immagine finale contiene solo la stringa di versione, non `.git`.
+> Note di build: `git describe` richiede la storia git nel contesto — `.git/` è incluso nel build context (non in `.dockerignore`) e i workflow fanno `fetch-depth: 0` (il checkout di default è shallow e senza tag). `git` è installato solo nello **stage di build** (multi-stage): l'immagine finale contiene solo la stringa di versione, non `.git`. `--dirty` è omesso di proposito: il build context è una copia filtrata dell'albero (esclude cartelle tracciate come `docs/`), quindi un flag "dirty" sul working tree non avrebbe senso — `describe` legge solo i ref di `.git`, senza working tree.
 
 ### Tag e release (manuali)
 

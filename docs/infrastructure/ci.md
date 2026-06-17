@@ -42,16 +42,16 @@ The product follows **SemVer** (`MAJOR.MINOR.PATCH`) with a **single version for
 
 ### Single source of truth for the version
 
-The product version has **one source of truth: the git tag**. It is not written by hand in any versioned file — `pyproject.toml` and `package.json` keep an **inert placeholder** `version` (we do not publish PyPI/npm packages): the real version is **computed at build** from `git describe --tags --always --dirty` and **baked into the image** (`/app/VERSION` file). So:
+The product version has **one source of truth: the git tag**. It is not written by hand in any versioned file — `pyproject.toml` and `package.json` keep an **inert placeholder** `version` (we do not publish PyPI/npm packages): the real version is **computed at build** from `git describe --tags --always` and **baked into the image** (`/app/VERSION` file). So:
 
 - **on a tag** (release): `git describe` returns the bare tag → `x.y.z`;
-- **off a tag** (dev, branch, local build): `x.y.z-N-g<sha>` ("N commits past release `x.y.z`, at commit `<sha>`", with a `-dirty` suffix if the working tree has uncommitted changes) — every build shows a **real, reconstructible version**, never a placeholder like `0.0.0`.
+- **off a tag** (dev, branch, local build): `x.y.z-N-g<sha>` ("N commits past release `x.y.z`, at commit `<sha>`") — every build shows a **real, reconstructible version**, never a placeholder like `0.0.0`.
 
 The app **exposes** this version at runtime: `GET /api/health` reports it (and so do the Swagger title and the UI footer). One formula, computed in one place (the Dockerfile), identical for release, dev and local builds.
 
 The **`CHANGELOG.md` is not the source: it is only verified.** A guard in `publish.yml` checks, on tag push, that the tag matches the version of the **top entry** of `CHANGELOG.md`; on a mismatch the publish fails (preventing the "I tagged before finalizing the changelog" drift). `WEA_VERSION` in `.env` is yet another thing: it is the **operator's choice** of which image to run (the tag to `pull`), not the product version.
 
-> Build notes: `git describe` needs the git history in the context — `.git/` is included in the build context (not in `.dockerignore`) and the workflows use `fetch-depth: 0` (the default checkout is shallow and without tags). `git` is installed only in the **build stage** (multi-stage): the final image carries only the version string, not `.git`.
+> Build notes: `git describe` needs the git history in the context — `.git/` is included in the build context (not in `.dockerignore`) and the workflows use `fetch-depth: 0` (the default checkout is shallow and without tags). `git` is installed only in the **build stage** (multi-stage): the final image carries only the version string, not `.git`. `--dirty` is intentionally omitted: the build context is a filtered copy of the tree (it excludes tracked dirs like `docs/`), so a working-tree dirty flag would be meaningless — `describe` reads `.git` refs only, no working tree needed.
 
 ### Tags and releases (manual)
 

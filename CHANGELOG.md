@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images on GHCR); the GitHub release is then created on that tag (no assets — the deploy kit lives in the repo). Intermediate per-PR versions live only in this file.
 
+## [0.0.20] - 2026-06-17
+
+### Added
+
+- **Product version baked from the git tag (1.T4)**: the app image derives its version in the build stage via `git describe --tags --always` (git installed there only; `.git` kept in the build context) and bakes it to `/app/VERSION` — a bare `x.y.z` on a tag, `x.y.z-N-g<sha>` off a tag, never a `0.0.0` placeholder. The phase-0 stub `web` server reads it and reports it on `GET /api/health` (`version` field) so the plumbing is verifiable before the real app (1.B1/1.B2). `--dirty` is omitted on purpose (the build context is a filtered copy of the tree, so a working-tree dirty flag would be meaningless)
+- **`publish.yml` version-guard**: on a tag push, a job verifies the tag matches the top `CHANGELOG.md` entry and fails the publish on drift (the CHANGELOG is verified, not the source). The image build's checkout uses `fetch-depth: 0` so `git describe` sees the full history and tags; the CI dev-image build does the same
+
+### Changed
+
+- `.dockerignore` no longer ignores `.git/` — the in-image `git describe` needs the repo history in the build context (it stays in the build stage only; the final image carries just the version string)
+
 ## [0.0.19] - 2026-06-17
 
 ### Changed
@@ -14,7 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Docs
 
-- **Version source of truth decided (phase 1, 1.T4)**: the product version's single source of truth is the **git tag**, computed at build from `git describe --tags --always --dirty` and baked into the image (`/app/VERSION`) — a bare `x.y.z` on a tag, `x.y.z-N-g<sha>` off a tag (never a `0.0.0` placeholder) — and exposed on `GET /api/health`. `CHANGELOG.md` is **only verified** (a `publish.yml` guard checks the tag matches the top entry), not the source; `pyproject.toml`/`package.json` keep an inert placeholder `version`. Documented across `ci.md` (new *Single source of truth for the version* section, IT + `docs-eng` mirror), `configuration.md`, `build-system.md` (IT + mirror), `INF-19`, and `phase-01` (1.B1/1.B2 + new transversal 1.T4)
+- **Version source of truth decided (phase 1, 1.T4)**: the product version's single source of truth is the **git tag**, computed at build from `git describe --tags --always` and baked into the image (`/app/VERSION`) — a bare `x.y.z` on a tag, `x.y.z-N-g<sha>` off a tag (never a `0.0.0` placeholder) — and exposed on `GET /api/health`. `CHANGELOG.md` is **only verified** (a `publish.yml` guard checks the tag matches the top entry), not the source; `pyproject.toml`/`package.json` keep an inert placeholder `version`. Documented across `ci.md` (new *Single source of truth for the version* section, IT + `docs-eng` mirror), `configuration.md`, `build-system.md` (IT + mirror), `INF-19`, and `phase-01` (1.B1/1.B2 + new transversal 1.T4)
 
 ## [0.0.17] - 2026-06-16
 

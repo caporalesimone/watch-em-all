@@ -46,6 +46,8 @@ jobs:
           - { image: watch-em-all-ops, dockerfile: packages/ops/Dockerfile }
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # full history + tags so `git describe` (in the image build) bakes the real version (1.T4)
       - uses: docker/setup-buildx-action@v4
       - name: Compute dev tag and owner
         id: meta
