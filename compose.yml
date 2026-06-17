@@ -14,6 +14,10 @@
 # in Compose v2); images pinned via WEA_VERSION in .env (never `latest`, INF-1);
 # log rotation everywhere (INF-2).
 
+# Fixed Compose project name → predictable, and distinct from the development
+# stack (compose-dev.yml uses `watch-em-all-dev`), so their volumes never clash.
+name: watch-em-all
+
 services:
   db:
     image: postgres:16
@@ -22,6 +26,12 @@ services:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
       POSTGRES_DB: "${POSTGRES_DB}"
     volumes: ["pgdata:/var/lib/postgresql/data"]
+    # The database lives in a Docker-managed named volume (above) — recommended.
+    # To keep it in a LOCAL folder instead, replace the line above with a bind
+    # mount AND remove the top-level `volumes:` block at the end of this file:
+    #   volumes: ["./pgdata:/var/lib/postgresql/data"]
+    # Use a native Linux path (not a Windows/WSL mount like /mnt/c): Postgres on a
+    # 9p mount can hit permission/performance issues. The folder is created on first run.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s

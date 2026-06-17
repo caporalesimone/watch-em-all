@@ -15,6 +15,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Product version on the login page** too (small line under the form), fetched from `GET /api/health` — alongside the version already shown in the sidebar.
 - **`docs/updates/phase-02.md`**: the phase-2 companion doc, including the browser command to preview the Italian translation (`localStorage.setItem('wea_lang','it')` + reload).
 
+### Changed
+
+- **Dev and release stacks no longer share a database volume.** Distinct Compose project names — `compose-dev.yml` → `watch-em-all-dev`, `compose.yml` → `watch-em-all` — so each gets its own named volume regardless of the folder it runs from. `compose.yml` also documents (commented) how to switch the DB to a local bind mount if preferred.
+
 ## [0.1.0] - 2026-06-17
 
 **Phase 1 — Foundations.** The live skeleton: the real application, authentication and the SPA shell replace the phase-0 stubs. (Developed as a single batch on `main`; this entry consolidates the whole phase.)
