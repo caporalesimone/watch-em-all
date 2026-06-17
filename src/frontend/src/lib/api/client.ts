@@ -1,0 +1,109 @@
+// Typed API client (FE-4): the only place that builds requests; goes through the
+// Auth Manager so no component touches a token. Errors surface as ApiErr carrying
+// the backend {detail, code} envelope.
+import { apiFetch, clearTokens, setTokens } from '$lib/auth/manager';
+
+export interface Me {
+	id: number;
+	username: string;
+	first_name: string;
+	last_name: string;
+	role: string;
+	locale: string;
+	must_change_password: boolean;
+}
+
+interface TokenPair {
+	access_token: string;
+	refresh_token: string;
+	expires_at: string;
+}
+
+export interface Health {
+	status: string;
+	db: string;
+	version: string;
+	worker_heartbeat_age_s: number | null;
+}
+
+// Public endpoint; returns its body on 200 and 503 alike (we only want `version`).
+export async function getHealth(): Promise<Health> {
+	const res = await fetch('/api/health');
+	return (await res.json()) as Health;
+}
+
+export class ApiErr extends Error {
+	constructor(
+		readonly status: number,
+		readonly code: string,
+		readonly detail: string
+	) {
+		super(detail);
+		this.name = 'ApiErr';
+	}
+}
+
+async function fail(res: Response): Promise<never> {
+	let code = 'error';
+	let detail = res.statusText;
+	try {
+		const body = (await res.json()) as { detail?: string; code?: string };
+		if (body.code) code = body.code;
+		if (body.detail) detail = body.detail;
+	} catch {
+		/* non-JSON error body */
+	}
+	throw new ApiErr(res.status, code, detail);
+}
+
+async function asJson<T>(res: Response): Promise<T> {
+	if (!res.ok) return fail(res);
+	return (await res.json()) as T;
+}
+
+async function asEmpty(res: Response): Promise<void> {
+	if (!res.ok) await fail(res);
+}
+
+export async function login(username: string, password: string): Promise<void> {
+	const res = await fetch('/api/auth/login', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ username, password })
+	});
+	setTokens(await asJson<TokenPair>(res));
+}
+
+export async function logout(): Promise<void> {
+	try {
+		await asEmpty(await apiFetch('/api/auth/logout', { method: 'POST' }));
+	} finally {
+		clearTokens();
+	}
+}
+
+export function getMe(): Promise<Me> {
+	return apiFetch('/api/me').then(asJson<Me>);
+}
+
+// oldPassword is required for a normal change and omitted for the forced first
+// change (must_change_password), which the backend accepts without it (auth.md).
+export async function changePassword(newPassword: string, oldPassword?: string): Promise<void> {
+	const payload: Record<string, string> = { new_password: newPassword };
+	if (oldPassword !== undefined) payload.old_password = oldPassword;
+	const res = await apiFetch('/api/auth/change-password', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(payload)
+	});
+	await asEmpty(res);
+}
+
+export async function updateLocale(locale: string): Promise<Me> {
+	const res = await apiFetch('/api/me', {
+		method: 'PATCH',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ locale })
+	});
+	return asJson<Me>(res);
+}

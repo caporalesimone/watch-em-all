@@ -1,0 +1,22 @@
+@import 'tailwindcss';
+
+/* Class-based dark mode (FE-9): `.dark` on <html> enables the dark variant. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+	color-scheme: light dark;
+}
+
+html {
+	/* standard property alongside Tailwind preflight's -webkit-text-size-adjust */
+	text-size-adjust: 100%;
+}
+
+html,
+body {
+	height: 100%;
+}
+
+body {
+	@apply bg-white text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+}

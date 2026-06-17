@@ -4,11 +4,15 @@ name: Publish
 # is wanted — build and push the two versioned images to GHCR. Tags are plain SemVer,
 # no `v` prefix; there is no auto-tag workflow.
 #
+# Phase 1 (1.T4): the product version's single source of truth is the git tag. The
+# image build derives it with `git describe` (so checkout needs the full history +
+# tags: fetch-depth 0), and a version-guard verifies the tag matches the top
+# CHANGELOG entry (the CHANGELOG is verified, not the source).
+#
 # The deploy kit (compose.yml + .env.example) is NOT attached as a release asset: it
 # lives in the repo and users fetch it from there (README install / deployment.md).
 # So this workflow only builds the images; the GitHub release itself, with its notes,
-# is created by the owner (GitHub UI or CLI) — no assets, so GitHub's immutable
-# releases impose no special handling here.
+# is created by the owner (GitHub UI or CLI).
 
 on:
   push:
@@ -19,7 +23,26 @@ permissions:
   packages: write
 
 jobs:
+  version-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Tag must match the top CHANGELOG entry (1.T4, INF-19)
+        run: |
+          top="$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)"
+          echo "tag=${GITHUB_REF_NAME}  changelog-top=${top:-<none>}"
+          if [ -z "$top" ]; then
+            echo "::error::Could not parse the top version from CHANGELOG.md."
+            exit 1
+          fi
+          if [ "$top" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match the top CHANGELOG entry ${top}. The CHANGELOG is verified, not the source (ci.md) — finalize CHANGELOG.md before tagging."
+            exit 1
+          fi
+          echo "Tag matches the top CHANGELOG entry."
+
   images:
+    needs: version-guard
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -29,6 +52,8 @@ jobs:
           - { image: watch-em-all-ops, dockerfile: packages/ops/Dockerfile }
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # full history + tags so `git describe` (in the image build) yields the real version
       - uses: docker/setup-buildx-action@v4
       - name: Compute owner (lowercase for GHCR)
         id: meta

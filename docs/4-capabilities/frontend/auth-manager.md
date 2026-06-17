@@ -1,65 +1,39 @@
 # Frontend — Auth Manager
 
-> **Layer 4 — Capability** · Audience: developer · Pseudocodice ammesso. Backend: [auth](../core/auth.md).
+> **Layer 4 — Capability** · Audience: developer.
+>
+> English translation of the Italian reference [`docs-ita/4-capabilities/frontend/auth-manager.md`](../../../docs-ita/4-capabilities/frontend/auth-manager.md), limited to what is implemented (DOC-12). Delivered in phase 1 (`src/frontend/src/lib/auth/`).
 
-## Scopo
+## Purpose
 
-Unico modulo del frontend che conosce i token: cache, header automatico, refresh con retry, logout. UI e domain layer non vedono mai un token.
+The only frontend module that knows about tokens: cache, automatic header, refresh with retry, logout. UI and domain code never see a token (FE-4).
 
-```mermaid
-flowchart TD
-    REQ[richiesta API] --> B[allega Bearer access]
-    B --> R{risposta}
-    R -->|≠ 401| OK[ritorna]
-    R -->|401| SF{refresh già in volo?}
-    SF -->|sì| WAIT[attendi quello in corso]
-    SF -->|no| DOREF[un solo refresh → nuova coppia ruotata]
-    WAIT --> RETRY[riprova UNA volta]
-    DOREF --> RETRY
-    DOREF -->|fallito| LOGOUT[pulisci token + redirect login]
-    RETRY --> OK
-```
+## Requirements
 
-## Requisiti
+- **FAUTH-R1** — Holds `access_token` and `refresh_token`. Declared choice (hobby posture): access in memory, refresh in `localStorage` to survive a reload. The XSS risk is accepted: app behind login, no third-party content rendered.
+- **FAUTH-R2** — Adds `Authorization: Bearer <access>` to every request from the API client.
+- **FAUTH-R3** — On `401`: try the refresh and **retry the original request once**. Failed refresh → clear tokens + the guard redirects to login.
+- **FAUTH-R4** — **Single-flight refresh**: one refresh in flight at a time; concurrent 401s await its result and reuse the new pair. Essential with rotation: concurrent refreshes would spend already-invalidated jtis and cause spurious logouts.
+- **FAUTH-R5** — **Proactive refresh** when `expires_at` is near (< 60 s), to avoid the 401 round-trip on the happy path.
+- **FAUTH-R6** — The forced-change flow is driven by `GET /api/me` (which is exempt from the gate and returns `must_change_password`); the route guard sends the user to the forced-change page.
 
-- **FAUTH-R1** — Conserva `access_token` e `refresh_token`. Scelta dichiarata (postura hobby): access in memoria, refresh in `localStorage` per sopravvivere al reload. Il rischio XSS è accettato: app dietro login, nessun contenuto di terzi renderizzato.
-- **FAUTH-R2** — Aggiunge `Authorization: Bearer <access>` a ogni richiesta del client API.
-- **FAUTH-R3** — Su `401`: tenta il refresh e **riesegue una sola volta** la richiesta originale. Refresh fallito → pulizia token + redirect al login.
-- **FAUTH-R4** — **Single-flight sul refresh**: un solo refresh in volo; le richieste concorrenti in 401 attendono il suo esito e riusano la nuova coppia. Indispensabile con la rotazione: refresh concorrenti spenderebbero jti già invalidati causando logout spuri.
-- **FAUTH-R5** — Refresh **proattivo** quando `expires_at` è vicino (es. < 60 s), per evitare il giro 401 sul percorso felice.
-- **FAUTH-R6** — Gestisce il flusso `must_change_password` (403 dedicato → route di cambio password forzato).
-
-## Pseudocodice
+## Shape
 
 ```
-let refreshing: Promise<void> | null = null
+let refreshing: Promise<boolean> | null = null
 
-async function apiFetch(req):
-    attachBearer(req, access)
-    res = await fetch(req)
+async function apiFetch(path, init):
+    if access near expiry: await refreshOnce()       # FAUTH-R5
+    res = await fetch(path, withBearer(init))
     if res.status != 401: return res
-    await refreshOnce()                      # FAUTH-R4
-    attachBearer(req, access)
-    return await fetch(req)                  # un solo retry (FAUTH-R3)
+    ok = await refreshOnce()                          # FAUTH-R4 (single-flight)
+    if not ok: return res
+    return await fetch(path, withBearer(init))        # one retry (FAUTH-R3)
 
-async function refreshOnce():
-    if refreshing: return refreshing         # single-flight
-    refreshing = (async () => {
-        try:
-            r = await POST("/api/auth/refresh", {refresh_token})
-            store(r.access_token, r.refresh_token, r.expires_at)   # coppia RUOTATA
-        catch:
-            clearTokens(); redirect("/login")
-        finally:
-            refreshing = null
-    })()
+function refreshOnce():
+    if not refreshing:
+        refreshing = doRefresh().finally(() => refreshing = null)
     return refreshing
 ```
 
-## Flusso
-
-```
-richiesta A ─┐
-richiesta B ─┼─ 401 → [single-flight] un solo refresh → nuova coppia → retry A, B, C
-richiesta C ─┘                  └─ fallito → logout + redirect login
-```
+`doRefresh()` posts the stored refresh token to `/api/auth/refresh`, stores the rotated pair on success, and clears the tokens on failure. The auth store's boot/sign-in actions then read `GET /api/me` to populate the user and let the guard route.

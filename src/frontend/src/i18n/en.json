@@ -1,0 +1,61 @@
+{
+	"app": {
+		"name": "Watch 'Em All"
+	},
+	"common": {
+		"loading": "Loading…",
+		"save": "Save",
+		"saved": "Saved",
+		"cancel": "Cancel"
+	},
+	"nav": {
+		"dashboard": "Dashboard",
+		"profile": "Profile",
+		"logout": "Log out",
+		"scrapers": "Scrapers"
+	},
+	"theme": {
+		"toggle": "Toggle theme"
+	},
+	"login": {
+		"title": "Sign in",
+		"username": "Username",
+		"password": "Password",
+		"submit": "Sign in"
+	},
+	"changePassword": {
+		"title": "Change your password",
+		"greeting": "Hi {name}, choose a new password to continue.",
+		"hint": "Choose a new password (at least 8 characters).",
+		"current": "Current password",
+		"new": "New password",
+		"confirm": "Confirm new password",
+		"submit": "Change password",
+		"mismatch": "The two passwords do not match.",
+		"done": "Password changed. Please sign in again."
+	},
+	"profile": {
+		"title": "Profile",
+		"account": "Account",
+		"name": "Name",
+		"surname": "Surname",
+		"role": "Role",
+		"language": "Language",
+		"languageValue": "English",
+		"changePassword": "Change password"
+	},
+	"dashboard": {
+		"title": "Dashboard",
+		"welcome": "Welcome, {name}.",
+		"empty": "Your watch-em-all is up and running. Catalog and carts arrive in the next phases."
+	},
+	"errors": {
+		"generic": "Something went wrong. Please try again.",
+		"invalid_credentials": "Invalid username or password.",
+		"account_disabled": "This account can no longer sign in. Contact your administrator.",
+		"rate_limited": "Too many attempts. Please wait a moment and try again.",
+		"invalid_old_password": "The current password is not correct.",
+		"password_unchanged": "The new password must differ from the old one.",
+		"must_change_password": "You must change your password first."
+	}
+}

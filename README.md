@@ -41,19 +41,19 @@ A Linux host (WSL2 or a dedicated server) with **Docker Engine + the Compose plu
 
 ### Installation (pull-based)
 
-The deploy is **pull-based**: the CI publishes the images to GHCR on every release tag, and you never download the sources — only the **deploy kit**, two files kept in the repo: `deploy/compose.yml` (the release compose, image-based) and `.env.example` (secrets template + image version). Fetch them at the release you want (a published `x.y.z` tag):
+The deploy is **pull-based**: the CI publishes the images to GHCR on every release tag, and you never download the sources — only the **deploy kit**, two files kept in the repo: `compose.yml` (the release compose, image-based) and `.env.example` (secrets template + image version). Fetch them at the release you want (a published `x.y.z` tag):
 
 ```bash
 mkdir watchemall && cd watchemall
 VERSION=0.0.16        # the release you want (a published tag)
-curl -LO https://raw.githubusercontent.com/caporalesimone/watch-em-all/$VERSION/deploy/compose.yml
+curl -LO https://raw.githubusercontent.com/caporalesimone/watch-em-all/$VERSION/compose.yml
 curl -LO https://raw.githubusercontent.com/caporalesimone/watch-em-all/$VERSION/.env.example
 cp .env.example .env          # then fill in the values
 docker compose pull
 docker compose up -d
 ```
 
-Fill `.env` before starting: set `WEA_VERSION` to the same release (`$VERSION`; never `latest`), pick strong `POSTGRES_*` values, and set `ADMIN_INITIAL_PASSWORD`. The repository and the GHCR packages are **public**, so both the file download and the image pull are anonymous — no auth. Once up, the app answers on `http://<host>:8080` (in phase 0 this is a placeholder page; the real app arrives in phase 1).
+Fill `.env` before starting: set `WEA_VERSION` to the same release (`$VERSION`; never `latest`), pick strong `POSTGRES_*` values, and set `ADMIN_INITIAL_PASSWORD`. The repository and the GHCR packages are **public**, so both the file download and the image pull are anonymous — no auth. Once up, the app answers on `http://<host>:8080` (the login page; sign in with the admin from your `.env`, then set a new password at the forced first change).
 
 ### Updating
 
@@ -90,7 +90,13 @@ docker compose up -d
 
 ## Development
 
-Development happens entirely inside the [dev container](docs/infrastructure/dev-container.md) — the host only needs Docker.
+Development happens inside the [dev container](docs/infrastructure/dev-container.md) — the host only needs Docker. The dev stack **builds from sources** via `compose-dev.yml` (the default `compose.yml` is the release, image-based one); both read their configuration from the same `.env`:
+
+```bash
+cp .env.example .env                                    # single config source
+docker compose -f compose-dev.yml up -d --build         # db + web + worker
+docker compose -f compose-dev.yml --profile dev up -d   # also Adminer on :8081
+```
 
 ## Releasing (maintainer)
 
@@ -108,8 +114,8 @@ Releases are **manual**, and the order matters: the **tag** triggers the image b
 
 > Create the tag **before** the release, not the other way around. Publishing a release from the UI with a *new* tag would announce the version before its images are built — a brief window where `docker compose pull` fails, or a published release pointing at a build that then failed. Tag → build → release keeps the release pointing only at images that already exist.
 
-The deploy kit (`deploy/compose.yml` + `.env.example`) is **not** attached to the release — it lives in the repo, and users fetch it at the release tag (see [Installation](#installation-pull-based)).
+The deploy kit (`compose.yml` + `.env.example`) is **not** attached to the release — it lives in the repo, and users fetch it at the release tag (see [Installation](#installation-pull-based)).
 
 ## Documentation
 
-The full documentation lives in the [docs/](docs/README.md) folder, organized by layers: business, architecture, features, technical capabilities, API, and plugin development guides. It is written in Italian (source of truth); an English equivalent grows phase by phase under [docs-eng/](docs-eng/).
+The project wiki lives in [docs/](docs/README.md) — **English**, growing phase by phase toward a complete documentation at v1 — organized by layers: business, architecture, features, technical capabilities, API, and plugin development guides. During the transition the **Italian** [docs-ita/](docs-ita/README.md) remains the complete reference (source of truth); once the English `docs/` is complete, `docs-ita/` is retired.

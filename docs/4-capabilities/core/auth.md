@@ -1,82 +1,59 @@
 # Auth / Session
 
-> **Layer 4 — Capability** · Audience: developer · Pseudocodice ammesso. Postura: [security-posture](../../2-architecture/security-posture.md) · Feature admin: [user-management](../../3-features/admin/user-management.md).
+> **Layer 4 — Capability** · Audience: developer.
+>
+> English translation of the Italian reference [`docs-ita/4-capabilities/core/auth.md`](../../../docs-ita/4-capabilities/core/auth.md), limited to what is implemented (DOC-12). Phase 1 ships the full stateless-JWT auth: login/logout, refresh with rotation, the forced first password change and the normal change, the initial-admin bootstrap and the login rate limit.
 
-## Scopo
+## Purpose
 
-Autenticazione JWT stateless con invalidazione leggera, due ruoli, gestione account by-admin. Dimensionata per ≤5 utenti: niente OAuth/SSO/MFA.
+Stateless JWT authentication with lightweight invalidation, two roles, admin-managed accounts. Sized for ≤5 users: no OAuth/SSO/MFA.
 
-La rotazione del refresh è il punto delicato: ogni refresh emette una coppia nuova e invalida la precedente; il riuso di un refresh vecchio è trattato come furto.
+Refresh rotation is the delicate part: every refresh issues a new pair and invalidates the previous one; reusing an old refresh is treated as theft.
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant API as Auth
-    participant DB as users
-    C->>API: POST /refresh {refresh_token}
-    API->>API: verifica firma, exp, typ=refresh
-    API->>DB: jti == refresh_jti? tv == token_version?
-    alt jti combacia
-        API->>DB: nuova coppia, refresh_jti = nuovo jti
-        API-->>C: access + refresh (ruotati)
-    else jti vecchio (riuso sospetto)
-        API->>DB: token_version += 1 (logout globale)
-        API-->>C: 401
-    end
-```
+## Requirements
 
-## Requisiti
+- **AUTH-R1** — `access_token` (15 min) is verified **without the DB** (signature + expiry + type); `refresh_token` (7 days) is verified **against the DB** only on refresh. Lifetimes are configurable from bootstrap.
+- **AUTH-R2** — Token claims: `sub` (user id), `role`, `tv` (token_version), `jti` (refresh only), `mcp` (`must_change_password`, access only), `typ` (`"access"` | `"refresh"`), `exp`. Verification **rejects** a token with the wrong `typ` for the context. The `mcp` claim lets the per-request guard enforce AUTH-R7 **without a DB read**.
+- **AUTH-R3** — HS256 signature with `SECRET_KEY` (≥256 bits of entropy, from `.env`).
+- **AUTH-R4** — **Refresh rotation**: each refresh issues a new pair and persists the new `jti` in `users.refresh_jti`. A refresh is valid only if `jti == users.refresh_jti` **and** `tv == users.token_version`. Reusing an old refresh (jti mismatch) is treated as possible theft: `token_version += 1` (global logout) + a log warning.
+- **AUTH-R5** — **Global invalidation** via `token_version += 1`: logout, password change, password reset, disable. Declared tolerance: an already-issued access token lives up to 15 min.
+- **AUTH-R6** — Login with an in-memory **rate limit** per IP+username (5 attempts/min; 429 over the threshold) and bcrypt password hashing, minimum length 8.
+- **AUTH-R7** — `must_change_password`: set on account creation and reset; while active, functional endpoints answer **403** with a dedicated code and the UI forces the change. **Exempt**: `change-password`, `logout` and **`GET /api/me`** (the last one feeds the SPA boot, which reads the user — including the flag — to route). The **forced first change** appears right after the first login and does **not** require the current password; the **normal change** (from Profile) always requires and verifies it.
+- **AUTH-R8** — No self-registration; accounts are created/managed by the admin. Bootstrap: first boot with no users → initial admin from `.env` with a forced change.
+- **AUTH-R10** — A **disabled / being-deleted** account: logging in with **correct credentials** returns a dedicated code (`account_disabled`); with wrong credentials, a generic error indistinguishable from a missing account (the account state is not enumerable).
 
-- **AUTH-R1** — `access_token` (15 min) verificato **senza DB** (firma + scadenza + tipo); `refresh_token` (7 giorni) verificato **con DB** al solo refresh. Durate configurabili da bootstrap.
-- **AUTH-R2** — Claim dei token: `sub` (user_id), `role`, `tv` (token_version), `jti` (solo refresh), `typ` (`"access"` | `"refresh"`), `exp`. La verifica **rifiuta** un token col `typ` sbagliato per il contesto: un refresh non è spendibile come access.
-- **AUTH-R3** — Firma HS256 con `SECRET_KEY` (≥256 bit di entropia, da `.env`).
-- **AUTH-R4** — **Rotazione del refresh**: a ogni refresh si emette una nuova coppia e si persiste il nuovo `jti` in `users.refresh_jti`. Un refresh è valido solo se `jti == users.refresh_jti` **e** `tv == users.token_version`. Il riuso di un refresh vecchio (jti mismatch) è trattato come possibile furto: `token_version += 1` (logout globale) + warning nel log.
-- **AUTH-R5** — **Invalidazione globale** via `token_version += 1`: logout, cambio password, reset password, disabilitazione. Tolleranza dichiarata: un access già emesso vale fino a 15 min.
-- **AUTH-R6** — Login con **rate limit** in-memory per IP+username (es. 5 tentativi/min, backoff; 429 oltre soglia) e hashing password bcrypt (o argon2), lunghezza minima 8.
-- **AUTH-R10** — Account **disabilitato o in cancellazione** ([user-management](../../3-features/admin/user-management.md), USR-R12): il login con **credenziali corrette** risponde con codice dedicato (`account_disabled`) e la UI mostra "l'accesso non è più possibile, contatta l'amministratore". Con credenziali errate: errore generico, indistinguibile da un account inesistente — lo stato dell'account non è enumerabile.
-- **AUTH-R7** — `must_change_password`: imposto alla creazione account e al reset; finché attivo, ogni endpoint (tranne change-password e logout) risponde 403 con codice dedicato e la UI forza il flusso di cambio.
-- **AUTH-R8** — Nessuna auto-registrazione; account creati/gestiti dall'admin. Bootstrap: primo avvio senza utenti → admin iniziale da `.env` con cambio forzato.
-- **AUTH-R9** — Multi-device: `token_version` è per-utente → logout/invalidation è **globale** (tutti i dispositivi). Dichiarato e accettato.
-
-## Flussi
+## Flows
 
 ```
 POST /api/auth/login {username, password}
-  → verifica hash, rate limit
-  → hash ok ma is_active=false o in cancellazione → 403 {code: "account_disabled"}  # AUTH-R10
-  → hash errato → 401 generico (mai rivelare lo stato dell'account)
-  → access(typ=access, tv) + refresh(typ=refresh, tv, jti=nuovo); users.refresh_jti = jti
-  → users.last_login_at = now()                     # ultimo accesso, mostrato all'admin (USR-R13)
-  → { access_token, refresh_token, expires_at }     # expires_at = scadenza dell'ACCESS
+  → verify hash, rate limit
+  → hash ok but is_active=false / being deleted → 403 {code: "account_disabled"}
+  → wrong hash → generic 401 (never reveal the account state)
+  → access(typ=access, tv, mcp) + refresh(typ=refresh, tv, jti=new); users.refresh_jti = jti
+  → users.last_login_at = now()
+  → { access_token, refresh_token, expires_at }     # expires_at = ACCESS expiry
 
 POST /api/auth/refresh {refresh_token}
-  → verifica firma, exp, typ=refresh, tv == users.token_version, jti == users.refresh_jti
-  → jti mismatch → token_version += 1; 401 (riuso sospetto)
-  → ok → nuova coppia, users.refresh_jti = nuovo jti
+  → verify signature, exp, typ=refresh, tv == users.token_version, jti == users.refresh_jti
+  → jti mismatch → token_version += 1; 401 (suspected reuse)
+  → ok → new pair, users.refresh_jti = new jti
 
 POST /api/auth/logout (Bearer)            → token_version += 1 → 204
-POST /api/auth/change-password (Bearer)   → verifica vecchia, policy, token_version += 1 → 204
+POST /api/auth/change-password (Bearer) {old_password?, new_password}
+  → if must_change_password (forced change): ignore old_password
+  → else (normal change): old_password required + verified, and ≠ new
+  → set hash, must_change_password=false, token_version += 1 → 204
 ```
 
-Verifica per-request (middleware):
+Per-request verification (middleware): decode the bearer, require `typ == "access"`, expose `UserCtx(sub, role)`; no DB read (AUTH-R1). `tv` is not checked here — an access token survives at most 15 min after a logout/disable.
 
-```
-def authenticate(request):
-    t = decode_jwt(bearer(request))          # firma + exp
-    require(t.typ == "access")               # AUTH-R2
-    request.user = UserCtx(t.sub, t.role)    # nessuna lettura DB (AUTH-R1)
-    # nota dichiarata: tv NON è verificato qui — un access sopravvive
-    # max 15 min a logout/disable (security posture)
-```
+## Roles and guards
 
-## Ruoli e guardie
-
-| Guardia | Comportamento |
+| Guard | Behaviour |
 |---|---|
-| `require_user` | qualunque autenticato; le query usano sempre `request.user.id` |
-| `require_admin` | `role == "admin"`; gli endpoint admin non toccano dati operativi utente |
-| Multi-tenancy | ogni query operativa filtra per `user_id` del token: è la barriera non negoziabile |
+| `require_user` | any authenticated user; rejects with 403 while `must_change_password` (the `mcp` claim) |
+| `require_admin` | `role == "admin"` |
 
-## Tabella `users` (campi auth)
+## `users` table (auth fields)
 
-`username` (UNIQUE), `password_hash`, `role`, `is_active`, `locale`, `must_change_password`, `token_version`, `refresh_jti`, `last_login_at` — schema completo in [database/schema.md](../database/schema.md).
+`username` (UNIQUE), `first_name`, `last_name`, `password_hash`, `role`, `is_active`, `locale`, `must_change_password`, `token_version`, `refresh_jti`, `last_login_at` — full schema in [database/schema.md](../database/schema.md).

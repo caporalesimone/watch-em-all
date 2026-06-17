@@ -1,11 +1,15 @@
 # Build context hygiene: images are built from the repo root.
-.git/
+# NOTE: .git/ is intentionally NOT ignored — the app image derives the product
+# version from `git describe` in its build stage (ci.md, 1.T4). It stays in the
+# build stage only (multi-stage); the final image carries just the version string.
 .devcontainer/
 docs/
-docs-eng/
+docs-ita/
 backups/
-deploy/
+compose*.yml
 node_modules/
+src/frontend/.svelte-kit/
+src/frontend/build/
 **/__pycache__/
 .venv/
 .env

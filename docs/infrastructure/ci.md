@@ -1,68 +1,66 @@
 # CI
 
-> **Infrastruttura** · Audience: DevOps, developer.
+> **Infrastructure** · Audience: DevOps, developer.
+>
+> English translation of the Italian reference [`docs-ita/infrastructure/ci.md`](../../docs-ita/infrastructure/ci.md), limited to what is implemented (DOC-12). The pipeline is born minimal in phase 0 and **grows with the flow**: linters and typecheck arrive with the first code (phase 1), contract and integration tests at scale (phase 12). Only the jobs that exist today are described here.
 
-Pipeline minima (GitHub Actions) su ogni push/PR: esegue i tool già scelti dal progetto — la CI non introduce regole nuove, rende reali quelle esistenti.
+## Jobs (phase 0)
 
-## Job
-
-| Job | Comandi | Gate |
+| Job | What it does | Gate |
 |---|---|---|
-| Lint backend | `ruff check .` · `ruff format --check .` | bloccante |
-| Typecheck backend | `mypy` (strict) | bloccante |
-| Test backend | `pytest` (unit + contratto; integrazione con Postgres service) | bloccante |
-| Lint frontend | `eslint` · `prettier --check` · `svelte-check` | bloccante |
-| Build frontend | `npm run build` (include `build:plugins`) | bloccante |
-| Build immagini | build di `watch-em-all` (app) e `watch-em-all-ops`; **su PR** push come `dev-<branch>` (vedi *Immagini dev*) | bloccante |
-| Guardia CHANGELOG | la PR deve aggiornare `CHANGELOG.md` (ogni PR = una versione, INF-19) | bloccante |
+| Build images | builds `watch-em-all` (app) and `watch-em-all-ops`; **on PRs** pushes them as `dev-<branch>` (see *Dev images*) | blocking |
+| CHANGELOG guard | the PR must update `CHANGELOG.md` (one PR = one version, INF-19) | blocking |
 
-La pipeline nasce in **fase 0** del [development flow](../development-flow/phase-00-pipeline.md) (build immagini, guardia CHANGELOG, publish dev e su tag) e **cresce col flusso**: linter e typecheck con il primo codice (fase 1), test di contratto e integrazione a regime (fase 12).
+Policy: `main` is always green; PRs are not merged with red jobs. Process details in [developer-rules](../../docs-ita/developer-rules/README.md).
 
-## Immagini dev (su PR)
+## Dev images (on PRs)
 
-Per **provare il container prima del merge**, un workflow costruisce le immagini a ogni **apertura/aggiornamento di PR** (anche draft) e le pubblica su GHCR con tag **`dev-<branch>`** (nome del branch sanificato), **sovrascritto** a ogni push: punta sempre all'ultima build di quel ramo. Più rami in volo → tag distinti, nessuna collisione.
+To **try the container before merge**, the build job pushes the images to GHCR with the tag **`dev-<branch>`** (sanitized branch name) on every PR open/update (drafts included), **overwritten** on each push: it always points at the latest build of that branch. Several branches in flight → distinct tags, no collision.
 
-- **Branch senza PR**: trigger manuale (`workflow_dispatch` con il branch in input) per generare `dev-<branch>` on-demand.
-- **Niente tag per-commit**: per fissare una build esatta si usa il **digest** (`@sha256:…`), sempre disponibile.
-- Le immagini `dev-*` sono **effimere**: il tag `dev-<branch>` viene **eliminato automaticamente alla chiusura della PR** — merge o abbandono — dal workflow `cleanup-dev-images.yml`, così i package non si riempiono di tag morti. Permanenti solo i tag di release `x.y.z` (mai toccati dalla pulizia).
+- **Branch without a PR**: manual trigger (`workflow_dispatch` with the branch as input) to produce `dev-<branch>` on demand.
+- **No per-commit tags**: to pin an exact build use the **digest** (`@sha256:…`), always available.
+- The `dev-*` images are **ephemeral**: the `dev-<branch>` tag is **deleted automatically when the PR closes** — merge or abandon — by the `cleanup-dev-images.yml` workflow (it also removes the orphan untagged manifest left behind), so the packages do not fill up with dead tags. Only release tags `x.y.z` are permanent (never touched by the cleanup).
 
-Come installare una dev per provarla: [deployment](deployment.md#provare-unimmagine-di-sviluppo).
+How to install a dev image to try it: [deployment](deployment.md#trying-a-dev-image).
 
-## Publish (su tag)
+## Publish (on tag)
 
-Workflow separato, attivato dai **tag `x.y.z`** (SemVer puro, senza prefisso `v`; INF-17): builda le **due** immagini multi-stage e le pubblica su **GHCR**. La **release GitHub** (con le note) la crea **l'owner** (UI o CLI); il **deploy kit non è allegato** alla release — vive nel repo e si scarica da lì ([deployment](deployment.md)).
+A separate workflow, triggered by **`x.y.z` tags** (plain SemVer, no `v` prefix; INF-17): it builds the **two** multi-stage images and pushes them to **GHCR**. The **GitHub release** (with its notes) is created by the **owner** (UI or CLI); the **deploy kit is not attached** to the release — it lives in the repo and is fetched from there ([deployment](deployment.md)).
 
-| Step | Cosa fa |
+| Step | What it does |
 |---|---|
-| Build & push | `watch-em-all` (app: ruoli web+worker) e `watch-em-all-ops` → `ghcr.io/<owner>/…:<tag>` (es. `1.2.0`; mai `latest`, INF-1) |
+| Build & push | `watch-em-all` (app: web+worker roles) and `watch-em-all-ops` → `ghcr.io/<owner>/…:<tag>` (e.g. `1.2.0`; never `latest`, INF-1) |
 
-Il tag è l'unico trigger di pubblicazione delle immagini: `main` verde non pubblica nulla — e il tag lo crea **l'owner a mano**, quando vuole una release (vedi *Tag e release* sotto). I **package GHCR sono pubblici** (come il repo): il pull lato utente è anonimo, nessuna autenticazione.
+The tag is the only publish trigger: a green `main` publishes nothing — and the tag is created **by the owner by hand**, when a release is wanted (see *Tags and releases* below). The GHCR **packages are public** (like the repo): the user-side pull is anonymous, no authentication.
 
-### Versioning del prodotto
+### Product versioning
 
-Il prodotto segue **SemVer** (`MAJOR.MINOR.PATCH`) con una **versione unica per l'intero bundle** (core + plugin first-party, spediti insieme nelle immagini); è la regola INF-19.
+The product follows **SemVer** (`MAJOR.MINOR.PATCH`) with a **single version for the whole bundle** (core + first-party plugins, shipped together in the images); it is rule INF-19.
 
-| Parte | Quando si incrementa |
-|---|---|
-| **MAJOR** | breaking dell'API HTTP pubblica **o** schema DB non puramente additivo (migrazione manuale, DB-R4) |
-| **MINOR** | nuove feature retrocompatibili (tipicamente la chiusura di una fase del [flow](../development-flow/README.md)) |
-| **PATCH** | fix retrocompatibili |
+- `0.x` during development; **every PR** carries a version bump + a `CHANGELOG.md` entry (**1 MVP = 1 PR = 1 version**), but **tags are not per-PR**: the owner creates them by hand when a release is wanted, so the repo does not fill up with tags.
+- `CHANGELOG.md` is updated in the **same PR** (the CI CHANGELOG guard enforces it).
 
-- `0.x` durante lo sviluppo (**0.1** alla chiusura della fase 7, **1.0** alla fase 12 — milestone scelte nella PR che chiude quelle fasi); **ogni PR** porta un bump di versione + voce `CHANGELOG.md` (**1 MVP = 1 PR = 1 versione**), ma **i tag non sono per-PR**: li crea **l'owner a mano** quando vuole una release (vedi sotto), così il repo non si riempie di tag.
-- `CHANGELOG.md` aggiornato nella **stessa PR** (è la guardia CHANGELOG della CI a imporlo).
+### Single source of truth for the version
 
-### Tag e release (manuali)
+The product version has **one source of truth: the git tag**. It is not written by hand in any versioned file — `pyproject.toml` and `package.json` keep an **inert placeholder** `version` (we do not publish PyPI/npm packages): the real version is **computed at build** from `git describe --tags --always` and **baked into the image** (`/app/VERSION` file). So:
 
-Il tag `x.y.z` (SemVer puro, **senza prefisso `v`**) lo crea **l'owner a mano**, quando decide che è il momento di una release: **nessun workflow di auto-tag**. Il push del tag su GitHub innesca `publish.yml` (build+push delle immagini versionate su GHCR). Implementato in fase 0 (0.T9).
+- **on a tag** (release): `git describe` returns the bare tag → `x.y.z`;
+- **off a tag** (dev, branch, local build): `x.y.z-N-g<sha>` ("N commits past release `x.y.z`, at commit `<sha>`") — every build shows a **real, reconstructible version**, never a placeholder like `0.0.0`.
 
-- I tag **non sono per-PR**: l'owner ne crea **quando vuole**; le versioni intermedie (per-PR) vivono solo nel CHANGELOG, senza tag — così il repo non si riempie di tag.
-- **Procedura di release**: il tag lo crea l'owner **dalla UI di GitHub** (pubblicando una release con le sue note) **o da CLI** (`git tag x.y.z && git push origin x.y.z`); il push del tag fa partire `publish.yml` che builda e pusha le immagini versionate. Il **deploy kit non è allegato alla release** — vive nel repo e l'utente lo scarica al tag della versione ([deployment](deployment.md)). Non essendoci asset sulla release, le *immutable releases* di GitHub non impongono nulla: la release si può creare liberamente dalla UI.
-- La versione del tag è quella dell'ultima voce di `CHANGELOG.md` da pubblicare; può alzare MINOR/MAJOR quando la milestone lo merita (es. 0.1.0 alla fase 7, 1.0.0 alla 12).
-- **Distinta** da: il `version` del manifest di un plugin (informativo, per-plugin) e l'`api_version` (intero, gate di compatibilità del contratto plugin) — entrambi ortogonali alla versione del prodotto.
+The app **exposes** this version at runtime: `GET /api/health` reports it (and so do the Swagger title and the UI footer). One formula, computed in one place (the Dockerfile), identical for release, dev and local builds.
 
-## Note
+The **`CHANGELOG.md` is not the source: it is only verified.** A guard in `publish.yml` checks, on tag push, that the tag matches the version of the **top entry** of `CHANGELOG.md`; on a mismatch the publish fails (preventing the "I tagged before finalizing the changelog" drift). `WEA_VERSION` in `.env` is yet another thing: it is the **operator's choice** of which image to run (the tag to `pull`), not the product version.
 
-- Il job di test backend usa un service container Postgres 16: i test di integrazione (catalog delta, alert engine, auth) girano su un DB reale effimero.
-- I test di **contratto dei plugin** ([checklist](../plugin-development/checklist-and-testing.md)) girano per ogni plugin abilitato: uno scraper che rompe le regole dell'`external_id` fallisce la CI, non la produzione.
-- Nessun deploy automatico verso le installazioni: la CI **pubblica** le immagini, l'aggiornamento resta una scelta dell'utente (`WEA_VERSION` nel `.env` + `pull`), coerente con la postura self-hosted.
-- Politica: `main` sempre verde; le PR non si mergiano con job rossi. Dettagli di processo in [developer-rules](../developer-rules/README.md).
+> Build notes: `git describe` needs the git history in the context — `.git/` is included in the build context (not in `.dockerignore`) and the workflows use `fetch-depth: 0` (the default checkout is shallow and without tags). `git` is installed only in the **build stage** (multi-stage): the final image carries only the version string, not `.git`. `--dirty` is intentionally omitted: the build context is a filtered copy of the tree (it excludes tracked dirs like `docs/`), so a working-tree dirty flag would be meaningless — `describe` reads `.git` refs only, no working tree needed.
+
+### Tags and releases (manual)
+
+The `x.y.z` tag (plain SemVer, **no `v` prefix**) is created **by the owner by hand**, when it is time for a release: **no auto-tag workflow**. Pushing the tag to GitHub triggers `publish.yml` (build+push of the versioned images to GHCR). Implemented in phase 0 (0.T9).
+
+- Tags are **not per-PR**: the owner creates them **whenever wanted**; the intermediate (per-PR) versions live only in the CHANGELOG, untagged.
+- **Release procedure**: the owner creates the tag **from the GitHub UI** (by publishing a release with its notes) **or from the CLI** (`git tag x.y.z && git push origin x.y.z`); pushing the tag triggers `publish.yml`, which builds and pushes the versioned images. The **deploy kit is not attached to the release** — it lives in the repo and the user fetches it at the release tag ([deployment](deployment.md)). With no release assets, GitHub's *immutable releases* impose nothing: a release can be created freely from the UI.
+- The tag version is the latest `CHANGELOG.md` entry to publish; it can raise MINOR/MAJOR when the milestone warrants it. **`publish.yml` verifies** the tag matches that entry and fails on drift (see *Single source of truth for the version*).
+
+## Notes
+
+- No automatic deploy to installations: the CI **publishes** the images, updating stays the user's choice (`WEA_VERSION` in `.env` + `pull`), consistent with the self-hosted posture.

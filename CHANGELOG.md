@@ -4,6 +4,29 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images on GHCR); the GitHub release is then created on that tag (no assets — the deploy kit lives in the repo). Intermediate per-PR versions live only in this file.
 
+## [0.1.0] - 2026-06-17
+
+**Phase 1 — Foundations.** The live skeleton: the real application, authentication and the SPA shell replace the phase-0 stubs. (Developed as a single batch on `main`; this entry consolidates the whole phase.)
+
+### Added
+
+- **Backend (FastAPI).** Config loader (1.B1): `config.yaml` + `.env` with `${VAR}` / `${VAR:-default}` interpolation, fail-fast validation, reads the baked product version. `GET /api/health` (1.B2): DB check + product version, Swagger at `/api/docs`, `{detail, code}` error envelope (BE-11). Users + initial-admin bootstrap (1.B3): `users` table with bcrypt hashing and **first/last name**, admin created from the environment with a forced password change. JWT auth (1.B4–1.B6): login/logout, refresh with `jti` rotation and reuse → 401 + global logout, `token_version` invalidation, the `must_change_password` gate (via an `mcp` access claim, no DB read), `account_disabled`, in-memory login rate limit. Profile (1.B7): `GET/PATCH /api/me` (id, username, first/last name, role, locale).
+- **Frontend (SvelteKit 2 / Svelte 5 SPA, 1.F1–1.F5).** Scaffold + svelte-i18n (`en` complete fallback + `it`) + dark/light theme with no flash; Auth Manager (access in memory, refresh in localStorage, single-flight + proactive refresh); login → route guard → protected shell (sidebar + header); forced first password change (no current password) and the normal change (current required), both with a hidden username field for password managers; dashboard greeting by first name; profile showing Username / Name / Surname / Role; the product version shown small under *Log out*. The `web` image builds and serves the SPA (`spa.py`, client-side-routing fallback).
+- **Version source of truth (1.T4).** The git tag: computed at build via `git describe` and baked into the image (`/app/VERSION`), exposed on `/api/health`; `pyproject.toml`/`package.json` keep an inert placeholder. A `publish.yml` guard verifies the tag matches the top CHANGELOG entry (the CHANGELOG is verified, not the source).
+- **CI (1.T1).** `backend-checks` (ruff, `ruff format --check`, `mypy --strict`, pytest) and `frontend-checks` (`prettier --check`, `svelte-check`, build) on every PR.
+- **Ops scripts (1.T2/1.T3).** Real `backup.sh` / `export.sh` / `restore.sh` (custom + plain dumps; restore verifies the archive, refuses while the app is connected, recreates the DB), replacing the phase-0 placeholders.
+- Dev affordance: a `wea_lang` localStorage override to preview the Italian translation (no selector exposed in V1).
+
+### Changed
+
+- **Documentation pivots to English.** `docs/` becomes the English canonical wiki (grows phase by phase; the implemented phase-1 capabilities are written there), `docs-ita/` is the Italian source of truth during the transition (retired at v1). New `docs/updates/` holds per-phase, feature-level summaries with *Good to know* and *Useful Commands* (not linked from the wiki).
+- **Single configuration source; composes at the repo root.** Both composes read `.env` (`env_file`), with no inline defaults — `.env.example` is the single source. `compose.yml` (the default) is the release/image compose; `compose-dev.yml` builds from sources; the `deploy/` folder is removed.
+- `GET /api/me` is exempt from the must-change-password gate (it drives the SPA boot and carries the user's name).
+
+### Fixed
+
+- Frontend polish: svelte-i18n initialised at module load (no "set the initial locale" error); a page `<title>`; form `name` attributes; missing assets return a clean 404 instead of the SPA HTML; `replaceState` guard redirects; no throwaway `GET /api/me` 401 on reload (proactive refresh on boot).
+
 ## [0.0.17] - 2026-06-16
 
 ### Changed

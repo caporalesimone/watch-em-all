@@ -1,0 +1,94 @@
+# Development compose — builds the app image FROM SOURCES (packages/app/Dockerfile,
+# build context = repo root). The release counterpart is compose.yml (the default
+# file, which pulls published images from GHCR). Both read their configuration from
+# .env (single source — copy it from .env.example first); no inline defaults here.
+#
+#   cp .env.example .env
+#   docker compose -f compose-dev.yml up -d --build         # db + web + worker
+#   docker compose -f compose-dev.yml --profile dev up -d   # also adminer on :8081
+#   docker compose -f compose-dev.yml run --rm ops backup.sh
+#
+# web and worker are ONE image (watch-em-all), two roles selected by `command`;
+# only `web` builds it, `worker` reuses the same tag. `ops` is a separate image
+# (postgres:16 + scripts). No `version:` field (deprecated in Compose v2). Log
+# rotation everywhere (INF-2).
+
+services:
+  db:
+    image: postgres:16
+    env_file: [.env]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    logging: &logging
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  web:
+    build: &app-build
+      context: .
+      dockerfile: packages/app/Dockerfile
+    image: watch-em-all:dev
+    command: ["web"]
+    env_file: [.env]            # config from .env (config.yaml interpolation, 1.B1)
+    ports: ["8080:8080"]
+    depends_on:
+      db: { condition: service_healthy }
+    healthcheck:
+      # curl ships in the app image (Dockerfile); -f makes non-2xx exit non-zero.
+      # Same command as the release compose — one healthcheck everywhere.
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging: *logging
+
+  worker:
+    build: *app-build                # same image as web (watch-em-all:dev); built once,
+    image: watch-em-all:dev          # the second build is a cache hit. Both build so a
+    command: ["worker"]              # plain `up --build` never tries to pull this tag.
+    env_file: [.env]                 # same env as web (config.yaml interpolation; stub today)
+    tmpfs:
+      - /tmp                          # heartbeat is ephemeral runtime state: keep it in
+                                      # RAM so the per-tick write never hits the disk
+    depends_on:
+      db: { condition: service_healthy }
+    healthcheck:
+      # Heartbeat: the worker touches this file every tick (CRON-R7); unhealthy if
+      # it goes stale (> 180s). $$ escapes the $ so Compose passes it to the shell.
+      test: ["CMD-SHELL", "test $$(($$(date +%s) - $$(stat -c %Y /tmp/worker-heartbeat))) -lt 180"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    logging: *logging
+
+  ops:
+    build:
+      context: .
+      dockerfile: packages/ops/Dockerfile
+    profiles: [ops]                       # ephemeral: docker compose run --rm ops <script>
+    env_file: [.env]                      # POSTGRES_* for the scripts; they default PGHOST=db
+    volumes:
+      - ./backups:/backups                # archives destination
+    depends_on:
+      db: { condition: service_healthy }
+
+  adminer:
+    image: adminer:4
+    ports: ["8081:8080"]
+    profiles: [dev]                       # browser DB inspection, dev only
+    depends_on:
+      db: { condition: service_healthy }
+    restart: unless-stopped
+
+volumes:
+  pgdata:
