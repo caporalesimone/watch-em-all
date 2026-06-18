@@ -1,0 +1,8 @@
+{
+	"tp_scraper": {
+		"title": "TP Scraper",
+		"blurb": "A throwaway test plugin that proves dynamic discovery, routing, the sidebar entry and its own backend route. It does not scrape anything.",
+		"ping": "Ping the backend route",
+		"error": "Request failed."
+	}
+}

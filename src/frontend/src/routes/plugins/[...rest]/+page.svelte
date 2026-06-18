@@ -3,11 +3,17 @@
 	import { page } from '$app/stores';
 	import { _ } from 'svelte-i18n';
 
+	import { registerPluginMessages, type PluginMessages } from '$lib/i18n';
 	import { mountedPlugins, pluginsReady, type MountedPlugin } from '$lib/stores/plugins';
 
 	// The plugin's frontend entry exports `default { component }` (FDISC-R3).
 	interface PluginEntry {
 		default: { component: Component };
+	}
+
+	// The plugin's i18n entry exports `default { <locale>: messages }`.
+	interface PluginI18n {
+		default: PluginMessages;
 	}
 
 	// Resolve the plugin whose route_base owns the current path (the plugin manages
@@ -21,7 +27,10 @@
 	);
 
 	async function load(plugin: MountedPlugin): Promise<Component> {
-		if (plugin.i18n) await plugin.i18n(); // register the plugin's i18n namespace
+		if (plugin.i18n) {
+			const messages = (await plugin.i18n()) as PluginI18n;
+			registerPluginMessages(messages.default); // core owns svelte-i18n
+		}
 		const module = (await plugin.component()) as PluginEntry;
 		return module.default.component;
 	}

@@ -1,0 +1,15 @@
+{
+	"name": "tp_scraper",
+	"display_name": "TP Scraper",
+	"type": "scraper",
+	"version": "0.1.0",
+	"api_version": 1,
+	"enabled": true,
+	"icon": "frontend/assets/icon.svg",
+	"backend": { "entry": "backend/__init__.py" },
+	"frontend": {
+		"entry": "frontend/index.ts",
+		"route_base": "/plugins/tp-scraper",
+		"i18n": "frontend/i18n"
+	}
+}

@@ -6,7 +6,7 @@
 // set before any component formats a message ($_), otherwise svelte-i18n throws
 // "Cannot format a message without first setting the initial locale". Since the
 // dictionaries are added synchronously, the locale is ready immediately.
-import { addMessages, init, locale, waitLocale } from 'svelte-i18n';
+import { _, addMessages, init, locale, waitLocale } from 'svelte-i18n';
 
 import en from '../../i18n/en.json';
 import it from '../../i18n/it.json';
@@ -33,4 +33,17 @@ export function setupI18n(): Promise<void> {
 	return waitLocale();
 }
 
-export { locale };
+/** A nested message dictionary (leaves are strings). */
+export type MessageTree = { [key: string]: string | MessageTree };
+/** A plugin's i18n payload: locale -> messages. */
+export type PluginMessages = Record<string, MessageTree>;
+
+/** Register a plugin's i18n namespace(s). Plugins live outside this project root,
+ * so they route svelte-i18n through $lib rather than importing the bare dep. */
+export function registerPluginMessages(byLocale: PluginMessages): void {
+	for (const [loc, dict] of Object.entries(byLocale)) addMessages(loc, dict);
+}
+
+// Re-exported so plugin frontends (and core components) format messages via $lib
+// instead of a bare `svelte-i18n` import, which would not resolve from src/plugins.
+export { _, locale };
