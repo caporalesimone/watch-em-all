@@ -22,6 +22,13 @@ Role legend: 🌐 public · 👤 user · 🛡 admin
 | GET | `/api/me` | 👤🛡 | — | `{id, username, first_name, last_name, role, locale, must_change_password}` | exempt from the must_change_password gate (drives the SPA boot) |
 | PATCH | `/api/me` | 👤🛡 | `{locale?}` | 200 | V1 English-only: the only accepted value is `en` |
 
+## Admin — users — [user-management](../3-features/admin/user-management.md)
+
+| Method | Path | Role | Body | Notes |
+|---|---|---|---|---|
+| POST | `/api/admin/users` | 🛡 | `{username, first_name, last_name, role, temp_password}` | creates an account with a forced first-login password change; duplicate username → 409 (USR-R1/R2/R15) |
+| GET | `/api/admin/users` | 🛡 | — | lists all accounts (username, name, role, status, last login) |
+
 ## Plugin discovery — [plugin-registry](../4-capabilities/core/plugin-registry.md)
 
 | Method | Path | Role | Response | Notes |

@@ -63,3 +63,12 @@ When the user is authed, the shell fetches `GET /api/plugins` and reconciles it 
 - bundle/runtime mismatches are surfaced in the console (never a broken page).
 
 See [plugin-discovery](plugin-discovery.md) for the full contract.
+
+## Roles — the split shell (user-management MVP)
+
+Roles don't overlap ([personas-and-roles](../../1-business/personas-and-roles.md)), so the shell branches on `me.role`:
+
+- **admin** → the admin area. Today: a **Users** page (`/admin/users`, create + list). The admin lands here and never sees the user dashboard or the SCRAPERS group.
+- **user** → the user area (dashboard + SCRAPERS, and the feature pages as they arrive).
+
+Profile and Log out are common. The route guard sends an admin away from `/` to `/admin/users` and keeps a standard user out of `/admin/*`; plugin discovery loads only for users. See [user-management](../../3-features/admin/user-management.md).

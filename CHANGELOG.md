@@ -4,9 +4,22 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images on GHCR); the GitHub release is then created on that tag (no assets — the deploy kit lives in the repo). Intermediate per-PR versions live only in this file.
 
+## [0.3.0] - 2026-06-18
+
+**User management (MVP)** — a small slice pulled forward from phase 10, before the catalog phase, so a standard `user` account can exist and be used to test the coming features. Roles don't overlap (personas-and-roles.md): an admin governs the system and never owns a personal catalog/cart; whoever wants to monitor prices uses a separate `user` account.
+
+### Added
+
+- **Admin user management — create + list.** `POST /api/admin/users` creates an account (username, first/last name, role, temporary password) with a forced first-login password change (USR-R1/R2/R15); `GET /api/admin/users` lists accounts. Admin-only; duplicate username → 409; no self-registration.
+- **Role-based shell.** The SPA now splits by role: an admin lands in the admin area (a **Users** page with a create form + list) and never sees the user dashboard or the SCRAPERS group; a standard user sees the user area. Profile and Log out are common; the route guard keeps each role in its lane and plugin discovery loads only for users.
+
+### Deferred to phase 10
+
+- The richer account lifecycle: reset password, disable/enable, deferred soft-delete (grace period + restore), status filters, last-login sort, courtesy notifications, and the per-user load dashboard.
+
 ## [0.2.0] - 2026-06-18
 
-**Phase 2 — Plugin system** (in progress). Opens with post-0.1.0 polish; phase-2 features are added here as they ship.
+**Phase 2 — Plugin system.** Opened with post-0.1.0 polish; the plugin-system backbone is below.
 
 ### Fixed
 

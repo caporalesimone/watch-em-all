@@ -18,10 +18,12 @@
 
 - [x] **Fase 0 — Pipeline e processo** → [phase-00-pipeline.md](phase-00-pipeline.md)
   *Risultato: container (stub), workflow GitHub, immagine dev sul branch, release sul tag: il processo è rodato end-to-end prima di qualsiasi codice di prodotto. Chiusa, rodata su `0.0.16`.*
-- [ ] **Fase 1 — Fondamenta** → [phase-01-foundations.md](phase-01-foundations.md)
+- [x] **Fase 1 — Fondamenta** → [phase-01-foundations.md](phase-01-foundations.md) — rilasciata `0.1.0`
   *Risultato: l'app parte con Docker, si fa login, la shell c'è.*
-- [ ] **Fase 2 — Plugin system** → [phase-02-plugin-system.md](phase-02-plugin-system.md)
+- [x] **Fase 2 — Plugin system** → [phase-02-plugin-system.md](phase-02-plugin-system.md) — rilasciata `0.2.0`
   *Risultato: un plugin demo appare da solo in sidebar con la sua pagina.*
+- [ ] **Gestione utenti (MVP)** — *fetta anticipata dalla [Fase 10](#) prima della Fase 3* ([user-management](../3-features/admin/user-management.md)), versione `0.3.0`. Serve un account `user` per provare le fasi seguenti: i ruoli **non si sovrappongono** (l'admin governa, non possiede carrelli; chi monitora usa un account `user`). Scope minimo: l'admin **crea** ed **elenca** gli utenti + shell **sdoppiato per ruolo**. Rimandato alla Fase 10: reset/disabilita/cancellazione differita/filtri/notifiche.
+  *Risultato: l'admin crea un utente standard e ci si logga come `user`.*
 - [ ] **Fase 3 — Catalogo e primo scrape** → [phase-03-catalog-first-scrape.md](phase-03-catalog-first-scrape.md)
   *Risultato: prodotti reali di Dragon Store nel Product Picker.*
 - [ ] **Fase 4 — Worker e scheduling** → [phase-04-worker-scheduling.md](phase-04-worker-scheduling.md)
@@ -37,7 +39,7 @@
 - [ ] **Fase 9 — Dragon Store completo** → [phase-09-dragonstore-complete.md](phase-09-dragonstore-complete.md)
   *Risultato: monitoraggio per categorie, dry-run dalla UI, catalogo gestibile.*
 - [ ] **Fase 10 — Governo admin** → [phase-10-admin-governance.md](phase-10-admin-governance.md)
-  *Risultato: plancia admin completa — statistiche, limiti, utenti, manutenzione.*
+  *Risultato: plancia admin completa — statistiche, limiti, utenti, manutenzione. (Creazione/elenco utenti **anticipati** come MVP prima della Fase 3; qui restano reset password, disabilita/riabilita, cancellazione differita + restore, filtri di stato, ultimo accesso, notifiche di cortesia, dashboard del carico.)*
 - [ ] **Fase 11 — Summary, analisi prezzi, export** → [phase-11-insights.md](phase-11-insights.md)
   *Risultato: report periodico, badge minimo storico e convenienza, export dei dati.*
 - [ ] **Fase 12 — Rifinitura e 1.0** → [phase-12-polish-v1.md](phase-12-polish-v1.md)
