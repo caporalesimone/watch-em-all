@@ -12,6 +12,15 @@ The **plugin system backbone**: plugins are self-contained folders that the app 
 - Set `"enabled": false` in a manifest and rebuild → the plugin disappears everywhere (sidebar, API, bundle). A broken plugin is rejected on its own: it is logged and skipped, the app and the other plugins keep running.
 - Shipped for this phase: **TP Scraper** (a page with a button that pings its own backend route) and **TP Notifier** (backend-only). They are throwaway test plugins — they don't scrape or send — and will be removed when real plugins land.
 
+## API & Swagger
+
+The HTTP API is documented interactively at **<http://localhost:8080/api/docs>** (Swagger UI — ReDoc at `/api/redoc`, raw schema at `/api/openapi.json`). Every endpoint carries a one-line summary of what it does.
+
+- **Everything is behind authentication**, except (by necessity) `GET /api/health`, `POST /api/auth/login` and `/api/auth/refresh`, and the plugin icon (`/api/plugin-assets/...`, loaded by the browser as an `<img>`, which cannot carry the bearer token).
+- **Authorize in Swagger:** call `POST /api/auth/login` (`admin` + your password) to get an `access_token`, then click **🔓 Authorize** (top-right), paste **just the token** (no `Bearer ` prefix), *Authorize* → *Close*. Every "Try it out" then carries it automatically.
+- The access token lasts ~15 minutes; when it expires you get `401` — log in again or call `POST /api/auth/refresh` with your refresh token.
+- Plugin routes appear under the **`Plugin: <name>`** tag (e.g. the TP Scraper's `GET /api/plugins/tp-scraper/ping`); the version link in the sidebar opens this page in a new tab.
+
 ## Good to know
 
 - Carries over from phase 1: `admin` is the default initial user (from `.env`), forced password change on first login, dark/light theme, version shown on the login page and in the sidebar.
