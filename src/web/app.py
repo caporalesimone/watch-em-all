@@ -13,15 +13,14 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI
 
 from src.core.bootstrap import ensure_initial_admin
 from src.core.config import get_settings
 from src.core.db import create_schema, init_engine, new_session
-from src.core.errors import APIError
-from src.web.routers import auth, health, me
+from src.core.plugins.registry import load_plugins
+from src.web.error_handlers import register_error_handlers
+from src.web.routers import auth, health, me, plugins
 from src.web.spa import SpaStaticFiles
 
 logging.basicConfig(level=logging.INFO)
@@ -48,6 +47,9 @@ def create_app() -> FastAPI:
             )
         finally:
             session.close()
+        # Discover, load and mount the enabled plugins (REG-*). Isolated failures
+        # are logged; the core stays up. Stored for the discovery endpoint.
+        _app.state.loaded_plugins = load_plugins(_app)
         log.info("web app started, version %s", settings.version)
         yield
 
@@ -60,25 +62,12 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    @app.exception_handler(APIError)
-    async def _api_error_handler(_request: Request, exc: APIError) -> JSONResponse:
-        return JSONResponse(
-            status_code=exc.status_code, content={"detail": exc.detail, "code": exc.code}
-        )
-
-    @app.exception_handler(RequestValidationError)
-    async def _validation_error_handler(
-        _request: Request, _exc: RequestValidationError
-    ) -> JSONResponse:
-        # api/README: validation errors are 400 with the {detail, code} envelope.
-        return JSONResponse(
-            status_code=400,
-            content={"detail": "request validation failed", "code": "validation_error"},
-        )
+    register_error_handlers(app)
 
     app.include_router(health.router, prefix="/api")
     app.include_router(auth.router, prefix="/api/auth")
     app.include_router(me.router, prefix="/api")
+    app.include_router(plugins.router, prefix="/api")
 
     # Serve the built SPA last (catch-all) so /api routes take precedence.
     if STATIC_DIR.is_dir():

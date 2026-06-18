@@ -50,6 +50,7 @@ class LoadedPlugin:
 
     manifest: Manifest
     plugin: BasePlugin
+    directory: Path  # the plugin's folder on disk (to resolve its icon asset)
 
 
 def load_plugins(
@@ -109,7 +110,7 @@ def _load_one(
     plugin.initialize(context_builder(manifest, plugin))
     _mount_router(app, manifest, plugin)
     names.add(manifest.name)
-    loaded.append(LoadedPlugin(manifest=manifest, plugin=plugin))
+    loaded.append(LoadedPlugin(manifest=manifest, plugin=plugin, directory=plugin_dir))
     log.info("plugin %s loaded (%s)", manifest.name, manifest.type)
 
 
