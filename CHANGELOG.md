@@ -14,6 +14,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- **Plugin system — the dynamic backbone (phase 2).** Plugins are auto-discovered full-stack folders under `src/plugins/{scrapers,notifiers}/<name>/`, each described by a declarative `manifest.json`.
+  - *Backend:* a manifest parser with validation (type ↔ folder, `api_version`, snake_case `name`, kebab `route_base`); a registry that loads the enabled plugins with **per-plugin failure isolation** (a broken plugin is rejected and logged — the app and the other plugins stay up); a minimal **Plugin Context** (own DB engine/session for `plugin_<name>_*` tables, namespaced logger, empty admin config — the logger/config are declared phase-2 stubs until `system_log` and the ConfigField infra land); `GET /api/plugins` discovery (no internal paths); each plugin mounts its router under `/api{route_base}` with a `Plugin: <name>` Swagger tag; icons served from `/api/plugin-assets/{name}/icon`.
+  - *Frontend:* a `build:plugins` step generates the component registry from the manifests (gitignored, never hand-edited); a single catch-all route `plugins/[...rest]` mounts plugin pages dynamically; scrapers appear in a collapsible **SCRAPERS** sidebar group, notifiers never do; bundle/runtime mismatches are surfaced in the console, never as a broken page. Plugins import only via `$lib` (so they resolve from outside the SvelteKit root); the `$plugins` alias + Vite `fs.allow` let the single Vite build bundle them.
+  - Ships two throwaway **Test Plugins** — TP Scraper (full-stack) and TP Notifier (backend-only) — that exercise the whole path; they will be removed when real plugins land.
 - **Product version on the login page** too (small line under the form), fetched from `GET /api/health` — alongside the version already shown in the sidebar.
 - **`docs/updates/phase-02.md`**: the phase-2 companion doc, including the browser command to preview the Italian translation (`localStorage.setItem('wea_lang','it')` + reload).
 - **Autofocus** on the new-password field when the forced password-change page opens (verified: the focused element is `input[name=new-password]`).
