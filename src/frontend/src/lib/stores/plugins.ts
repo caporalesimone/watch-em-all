@@ -30,12 +30,22 @@ export async function loadPlugins(): Promise<void> {
 		discovered = [];
 	}
 	const generatedByName = new Map(generated.map((entry) => [entry.name, entry]));
+	const discoveredScrapers = new Set<string>();
 	const mounted: MountedPlugin[] = [];
 	for (const plugin of discovered) {
 		// Notifiers never appear in the sidebar or as routes.
 		if (plugin.type !== 'scraper' || !plugin.route_base) continue;
+		discoveredScrapers.add(plugin.name);
 		const entry = generatedByName.get(plugin.name);
-		if (!entry) continue; // enabled in the backend but absent from this bundle (see F3)
+		if (!entry) {
+			// Enabled in the backend but missing from this bundle: hide it (never a
+			// broken page) and tell the developer the build is stale (FDISC-R4).
+			console.warn(
+				`Plugin "${plugin.name}" is enabled in the backend but missing from this ` +
+					`frontend build — rebuild the frontend (npm run build) to mount it.`
+			);
+			continue;
+		}
 		mounted.push({
 			name: plugin.name,
 			display_name: plugin.display_name,
@@ -44,6 +54,16 @@ export async function loadPlugins(): Promise<void> {
 			component: entry.component,
 			i18n: entry.i18n
 		});
+	}
+	// The reverse mismatch: bundled but not loaded by the backend (FDISC-R4). Not an
+	// error — it just won't appear; surface it so the skew is visible.
+	for (const entry of generated) {
+		if (!discoveredScrapers.has(entry.name)) {
+			console.warn(
+				`Plugin "${entry.name}" is bundled in the frontend but not loaded by the ` +
+					`backend — rebuild/restart to reconcile.`
+			);
+		}
 	}
 	mountedPlugins.set(mounted);
 	pluginsReady.set(true);
