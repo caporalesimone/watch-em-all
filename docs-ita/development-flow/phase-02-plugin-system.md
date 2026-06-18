@@ -27,10 +27,10 @@ Si crea una cartella con un manifest e due file: al rebuild il plugin **appare d
 
 ## Definition of Done
 
-- [ ] Il plugin demo è completamente dinamico: nessun riferimento a "demo" nel codice core o di build.
-- [ ] `enabled: false` + rebuild → il plugin non esiste da nessuna parte (API, sidebar, bundle).
-- [ ] Un secondo plugin demo copia-incollato appare anch'esso senza toccare nulla.
-- [ ] [docs](../../docs/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
+- [x] I plugin (TP) sono completamente dinamici: **nessun riferimento a `tp_scraper`/`tp_notifier` nel codice core o di build** (verificato: i match sono solo in docs e test).
+- [ ] `enabled: false` + rebuild → il plugin non esiste da nessuna parte (API, sidebar, bundle). *(da provare dal vivo)*
+- [ ] Un secondo plugin TP copia-incollato appare anch'esso senza toccare nulla. *(da provare dal vivo)*
+- [x] [docs](../../docs/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti
 

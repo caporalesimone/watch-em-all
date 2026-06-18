@@ -22,6 +22,15 @@ Role legend: 🌐 public · 👤 user · 🛡 admin
 | GET | `/api/me` | 👤🛡 | — | `{id, username, first_name, last_name, role, locale, must_change_password}` | exempt from the must_change_password gate (drives the SPA boot) |
 | PATCH | `/api/me` | 👤🛡 | `{locale?}` | 200 | V1 English-only: the only accepted value is `en` |
 
+## Plugin discovery — [plugin-registry](../4-capabilities/core/plugin-registry.md)
+
+| Method | Path | Role | Response | Notes |
+|---|---|---|---|---|
+| GET | `/api/plugins` | 👤🛡 | `[{name, type, route_base, icon, display_name}]` | only enabled + loaded plugins; no internal paths. `route_base`/`icon` are `null` for a plugin without a frontend (notifiers) |
+| GET | `/api/plugin-assets/{name}/icon` | 👤🛡 | image | the plugin's manifest `icon`, served as a static asset (path-traversal guarded); 404 if absent |
+
+Plugin-specific routes are registered by each plugin under `/api{route_base}` (e.g. `/api/plugins/my-store/...`) and documented in OpenAPI under the `Plugin: <name>` tag.
+
 ## Health — [deployment](../infrastructure/deployment.md)
 
 | Method | Path | Role | Response | Notes |

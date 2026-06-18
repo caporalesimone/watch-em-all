@@ -19,10 +19,20 @@ This is the project's **English documentation**, the destined canonical wiki. It
 - **[api/](api/)** — HTTP API (Phase 1: Auth, Me, Health):
   - [README.md](api/README.md) — conventions and Swagger
   - [endpoints.md](api/endpoints.md) — the implemented endpoints
-- **[4-capabilities/](4-capabilities/)** — implemented capabilities (Phase 1 — Foundations):
-  - [core/auth.md](4-capabilities/core/auth.md) — JWT auth, refresh rotation, forced/normal password change, bootstrap
-  - [database/schema.md](4-capabilities/database/schema.md) — the `users` table
-  - [frontend/app-shell.md](4-capabilities/frontend/app-shell.md) — SPA shell, theme, i18n, pages
-  - [frontend/auth-manager.md](4-capabilities/frontend/auth-manager.md) — the token manager (single-flight refresh)
+- **[4-capabilities/](4-capabilities/)** — implemented capabilities:
+  - [core/auth.md](4-capabilities/core/auth.md) — JWT auth, refresh rotation, forced/normal password change, bootstrap (Phase 1)
+  - [database/schema.md](4-capabilities/database/schema.md) — the `users` table (Phase 1)
+  - [frontend/app-shell.md](4-capabilities/frontend/app-shell.md) — SPA shell, theme, i18n, pages (Phase 1)
+  - [frontend/auth-manager.md](4-capabilities/frontend/auth-manager.md) — the token manager (single-flight refresh) (Phase 1)
+  - [core/plugin-registry.md](4-capabilities/core/plugin-registry.md) — discovery, validation, isolated loading (Phase 2)
+  - [core/plugin-context.md](4-capabilities/core/plugin-context.md) — the minimal context handed to a plugin (Phase 2)
+  - [frontend/plugin-discovery.md](4-capabilities/frontend/plugin-discovery.md) — generated registry + dynamic routing (Phase 2)
+
+**Plugin system (Phase 2)** — the dynamic backbone:
+
+- [2-architecture/plugin-architecture.md](2-architecture/plugin-architecture.md) — plugin-first, dynamic integration, isolation
+- [3-features/plugins/dynamic-integration.md](3-features/plugins/dynamic-integration.md) — feature view: discovery, where plugins appear, lifecycle
+- [plugin-development/manifest-reference.md](plugin-development/manifest-reference.md) — the `manifest.json` contract
+- and the `core/`, `frontend/` capabilities listed above, plus [api/endpoints.md](api/endpoints.md) (plugin discovery) and [infrastructure/build-system.md](infrastructure/build-system.md) (unified frontend build)
 
 The remaining business/architecture/feature layers arrive as the corresponding features land in later phases.
