@@ -21,7 +21,7 @@ from src.core.db import create_schema, init_engine, new_session
 from src.core.plugins.registry import load_plugins
 from src.web.deps import require_user
 from src.web.error_handlers import register_error_handlers
-from src.web.routers import auth, health, me, plugins
+from src.web.routers import admin_users, auth, health, me, plugins
 from src.web.spa import SpaStaticFiles
 
 logging.basicConfig(level=logging.INFO)
@@ -74,6 +74,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix="/api")
     app.include_router(auth.router, prefix="/api/auth")
     app.include_router(me.router, prefix="/api")
+    app.include_router(admin_users.router, prefix="/api")
     app.include_router(plugins.router, prefix="/api")
     # The SPA catch-all is mounted in the lifespan, after the plugins (see above).
 
