@@ -2,14 +2,16 @@
 	import { page } from '$app/stores';
 	import { _ } from 'svelte-i18n';
 
-	import { signOut } from '$lib/stores/auth';
+	import { auth, signOut } from '$lib/stores/auth';
 	import { mountedPlugins } from '$lib/stores/plugins';
 	import { version } from '$lib/stores/version';
 
-	const links = [
-		{ href: '/', key: 'nav.dashboard' },
-		{ href: '/profile', key: 'nav.profile' }
-	];
+	// Roles don't overlap (personas-and-roles.md): an admin governs (no personal
+	// catalog/carts), a user owns their data. The shell shows one or the other.
+	const isAdmin = $derived(($auth.user?.role ?? 'user') === 'admin');
+	const primary = $derived(
+		isAdmin ? [{ href: '/admin/users', key: 'nav.users' }] : [{ href: '/', key: 'nav.dashboard' }]
+	);
 
 	function itemClass(href: string): string {
 		const base = 'rounded px-3 py-2 text-sm hover:bg-slate-200 dark:hover:bg-slate-800';
@@ -23,12 +25,13 @@
 >
 	<div class="mb-6 text-center text-lg font-semibold">{$_('app.name')}</div>
 	<nav class="flex flex-1 flex-col gap-1">
-		{#each links as link (link.href)}
+		{#each primary as link (link.href)}
 			<a href={link.href} class={itemClass(link.href)}>{$_(link.key)}</a>
 		{/each}
+		<a href="/profile" class={itemClass('/profile')}>{$_('nav.profile')}</a>
 
-		<!-- SCRAPERS group, last so it can grow without moving the core links (FDISC-R5). -->
-		{#if $mountedPlugins.length > 0}
+		<!-- SCRAPERS group (users only), last so it can grow without moving the core links. -->
+		{#if !isAdmin && $mountedPlugins.length > 0}
 			<details open class="mt-4">
 				<summary
 					class="cursor-pointer px-3 py-1 text-xs font-semibold tracking-wide text-slate-400 uppercase select-none"

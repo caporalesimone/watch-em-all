@@ -41,8 +41,14 @@
 		} else if (state.status === 'authed') {
 			if (state.user?.must_change_password) {
 				if (path !== '/change-password') void goto('/change-password', { replaceState: true });
-			} else if (path === '/login' || path === '/change-password') {
-				void goto('/', { replaceState: true });
+			} else if (state.user?.role === 'admin') {
+				// Admin lives in the admin area; no user dashboard/scrapers (roles don't overlap).
+				if (path === '/login' || path === '/change-password' || path === '/')
+					void goto('/admin/users', { replaceState: true });
+			} else {
+				// Standard user: keep out of the auth pages and the admin area.
+				if (path === '/login' || path === '/change-password' || path.startsWith('/admin'))
+					void goto('/', { replaceState: true });
 			}
 		}
 	});
@@ -51,7 +57,11 @@
 	$effect(() => {
 		if (!ready) return;
 		const state = $auth;
-		if (state.status === 'authed' && !state.user?.must_change_password) {
+		if (
+			state.status === 'authed' &&
+			!state.user?.must_change_password &&
+			state.user?.role !== 'admin'
+		) {
 			if (!pluginsLoaded) {
 				pluginsLoaded = true;
 				void loadPlugins();

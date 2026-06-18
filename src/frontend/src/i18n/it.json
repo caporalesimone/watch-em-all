@@ -12,7 +12,33 @@
 		"dashboard": "Dashboard",
 		"profile": "Profilo",
 		"logout": "Esci",
-		"scrapers": "Scraper"
+		"scrapers": "Scraper",
+		"users": "Utenti"
+	},
+	"admin": {
+		"users": {
+			"title": "Utenti",
+			"create": "Crea un utente",
+			"username": "Nome utente",
+			"firstName": "Nome",
+			"lastName": "Cognome",
+			"role": "Ruolo",
+			"roleUser": "Utente",
+			"roleAdmin": "Admin",
+			"tempPassword": "Password temporanea",
+			"submit": "Crea",
+			"colName": "Nome",
+			"colRole": "Ruolo",
+			"colStatus": "Stato",
+			"colLastLogin": "Ultimo accesso",
+			"statusActive": "Attivo",
+			"statusDisabled": "Disabilitato",
+			"statusPending": "Cambio in sospeso",
+			"never": "Mai",
+			"created": "Creato \"{username}\" — comunica la password temporanea; dovrà cambiarla al primo accesso.",
+			"errorTaken": "Questo nome utente è già in uso.",
+			"errorGeneric": "Impossibile creare l'utente."
+		}
 	},
 	"theme": {
 		"toggle": "Cambia tema"

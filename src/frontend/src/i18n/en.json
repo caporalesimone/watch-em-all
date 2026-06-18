@@ -12,7 +12,33 @@
 		"dashboard": "Dashboard",
 		"profile": "Profile",
 		"logout": "Log out",
-		"scrapers": "Scrapers"
+		"scrapers": "Scrapers",
+		"users": "Users"
+	},
+	"admin": {
+		"users": {
+			"title": "Users",
+			"create": "Create a user",
+			"username": "Username",
+			"firstName": "First name",
+			"lastName": "Last name",
+			"role": "Role",
+			"roleUser": "User",
+			"roleAdmin": "Admin",
+			"tempPassword": "Temporary password",
+			"submit": "Create",
+			"colName": "Name",
+			"colRole": "Role",
+			"colStatus": "Status",
+			"colLastLogin": "Last login",
+			"statusActive": "Active",
+			"statusDisabled": "Disabled",
+			"statusPending": "Change pending",
+			"never": "Never",
+			"created": "Created \"{username}\" — share the temporary password; they must change it at first login.",
+			"errorTaken": "That username is already in use.",
+			"errorGeneric": "Could not create the user."
+		}
 	},
 	"theme": {
 		"toggle": "Toggle theme"
