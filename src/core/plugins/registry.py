@@ -15,6 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 from fastapi import FastAPI
 
@@ -58,11 +59,15 @@ def load_plugins(
     *,
     context_builder: ContextBuilder = build_context,
     plugins_root: Path = PLUGINS_ROOT,
+    router_dependencies: list[Any] | None = None,
 ) -> list[LoadedPlugin]:
     """Discover and load every enabled plugin; return the loaded ones.
 
     ``app`` receives each plugin's router under ``/api{route_base}``. Pass None in
     the worker, which loads plugins (``initialize``) but serves no HTTP.
+    ``router_dependencies`` (e.g. ``[Depends(require_user)]``) are applied to every
+    plugin router so all plugin routes sit behind authentication; the dependency is
+    injected by the web app to keep the core decoupled from the auth layer.
     """
     loaded: list[LoadedPlugin] = []
     names: set[str] = set()
@@ -72,7 +77,15 @@ def load_plugins(
             continue
         for plugin_dir in sorted(p for p in base.iterdir() if p.is_dir()):
             try:
-                _load_one(app, folder_type, plugin_dir, names, loaded, context_builder)
+                _load_one(
+                    app,
+                    folder_type,
+                    plugin_dir,
+                    names,
+                    loaded,
+                    context_builder,
+                    router_dependencies,
+                )
             except Exception as exc:  # REG-R5: isolate the failure, keep going.
                 log.error("plugin %s rejected: %s", plugin_dir.name, exc)
     return loaded
@@ -85,6 +98,7 @@ def _load_one(
     names: set[str],
     loaded: list[LoadedPlugin],
     context_builder: ContextBuilder,
+    router_dependencies: list[Any] | None,
 ) -> None:
     manifest = parse_manifest(plugin_dir / "manifest.json", folder_type=folder_type)
     if not manifest.enabled:
@@ -108,7 +122,7 @@ def _load_one(
         )
 
     plugin.initialize(context_builder(manifest, plugin))
-    _mount_router(app, manifest, plugin)
+    _mount_router(app, manifest, plugin, router_dependencies)
     names.add(manifest.name)
     loaded.append(LoadedPlugin(manifest=manifest, plugin=plugin, directory=plugin_dir))
     log.info("plugin %s loaded (%s)", manifest.name, manifest.type)
@@ -141,7 +155,12 @@ def _import_entry(plugin_name: str, entry_path: Path) -> ModuleType:
     return module
 
 
-def _mount_router(app: FastAPI | None, manifest: Manifest, plugin: BasePlugin) -> None:
+def _mount_router(
+    app: FastAPI | None,
+    manifest: Manifest,
+    plugin: BasePlugin,
+    router_dependencies: list[Any] | None,
+) -> None:
     router = plugin.router()
     if router is None:
         return
@@ -153,8 +172,10 @@ def _mount_router(app: FastAPI | None, manifest: Manifest, plugin: BasePlugin) -
         return
     if app is not None:
         # route_base is the verbatim frontend path; the backend mounts at /api + it.
+        # router_dependencies (auth) are applied to every route in the plugin router.
         app.include_router(
             router,
             prefix=f"/api{manifest.frontend.route_base}",
             tags=[f"Plugin: {manifest.name}"],
+            dependencies=router_dependencies,
         )

@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from src.core.db import init_engine
 from src.core.plugins.registry import load_plugins
+from src.web.deps import require_user
 from src.web.error_handlers import register_error_handlers
 from src.web.routers import plugins as plugins_router
 
@@ -101,6 +102,9 @@ def _build_app(tmp_path: Path) -> FastAPI:
     app = FastAPI()
     register_error_handlers(app)
     app.include_router(plugins_router.router, prefix="/api")
+    # The discovery endpoint is auth-gated (#3); bypass it for these unit tests
+    # (the real-app gating is checked in test_discovery_endpoint_wired_on_real_app).
+    app.dependency_overrides[require_user] = lambda: None
     app.state.loaded_plugins = load_plugins(app, plugins_root=tmp_path)
     return app
 
@@ -152,9 +156,9 @@ def test_icon_served_and_unknown_is_404(tmp_path: Path) -> None:
 
 
 def test_discovery_endpoint_wired_on_real_app(client: TestClient) -> None:
+    # Discovery is behind auth (#3): an unauthenticated request is rejected.
     resp = client.get("/api/plugins")
-    assert resp.status_code == 200
-    assert isinstance(resp.json(), list)
+    assert resp.status_code == 401
 
 
 def test_spa_catch_all_mounted_last_so_api_wins(

@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from src.core.errors import APIError
 from src.core.plugins.manifest import PluginType
 from src.core.plugins.registry import LoadedPlugin
+from src.web.deps import UserDep
 
 router = APIRouter()
 
@@ -34,8 +35,13 @@ def _loaded(request: Request) -> list[LoadedPlugin]:
     return list(getattr(request.app.state, "loaded_plugins", []))
 
 
-@router.get("/plugins", response_model=list[PluginInfo], tags=["Plugins"])
-def list_plugins(request: Request) -> list[PluginInfo]:
+@router.get(
+    "/plugins",
+    response_model=list[PluginInfo],
+    tags=["Plugins"],
+    summary="List the enabled, loaded plugins for the SPA (name, type, route, icon).",
+)
+def list_plugins(request: Request, _user: UserDep) -> list[PluginInfo]:
     infos: list[PluginInfo] = []
     for loaded in _loaded(request):
         manifest = loaded.manifest
@@ -53,7 +59,11 @@ def list_plugins(request: Request) -> list[PluginInfo]:
     return infos
 
 
-@router.get("/plugin-assets/{plugin_name}/icon", tags=["Plugins"])
+@router.get(
+    "/plugin-assets/{plugin_name}/icon",
+    tags=["Plugins"],
+    summary="Serve a plugin's icon asset (public static asset, loaded as an <img>).",
+)
 def plugin_icon(plugin_name: str, request: Request) -> FileResponse:
     for loaded in _loaded(request):
         if loaded.manifest.name != plugin_name or not loaded.manifest.icon:

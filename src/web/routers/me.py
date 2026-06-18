@@ -24,7 +24,11 @@ def _to_response(user: User) -> MeResponse:
     )
 
 
-@router.get("/me", response_model=MeResponse)
+@router.get(
+    "/me",
+    response_model=MeResponse,
+    summary="Current user's profile (exempt from the must-change-password gate, for the SPA boot).",
+)
 def get_me(claims: ClaimsDep, db: SessionDep) -> MeResponse:
     # Exempt from the must-change-password gate (auth.md): the SPA boot reads /me
     # to learn the user (and the must_change_password flag) and route accordingly.
@@ -34,7 +38,11 @@ def get_me(claims: ClaimsDep, db: SessionDep) -> MeResponse:
     return _to_response(user)
 
 
-@router.patch("/me", response_model=MeResponse)
+@router.patch(
+    "/me",
+    response_model=MeResponse,
+    summary="Update the current user's profile (locale).",
+)
 def patch_me(body: MePatch, claims: UserDep, db: SessionDep) -> MeResponse:
     user = db.get(User, claims.sub)
     if user is None:

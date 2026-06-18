@@ -13,12 +13,13 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
 from src.core.bootstrap import ensure_initial_admin
 from src.core.config import get_settings
 from src.core.db import create_schema, init_engine, new_session
 from src.core.plugins.registry import load_plugins
+from src.web.deps import require_user
 from src.web.error_handlers import register_error_handlers
 from src.web.routers import auth, health, me, plugins
 from src.web.spa import SpaStaticFiles
@@ -48,8 +49,9 @@ def create_app() -> FastAPI:
         finally:
             session.close()
         # Discover, load and mount the enabled plugins (REG-*). Isolated failures
-        # are logged; the core stays up. Stored for the discovery endpoint.
-        _app.state.loaded_plugins = load_plugins(_app)
+        # are logged; the core stays up. Stored for the discovery endpoint. Every
+        # plugin route sits behind authentication (#3).
+        _app.state.loaded_plugins = load_plugins(_app, router_dependencies=[Depends(require_user)])
         # Mount the built SPA LAST (catch-all on "/"), after the core routers (added
         # at construction) and the plugin routers (added just above), so every /api
         # route — plugins included — takes precedence over the SPA fallback.

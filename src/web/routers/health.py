@@ -12,7 +12,11 @@ from src.web.schemas import HealthResponse
 router = APIRouter(tags=["Health"])
 
 
-@router.get("/health", response_model=HealthResponse)
+@router.get(
+    "/health",
+    response_model=HealthResponse,
+    summary="Liveness probe: app status, database reachability, and the product version (public).",
+)
 def health(response: Response, settings: SettingsDep, db: SessionDep) -> HealthResponse:
     try:
         db.execute(text("SELECT 1"))

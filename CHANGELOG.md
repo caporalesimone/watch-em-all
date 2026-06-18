@@ -25,6 +25,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - **Dev and release stacks no longer share a database volume.** Distinct Compose project names — `compose-dev.yml` → `watch-em-all-dev`, `compose.yml` → `watch-em-all` — so each gets its own named volume regardless of the folder it runs from. `compose.yml` also documents (commented) how to switch the DB to a local bind mount if preferred.
+- **Every functional API now sits behind authentication.** Only `/api/health`, `/api/auth/login`, `/api/auth/refresh` and the static plugin icon (`/api/plugin-assets/...`, loaded by the browser as an `<img>`) stay public; the plugin discovery and every plugin route now require a logged-in user. Each endpoint also carries a one-line English `summary` shown in Swagger.
+- **Sidebar:** the brand is now "👀 Watch 'Em All"; the version line is a centered link that opens Swagger (`/api/docs`) in a new tab (same text, no other restyle).
+- Removed obsolete `.gitkeep` placeholders now that `src/{core,web,frontend}` and the plugin folders carry real content (kept `src/worker/.gitkeep`, still empty until phase 4).
 
 ## [0.1.0] - 2026-06-17
 
