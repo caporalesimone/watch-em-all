@@ -19,7 +19,7 @@ from types import ModuleType
 from fastapi import FastAPI
 
 from src.core.plugins.base import BasePlugin, NotifierPlugin, ScraperPlugin
-from src.core.plugins.context import PluginContext
+from src.core.plugins.context import PluginContext, build_context
 from src.core.plugins.manifest import Manifest, ManifestError, PluginType, parse_manifest
 
 log = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ class LoadedPlugin:
 def load_plugins(
     app: FastAPI | None,
     *,
-    context_builder: ContextBuilder,
+    context_builder: ContextBuilder = build_context,
     plugins_root: Path = PLUGINS_ROOT,
 ) -> list[LoadedPlugin]:
     """Discover and load every enabled plugin; return the loaded ones.
