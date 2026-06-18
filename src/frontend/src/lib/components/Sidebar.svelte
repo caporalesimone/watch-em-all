@@ -58,15 +58,14 @@
 		{$_('nav.logout')}
 	</button>
 	{#if $version}
-		<!-- Same text, now a link to Swagger (new tab), centered in the sidebar. -->
-		<a
-			href="/api/docs"
-			target="_blank"
-			rel="noopener"
-			class="mt-1 block px-3 text-center text-[11px] break-all text-slate-400 dark:text-slate-600"
+		<!-- Version centered between two thin rules (same color), linking to Swagger. -->
+		<div
+			class="mt-1 flex items-center gap-2 px-3 text-[11px] text-slate-400 dark:text-slate-600"
 			title={$version}
 		>
-			v{$version}
-		</a>
+			<span class="h-px flex-1 bg-current"></span>
+			<a href="/api/docs" target="_blank" rel="noopener" class="whitespace-nowrap">v{$version}</a>
+			<span class="h-px flex-1 bg-current"></span>
+		</div>
 	{/if}
 </aside>
