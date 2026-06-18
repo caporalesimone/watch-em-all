@@ -1,4 +1,4 @@
-# User management (MVP)
+# Phase 2.5 — User management (MVP)
 
 > Feature-level recap. A small slice pulled forward from phase 10, before the catalog phase (0.3.0).
 

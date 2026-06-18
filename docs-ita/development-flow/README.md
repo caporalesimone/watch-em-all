@@ -22,7 +22,7 @@
   *Risultato: l'app parte con Docker, si fa login, la shell c'è.*
 - [x] **Fase 2 — Plugin system** → [phase-02-plugin-system.md](phase-02-plugin-system.md) — rilasciata `0.2.0`
   *Risultato: un plugin demo appare da solo in sidebar con la sua pagina.*
-- [ ] **Gestione utenti (MVP)** — *fetta anticipata dalla [Fase 10](#) prima della Fase 3* ([user-management](../3-features/admin/user-management.md)), versione `0.3.0`. Serve un account `user` per provare le fasi seguenti: i ruoli **non si sovrappongono** (l'admin governa, non possiede carrelli; chi monitora usa un account `user`). Scope minimo: l'admin **crea** ed **elenca** gli utenti + shell **sdoppiato per ruolo**. Rimandato alla Fase 10: reset/disabilita/cancellazione differita/filtri/notifiche.
+- [ ] **Fase 2.5 — Gestione utenti (MVP)** — *fetta anticipata dalla Fase 10 prima della Fase 3* ([user-management](../3-features/admin/user-management.md)), versione `0.3.0`. Serve un account `user` per provare le fasi seguenti: i ruoli **non si sovrappongono** (l'admin governa, non possiede carrelli; chi monitora usa un account `user`). Scope minimo: l'admin **crea** ed **elenca** gli utenti + shell **sdoppiato per ruolo**. Rimandato alla Fase 10: reset/disabilita/cancellazione differita/filtri/notifiche.
   *Risultato: l'admin crea un utente standard e ci si logga come `user`.*
 - [ ] **Fase 3 — Catalogo e primo scrape** → [phase-03-catalog-first-scrape.md](phase-03-catalog-first-scrape.md)
   *Risultato: prodotti reali di Dragon Store nel Product Picker.*
