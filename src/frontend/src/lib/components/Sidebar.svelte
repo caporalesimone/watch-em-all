@@ -21,7 +21,7 @@
 <aside
 	class="flex w-56 flex-col border-r border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900"
 >
-	<div class="mb-6 text-lg font-semibold">{$_('app.name')}</div>
+	<div class="mb-6 text-center text-lg font-semibold">{$_('app.name')}</div>
 	<nav class="flex flex-1 flex-col gap-1">
 		{#each links as link (link.href)}
 			<a href={link.href} class={itemClass(link.href)}>{$_(link.key)}</a>
