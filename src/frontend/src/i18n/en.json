@@ -17,6 +17,9 @@
 	"theme": {
 		"toggle": "Toggle theme"
 	},
+	"plugins": {
+		"notFound": "This plugin page is not available."
+	},
 	"login": {
 		"title": "Sign in",
 		"username": "Username",

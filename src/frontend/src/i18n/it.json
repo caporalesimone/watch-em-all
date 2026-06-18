@@ -17,6 +17,9 @@
 	"theme": {
 		"toggle": "Cambia tema"
 	},
+	"plugins": {
+		"notFound": "Questa pagina del plugin non è disponibile."
+	},
 	"login": {
 		"title": "Accedi",
 		"username": "Nome utente",
