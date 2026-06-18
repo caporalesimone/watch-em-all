@@ -26,6 +26,15 @@ export interface Health {
 	worker_heartbeat_age_s: number | null;
 }
 
+// Plugin discovery (REG-R6): enabled + loaded plugins, no internal paths.
+export interface PluginInfo {
+	name: string;
+	type: 'scraper' | 'notifier';
+	route_base: string | null;
+	icon: string | null;
+	display_name: string;
+}
+
 // Public endpoint; returns its body on 200 and 503 alike (we only want `version`).
 export async function getHealth(): Promise<Health> {
 	const res = await fetch('/api/health');
@@ -84,6 +93,10 @@ export async function logout(): Promise<void> {
 
 export function getMe(): Promise<Me> {
 	return apiFetch('/api/me').then(asJson<Me>);
+}
+
+export function getPlugins(): Promise<PluginInfo[]> {
+	return apiFetch('/api/plugins').then(asJson<PluginInfo[]>);
 }
 
 // oldPassword is required for a normal change and omitted for the forced first

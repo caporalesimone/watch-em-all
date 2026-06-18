@@ -36,6 +36,25 @@ The **published images** are **two** — `watch-em-all` (the app: `web` and `wor
 - Stack (fixed at major versions on day one — new project, no migration debt): backend Python 3.12+, Poetry, FastAPI; frontend Node 22 LTS, SvelteKit 2. The build tooling (single root `pyproject.toml`, the unified Vite build, the plugin registry) lands with the first code (phase 1) and is documented here as it arrives.
 - The product **version** has a single source of truth in the **git tag**: it is not hand-written in any versioned file (`pyproject.toml`/`package.json` keep an inert placeholder `version`), but computed at build from `git describe` and baked into the image, exposed on `/api/health` ([ci](ci.md#single-source-of-truth-for-the-version)).
 
+## Unified frontend build with plugins (phase 2)
+
+One Vite process builds the app **and** the enabled plugins:
+
+```
+npm run build
+  ├── 1. build:plugins   # reads every src/plugins/**/manifest.json
+  │       ├── keeps enabled=true with a frontend.entry
+  │       └── generates src/frontend/src/generated/plugin-registry.ts
+  └── 2. vite build      # SvelteKit (adapter-static, SPA fallback)
+```
+
+Rules:
+
+- The generated registry is **never** hand-written (FDISC-R1); it is gitignored and regenerated automatically on `predev`/`prebuild`/`precheck`.
+- Adding a plugin = a folder with a valid manifest + a conforming `frontend/index.ts`: **zero** changes to build or routing.
+- Plugin frontends live in `src/plugins` (outside the SvelteKit root). The `$plugins` alias (in `svelte.config.js`) maps to it and Vite's `server.fs.allow` is widened to the repo root so the dev server can read them. Plugins import shared code only via `$lib` (single build: no cross-bundle issue), never a bare dependency.
+- **Operational consequence**: changing `enabled` (or adding/removing a plugin) needs a rebuild of the `web` image (`RUN npm run build` in the Dockerfile) + restart — documented in [deployment](deployment.md).
+
 ## Phase 0 — stub containers
 
 In phase 0 the application containers carry no product logic; they exist to exercise the whole pipeline end to end:

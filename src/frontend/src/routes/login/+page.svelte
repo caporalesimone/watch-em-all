@@ -3,6 +3,7 @@
 
 	import { ApiErr } from '$lib/api/client';
 	import { signIn } from '$lib/stores/auth';
+	import { version } from '$lib/stores/version';
 
 	let username = $state('');
 	let password = $state('');
@@ -59,4 +60,7 @@
 	>
 		{$_('login.submit')}
 	</button>
+	{#if $version}
+		<p class="text-center text-[11px] text-slate-400 dark:text-slate-600">v{$version}</p>
+	{/if}
 </form>

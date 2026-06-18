@@ -58,7 +58,11 @@ def _issue_pair(settings: SettingsDep, user: User) -> TokenPair:
     return TokenPair(access_token=access, refresh_token=refresh, expires_at=access_exp)
 
 
-@router.post("/login", response_model=TokenPair)
+@router.post(
+    "/login",
+    response_model=TokenPair,
+    summary="Authenticate and return an access + refresh token pair (public).",
+)
 def login(body: LoginRequest, request: Request, settings: SettingsDep, db: SessionDep) -> TokenPair:
     client_ip = request.client.host if request.client else "unknown"
     rl_key = f"{client_ip}:{body.username.lower()}"
@@ -80,7 +84,11 @@ def login(body: LoginRequest, request: Request, settings: SettingsDep, db: Sessi
     return pair
 
 
-@router.post("/refresh", response_model=TokenPair)
+@router.post(
+    "/refresh",
+    response_model=TokenPair,
+    summary="Exchange a valid refresh token for a new token pair, rotating the jti (public).",
+)
 def refresh(body: RefreshRequest, settings: SettingsDep, db: SessionDep) -> TokenPair:
     try:
         claims = decode_token(settings.core.secret_key, body.refresh_token, expected_typ="refresh")
@@ -107,7 +115,11 @@ def refresh(body: RefreshRequest, settings: SettingsDep, db: SessionDep) -> Toke
     return pair
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Log out everywhere: invalidate all of the current user's tokens.",
+)
 def logout(claims: ClaimsDep, db: SessionDep) -> Response:
     user = db.get(User, claims.sub)
     if user is not None:
@@ -117,7 +129,11 @@ def logout(claims: ClaimsDep, db: SessionDep) -> Response:
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/change-password",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Change the current user's password (the forced first change omits the old password).",
+)
 def change_password(body: ChangePasswordRequest, claims: ClaimsDep, db: SessionDep) -> Response:
     user = db.get(User, claims.sub)
     if user is None:

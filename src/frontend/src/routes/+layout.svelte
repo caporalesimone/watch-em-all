@@ -11,11 +11,13 @@
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import { setupI18n } from '$lib/i18n';
 	import { auth, bootstrap } from '$lib/stores/auth';
+	import { loadPlugins, resetPlugins } from '$lib/stores/plugins';
 	import { theme } from '$lib/stores/theme';
 	import { version } from '$lib/stores/version';
 
 	let { children } = $props();
 	let ready = $state(false);
+	let pluginsLoaded = $state(false);
 
 	onMount(async () => {
 		theme.init();
@@ -42,6 +44,21 @@
 			} else if (path === '/login' || path === '/change-password') {
 				void goto('/', { replaceState: true });
 			}
+		}
+	});
+
+	// Load the plugin list once the user is authed; clear it on sign-out (FDISC-R2).
+	$effect(() => {
+		if (!ready) return;
+		const state = $auth;
+		if (state.status === 'authed' && !state.user?.must_change_password) {
+			if (!pluginsLoaded) {
+				pluginsLoaded = true;
+				void loadPlugins();
+			}
+		} else if (state.status === 'anon' && pluginsLoaded) {
+			pluginsLoaded = false;
+			resetPlugins();
 		}
 	});
 

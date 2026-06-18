@@ -1,6 +1,6 @@
 {
 	"app": {
-		"name": "Watch 'Em All"
+		"name": "👀 Watch 'Em All"
 	},
 	"common": {
 		"loading": "Loading…",
@@ -16,6 +16,9 @@
 	},
 	"theme": {
 		"toggle": "Toggle theme"
+	},
+	"plugins": {
+		"notFound": "This plugin page is not available."
 	},
 	"login": {
 		"title": "Sign in",

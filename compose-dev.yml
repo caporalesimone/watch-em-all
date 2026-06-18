@@ -13,6 +13,10 @@
 # (postgres:16 + scripts). No `version:` field (deprecated in Compose v2). Log
 # rotation everywhere (INF-2).
 
+# Distinct Compose project name so the dev stack gets its OWN volumes
+# (watch-em-all-dev_*), never sharing the database with the release (watch-em-all).
+name: watch-em-all-dev
+
 services:
   db:
     image: postgres:16

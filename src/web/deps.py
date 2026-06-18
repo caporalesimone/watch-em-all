@@ -11,7 +11,8 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import Depends, Header
+from fastapi import Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from src.core.config import Settings, get_settings
@@ -22,16 +23,21 @@ from src.core.security import TokenClaims, TokenError, decode_token
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 SessionDep = Annotated[Session, Depends(get_session)]
 
+# Bearer scheme: makes Swagger show the "Authorize" button (paste just the token).
+# auto_error=False so we return the project's {detail, code} envelope, not the default.
+_bearer = HTTPBearer(auto_error=False, description="Paste the access_token (no 'Bearer ' prefix).")
+
 
 def current_claims(
     settings: SettingsDep,
-    authorization: Annotated[str | None, Header()] = None,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)] = None,
 ) -> TokenClaims:
-    if not authorization or not authorization.startswith("Bearer "):
+    if credentials is None or credentials.scheme.lower() != "bearer":
         raise APIError(401, "not_authenticated", "missing bearer token")
-    token = authorization[len("Bearer ") :].strip()
     try:
-        return decode_token(settings.core.secret_key, token, expected_typ="access")
+        return decode_token(
+            settings.core.secret_key, credentials.credentials, expected_typ="access"
+        )
     except TokenError as exc:
         raise APIError(401, "invalid_token", "invalid or expired token") from exc
 

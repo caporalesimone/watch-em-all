@@ -37,7 +37,7 @@ The **forced password change** page shows only *new password* + *confirm*: the c
 
 ## Shell and navigation
 
-- **Left sidebar** (persistent): Dashboard · Profile · Log out. Feature entries (catalog, carts, scrapers…) join in later phases.
+- **Left sidebar** (persistent): Dashboard · Profile · Log out, plus a collapsible **SCRAPERS** group at the bottom, populated dynamically from `GET /api/plugins` (phase 2 — see [Plugins](#plugins-phase-2)). The other feature entries (catalog, carts…) join in later phases.
 - **Header**: theme toggle (the language selector is planned but not exposed in V1, English-only).
 
 ## Theme and language
@@ -53,3 +53,13 @@ The **forced password change** page shows only *new password* + *confirm*: the c
 | Login | username + password; surfaces auth error codes |
 | Forced change | new + confirm only (no current password); greets by name |
 | Profile | **account fields** (Username, Name, Surname, Role — read-only), change password (current password required), language (read-only, English) |
+
+## Plugins (phase 2)
+
+When the user is authed, the shell fetches `GET /api/plugins` and reconciles it against the build-time generated registry (`src/generated/plugin-registry.ts`):
+
+- a `lib/stores/plugins` store holds the mountable scrapers; the **SCRAPERS** sidebar group renders them (icon + name → `route_base`). Notifiers never appear here.
+- a single catch-all route `routes/plugins/[...rest]/+page.svelte` resolves `route_base` from the path and lazily mounts the plugin component, registering its i18n namespace through `$lib`.
+- bundle/runtime mismatches are surfaced in the console (never a broken page).
+
+See [plugin-discovery](plugin-discovery.md) for the full contract.
