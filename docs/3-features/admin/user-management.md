@@ -2,7 +2,7 @@
 
 > **Layer 3 — Admin feature** · Audience: architects, developers.
 >
-> English translation of the Italian reference [`docs-ita/3-features/admin/user-management.md`](../../../docs-ita/3-features/admin/user-management.md), limited to what is implemented (DOC-12). This MVP — **create + list accounts** + a role-split shell — was pulled forward from phase 10 so a standard `user` account can exist before the catalog phase. The richer lifecycle (reset, disable, deferred delete, filters, notifications) arrives in phase 10.
+> English translation of the Italian reference [`docs-ita/3-features/admin/user-management.md`](../../../docs-ita/3-features/admin/user-management.md), limited to what is implemented (DOC-12). This MVP — **create + list accounts** + a role-split shell — is **phase 3's first step (0.3.0)**, pulled forward from phase 10 so a standard `user` account can exist before the catalog itself. The richer lifecycle (reset, disable, deferred delete, filters, notifications) stays in phase 10.
 
 ## Roles don't overlap
 

@@ -4,9 +4,9 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images on GHCR); the GitHub release is then created on that tag (no assets — the deploy kit lives in the repo). Intermediate per-PR versions live only in this file.
 
-## [0.3.0] - 2026-06-18
+## [0.3.0] - 2026-06-19
 
-**User management (MVP)** — a small slice pulled forward from phase 10, before the catalog phase, so a standard `user` account can exist and be used to test the coming features. Roles don't overlap (personas-and-roles.md): an admin governs the system and never owns a personal catalog/cart; whoever wants to monitor prices uses a separate `user` account.
+**Phase 3 — Catalog and first scrape** (in progress). First MVP: **user management**, pulled forward from phase 10 so a standard `user` account can exist before the catalog itself. Roles don't overlap (personas-and-roles.md): an admin governs the system and never owns a personal catalog/cart; whoever wants to monitor prices uses a separate `user` account. The catalog, the Dragon Store scraper and the Product Picker follow.
 
 ### Added
 

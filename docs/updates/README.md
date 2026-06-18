@@ -12,4 +12,4 @@ companion changelog-in-prose, not part of the canonical wiki tree.
 - [phase-00.md](phase-00.md) — Pipeline & infrastructure
 - [phase-01.md](phase-01.md) — Foundations (auth, shell, profile)
 - [phase-02.md](phase-02.md) — Plugin system
-- [phase-02.5.md](phase-02.5.md) — User management (MVP, pulled forward from phase 10)
+- [phase-03.md](phase-03.md) — Catalog & first scrape (in progress; first MVP: user management)

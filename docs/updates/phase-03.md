@@ -1,10 +1,12 @@
-# Phase 2.5 — User management (MVP)
+# Phase 3 — Catalog & first scrape
 
-> Feature-level recap. A small slice pulled forward from phase 10, before the catalog phase (0.3.0).
+> Feature-level recap. **In progress** — this file grows as the phase-3 MVPs land. The **first MVP is user management** (0.3.0), pulled forward from phase 10 so a standard `user` account can exist before the catalog itself; the catalog, the Dragon Store scraper and the Product Picker follow.
 
 ## What's implemented
 
-So that a standard `user` account can exist (and be used to test the coming features), the admin can now create and list users.
+### 1) User management (MVP) — 0.3.0
+
+So that a standard `user` account can exist (and be used to test the catalog and the rest of the phase), the admin can now create and list users.
 
 - **Roles don't overlap.** An admin **governs** (creates accounts; later: scrapers, settings) and has **no** personal catalog/cart/notifications. Whoever wants to monitor prices uses a separate `user` account. There is **no self-registration**.
 - **Admin → Users page** (`/admin/users`): a create form (username, first/last name, role, temporary password) + a list (username, name, role, status, last login). The new account must change its temporary password at first login.
