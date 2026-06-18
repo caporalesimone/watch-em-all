@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -154,3 +155,45 @@ def test_discovery_endpoint_wired_on_real_app(client: TestClient) -> None:
     resp = client.get("/api/plugins")
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
+
+
+def test_spa_catch_all_mounted_last_so_api_wins(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Regression: the SPA is a catch-all on "/"; if it is mounted before the plugin
+    # routers (added in the lifespan), it shadows /api/plugins/<route>/... and serves
+    # index.html instead. It must be the LAST route. (Only reproducible with the SPA
+    # mounted, i.e. with a static dir present — which the other tests don't have.)
+    static = tmp_path / "static"
+    static.mkdir()
+    (static / "index.html").write_text("<!doctype html><title>spa</title>", encoding="utf-8")
+
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text(
+        'core:\n  database_url: "sqlite+pysqlite:///:memory:"\n'
+        '  secret_key: "${SECRET_KEY}"\n  default_locale: "en"\n'
+        "  access_token_ttl_min: 15\n  refresh_token_ttl_days: 7\n",
+        encoding="utf-8",
+    )
+    ver = tmp_path / "VERSION"
+    ver.write_text("9.9.9-test\n", encoding="utf-8")
+    monkeypatch.setenv("SECRET_KEY", "x" * 64)
+    monkeypatch.setenv("ADMIN_INITIAL_USERNAME", "admin")
+    monkeypatch.setenv("ADMIN_INITIAL_PASSWORD", "initpass123")
+
+    from src.core import config as config_mod
+
+    monkeypatch.setattr(config_mod, "CONFIG_PATH", str(cfg))
+    monkeypatch.setattr(config_mod, "VERSION_PATH", str(ver))
+    config_mod.get_settings.cache_clear()
+
+    from src.web import app as app_mod
+
+    monkeypatch.setattr(app_mod, "STATIC_DIR", static)
+
+    app = app_mod.create_app()
+    with TestClient(app) as test_client:
+        assert getattr(app.router.routes[-1], "name", None) == "spa"
+        assert test_client.get("/api/health").status_code == 200  # core /api still wins
+        assert "<!doctype html>" in test_client.get("/").text.lower()  # SPA served at root
+    config_mod.get_settings.cache_clear()

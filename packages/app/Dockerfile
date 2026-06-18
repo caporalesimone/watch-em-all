@@ -6,12 +6,17 @@
 # Build context is the REPO ROOT: docker build -f packages/app/Dockerfile .
 
 FROM node:22-slim AS frontend
-# Build the SvelteKit SPA (adapter-static → /fe/build); baked into the image and
-# served by FastAPI (spa.py). Dependency layer first so source edits keep the cache.
-WORKDIR /fe
+# Build the SvelteKit SPA (adapter-static → build/); baked into the image and
+# served by FastAPI (spa.py). The repo layout is preserved (/src/frontend with a
+# /src/plugins sibling) so the `$plugins` alias and the build:plugins generator
+# resolve the plugin frontends exactly as they do in the repo. Dependency layer
+# first so source edits keep the cache.
+WORKDIR /src/frontend
 COPY src/frontend/package.json src/frontend/package-lock.json ./
 RUN npm ci
 COPY src/frontend/ ./
+# Plugin frontends live in a sibling folder and are bundled by the single build.
+COPY src/plugins/ /src/plugins/
 RUN npm run build
 
 FROM python:3.12-slim-bookworm AS build
@@ -48,11 +53,14 @@ ENV PATH="/app/.venv/bin:$PATH" \
     WEA_STATIC_DIR=/app/static
 COPY --from=build /build/.venv /app/.venv
 COPY --from=build /build/VERSION /app/VERSION
-COPY --from=frontend /fe/build /app/static
+COPY --from=frontend /src/frontend/build /app/static
 COPY config.yaml /app/config.yaml
 COPY src/__init__.py /app/src/__init__.py
 COPY src/core /app/src/core
 COPY src/web /app/src/web
+# Plugins are auto-discovered at startup (registry) and their icons are served as
+# static assets, so the whole folder (manifest + backend + icon) ships in the image.
+COPY src/plugins /app/src/plugins
 COPY packages/app/stub/worker.py /app/stub/worker.py
 COPY --chmod=0755 packages/app/entrypoint.sh /app/entrypoint.sh
 USER app

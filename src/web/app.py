@@ -50,6 +50,11 @@ def create_app() -> FastAPI:
         # Discover, load and mount the enabled plugins (REG-*). Isolated failures
         # are logged; the core stays up. Stored for the discovery endpoint.
         _app.state.loaded_plugins = load_plugins(_app)
+        # Mount the built SPA LAST (catch-all on "/"), after the core routers (added
+        # at construction) and the plugin routers (added just above), so every /api
+        # route — plugins included — takes precedence over the SPA fallback.
+        if STATIC_DIR.is_dir():
+            _app.mount("/", SpaStaticFiles(directory=STATIC_DIR, html=True), name="spa")
         log.info("web app started, version %s", settings.version)
         yield
 
@@ -68,10 +73,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api/auth")
     app.include_router(me.router, prefix="/api")
     app.include_router(plugins.router, prefix="/api")
-
-    # Serve the built SPA last (catch-all) so /api routes take precedence.
-    if STATIC_DIR.is_dir():
-        app.mount("/", SpaStaticFiles(directory=STATIC_DIR, html=True), name="spa")
+    # The SPA catch-all is mounted in the lifespan, after the plugins (see above).
 
     return app
 
