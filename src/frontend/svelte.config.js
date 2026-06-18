@@ -7,7 +7,12 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 const config = {
 	preprocess: vitePreprocess(),
 	kit: {
-		adapter: adapter({ fallback: 'index.html' })
+		adapter: adapter({ fallback: 'index.html' }),
+		// Plugin frontends live in src/plugins (a sibling of this project root); the
+		// generated registry imports them via `$plugins/...` (2.F1, build-system.md).
+		alias: {
+			$plugins: '../plugins'
+		}
 	}
 };
 
