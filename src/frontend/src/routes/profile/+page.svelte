@@ -3,6 +3,7 @@
 	import { _ } from 'svelte-i18n';
 
 	import * as api from '$lib/api/client';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { auth, forceAnon } from '$lib/stores/auth';
 
 	let current = $state('');
@@ -39,7 +40,7 @@
 </script>
 
 <div class="max-w-md space-y-8">
-	<h1 class="text-2xl font-semibold">{$_('profile.title')}</h1>
+	<PageTitle title={$_('profile.title')} />
 
 	<section class="space-y-2 text-sm">
 		<h2 class="font-medium">{$_('profile.account')}</h2>
@@ -48,16 +49,16 @@
 			<span>{$auth.user?.username}</span>
 		</div>
 		<div class="flex justify-between">
+			<span class="text-slate-500 dark:text-slate-400">{$_('profile.role')}</span>
+			<span>{$auth.user?.role}</span>
+		</div>
+		<div class="flex justify-between">
 			<span class="text-slate-500 dark:text-slate-400">{$_('profile.name')}</span>
 			<span>{$auth.user?.first_name}</span>
 		</div>
 		<div class="flex justify-between">
 			<span class="text-slate-500 dark:text-slate-400">{$_('profile.surname')}</span>
 			<span>{$auth.user?.last_name}</span>
-		</div>
-		<div class="flex justify-between">
-			<span class="text-slate-500 dark:text-slate-400">{$_('profile.role')}</span>
-			<span>{$auth.user?.role}</span>
 		</div>
 		<div class="flex justify-between">
 			<span class="text-slate-500 dark:text-slate-400">{$_('profile.language')}</span>

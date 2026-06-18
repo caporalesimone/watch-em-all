@@ -3,6 +3,7 @@
 	import { _ } from 'svelte-i18n';
 
 	import { ApiErr, createUser, listUsers, type AdminUser, type NewUser } from '$lib/api/client';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 
 	let users = $state<AdminUser[]>([]);
 	let loading = $state(true);
@@ -25,6 +26,15 @@
 	}
 
 	onMount(() => void refresh());
+
+	// 8 alphanumeric chars (A-Z a-z 0-9, no symbols), shown in clear so the admin
+	// can read it out; they can also type their own temporary password instead.
+	function generatePassword(): void {
+		const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+		const bytes = new Uint32Array(8);
+		crypto.getRandomValues(bytes);
+		form.temp_password = Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
+	}
 
 	async function submit(event: Event): Promise<void> {
 		event.preventDefault();
@@ -60,42 +70,56 @@
 
 	const inputClass =
 		'rounded border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900';
+	const fieldClass = 'flex flex-col gap-1 text-xs text-slate-500';
 </script>
 
-<section class="space-y-6">
-	<h1 class="text-xl font-semibold">{$_('admin.users.title')}</h1>
+<section class="space-y-8">
+	<PageTitle title={$_('admin.users.title')} />
 
-	<form onsubmit={submit} class="flex flex-wrap items-end gap-3">
-		<label class="flex flex-col gap-1 text-xs text-slate-500">
-			{$_('admin.users.username')}
-			<input class={inputClass} bind:value={form.username} required autocomplete="off" />
-		</label>
-		<label class="flex flex-col gap-1 text-xs text-slate-500">
-			{$_('admin.users.firstName')}
-			<input class={inputClass} bind:value={form.first_name} required />
-		</label>
-		<label class="flex flex-col gap-1 text-xs text-slate-500">
-			{$_('admin.users.lastName')}
-			<input class={inputClass} bind:value={form.last_name} required />
-		</label>
-		<label class="flex flex-col gap-1 text-xs text-slate-500">
-			{$_('admin.users.role')}
-			<select class={inputClass} bind:value={form.role}>
-				<option value="user">{$_('admin.users.roleUser')}</option>
-				<option value="admin">{$_('admin.users.roleAdmin')}</option>
-			</select>
-		</label>
-		<label class="flex flex-col gap-1 text-xs text-slate-500">
-			{$_('admin.users.tempPassword')}
-			<input
-				class={inputClass}
-				type="text"
-				bind:value={form.temp_password}
-				required
-				minlength="8"
-				autocomplete="off"
-			/>
-		</label>
+	<form onsubmit={submit} class="max-w-md space-y-3">
+		<div class="grid grid-cols-2 gap-3">
+			<label class={fieldClass}>
+				{$_('admin.users.username')}
+				<input class={inputClass} bind:value={form.username} required autocomplete="off" />
+			</label>
+			<label class={fieldClass}>
+				{$_('admin.users.role')}
+				<select class={inputClass} bind:value={form.role}>
+					<option value="user">{$_('admin.users.roleUser')}</option>
+					<option value="admin">{$_('admin.users.roleAdmin')}</option>
+				</select>
+			</label>
+		</div>
+		<div class="grid grid-cols-2 gap-3">
+			<label class={fieldClass}>
+				{$_('admin.users.firstName')}
+				<input class={inputClass} bind:value={form.first_name} required />
+			</label>
+			<label class={fieldClass}>
+				{$_('admin.users.lastName')}
+				<input class={inputClass} bind:value={form.last_name} required />
+			</label>
+		</div>
+		<div class={fieldClass}>
+			<span>{$_('admin.users.tempPassword')}</span>
+			<div class="flex gap-2">
+				<input
+					class="{inputClass} flex-1"
+					type="text"
+					bind:value={form.temp_password}
+					required
+					minlength="8"
+					autocomplete="off"
+				/>
+				<button
+					type="button"
+					onclick={generatePassword}
+					class="rounded border border-slate-300 px-2 py-1 text-xs whitespace-nowrap hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+				>
+					{$_('admin.users.generate')}
+				</button>
+			</div>
+		</div>
 		<button
 			type="submit"
 			disabled={submitting}

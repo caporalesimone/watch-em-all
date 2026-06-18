@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { _ } from 'svelte-i18n';
 
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { auth } from '$lib/stores/auth';
 </script>
 
-<div class="space-y-3">
-	<h1 class="text-2xl font-semibold">{$_('dashboard.title')}</h1>
+<div class="space-y-8">
+	<PageTitle title={$_('dashboard.title')} />
 	{#if $auth.user}
 		<p>{$_('dashboard.welcome', { values: { name: $auth.user.first_name } })}</p>
 	{/if}
