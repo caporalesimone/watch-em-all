@@ -1,6 +1,6 @@
 # Fase 3 — Catalogo e primo scrape
 
-> Stato: ☐ da iniziare · Prerequisiti: Fase 2 · [Indice del flusso](README.md)
+> Stato: 🚧 in corso — **primo MVP fatto: Gestione utenti (`0.3.0`)**; il catalogo/scrape segue · Prerequisiti: Fase 2 · [Indice del flusso](README.md)
 
 ## Obiettivo
 
@@ -11,6 +11,8 @@ I dati veri entrano nel sistema: contratto `Product`, catalogo con delta e stori
 Incolli l'URL di un prodotto Dragon Store nella pagina del plugin → "Scrape ora" → il prodotto è nel tuo Product Picker con foto, prezzi, sconto e provenienza. Rilanci: zero duplicati, e se il prezzo è cambiato lo storico lo registra.
 
 ## MVP
+
+- [x] **3.U — Gestione utenti (MVP iniziale)** (`0.3.0`): anticipato dalla [Fase 10](#) perché serve un account `user` per provare il resto della fase (i ruoli **non si sovrappongono**: l'admin governa, non possiede carrelli — [personas-and-roles](../1-business/personas-and-roles.md)). Backend: `POST`/`GET /api/admin/users` (admin-only; crea con cambio-pwd forzato, elenca). Frontend: shell **sdoppiato per ruolo** + pagina admin **Users** (crea + elenca; password temporanea generabile in chiaro, 8 alfanumerici). Rimandato alla Fase 10: reset password, disabilita/riabilita, cancellazione differita + restore, filtri, ordinamento ultimo accesso, notifiche di cortesia. Dettaglio: [user-management](../3-features/admin/user-management.md). *Verifica: l'admin crea un `user`, ci si logga; endpoint admin-only.*
 
 ### Backend
 

@@ -99,6 +99,40 @@ export function getPlugins(): Promise<PluginInfo[]> {
 	return apiFetch('/api/plugins').then(asJson<PluginInfo[]>);
 }
 
+// Admin user management (USR-*): create + list. Admin-only on the backend.
+export interface AdminUser {
+	id: number;
+	username: string;
+	first_name: string;
+	last_name: string;
+	role: string;
+	is_active: boolean;
+	must_change_password: boolean;
+	last_login_at: string | null;
+	created_at: string;
+}
+
+export interface NewUser {
+	username: string;
+	first_name: string;
+	last_name: string;
+	role: 'user' | 'admin';
+	temp_password: string;
+}
+
+export function listUsers(): Promise<AdminUser[]> {
+	return apiFetch('/api/admin/users').then(asJson<AdminUser[]>);
+}
+
+export async function createUser(payload: NewUser): Promise<AdminUser> {
+	const res = await apiFetch('/api/admin/users', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(payload)
+	});
+	return asJson<AdminUser>(res);
+}
+
 // oldPassword is required for a normal change and omitted for the forced first
 // change (must_change_password), which the backend accepts without it (auth.md).
 export async function changePassword(newPassword: string, oldPassword?: string): Promise<void> {

@@ -7,6 +7,7 @@ complete by construction.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -52,3 +53,25 @@ class HealthResponse(BaseModel):
     db: str
     version: str
     worker_heartbeat_age_s: float | None = None
+
+
+class UserCreate(BaseModel):
+    # Admin-created account (USR-R1/R15): username + first/last name (both required)
+    # + role + a temporary password the user must change at first login (USR-R2).
+    username: str = Field(min_length=1, max_length=64)
+    first_name: str = Field(min_length=1, max_length=64)
+    last_name: str = Field(min_length=1, max_length=64)
+    role: Literal["admin", "user"]
+    temp_password: str = Field(min_length=8)  # AUTH-R6
+
+
+class AdminUserSummary(BaseModel):
+    id: int
+    username: str
+    first_name: str
+    last_name: str
+    role: str
+    is_active: bool
+    must_change_password: bool
+    last_login_at: datetime | None
+    created_at: datetime

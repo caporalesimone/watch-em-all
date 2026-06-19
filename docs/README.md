@@ -35,4 +35,8 @@ This is the project's **English documentation**, the destined canonical wiki. It
 - [plugin-development/manifest-reference.md](plugin-development/manifest-reference.md) — the `manifest.json` contract
 - and the `core/`, `frontend/` capabilities listed above, plus [api/endpoints.md](api/endpoints.md) (plugin discovery) and [infrastructure/build-system.md](infrastructure/build-system.md) (unified frontend build)
 
+**Phase 3 — Catalog & first scrape (in progress)** — first MVP: user management (0.3.0), pulled forward from phase 10:
+
+- [3-features/admin/user-management.md](3-features/admin/user-management.md) — create + list accounts, the role-split shell; plus the `/api/admin/users` endpoints in [api/endpoints.md](api/endpoints.md)
+
 The remaining business/architecture/feature layers arrive as the corresponding features land in later phases.
