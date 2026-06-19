@@ -20,6 +20,19 @@ So that a standard `user` account can exist (and be used to test the catalog and
 ## Useful Commands
 
 ```bash
-docker compose -f compose-dev.yml up -d --build         # rebuild + restart
+docker compose -f compose-dev.yml up -d --build         # rebuild + restart — app on http://localhost:8080
+docker compose -f compose-dev.yml --profile dev up -d   # also start Adminer (DB browser) on http://localhost:8081
 docker compose -f compose-dev.yml down -v               # reset the DB (admin recreated from .env, must change password)
 ```
+
+**Adminer** (DB browser) — once started with the `dev` profile, open **http://localhost:8081** and log in with:
+
+| Field | Value |
+|---|---|
+| System | PostgreSQL |
+| Server | `db` (the Compose service name, not `localhost`) |
+| Username | `POSTGRES_USER` from `.env` |
+| Password | `POSTGRES_PASSWORD` from `.env` |
+| Database | `POSTGRES_DB` from `.env` |
+
+> The `dev` profile must be passed every time you want Adminer; without it only `db`/`web`/`worker` start.
