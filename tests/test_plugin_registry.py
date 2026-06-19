@@ -26,6 +26,9 @@ from src.core.plugins.base import ScraperPlugin
 class _Plugin(ScraperPlugin):
     plugin_id = "{plugin_id}"
 
+    def identity_seed(self, raw):
+        return None
+
     def router(self):
         router = APIRouter()
 
@@ -55,11 +58,16 @@ _engine = create_engine("sqlite+pysqlite:///:memory:")
 
 
 def _ctx_builder(manifest: Manifest, plugin: BasePlugin) -> PluginContext:
+    def _noop_update_catalog(user_id: int, products: object) -> None:
+        # Registry tests only load plugins (initialize); the callback is never invoked.
+        raise AssertionError("update_catalog should not be called in registry tests")
+
     return PluginContext(
         engine=_engine,
         db=Session(_engine),
         logger=logging.getLogger(f"plugin.{manifest.name}"),
         config={},
+        update_catalog=_noop_update_catalog,  # type: ignore[arg-type]
     )
 
 

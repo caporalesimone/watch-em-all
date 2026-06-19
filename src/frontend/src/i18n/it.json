@@ -10,10 +10,34 @@
 	},
 	"nav": {
 		"dashboard": "Dashboard",
+		"catalog": "Catalogo",
 		"profile": "Profilo",
 		"logout": "Esci",
 		"scrapers": "Scraper",
 		"users": "Utenti"
+	},
+	"catalog": {
+		"title": "Catalogo",
+		"search": "Cerca per nome",
+		"searchAction": "Cerca",
+		"empty": "Il tuo catalogo è vuoto. Configura uno scraper e avvialo dalla sua pagina per popolarlo.",
+		"count": "{total} prodotti",
+		"colSource": "Provenienza",
+		"colImage": "Foto",
+		"colName": "Titolo",
+		"colPriceOriginal": "Prezzo pieno",
+		"colPriceCurrent": "Prezzo",
+		"colDiscount": "Sconto",
+		"colAvailability": "Disponibilità",
+		"colOpen": "Apri",
+		"open": "Apri",
+		"available": "Disponibile",
+		"unavailable": "Esaurito",
+		"removed": "Delistato",
+		"prev": "Precedente",
+		"next": "Successivo",
+		"pageInfo": "Pagina {page} di {pages}",
+		"error": "Impossibile caricare il catalogo."
 	},
 	"admin": {
 		"users": {

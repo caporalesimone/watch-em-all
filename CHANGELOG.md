@@ -4,6 +4,27 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images on GHCR); the GitHub release is then created on that tag (no assets — the deploy kit lives in the repo). Intermediate per-PR versions live only in this file.
 
+## [0.3.2] - 2026-06-20
+
+**Phase 3 — Dragon Store (mock) end-to-end + Product Picker.** The first scraper drives the catalog end-to-end, with the runtime contracts it needs: product identity, the `update_catalog` callback, and a per-scraper manual scrape limited by a cooldown. Dragon Store delivers **mock** products — real identity (from the native id), invented content — so the whole flow (watch a URL → preview → scrape → Product Picker) works before the real parser. Declared mock (flow rule #7): `run_for_user`/`run_test` return hardcoded products and the cooldown interval is a constant (1h), to become a per-scraper admin key in phase 4.
+
+### Added
+
+- **Scraper identity template-method** (`ScraperPlugin`): a plugin implements only `identity_seed`; `normalize_url` / `_stable_id` (sha256) / `external_id_for` are `final` and uniform, so the same product always maps to the same `external_id` across processes (SCR-R10). A scraper without a seed does not load.
+- **`context.update_catalog`**: the Plugin Context binds the Catalog Update Service to its session and the plugin's `plugin_id` — the scraper's only write path.
+- **Per-scraper manual scrape-now with a server-enforced cooldown.** `POST /api/plugins/{scraper}/scrape-now` runs the scraper for the requesting user in the background; the twin `GET` returns the cooldown status `{available, available_at, retry_after_seconds, interval_seconds}`. The anchor (`scrape_cooldown` table) is stamped at the **start** of any scrape and read **only** by the manual one (SCR-R15): a second press within the interval gets `429`. The route is auto-mounted by the web for scrapers that implement `run_for_user` (so the throwaway test plugin gets none).
+- **Dragon Store scraper (mock):** product watches (`kind=product`), `identity_seed` from the native `.gp.<id>.uw` id, `run_for_user` (mock delivery via `update_catalog`) + dry-run `run_test`, watches CRUD + test routes, and `delete_user_data`.
+- **Product Picker** (`/catalog`): the current user's catalog as a server-paginated, sortable (name / price / discount), name-searchable table — source, photo, prices, discount badge, availability and an open link; the empty state points to the scraper pages.
+- **Dragon Store plugin page:** add a product URL, list/remove watches, dry-run preview, and the **Scrape now** button — sober treatment: disabled with a live countdown caption while on cooldown, and a confirm dialog stating the interval.
+
+### Changed
+
+- `ScraperPlugin` is now abstract (`identity_seed` required); the throwaway `tp_scraper` carries a stub.
+
+### Docs
+
+- Reworked the scrape-now spec to **per-scraper, from the scraper page, with a per-scraper cooldown** (new SCR-R15; CAT-R7 re-scoped to the catalog empty state, CAT-R9 dropped; endpoints, Dragon Store capabilities and phase-03/04 updated). Added an English **future-improvements** page (richer cooldown affordance with a progress bar; a catalog-level "scrape all" button).
+
 ## [0.3.1] - 2026-06-19
 
 **Phase 3 — Catalog core (backend).** The catalog now has a place to live: the `Product` contract, the `products`/`price_history` tables and the Catalog Update Service that turns a scraper's delivery into persistent state. No scraper or HTTP yet — those (and the Product Picker UI) follow in the next phase-3 MVPs; this MVP is verified by unit/API tests.

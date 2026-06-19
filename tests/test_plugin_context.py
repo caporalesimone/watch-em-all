@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
-from sqlalchemy import inspect
+from sqlalchemy import inspect, select
 
-from src.core.db import get_engine, init_engine
-from src.core.plugins.base import NotifierPlugin
+from src.core.contracts import Product
+from src.core.db import create_schema, get_engine, init_engine, new_session
+from src.core.models import CatalogProduct
+from src.core.plugins.base import NotifierPlugin, ScraperPlugin
 from src.core.plugins.context import build_context
 from src.core.plugins.manifest import Manifest
 from src.core.plugins.registry import load_plugins
@@ -35,6 +39,9 @@ class _Item(_Base):
 
 class _Plugin(ScraperPlugin):
     plugin_id = "tp_ctx"
+
+    def identity_seed(self, raw):
+        return None
 
     def initialize(self, ctx):
         _Base.metadata.create_all(ctx.engine)
@@ -96,3 +103,47 @@ def test_build_context_shape() -> None:
     assert ctx.config == {}
     assert ctx.engine is get_engine()
     assert "tp_notifier" in ctx.logger.name
+    assert callable(ctx.update_catalog)
+
+
+def test_update_catalog_binding_writes_through_service() -> None:
+    """The bound callback delivers products to the Catalog Update Service under
+    this context's session and the plugin's plugin_id (the only write path)."""
+    init_engine("sqlite+pysqlite:///:memory:")
+    create_schema()
+    manifest = Manifest.model_validate(
+        {
+            "name": "dragon_store",
+            "display_name": "Dragon Store",
+            "type": "scraper",
+            "version": "1.0.0",
+            "api_version": 1,
+            "enabled": True,
+            "backend": {"entry": "backend/__init__.py"},
+        }
+    )
+
+    class _Scraper(ScraperPlugin):
+        plugin_id = "dragon_store"
+
+        def identity_seed(self, raw: object) -> str | None:
+            return None
+
+    ctx = build_context(manifest, _Scraper())
+    product = Product(
+        plugin_id="dragon_store",
+        external_id="abc123",
+        url="https://example.com/p.gp.35880.uw",
+        name="Necronomicon",
+        price_current=Decimal("40.00"),
+        is_available=True,
+        scraped_at=datetime.now(UTC),
+    )
+
+    counters = ctx.update_catalog(7, [product])
+
+    assert counters.new == 1
+    row = new_session().scalar(select(CatalogProduct).where(CatalogProduct.user_id == 7))
+    assert row is not None
+    assert row.plugin_id == "dragon_store"
+    assert row.external_id == "abc123"

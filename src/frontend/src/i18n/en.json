@@ -10,10 +10,34 @@
 	},
 	"nav": {
 		"dashboard": "Dashboard",
+		"catalog": "Catalog",
 		"profile": "Profile",
 		"logout": "Log out",
 		"scrapers": "Scrapers",
 		"users": "Users"
+	},
+	"catalog": {
+		"title": "Catalog",
+		"search": "Search by name",
+		"searchAction": "Search",
+		"empty": "Your catalog is empty. Configure a scraper and run it from its page to populate it.",
+		"count": "{total} products",
+		"colSource": "Source",
+		"colImage": "Photo",
+		"colName": "Title",
+		"colPriceOriginal": "List price",
+		"colPriceCurrent": "Price",
+		"colDiscount": "Discount",
+		"colAvailability": "Availability",
+		"colOpen": "Open",
+		"open": "Open",
+		"available": "Available",
+		"unavailable": "Out of stock",
+		"removed": "Delisted",
+		"prev": "Previous",
+		"next": "Next",
+		"pageInfo": "Page {page} of {pages}",
+		"error": "Could not load the catalog."
 	},
 	"admin": {
 		"users": {

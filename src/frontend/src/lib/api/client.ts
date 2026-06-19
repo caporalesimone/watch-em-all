@@ -99,6 +99,58 @@ export function getPlugins(): Promise<PluginInfo[]> {
 	return apiFetch('/api/plugins').then(asJson<PluginInfo[]>);
 }
 
+// Catalog / Product Picker (CAT-*). Money fields are Decimal serialised as
+// strings (exact, no float drift) — rendered as-is, never parsed for maths.
+export interface CatalogItem {
+	id: number;
+	plugin_id: string;
+	external_id: string;
+	url: string;
+	name: string;
+	image_url: string | null;
+	currency: string;
+	price_current: string;
+	price_original: string;
+	discount_pct: string;
+	is_available: boolean;
+	removed: boolean;
+	extra: Record<string, unknown>;
+	first_seen_at: string;
+	last_seen_at: string;
+}
+
+export interface CatalogPage {
+	items: CatalogItem[];
+	total: number;
+	page: number;
+	page_size: number;
+}
+
+export type CatalogSort = 'name' | 'price_current' | 'discount_pct' | 'last_seen_at';
+
+export interface CatalogQuery {
+	page?: number;
+	page_size?: number;
+	sort?: CatalogSort;
+	order?: 'asc' | 'desc';
+	q?: string;
+	available?: boolean;
+	removed?: boolean;
+}
+
+export function listCatalog(query: CatalogQuery = {}): Promise<CatalogPage> {
+	const p = new URLSearchParams();
+	if (query.page) p.set('page', String(query.page));
+	if (query.page_size) p.set('page_size', String(query.page_size));
+	if (query.sort) p.set('sort', query.sort);
+	if (query.order) p.set('order', query.order);
+	if (query.q) p.set('q', query.q);
+	if (query.available !== undefined) p.set('available', String(query.available));
+	if (query.removed !== undefined) p.set('removed', String(query.removed));
+	const qs = p.toString();
+	return apiFetch(`/api/catalog${qs ? `?${qs}` : ''}`).then(asJson<CatalogPage>);
+}
+
 // Admin user management (USR-*): create + list. Admin-only on the backend.
 export interface AdminUser {
 	id: number;

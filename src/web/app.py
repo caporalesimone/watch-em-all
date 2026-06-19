@@ -18,10 +18,13 @@ from fastapi import Depends, FastAPI
 from src.core.bootstrap import ensure_initial_admin
 from src.core.config import get_settings
 from src.core.db import create_schema, init_engine, new_session
+from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.registry import load_plugins
+from src.core.scrape import implements_scraping
 from src.web.deps import require_user
 from src.web.error_handlers import register_error_handlers
 from src.web.routers import admin_users, auth, catalog, health, me, plugins
+from src.web.routers.scrape import make_scrape_now_router
 from src.web.spa import SpaStaticFiles
 
 logging.basicConfig(level=logging.INFO)
@@ -52,6 +55,22 @@ def create_app() -> FastAPI:
         # are logged; the core stays up. Stored for the discovery endpoint. Every
         # plugin route sits behind authentication (#3).
         _app.state.loaded_plugins = load_plugins(_app, router_dependencies=[Depends(require_user)])
+        # Standard per-scraper scrape-now routes (SCR-R15): mounted here in the web
+        # (they need the authenticated user + a request session, so they cannot
+        # live in the web-free core base) for every scraper that actually implements
+        # run_for_user — a non-scraping test plugin gets no broken endpoint. The
+        # handlers carry their own auth (UserDep).
+        for lp in _app.state.loaded_plugins:
+            if (
+                isinstance(lp.plugin, ScraperPlugin)
+                and lp.manifest.frontend is not None
+                and implements_scraping(lp.plugin)
+            ):
+                _app.include_router(
+                    make_scrape_now_router(lp),
+                    prefix=f"/api{lp.manifest.frontend.route_base}",
+                    tags=[f"Plugin: {lp.manifest.name}"],
+                )
         # Mount the built SPA LAST (catch-all on "/"), after the core routers (added
         # at construction) and the plugin routers (added just above), so every /api
         # route — plugins included — takes precedence over the SPA fallback.

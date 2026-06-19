@@ -1,18 +1,29 @@
 """Plugin base contracts (2.B2, plugin-architecture.md).
 
-Two families derive from a common base. Phase 2 keeps the contract minimal: the
-type-specific runtime methods (run_for_user, send, config schemas, ...) arrive in
-later phases. A plugin instance is exported as `plugin` from its backend entry
-(2.B2 decision) and its `plugin_id` must equal the manifest `name`.
+Two families derive from a common base. A plugin instance is exported as
+`plugin` from its backend entry (2.B2 decision) and its `plugin_id` must equal
+the manifest `name`.
+
+Scrapers add the identity template-method (SCR-R10 / product.md): the plugin
+supplies only the SEED (``identity_seed``, abstract — a scraper without it does
+not load); normalisation and hashing are FINAL and identical for every scraper,
+so the same product always maps to the same ``external_id`` across processes
+(worker vs web). The runtime methods (``run_for_user`` / ``run_test``) arrive
+with the scraper runtime; their write path is the ``context.update_catalog``
+callback (the scraper never writes the catalog directly).
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import hashlib
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Any, final
+from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter
 
 if TYPE_CHECKING:
+    from src.core.contracts import DeltaCounters, Product
     from src.core.plugins.context import PluginContext
 
 
@@ -34,8 +45,58 @@ class BasePlugin:
         Default: no-op (plugins without per-user data)."""
 
 
-class ScraperPlugin(BasePlugin):
-    """Scraper family. Phase 2: marker base; run/config contracts land later."""
+class ScraperPlugin(BasePlugin, ABC):
+    """Scraper family (scraper-plugin.md).
+
+    Identity is a template method (SCR-R10): the plugin implements only
+    ``identity_seed``; ``normalize_url`` / ``_stable_id`` / ``external_id_for``
+    are ``final`` and uniform for all scrapers. ``run_for_user`` / ``run_test``
+    are the runtime entry points (real scrapers override them).
+    """
+
+    @abstractmethod
+    def identity_seed(self, raw: Any) -> str | None:
+        """The site-specific identity seed, the ONLY site-specific point of the
+        identity. Returns the native SKU/ID (preferred — stable by construction),
+        or ``None`` to fall back to the URL. NEVER titles/descriptions: they
+        change. Being abstract, a scraper that omits it does not instantiate, so
+        the registry rejects it at load instead of breaking history in production.
+        """
+
+    @final
+    @staticmethod
+    def normalize_url(url: str) -> str:
+        """Drop volatile query/fragment, lowercase the host, strip the trailing
+        slash. FINAL: identical for every scraper."""
+        p = urlsplit(url.strip())
+        return urlunsplit((p.scheme.lower(), p.netloc.lower(), p.path.rstrip("/"), "", ""))
+
+    @final
+    @staticmethod
+    def _stable_id(seed: str) -> str:
+        """Any string -> a fixed 16-hex (64-bit) id, deterministic across
+        processes. NEVER the built-in ``hash()`` (randomised by PYTHONHASHSEED)."""
+        return hashlib.sha256(seed.encode("utf-8")).hexdigest()[:16]
+
+    @final
+    def external_id_for(self, raw: Any, url: str) -> str:
+        """Orchestration: plugin seed -> URL fallback -> uniform hashing. The
+        plugin never fills ``external_id`` by hand; it calls this when building a
+        ``Product``."""
+        return self._stable_id(self.identity_seed(raw) or self.normalize_url(url))
+
+    def run_for_user(self, context: PluginContext, user_id: int) -> DeltaCounters:
+        """Scrape this user's inputs and deliver the current products through
+        ``context.update_catalog`` (the only write path), returning the delta
+        counters. The default raises so a misconfigured scraper fails loudly;
+        real scrapers override it."""
+        raise NotImplementedError(f"{self.plugin_id}: run_for_user not implemented")
+
+    def run_test(self, context: PluginContext, params: dict[str, Any]) -> list[Product]:
+        """Dry-run (SCR-R11): produce the products for UI-provided ``params``
+        WITHOUT writing anything (neither catalog nor inputs). Real scrapers
+        override it."""
+        raise NotImplementedError(f"{self.plugin_id}: run_test not implemented")
 
 
 class NotifierPlugin(BasePlugin):
