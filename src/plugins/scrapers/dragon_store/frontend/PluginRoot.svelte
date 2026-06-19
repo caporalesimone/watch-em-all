@@ -169,7 +169,7 @@
 </script>
 
 <section class="space-y-8">
-	<header class="space-y-1">
+	<header class="space-y-4">
 		<h1 class="text-xl font-semibold">{$_('dragon_store.title')}</h1>
 		<p class="max-w-prose text-sm text-slate-500">{$_('dragon_store.blurb')}</p>
 	</header>

@@ -15,6 +15,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - **Scrape now** pulls your watched products into the catalog on demand.
 - Right after a scrape, **Scrape now** rests for a while — the button shows a countdown until it's available again.
 - New **Catalog** page: your products in a searchable, sortable, paginated table — price, discount, availability, source, and a link to the shop.
+- Tidied the shell: the empty top bar is gone, and the light/dark theme toggle now lives in **Profile → Settings**.
 
 _Under the hood:_ the first scraper drives the catalog end-to-end with **mock** data — real product identity (from the site's native id), invented prices — so the whole flow works before the real parser arrives. Scrapers write only through the catalog service; the manual scrape is rate-limited per scraper by a cooldown (a constant for now, admin-configurable in phase 4). Product identity is a shared template-method, so a product keeps the same id across runs. Spec reworked accordingly (SCR-R15), plus an English future-improvements page; `tp_scraper` stays as a throwaway test plugin.
 

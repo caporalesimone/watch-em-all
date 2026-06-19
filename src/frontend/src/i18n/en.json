@@ -96,6 +96,10 @@
 		"role": "Role",
 		"language": "Language",
 		"languageValue": "English",
+		"settings": "Settings",
+		"theme": "Theme",
+		"themeDark": "Dark",
+		"themeLight": "Light",
 		"changePassword": "Change password"
 	},
 	"dashboard": {

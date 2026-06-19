@@ -40,7 +40,7 @@ Il **cambio password forzato** (CHG) mostra solo *nuova password* + *conferma*: 
 ## Shell e navigazione
 
 - **Sidebar sinistra persistente**: Dashboard · Product Picker · Carrelli · Storico prezzi · Storico alert (badge non letti) · Profilo · *(separatore)* · gruppo **SCRAPERS** collassabile (default aperto), **ultimo** così cresce senza spostare le voci core; voci dinamiche da `GET /api/plugins` con icona e route del plugin.
-- **Header**: toggle tema (il selettore lingua è previsto ma non esposto in V1, English-only). I notifier **non** sono in nav (stanno in Profilo).
+- **Niente barra superiore**: il toggle **tema** (chiaro/scuro) vive nel **Profilo → Impostazioni** (il selettore lingua è previsto ma non esposto in V1, English-only). I notifier **non** sono in nav (stanno in Profilo).
 - **Area admin**: sezione separata visibile solo con ruolo admin (dashboard di sistema, utenti, scheduler, monitoraggio, config plugin, log, impostazioni).
 
 ## Tema e lingua

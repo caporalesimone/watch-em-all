@@ -7,7 +7,6 @@
 	import { _ } from 'svelte-i18n';
 
 	import { getHealth } from '$lib/api/client';
-	import Header from '$lib/components/Header.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import { setupI18n } from '$lib/i18n';
 	import { auth, bootstrap } from '$lib/stores/auth';
@@ -84,10 +83,7 @@
 {:else if showShell}
 	<div class="flex h-full">
 		<Sidebar />
-		<div class="flex flex-1 flex-col">
-			<Header />
-			<main class="flex-1 overflow-auto p-6">{@render children()}</main>
-		</div>
+		<main class="flex-1 overflow-auto p-6">{@render children()}</main>
 	</div>
 {:else}
 	<main class="flex h-full items-center justify-center p-6">{@render children()}</main>
