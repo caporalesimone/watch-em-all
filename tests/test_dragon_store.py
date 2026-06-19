@@ -8,6 +8,9 @@ through ``app.state.loaded_plugins`` to avoid importing the plugin package.
 
 from __future__ import annotations
 
+from typing import cast
+
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.core.plugins.context import build_context
@@ -57,8 +60,9 @@ def _user(client: TestClient, username: str = "alice") -> tuple[int, str]:
     return _make_user(client, _admin_token(client), username)
 
 
-def _dragon(client: TestClient):  # type: ignore[no-untyped-def]
-    return next(lp for lp in client.app.state.loaded_plugins if lp.manifest.name == "dragon_store")
+def _dragon(client: TestClient):  # type: ignore[no-untyped-def]  # test helper: returns the loaded plugin
+    app = cast(FastAPI, client.app)
+    return next(lp for lp in app.state.loaded_plugins if lp.manifest.name == "dragon_store")
 
 
 # --- HTTP: watches CRUD ---
