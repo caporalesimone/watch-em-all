@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every PR carries exactly one version bump and one entry here (1 MVP = 1 PR = 1 version). Release tags are **not** per-PR: the owner creates a plain SemVer `x.y.z` tag (no `v` prefix) **by hand** when a release is wanted, and pushing it triggers the publish workflow (versioned images on GHCR); the GitHub release is then created on that tag (no assets — the deploy kit lives in the repo). Intermediate per-PR versions live only in this file.
 
+## [0.3.1] - 2026-06-19
+
+**Phase 3 — Catalog core (backend).** The catalog now has a place to live: the `Product` contract, the `products`/`price_history` tables and the Catalog Update Service that turns a scraper's delivery into persistent state. No scraper or HTTP yet — those (and the Product Picker UI) follow in the next phase-3 MVPs; this MVP is verified by unit/API tests.
+
+### Added
+
+- **`Product` contract + `DeltaCounters`** (`src/core/contracts.py`): the single type a scraper produces (product.md). Price/discount fields left `None` are resolved by the core (PROD-R1).
+- **Catalog tables** (`products`, `price_history`): identity is `UNIQUE (user_id, plugin_id, external_id)` (CATSVC-R2); history is append-only with a CASCADE FK; per-user (DB-R1). Money stored as `Numeric`/`Decimal`.
+- **Catalog Update Service** (`update_catalog(session, user_id, plugin_id, products) → DeltaCounters`): the sole catalog write path (CATSVC-R1). Resolves missing prices (CATSVC-R3), classifies the delta (new/updated/price-change/removed), appends a history entry **only** on a price **or** availability change (CATSVC-R4), and delists rows absent from the delivery — a reappearing row clears `removed` (CATSVC-R5). `plugin_id` is explicit so an empty delivery still delists.
+- **`GET /api/catalog`**: the current user's catalog (scoped to the token's user), paginated, sortable (`name`/`price_current`/`discount_pct`/`last_seen_at`) and filterable (name search, availability, delisted). Auth-gated.
+
 ## [0.3.0] - 2026-06-19
 
 **Phase 3 — Catalog and first scrape** (in progress). First MVP: **user management**, pulled forward from phase 10 so a standard `user` account can exist before the catalog itself. Roles don't overlap (personas-and-roles.md): an admin governs the system and never owns a personal catalog/cart; whoever wants to monitor prices uses a separate `user` account. The catalog, the Dragon Store scraper and the Product Picker follow.

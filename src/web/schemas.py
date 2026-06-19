@@ -7,7 +7,8 @@ complete by construction.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from decimal import Decimal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -75,3 +76,30 @@ class AdminUserSummary(BaseModel):
     must_change_password: bool
     last_login_at: datetime | None
     created_at: datetime
+
+
+class CatalogItem(BaseModel):
+    # One product row of the current user's catalog, as the Product Picker reads
+    # it. Money is Decimal (serialised as a JSON string — exact, no float drift).
+    id: int
+    plugin_id: str
+    external_id: str
+    url: str
+    name: str
+    image_url: str | None
+    currency: str
+    price_current: Decimal
+    price_original: Decimal
+    discount_pct: Decimal
+    is_available: bool
+    removed: bool
+    extra: dict[str, Any]
+    first_seen_at: datetime
+    last_seen_at: datetime
+
+
+class CatalogPage(BaseModel):
+    items: list[CatalogItem]
+    total: int
+    page: int
+    page_size: int
