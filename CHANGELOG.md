@@ -20,27 +20,22 @@ _Under the hood:_ the first scraper drives the catalog end-to-end with **mock** 
 
 ## [0.3.1] - 2026-06-19
 
-**Phase 3 — Catalog core (backend).** The catalog now has a place to live: the `Product` contract, the `products`/`price_history` tables and the Catalog Update Service that turns a scraper's delivery into persistent state. No scraper or HTTP yet — those (and the Product Picker UI) follow in the next phase-3 MVPs; this MVP is verified by unit/API tests.
+**Phase 3 — groundwork for the catalog (nothing visible yet).**
 
-### Added
+- No user-facing change: this lays the foundations the catalog and scrapers build on.
 
-- **`Product` contract + `DeltaCounters`** (`src/core/contracts.py`): the single type a scraper produces (product.md). Price/discount fields left `None` are resolved by the core (PROD-R1).
-- **Catalog tables** (`products`, `price_history`): identity is `UNIQUE (user_id, plugin_id, external_id)` (CATSVC-R2); history is append-only with a CASCADE FK; per-user (DB-R1). Money stored as `Numeric`/`Decimal`.
-- **Catalog Update Service** (`update_catalog(session, user_id, plugin_id, products) → DeltaCounters`): the sole catalog write path (CATSVC-R1). Resolves missing prices (CATSVC-R3), classifies the delta (new/updated/price-change/removed), appends a history entry **only** on a price **or** availability change (CATSVC-R4), and delists rows absent from the delivery — a reappearing row clears `removed` (CATSVC-R5). `plugin_id` is explicit so an empty delivery still delists.
-- **`GET /api/catalog`**: the current user's catalog (scoped to the token's user), paginated, sortable (`name`/`price_current`/`discount_pct`/`last_seen_at`) and filterable (name search, availability, delisted). Auth-gated.
+_Under the hood:_ adds the `Product` contract every scraper produces and the catalog tables (`products` + an append-only `price_history`, per-user, identity `user_id + plugin_id + external_id`). The Catalog Update Service is the **single write path**: it fills in missing prices, classifies each change (new / updated / price change / delisted), records history only when price or availability changes, and delists products missing from a delivery — a reappearing one comes back. `GET /api/catalog` reads the user's catalog (paginated, sortable, filterable). Backend only, verified by unit/API tests.
 
 ## [0.3.0] - 2026-06-19
 
-**Phase 3 — Catalog and first scrape** (in progress). First MVP: **user management**, pulled forward from phase 10 so a standard `user` account can exist before the catalog itself. Roles don't overlap (personas-and-roles.md): an admin governs the system and never owns a personal catalog/cart; whoever wants to monitor prices uses a separate `user` account. The catalog, the Dragon Store scraper and the Product Picker follow.
+**Phase 3 — admins can create the accounts that use the app.**
 
-### Added
+- Admins create user accounts (username, name, role, a temporary password) and see them in a list.
+- A new account must change its temporary password at first login.
+- The app splits by role: admins get an admin area, regular users get their own — no mixing.
+- No self-registration: only an admin creates accounts.
 
-- **Admin user management — create + list.** `POST /api/admin/users` creates an account (username, first/last name, role, temporary password) with a forced first-login password change (USR-R1/R2/R15); `GET /api/admin/users` lists accounts. Admin-only; duplicate username → 409; no self-registration.
-- **Role-based shell.** The SPA now splits by role: an admin lands in the admin area (a **Users** page with a create form + list) and never sees the user dashboard or the SCRAPERS group; a standard user sees the user area. Profile and Log out are common; the route guard keeps each role in its lane and plugin discovery loads only for users.
-
-### Deferred to phase 10
-
-- The richer account lifecycle: reset password, disable/enable, deferred soft-delete (grace period + restore), status filters, last-login sort, courtesy notifications, and the per-user load dashboard.
+_Under the hood:_ `POST`/`GET /api/admin/users` (admin-only; duplicate username → 409), the forced first-login password change, and a role-based shell with a route guard (plugin discovery loads only for users). User management was pulled forward from phase 10 so a `user` account can exist before the catalog. Deferred to phase 10: reset password, disable/enable, soft-delete with grace + restore, status filters, last-login sort, courtesy notifications, the load dashboard.
 
 ## [0.2.0] - 2026-06-18
 
