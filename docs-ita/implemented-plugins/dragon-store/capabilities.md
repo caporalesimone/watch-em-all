@@ -77,7 +77,8 @@ def get_adjustments(self, cart_total):
 | `image_url` | JSON-LD `image` | URL già assoluto |
 | `brand` | `text` = JSON-LD `brand.name`; `link` = DOM `tr.T9 > a[href]` reso assoluto | `link` opzionale (PROD-R6) |
 | `product_properties` | sanitizer del titolo + disponibilità | vedi sotto (PROD-R5) |
-| `extra` | JSON-LD | `sku` (codice articolo), `priceValidUntil`, `category`, `description` |
+| `category` | JSON-LD `BreadcrumbList` (`itemListElement` → `name` + `@id` relativo reso assoluto), root → leaf | breadcrumb (PROD-R7), costruito con `add_child` |
+| `extra` | JSON-LD | `sku` (codice articolo), `priceValidUntil`, `category` (stringa piatta), `description` |
 
 **Mappa disponibilità** (`schema.org` → `is_available` + tag):
 
@@ -101,6 +102,8 @@ Oltre al sanitizer, lo stato **`PreOrder`** aggiunge il tag **"Pre Order"** (che
 ## Route del plugin
 
 Sotto `/api/plugins/dragon-store` ([convenzione](../../api/endpoints.md#rotte-plugin-specific)): `config-schema/{admin|user}`, `admin-config` (GET/PUT), `test` (dry-run), `scrape-now` (POST scrape immediato dell'utente + GET stato cooldown), `watches` (GET/POST/DELETE). Lo `scrape-now` e il suo cooldown sono forniti dalla base `ScraperPlugin` (convenzione del core, non riscritti dal plugin). Tag Swagger: `Plugin: Dragon Store`.
+
+**Watches**: `POST /watches` rifiuta un URL **già presente** per l'utente (`409 duplicate_watch`) e fa uno **scrape one-off** (`_dry_context`, nessuna scrittura sul catalogo) per risolvere subito il titolo, salvando uno **snapshot** del prodotto (titolo, immagine, marca, tag, categoria) sulla riga watch (colonna `snapshot_json`), aggiornato a ogni run schedulata/manuale. La pagina utente mostra perciò le watch come la **preview**: immagine, titolo (link), marca, categoria, colonna tag e tasto Remove — il titolo c'è già all'aggiunta, senza dipendere dal catalogo.
 
 ## Pre-analisi del sito (giugno 2026, una pagina di categoria)
 
