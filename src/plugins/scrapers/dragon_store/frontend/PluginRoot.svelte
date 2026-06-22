@@ -108,6 +108,10 @@
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ url: url.trim() })
 		});
+		if (res.status === 409) {
+			error = $_('dragon_store.watches.duplicate');
+			return;
+		}
 		if (!res.ok) {
 			error = $_('dragon_store.error');
 			return;

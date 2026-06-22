@@ -9,7 +9,8 @@
 			"add": "Add watch",
 			"empty": "No watched products yet. Paste a product URL above.",
 			"remove": "Remove",
-			"invalid": "Enter a product URL first."
+			"invalid": "Enter a product URL first.",
+			"duplicate": "You are already watching this URL."
 		},
 		"dry_run": {
 			"action": "Preview (dry-run)",

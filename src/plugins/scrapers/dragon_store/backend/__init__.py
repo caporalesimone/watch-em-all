@@ -199,6 +199,9 @@ class DragonStorePlugin(ScraperPlugin):
             url = body.url.strip()
             if not url:
                 raise APIError(422, "invalid_url", "url must not be empty")
+            already = db.scalar(select(Watch).where(Watch.user_id == user.sub, Watch.url == url))
+            if already is not None:
+                raise APIError(409, "duplicate_watch", "this URL is already watched")
             watch = Watch(user_id=user.sub, kind="product", url=url)
             db.add(watch)
             db.commit()

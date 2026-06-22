@@ -161,6 +161,16 @@ def test_watches_are_per_user(client: TestClient) -> None:
     assert client.get(f"{DS}/watches", headers=_bearer(tb)).json() == []
 
 
+def test_add_duplicate_watch_rejected(client: TestClient) -> None:
+    _uid, token = _user(client)
+    h = _bearer(token)
+    assert client.post(f"{DS}/watches", json={"url": URL_A}, headers=h).status_code == 201
+    dup = client.post(f"{DS}/watches", json={"url": URL_A}, headers=h)
+    assert dup.status_code == 409
+    assert dup.json()["code"] == "duplicate_watch"
+    assert len(client.get(f"{DS}/watches", headers=h).json()) == 1  # still one
+
+
 # --- HTTP: dry-run (real scrape, no write) ---
 
 
