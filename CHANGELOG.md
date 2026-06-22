@@ -6,6 +6,17 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 Each entry is **short** and reads as a user-facing story: first a **bullet list of what changed for you** (additions, removals and changes together, light on jargon), then a brief **_under the hood_** paragraph on the architectural/technical changes. Older entries predate this style and are left as they are.
 
+## [0.3.3] - 2026-06-22
+
+**Phase 3 — real Dragon Store scraping (the mock is gone).**
+
+- **Scrape now** and the dry-run preview now read the real product page: real title, price, list price, availability, image and **brand**.
+- Products show their **brand** (a link through to the shop when available) and **tags** such as _Edizione Limitata_, _Offerta Raven Prime_ or _Pre Order_ — in both the Catalog and the dry-run preview.
+- Marketing labels are stripped from the product name and shown as tags instead, so titles stay clean.
+- Pre-order items ("Prossimamente") count as orderable and are tagged _Pre Order_; out-of-stock items are marked unavailable.
+
+_Under the hood:_ a new `context.http` client gives every scraper politeness (a minimum interval between requests), a timeout, an identifiable user-agent, a request counter and short retries with backoff on transient errors (stdlib only — no new dependency). The Dragon Store parser reads the page's JSON-LD `Product` as the primary, unambiguous source and takes the list price from the detail table, decoding windows-1252 + HTML entities and ignoring the page's many related products. `Product` gains `brand` (text + optional link) and `product_properties` (a generic tag list the scraper fills; the base supplies `add_property`/`get_properties`). The title sanitizer is Dragon-Store-specific, driven by a hand-maintained label list. Verified offline against five saved real-page fixtures.
+
 ## [0.3.2] - 2026-06-20
 
 **Phase 3 — watch a Dragon Store product and find it in your catalog.**

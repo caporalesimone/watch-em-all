@@ -1,6 +1,6 @@
 # Phase 3 — Catalog & first scrape
 
-> Feature-level recap. **In progress** — this file grows as the phase-3 MVPs land. The **first MVP is user management** (0.3.0), pulled forward from phase 10 so a standard `user` account can exist before the catalog itself; the catalog, the Dragon Store scraper and the Product Picker follow.
+> Feature-level recap. **In progress** — this file grows as the phase-3 MVPs land. User management came first (0.3.0, pulled forward from phase 10 so a standard `user` account can exist before the catalog); the catalog, the Dragon Store scraper and the Product Picker followed, with **real** scraping replacing the initial mock in 0.3.3.
 
 ## What's implemented
 
@@ -11,6 +11,14 @@ So that a standard `user` account can exist (and be used to test the catalog and
 - **Roles don't overlap.** An admin **governs** (creates accounts; later: scrapers, settings) and has **no** personal catalog/cart/notifications. Whoever wants to monitor prices uses a separate `user` account. There is **no self-registration**.
 - **Admin → Users page** (`/admin/users`): a create form (username, first/last name, role, temporary password) + a list (username, name, role, status, last login). The new account must change its temporary password at first login.
 - **The shell splits by role:** an admin lands in the admin area and never sees the user dashboard / SCRAPERS group; a standard user sees the user area. Profile and Log out are common.
+
+### 2) Catalog, Dragon Store scraper & Product Picker — 0.3.1 → 0.3.3
+
+- **Watch a Dragon Store product** by pasting its URL on the scraper's page; **preview** a scrape without saving (dry-run), or **Scrape now** to pull your watched products into the catalog. Scrape now is rate-limited per scraper by a cooldown — the button shows a countdown until it's available again.
+- **Catalog page:** your products in a searchable, sortable, paginated table — price, list price, discount, availability, source, **brand** and a link to the shop.
+- **Real scraping (0.3.3):** the scraper reads the live product page — real title, prices, availability, image and **brand** (a link to the shop where available). Marketing/edition labels (e.g. _Edizione Limitata_, _Offerta Raven Prime_) are stripped from the title and shown as **tags**; pre-order items are tagged _Pre Order_ and count as orderable, while out-of-stock items are marked unavailable.
+
+_Under the hood:_ the `Product` contract + per-user catalog tables (`products` / append-only `price_history`) with the Catalog Update Service as the single write path (delta, history, delisting). A polite, counted, retrying `context.http` client; the Dragon Store parser reads the page's JSON-LD `Product` and takes the list price from the detail table (decoding windows-1252 + HTML entities), ignoring the page's many related products. `brand` (text + optional link) and `product_properties` (tags) are generic `Product` fields the core just persists; the title sanitizer is Dragon-Store-specific.
 
 ## Good to know
 
