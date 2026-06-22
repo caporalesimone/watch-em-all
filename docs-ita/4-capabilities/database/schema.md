@@ -35,7 +35,7 @@ erDiagram
 
 | Tabella | Colonne | Note |
 |---|---|---|
-| `products` | id, user_id FK, plugin_id, external_id, url, name, image_url, extra_json, currency, price_current, price_original, discount_pct, is_available, removed, first_seen_at, last_seen_at | **UNIQUE (user_id, plugin_id, external_id)** = identità del prodotto; catalogo per-utente |
+| `products` | id, user_id FK, plugin_id, external_id, url, name, image_url, brand_text, brand_link, product_properties (JSON), extra_json, currency, price_current, price_original, discount_pct, is_available, removed, first_seen_at, last_seen_at | **UNIQUE (user_id, plugin_id, external_id)** = identità del prodotto; catalogo per-utente. `brand_text`/`brand_link` (PROD-R6, link opzionale) e `product_properties` (array JSON di tag, PROD-R5) sono dati dello scraper, persistiti senza interpretazione |
 | `price_history` | id, product_id FK **CASCADE**, user_id, price_current, price_original, discount_pct, is_available, recorded_at | Append-only; entry su cambio prezzo **o** disponibilità; INDEX (product_id, recorded_at); **nessuna retention** |
 
 ## Carrelli

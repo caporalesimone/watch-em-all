@@ -1,6 +1,6 @@
 # Dragon Store — Capabilities
 
-> **Implemented plugin** · Dettaglio tecnico (pseudocodice ammesso). File: `backend/__init__.py`, `plugin.py`, `parser.py`, `discount.py`, `routes.py`.
+> **Implemented plugin** · Dettaglio tecnico (pseudocodice ammesso). File: `backend/__init__.py`, `plugin.py`, `parser.py`, `sanitizer.py` (+ JSON etichette), `discount.py`, `routes.py`.
 
 ## Tabelle del plugin
 
@@ -35,6 +35,8 @@ Una richiesta alla volta via `context.http` (politeness imposta dal core); pagin
 
 Nota su DRG-R8 (l'inclusione vince): il filtro ammaccati avviene **per-watch, prima del merge** — un prodotto filtrato dalla categoria A ma incluso dalla categoria B (o aggiunto come singolo) sopravvive naturalmente al dedup, senza logica speciale.
 
+> **Fase 3 (MVP)**: si implementa **solo il ramo `kind=product`** (scheda singola via `scrape_product`); categorie, filtro ammaccati e paginazione sono **fase 9**. Il parsing reale della scheda è documentato sotto (§ Scheda prodotto `.gp`).
+
 ## Adjustments
 
 ```
@@ -52,6 +54,49 @@ def get_adjustments(self, cart_total):
 ## Identità del prodotto
 
 **Pre-analisi (vedi sotto)**: il sito espone un **ID numerico nativo** per prodotto, presente sia nell'URL della scheda (`...gp.<id>.uw`, es. `gp.35880.uw`) sia nella card di listing (`id="r_35880"`, `data-id="prod_35880"`), oltre a un **codice articolo** (`Cod. art.`, es. `XRDCT21`). Strategia: `identity_seed` restituisce l'**id numerico nativo** (stabile e univoco per costruzione), o `None` se non estraibile in qualche contesto → la base applica il fallback `normalize_url(url)` e l'hashing (SCR-R10); `external_id` non è mai assegnato a mano. Il codice articolo si conserva in `extra` come dato informativo.
+
+## Scheda prodotto (`.gp`): parsing reale (studio ad hoc, giugno 2026)
+
+> Verificato su 5 schede reali (`gp.896`, `36099`, `27006`, `34602`, `30708`): scontata, prezzo pieno, esaurita, **preorder**, edizione limitata, categoria diversa. La scheda è server-rendered come la categoria → HTTP + parsing, niente browser headless.
+
+**DRG-Q7 chiusa**: la scheda `.gp` espone un **JSON-LD `Product`** (oltre a `BreadcrumbList`). È la fonte **primaria** del parsing — robusta e non ambigua: la pagina contiene anche **20-46 prodotti correlati** (card con prezzi propri), quindi un parsing DOM "ingenuo" prenderebbe il prodotto sbagliato. Àncore univoche del prodotto principale: **un solo `<h1>`** e **una sola riga `tr.availability`**; i dati DOM si leggono sempre **scoped alla tabella di dettaglio**, mai con selettori page-wide.
+
+**Encoding**: la pagina dichiara `iso-8859-1` ma è in realtà **`windows-1252`** (il byte `0x80` = `€`); inoltre alcuni testi sono **entità HTML** (`Citt&#224;`→Città), altri byte raw (`più`). Il parser **decodifica `cp1252`** e poi applica **`html.unescape()`** su ogni testo estratto.
+
+**Mappatura `Product`** (fonte per campo):
+
+| Campo | Fonte | Note |
+|---|---|---|
+| `external_id` | URL → `identity_seed` (id nativo `gp.<id>`) | invariato, vedi § Identità |
+| `name` | JSON-LD `name` → **sanitizer del titolo** (sotto) | poi `html.unescape` |
+| `price_current` | JSON-LD `offers.price` | punto decimale, già pulito |
+| `price_original` | DOM riga **"P. Listino"** (`tr.D1`) della tabella principale | virgola → `Decimal`; == corrente se prezzo pieno (→ sconto 0 lato core) |
+| `discount_pct` | — (lasciato `None`) | lo calcola il core (CATSVC) |
+| `currency` | JSON-LD `priceCurrency` | EUR |
+| `is_available` | JSON-LD `offers.availability` | mappa sotto |
+| `image_url` | JSON-LD `image` | URL già assoluto |
+| `brand` | `text` = JSON-LD `brand.name`; `link` = DOM `tr.T9 > a[href]` reso assoluto | `link` opzionale (PROD-R6) |
+| `product_properties` | sanitizer del titolo + disponibilità | vedi sotto (PROD-R5) |
+| `extra` | JSON-LD | `sku` (codice articolo), `priceValidUntil`, `category`, `description` |
+
+**Mappa disponibilità** (`schema.org` → `is_available` + tag):
+
+| `offers.availability` | DOM | `is_available` | tag |
+|---|---|---|---|
+| `InStock` | `span.fullAV` ("Disponibile") | `True` | — |
+| `OutOfStock` | `span.noAV` ("Non Disponibile") | `False` | — |
+| `PreOrder` | `span.inArrivalAV` ("Prossimamente") | **`True`** (ordinabile) | **"Pre Order"** |
+| *altro / sconosciuto* | — | `False` | — (+ log per scoprire il nuovo stato) |
+
+## Sanitizer del titolo e `product_properties`
+
+Il titolo del sito porta a volte **etichette commerciali / di edizione** che non fanno parte del nome del prodotto (es. `OFFERTA RAVEN PRIME - …`, `EDIZIONE LIMITATA - …`). Il sanitizer **è specifico di Dragon Store** (non del core; altri scraper possono non averne):
+
+- una lista di etichette **hardcoded in un JSON del plugin**, caricata all'avvio — popolata nel tempo dal manutentore; rappresenta le `product_properties` **possibili** estraibili dal titolo;
+- ad ogni scrape, per ogni etichetta presente nel titolo (match **case-insensitive**): viene **tolta dal titolo** e **aggiunta** ai tag via `add_property` (SCR-R16) nella sua **forma canonica** dal JSON;
+- sia l'etichetta sia il **titolo residuo** sono **trimmati** da spazi e simboli in testa/coda (es. `"OFFERTA RAVEN PRIME -  "` → `"OFFERTA RAVEN PRIME"`; il titolo perde il `" - "` iniziale rimasto).
+
+Oltre al sanitizer, lo stato **`PreOrder`** aggiunge il tag **"Pre Order"** (che non viene dal titolo). Tutti i tag finiscono in `product_properties` (PROD-R5); la UI li mostra come elenco. L'elenco delle etichette del JSON è **consultabile dall'admin** (vista read-only; arriva con le pagine admin).
 
 ## Route del plugin
 
@@ -94,12 +139,12 @@ Sotto `/api/plugins/dragon-store` ([convenzione](../../api/endpoints.md#rotte-pl
 
 | ID | Punto | Stato |
 |---|---|---|
-| DRG-Q1 | Dati nel DOM iniziale vs AJAX | ✅ **chiuso (provvisorio)**: listing server-rendered con prezzi e disponibilità; da confermare sulla scheda prodotto |
+| DRG-Q1 | Dati nel DOM iniziale vs AJAX | ✅ **chiuso**: confermato anche sulla **scheda prodotto** (server-rendered, JSON-LD `Product` presente) |
 | DRG-Q2 | Browser headless necessario? | ✅ **chiuso (provvisorio)**: no — HTTP + parsing HTML sufficiente per le categorie |
 | DRG-Q3 | SKU/ID nativo stabile | ✅ **chiuso**: id numerico nativo (`gp.<id>`/`r_<id>`) + codice articolo; vedi § Identità |
 | DRG-Q4 | Paginazione delle categorie | 🔶 **ridotto**: la categoria campione è single-page (45 card); verificare categorie grandi |
-| DRG-Q5 | Segnalazione "ammaccato" e out-of-stock | ✅ **chiuso**: titolo `AMMACCATO - …` (schede dedicate); `span.fullAV`/`span.noAV` |
+| DRG-Q5 | Segnalazione "ammaccato" e disponibilità | ✅ **chiuso**: titolo `AMMACCATO - …` (schede dedicate); disponibilità a **3 stati** — `InStock`/`fullAV`, `OutOfStock`/`noAV`, **`PreOrder`/`inArrivalAV`** ("Prossimamente") |
 | DRG-Q6 | Spese di spedizione come adjustment | da decidere (regole del negozio da leggere) |
-| DRG-Q7 | La scheda prodotto (`.gp`) espone JSON-LD `Product`? (parsing più robusto del DOM) | nuovo — da verificare nello studio ad hoc |
+| DRG-Q7 | La scheda prodotto (`.gp`) espone JSON-LD `Product`? | ✅ **chiuso**: **sì** — è la fonte **primaria** del parsing (vedi § Scheda prodotto `.gp`) |
 
 > "Chiuso (provvisorio)" = verificato su una pagina campione: lo studio ad hoc pre-implementazione deve confermarlo su più categorie e sulla scheda prodotto. Se servisse il browser headless, la dipendenza va dichiarata in un gruppo opzionale del `pyproject.toml` unico alla root ([build-system](../../infrastructure/build-system.md)); il vincolo di mono-thread resta.
