@@ -27,6 +27,30 @@ if TYPE_CHECKING:
     from src.core.plugins.context import PluginContext
 
 
+class ProductProperties:
+    """Per-product accumulator of tags (``product_properties``, SCR-R16 / PROD-R5).
+
+    The base provides the *mechanism*; what to add is the plugin's choice (a label
+    cleaned off the title, a special availability state, …). One instance per
+    product being built — never stored on the (singleton) plugin instance, so tags
+    never leak across products/users. Strings are trimmed of surrounding whitespace
+    and separator symbols, and deduplicated.
+    """
+
+    _STRIP = " \t\r\n-–—:|·"
+
+    def __init__(self) -> None:
+        self._items: list[str] = []
+
+    def add_property(self, value: str) -> None:
+        cleaned = value.strip(self._STRIP).strip()
+        if cleaned and cleaned not in self._items:
+            self._items.append(cleaned)
+
+    def get_properties(self) -> list[str]:
+        return list(self._items)
+
+
 class BasePlugin:
     """Common contract for every plugin, with default (no-op) implementations."""
 
@@ -84,6 +108,12 @@ class ScraperPlugin(BasePlugin, ABC):
         plugin never fills ``external_id`` by hand; it calls this when building a
         ``Product``."""
         return self._stable_id(self.identity_seed(raw) or self.normalize_url(url))
+
+    @staticmethod
+    def new_properties() -> ProductProperties:
+        """A fresh per-product tag accumulator (SCR-R16). Use one per product;
+        add tags via ``add_property`` and read them back with ``get_properties``."""
+        return ProductProperties()
 
     def run_for_user(self, context: PluginContext, user_id: int) -> DeltaCounters:
         """Scrape this user's inputs and deliver the current products through

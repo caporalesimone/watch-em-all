@@ -19,6 +19,17 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class BrandRef(BaseModel):
+    """A product's brand: a label plus an optional link (product.md PROD-R6).
+
+    ``link`` (absolute URL to the brand page) is optional: the UI renders plain
+    text, or clickable text opening a new tab when the link is present.
+    """
+
+    text: str
+    link: str | None = None
+
+
 class Product(BaseModel):
     """The current state of one product as a scraper sees it (product.md).
 
@@ -34,6 +45,10 @@ class Product(BaseModel):
     url: str
     name: str
     image_url: str | None = None  # remote URL, never downloaded locally (PROD)
+    brand: BrandRef | None = None  # text + optional link; None if not extracted (PROD-R6)
+    # Generic product "tags" (e.g. "Edizione Limitata", "Pre Order"); the scraper
+    # populates it from any source, the core only persists it (PROD-R5).
+    product_properties: list[str] = Field(default_factory=list)
 
     price_current: Decimal  # discounted / current price
     price_original: Decimal | None = None  # None -> resolved from history, then current

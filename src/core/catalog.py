@@ -69,6 +69,9 @@ def _insert_product(
         url=p.url,
         name=p.name,
         image_url=p.image_url,
+        brand_text=p.brand.text if p.brand else None,
+        brand_link=p.brand.link if p.brand else None,
+        product_properties=list(p.product_properties),
         extra_json=p.extra,
         currency=p.currency,
         price_current=p.price_current,
@@ -90,6 +93,9 @@ def _update_mutable_fields(
     row.name = p.name
     row.url = p.url
     row.image_url = p.image_url
+    row.brand_text = p.brand.text if p.brand else None
+    row.brand_link = p.brand.link if p.brand else None
+    row.product_properties = list(p.product_properties)
     row.extra_json = p.extra
     row.currency = p.currency
     row.price_current = p.price_current
