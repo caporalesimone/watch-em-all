@@ -1,15 +1,15 @@
-"""Dragon Store scraper — phase-3 MOCK (3.B8/3.B9).
+"""Dragon Store scraper — real scraping (3.B6/3.B7).
 
-Real identity, fake content: ``run_for_user`` / ``run_test`` return hardcoded
-products derived from each watch URL. The native id (``.gp.<id>.uw``) drives
-``external_id`` through the base identity template-method (stable across runs);
-everything else is invented so the catalog → Product-Picker flow can be exercised
-end-to-end before the real parser lands (PR3, 3.B6/3.B7). Watches are product
-URLs only (``kind=product``); categories arrive in phase 9.
+One HTTP request per product watch (``kind=product``) via ``context.http``; the
+page is parsed by :mod:`parser` (JSON-LD ``Product`` primary, DOM list price) and
+the title is cleaned by :mod:`sanitizer` (marketing/edition labels become
+``product_properties`` tags). The native id (``.gp.<id>.uw``) drives
+``external_id`` through the base identity template-method (stable across runs).
+Categories, pagination and the "ammaccato" filter are phase 9.
 
 The write path is the ``context.update_catalog`` callback inside
 ``run_for_user`` — the scraper never writes the catalog itself. ``run_test`` is a
-dry-run: it builds the same products but writes nothing (SCR-R11).
+dry-run: it scrapes the same way but writes nothing (SCR-R11).
 """
 
 from __future__ import annotations
@@ -17,7 +17,6 @@ from __future__ import annotations
 import logging
 import re
 from datetime import UTC, datetime
-from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter
@@ -25,15 +24,22 @@ from pydantic import BaseModel
 from sqlalchemy import DateTime, Integer, String, delete, func, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
-from src.core.contracts import DeltaCounters, Product
+from src.core.contracts import BrandRef, DeltaCounters, Product
 from src.core.errors import APIError
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.context import PluginContext
 from src.web.deps import SessionDep, UserDep
 
+from .parser import DragonStoreParseError, ParsedProduct, parse_product
+from .sanitizer import load_title_labels, sanitize_title
+
 PLUGIN_ID = "dragon_store"
 # Native product id in a Dragon Store product URL, e.g. ".../...gp.35880.uw".
 _GP_ID_RE = re.compile(r"\.gp\.(\d+)\.uw")
+# schema.org availability tokens treated as "orderable now" (PreOrder is buyable).
+_AVAILABLE_STATES = frozenset({"InStock", "PreOrder"})
+_KNOWN_STATES = frozenset({"InStock", "OutOfStock", "PreOrder"})
+_PREORDER_PROPERTY = "Pre Order"
 
 
 class _Base(DeclarativeBase):
@@ -94,37 +100,76 @@ class DragonStorePlugin(ScraperPlugin):
         context.db.execute(delete(Watch).where(Watch.user_id == user_id))
         context.db.commit()
 
-    # --- mock product building (real identity, fake content) ---
-    def _mock_product(self, url: str, external_id: str) -> Product:
-        # Deterministic fake fields from the (stable) external_id, so re-runs are
-        # idempotent — no spurious price-change history (CATSVC-R4).
-        n = int(external_id, 16)
-        current = Decimal(10 + n % 90) + Decimal("0.99")
-        original = (current * Decimal("1.30")).quantize(Decimal("0.01"))
-        gp = _GP_ID_RE.search(url)
-        label = gp.group(1) if gp else "?"
+    # --- scraping (SCR-R4/R5/R6): one HTTP request per watch, via context.http ---
+    def _scrape_products(self, context: PluginContext, urls: list[str]) -> list[Product]:
+        by_id: dict[str, Product] = {}  # dedup on external_id (PROD-R3)
+        for url in urls:
+            product = self._scrape_one(context, url)
+            if product is not None:
+                by_id[product.external_id] = product
+        return list(by_id.values())
+
+    def _scrape_one(self, context: PluginContext, url: str) -> Product | None:
+        """Fetch + parse one product page; ``None`` (logged) on any failure, so a
+        single bad page never aborts the whole run."""
+        try:
+            response = context.http.get(url)
+        except OSError as exc:  # network/timeout after retries
+            context.logger.warning("dragon_store: fetch failed for %s: %s", url, exc)
+            return None
+        if response.status_code != 200:
+            context.logger.warning("dragon_store: %s returned HTTP %s", url, response.status_code)
+            return None
+        try:
+            parsed = parse_product(response.content, url)
+        except DragonStoreParseError as exc:
+            context.logger.warning("dragon_store: parse failed for %s: %s", url, exc)
+            return None
+        return self._to_product(context, url, parsed)
+
+    def _to_product(self, context: PluginContext, url: str, parsed: ParsedProduct) -> Product:
+        clean_name, labels = sanitize_title(parsed.name, load_title_labels())
+        props = self.new_properties()
+        for label in labels:
+            props.add_property(label)
+
+        if parsed.availability and parsed.availability not in _KNOWN_STATES:
+            context.logger.warning(
+                "dragon_store: unknown availability %r for %s", parsed.availability, url
+            )
+        is_available = parsed.availability in _AVAILABLE_STATES
+        if parsed.availability == "PreOrder":
+            props.add_property(_PREORDER_PROPERTY)
+
+        brand = (
+            BrandRef(text=parsed.brand_text, link=parsed.brand_link) if parsed.brand_text else None
+        )
+        extra = {
+            key: value
+            for key, value in {
+                "sku": parsed.sku,
+                "price_valid_until": parsed.price_valid_until,
+                "category": parsed.category,
+                "description": parsed.description,
+            }.items()
+            if value is not None
+        }
         return Product(
             plugin_id=PLUGIN_ID,
-            external_id=external_id,
+            external_id=self.external_id_for(raw=url, url=url),
             url=url,
-            name=f"[MOCK] Dragon Store product {label}",
-            image_url=None,
-            price_current=current,
-            price_original=original,
-            discount_pct=None,  # let the core derive it from original/current
-            currency="EUR",
-            is_available=True,
+            name=clean_name or parsed.name,  # fall back if the title was all label
+            image_url=parsed.image_url,
+            brand=brand,
+            product_properties=props.get_properties(),
+            price_current=parsed.price_current,
+            price_original=parsed.price_original,
+            discount_pct=None,  # the core derives it from original/current (CATSVC)
+            currency=parsed.currency,
+            is_available=is_available,
             scraped_at=datetime.now(UTC),
-            extra={"mock": True, "source_url": url},
+            extra=extra,
         )
-
-    def _build_products(self, urls: list[str]) -> list[Product]:
-        # external_id via the base template-method; dedup on it (PROD-R3).
-        by_id: dict[str, Product] = {}
-        for url in urls:
-            external_id = self.external_id_for(raw=url, url=url)
-            by_id[external_id] = self._mock_product(url, external_id)
-        return list(by_id.values())
 
     # --- runtime (SCR-R4/R5/R11) ---
     def run_for_user(self, context: PluginContext, user_id: int) -> DeltaCounters:
@@ -132,11 +177,14 @@ class DragonStorePlugin(ScraperPlugin):
         if not urls:
             # No watches != "site returned nothing": deliver nothing, do NOT delist.
             return DeltaCounters()
-        return context.update_catalog(user_id, self._build_products(urls))
+        return context.update_catalog(user_id, self._scrape_products(context, urls))
 
     def run_test(self, context: PluginContext, params: dict[str, Any]) -> list[Product]:
         url = str(params.get("url", "")).strip()
-        return self._build_products([url]) if url else []
+        if not url:
+            return []
+        product = self._scrape_one(context, url)
+        return [product] if product is not None else []
 
     # --- routes: watches CRUD + dry-run test (per-user) ---
     def router(self) -> APIRouter:

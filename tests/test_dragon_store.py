@@ -1,23 +1,77 @@
-"""Tests for the Dragon Store scraper (phase-3 MOCK) and the scrape-now flow.
+"""Tests for the Dragon Store scraper (real scraping) and the scrape-now flow.
 
-HTTP tests drive the real app (watches CRUD, dry-run, scrape-now cooldown). The
-``run_for_user`` mock (idempotency, no-watch, identity dedup) is exercised by
-calling the loaded plugin directly with a real context — the plugin is reached
+Content-dependent tests run against a **local mock server** that serves the saved
+fixtures by native gp id, so the watches point at ``http://127.0.0.1:.../...gp.<id>.uw``
+and the real parser/sanitiser path is exercised end-to-end without the internet.
+Watches CRUD and the cooldown status need no scraping. The plugin is reached
 through ``app.state.loaded_plugins`` to avoid importing the plugin package.
 """
 
 from __future__ import annotations
 
-from typing import cast
+import re
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any, cast
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from src.core.http import HttpClient
 from src.core.plugins.context import build_context
 
 DS = "/api/plugins/dragon-store"
 URL_A = "https://shop.example/il-richiamo.1.1.192.gp.35880.uw"
-URL_B = "https://shop.example/altro.1.1.192.gp.41000.uw"
+
+_FIX = Path(__file__).parent / "fixtures" / "dragon_store"
+_FIXTURES = {
+    "896": "gp_896_discounted.html",
+    "36099": "gp_36099_preorder.html",
+    "27006": "gp_27006_out_of_stock.html",
+    "34602": "gp_34602_limited_edition.html",
+    "30708": "gp_30708_other_category.html",
+}
+_GP_RE = re.compile(r"\.gp\.(\d+)\.uw")
+
+
+class DragonServer:
+    """Serves the saved fixtures by gp id, on an ephemeral port; a context manager."""
+
+    def __init__(self) -> None:
+        pages = {gid: (_FIX / name).read_bytes() for gid, name in _FIXTURES.items()}
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                match = _GP_RE.search(self.path)
+                body = pages.get(match.group(1)) if match else None
+                if body is None:
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=iso-8859-1")
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, fmt: str, *args: Any) -> None:
+                return
+
+        self._srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self._thread = threading.Thread(target=self._srv.serve_forever, daemon=True)
+
+    def __enter__(self) -> str:
+        self._thread.start()
+        return f"http://127.0.0.1:{self._srv.server_address[1]}"
+
+    def __exit__(self, *exc: object) -> None:
+        self._srv.shutdown()
+        self._srv.server_close()
+        self._thread.join(timeout=2)
+
+
+def gp_url(base: str, gp_id: str) -> str:
+    return f"{base}/prod.1.1.1.gp.{gp_id}.uw"
 
 
 def _bearer(token: str) -> dict[str, str]:
@@ -65,7 +119,19 @@ def _dragon(client: TestClient):  # type: ignore[no-untyped-def]  # test helper:
     return next(lp for lp in app.state.loaded_plugins if lp.manifest.name == "dragon_store")
 
 
-# --- HTTP: watches CRUD ---
+def _run_for_user(client: TestClient, uid: int):  # type: ignore[no-untyped-def]
+    """Run the loaded plugin with a fast (no-politeness) HTTP client against the
+    local server; returns the delta counters."""
+    lp = _dragon(client)
+    ctx = build_context(lp.manifest, lp.plugin)
+    ctx.http = HttpClient(min_interval_s=0.0, sleep=lambda _s: None)
+    try:
+        return lp.plugin.run_for_user(ctx, uid)
+    finally:
+        ctx.db.close()
+
+
+# --- HTTP: watches CRUD (no scraping) ---
 
 
 def test_watches_crud(client: TestClient) -> None:
@@ -95,20 +161,47 @@ def test_watches_are_per_user(client: TestClient) -> None:
     assert client.get(f"{DS}/watches", headers=_bearer(tb)).json() == []
 
 
-# --- HTTP: dry-run (no write) ---
+# --- HTTP: dry-run (real scrape, no write) ---
 
 
-def test_dry_run_returns_products_without_writing(client: TestClient) -> None:
+def test_dry_run_discounted_sanitises_title_and_writes_nothing(client: TestClient) -> None:
     _uid, token = _user(client)
     h = _bearer(token)
-    resp = client.post(f"{DS}/test", json={"url": URL_A}, headers=h)
+    with DragonServer() as base:
+        resp = client.post(f"{DS}/test", json={"url": gp_url(base, "896")}, headers=h)
     assert resp.status_code == 200
     products = resp.json()
     assert len(products) == 1
-    assert products[0]["plugin_id"] == "dragon_store"
-    assert "MOCK" in products[0]["name"]
-    # nothing persisted
+    product = products[0]
+    assert product["plugin_id"] == "dragon_store"
+    assert product["price_current"] == "9.90"
+    assert product["currency"] == "EUR"
+    assert product["is_available"] is True
+    assert product["brand"]["text"] == "Giochi Uniti"
+    # title label stripped from the name and surfaced as a tag
+    assert "OFFERTA RAVEN PRIME" not in product["name"].upper()
+    assert "Offerta Raven Prime" in product["product_properties"]
+    # nothing persisted (dry-run)
     assert client.get("/api/catalog", headers=h).json()["total"] == 0
+
+
+def test_dry_run_preorder_tags_pre_order_and_is_available(client: TestClient) -> None:
+    _uid, token = _user(client)
+    h = _bearer(token)
+    with DragonServer() as base:
+        resp = client.post(f"{DS}/test", json={"url": gp_url(base, "36099")}, headers=h)
+    product = resp.json()[0]
+    assert product["is_available"] is True  # PreOrder is orderable
+    assert "Pre Order" in product["product_properties"]
+
+
+def test_dry_run_out_of_stock_is_unavailable(client: TestClient) -> None:
+    _uid, token = _user(client)
+    h = _bearer(token)
+    with DragonServer() as base:
+        resp = client.post(f"{DS}/test", json={"url": gp_url(base, "27006")}, headers=h)
+    product = resp.json()[0]
+    assert product["is_available"] is False
 
 
 # --- HTTP: scrape-now + cooldown ---
@@ -117,13 +210,13 @@ def test_dry_run_returns_products_without_writing(client: TestClient) -> None:
 def test_scrape_now_populates_catalog(client: TestClient) -> None:
     _uid, token = _user(client)
     h = _bearer(token)
-    client.post(f"{DS}/watches", json={"url": URL_A}, headers=h)
+    with DragonServer() as base:
+        client.post(f"{DS}/watches", json={"url": gp_url(base, "896")}, headers=h)
+        started = client.post(f"{DS}/scrape-now", headers=h)
+        assert started.status_code == 202
+        assert started.json()["status"] == "started"
+        page = client.get("/api/catalog", headers=h).json()
 
-    started = client.post(f"{DS}/scrape-now", headers=h)
-    assert started.status_code == 202
-    assert started.json()["status"] == "started"
-
-    page = client.get("/api/catalog", headers=h).json()
     assert page["total"] == 1
     assert page["items"][0]["plugin_id"] == "dragon_store"
 
@@ -131,10 +224,10 @@ def test_scrape_now_populates_catalog(client: TestClient) -> None:
 def test_scrape_now_cooldown_blocks_second(client: TestClient) -> None:
     _uid, token = _user(client)
     h = _bearer(token)
-    client.post(f"{DS}/watches", json={"url": URL_A}, headers=h)
-
-    assert client.post(f"{DS}/scrape-now", headers=h).status_code == 202
-    blocked = client.post(f"{DS}/scrape-now", headers=h)
+    with DragonServer() as base:
+        client.post(f"{DS}/watches", json={"url": gp_url(base, "896")}, headers=h)
+        assert client.post(f"{DS}/scrape-now", headers=h).status_code == 202
+        blocked = client.post(f"{DS}/scrape-now", headers=h)
     assert blocked.status_code == 429
     assert blocked.json()["code"] == "scrape_cooldown"
 
@@ -151,38 +244,24 @@ def test_scrape_now_status_available_before_first_run(client: TestClient) -> Non
     assert status["available_at"] is None
 
 
-# --- direct: run_for_user mock (idempotency, no-watch, identity dedup) ---
+# --- direct: run_for_user (idempotency, no-watch, identity dedup) ---
 
 
 def test_run_for_user_idempotent(client: TestClient) -> None:
     uid, token = _user(client)
-    client.post(f"{DS}/watches", json={"url": URL_A}, headers=_bearer(token))
-    lp = _dragon(client)
-
-    ctx = build_context(lp.manifest, lp.plugin)
-    try:
-        first = lp.plugin.run_for_user(ctx, uid)
-    finally:
-        ctx.db.close()
-    ctx2 = build_context(lp.manifest, lp.plugin)
-    try:
-        second = lp.plugin.run_for_user(ctx2, uid)
-    finally:
-        ctx2.db.close()
+    with DragonServer() as base:
+        client.post(f"{DS}/watches", json={"url": gp_url(base, "896")}, headers=_bearer(token))
+        first = _run_for_user(client, uid)
+        second = _run_for_user(client, uid)
 
     assert first.new == 1
     assert second.new == 0  # same product, stable identity -> no duplicate
-    assert second.price_changes == 0  # deterministic price -> no spurious history
+    assert second.price_changes == 0  # unchanged price -> no spurious history
 
 
 def test_run_for_user_no_watches_writes_nothing(client: TestClient) -> None:
     uid, _token = _user(client)
-    lp = _dragon(client)
-    ctx = build_context(lp.manifest, lp.plugin)
-    try:
-        counters = lp.plugin.run_for_user(ctx, uid)
-    finally:
-        ctx.db.close()
+    counters = _run_for_user(client, uid)
     assert counters.found == 0
     assert counters.new == 0
     assert counters.removed == 0  # no watches must NOT delist
@@ -191,13 +270,23 @@ def test_run_for_user_no_watches_writes_nothing(client: TestClient) -> None:
 def test_identity_dedup_same_gp_id(client: TestClient) -> None:
     uid, token = _user(client)
     h = _bearer(token)
-    # Two watches, same native gp id but different volatile URL -> one product.
-    client.post(f"{DS}/watches", json={"url": URL_A}, headers=h)
-    client.post(f"{DS}/watches", json={"url": URL_A + "?ref=promo"}, headers=h)
-    lp = _dragon(client)
-    ctx = build_context(lp.manifest, lp.plugin)
-    try:
-        counters = lp.plugin.run_for_user(ctx, uid)
-    finally:
-        ctx.db.close()
+    with DragonServer() as base:
+        # Two watches, same native gp id but different volatile URL -> one product.
+        client.post(f"{DS}/watches", json={"url": gp_url(base, "896")}, headers=h)
+        client.post(f"{DS}/watches", json={"url": gp_url(base, "896") + "?ref=promo"}, headers=h)
+        counters = _run_for_user(client, uid)
     assert counters.found == 1  # deduped on external_id
+
+
+def test_run_for_user_brand_and_price_persisted(client: TestClient) -> None:
+    uid, token = _user(client)
+    h = _bearer(token)
+    with DragonServer() as base:
+        client.post(f"{DS}/watches", json={"url": gp_url(base, "34602")}, headers=h)
+        counters = _run_for_user(client, uid)
+        page = client.get("/api/catalog", headers=h).json()
+    assert counters.new == 1
+    assert page["total"] == 1
+    item = page["items"][0]
+    assert item["price_current"] == "89.99"  # full price
+    assert item["is_available"] is True
