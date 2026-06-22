@@ -10,7 +10,12 @@
 	// catalog/carts), a user owns their data. The shell shows one or the other.
 	const isAdmin = $derived(($auth.user?.role ?? 'user') === 'admin');
 	const primary = $derived(
-		isAdmin ? [{ href: '/admin/users', key: 'nav.users' }] : [{ href: '/', key: 'nav.dashboard' }]
+		isAdmin
+			? [{ href: '/admin/users', key: 'nav.users' }]
+			: [
+					{ href: '/', key: 'nav.dashboard' },
+					{ href: '/catalog', key: 'nav.catalog' }
+				]
 	);
 
 	function itemClass(href: string): string {

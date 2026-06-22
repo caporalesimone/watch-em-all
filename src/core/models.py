@@ -117,3 +117,25 @@ class PriceHistory(Base):
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+
+class ScrapeCooldown(Base):
+    """Anchor for the manual scrape-now cooldown (SCR-R15).
+
+    Holds the **last scrape time per (plugin, user)**, written at the START of any
+    scrape — manual now, scheduled from phase 4 — but **read only by the manual
+    scrape-now** to enforce the per-scraper minimum interval. Hence the asymmetry:
+    a scheduled run starts the manual cooldown (writes), yet is never itself
+    rate-limited (never reads). One row per pair, upserted; not a history log
+    (run records live in ``scrape_user_log`` from phase 4).
+    """
+
+    __tablename__ = "scrape_cooldown"
+    __table_args__ = (UniqueConstraint("plugin_id", "user_id", name="uq_scrape_cooldown_identity"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    plugin_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    last_scraped_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

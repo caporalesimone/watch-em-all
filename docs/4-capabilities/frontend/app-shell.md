@@ -15,7 +15,7 @@ src/frontend/src/
 ├── routes/            # +layout (shell + guard), +page (dashboard),
 │                      # login/, change-password/, profile/
 ├── lib/
-│   ├── components/    # Sidebar, Header (shared design system)
+│   ├── components/    # Sidebar (shared design system)
 │   ├── stores/        # auth, theme
 │   ├── api/           # typed client (uses lib/auth)
 │   └── auth/          # Auth Manager
@@ -38,7 +38,7 @@ The **forced password change** page shows only *new password* + *confirm*: the c
 ## Shell and navigation
 
 - **Left sidebar** (persistent): Dashboard · Profile · Log out, plus a collapsible **SCRAPERS** group at the bottom, populated dynamically from `GET /api/plugins` (phase 2 — see [Plugins](#plugins-phase-2)). The other feature entries (catalog, carts…) join in later phases.
-- **Header**: theme toggle (the language selector is planned but not exposed in V1, English-only).
+- **No top bar**: the **theme** (light/dark) toggle lives in **Profile → Settings** (the language selector is planned but not exposed in V1, English-only).
 
 ## Theme and language
 
@@ -52,7 +52,7 @@ The **forced password change** page shows only *new password* + *confirm*: the c
 | Dashboard | greets by **first name** ("Welcome, &lt;name&gt;"); placeholder until catalog/carts arrive |
 | Login | username + password; surfaces auth error codes |
 | Forced change | new + confirm only (no current password); greets by name |
-| Profile | **account fields** (Username, Name, Surname, Role — read-only), change password (current password required), language (read-only, English) |
+| Profile | **account fields** (Username, Name, Surname, Role — read-only), a **Settings** section (light/dark theme toggle), change password (current password required), language (read-only, English) |
 
 ## Plugins (phase 2)
 

@@ -39,7 +39,8 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 | DELETE | `/api/catalog` | 👤 | — | svuota il catalogo (cascata su membri+storico) |
 | DELETE | `/api/catalog/items` | 👤 | `{product_ids}` | rimozione selettiva (cascata) |
 | DELETE | `/api/catalog/removed` | 👤 | — | elimina i delistati |
-| POST | `/api/catalog/scrape-now` | 👤 | — | **solo a catalogo vuoto** (server riverifica → 409); avvia job in background, risponde 202 `{job_ids}` |
+
+> Lo **scrape-now** non è un endpoint di catalogo: è **per-scraper**, esposto dal plugin sotto `/api/plugins/{route}/scrape-now` (vedi *Rotte plugin-specific* in fondo). Il catalogo si scrive solo via Catalog Update Service, mai da qui.
 
 ## Carrelli — [cart-engine](../4-capabilities/core/cart-engine.md)
 
@@ -151,6 +152,8 @@ Registrate dal plugin sotto `/api/plugins/{route_base}`; tipiche per uno scraper
 | GET | `/api/plugins/{route}/config-schema/user` | 👤 | `ConfigField[]` |
 | GET/PUT | `/api/plugins/{route}/admin-config` | 🛡 | config operativa del plugin |
 | POST | `/api/plugins/{route}/test` | 👤🛡 | dry-run, nessuna scrittura; risponde `list[Product]` |
+| POST | `/api/plugins/{route}/scrape-now` | 👤 | scrape immediato del **solo utente richiedente** (scrive nel catalogo); **cooldown per-scraper** → **429** col tempo rimanente; 202 + job in background |
+| GET | `/api/plugins/{route}/scrape-now` | 👤 | stato del cooldown per l'utente: `{available, available_at, interval_seconds}` (alimenta il conto alla rovescia in UI) |
 | GET/POST/DELETE | `/api/plugins/{route}/watches` | 👤 | input dell'utente (cosa osservare) — forma libera del plugin |
 
 Il plugin documenta le proprie route nello schema OpenAPI (`tags=["Plugin: <nome>"]`).

@@ -14,7 +14,7 @@ Il catalogo è l'insieme dei prodotti estratti dagli scraper per l'utente. Il **
 - **CAT-R4** — I prodotti **delistati** (`removed`, assenti dall'ultimo scrape) restano in tabella grigiati, esclusi da carrelli e alert, finché l'utente non li pulisce. Se ricompaiono in uno scrape, tornano attivi.
 - **CAT-R5** — La tabella è **paginata lato server**, ordinabile (titolo, prezzi, % sconto, scraper), filtrabile per scraper e ricercabile per titolo.
 - **CAT-R6** — Azioni di pulizia: rimuovi delistati, rimozione selettiva (modalità delete), svuota catalogo. Tutte con conferma; la conferma **dichiara le conseguenze** (rimozione dai carrelli e perdita dello storico dei prodotti coinvolti).
-- **CAT-R7** — **Scrape ora**: disponibile **solo a catalogo vuoto**, esegue gli scraper configurati dall'utente per popolarlo subito. Il server riverifica la condizione (catalogo non vuoto → richiesta rifiutata con errore esplicito). L'esecuzione è in background: la UI mostra l'avanzamento.
+- **CAT-R7** — **Empty-state del catalogo**: a catalogo vuoto il Product Picker non offre azioni di scraping, ma **rimanda alle pagine degli scraper** per configurare cosa osservare e avviare il primo popolamento. Lo **Scrape ora** è **per-scraper** e vive sulla pagina dello scraper, non qui ([scraper-plugin](../plugins/scraper-plugin.md), SCR-R15).
 - **CAT-R8** — L'eliminazione di un prodotto dal catalogo lo rimuove **a cascata** dai carrelli e ne elimina lo storico prezzi.
 
 ## La tabella
@@ -62,17 +62,17 @@ Distinzione da tenere ferma (fonte frequente di confusione):
 ```mermaid
 sequenceDiagram
     participant U as Utente
-    participant P as Pagina plugin
-    participant PP as Product Picker
+    participant P as Pagina scraper
     participant W as Web (background)
+    participant PP as Product Picker
 
     U->>P: configura cosa osservare
-    U->>PP: catalogo vuoto → bottone "Scrape ora"
-    U->>W: scrape-now
-    W->>W: verifica catalogo vuoto + lock per-scraper
+    U->>P: "Scrape ora" (sulla pagina dello scraper)
+    P->>W: scrape-now (questo scraper, questo utente)
+    W->>W: verifica cooldown per-scraper + lock per-scraper
     W-->>U: avviato (job in background)
-    W->>W: esegue gli scraper dell'utente
+    W->>W: esegue lo scraper per l'utente
     U->>PP: il catalogo si popola
 ```
 
-Negli altri casi il catalogo si aggiorna ai normali scrape schedulati: lo "Scrape ora" esiste solo per non far attendere ore il primo popolamento.
+A catalogo vuoto il Product Picker invita a configurare uno scraper e avviarne il primo scrape **dalla sua pagina**: lo "Scrape ora" è **per-scraper** e vive lì ([scraper-plugin](../plugins/scraper-plugin.md), SCR-R15). Nasce per non far attendere ore il primo popolamento, ma resta disponibile in ogni momento entro il cooldown del singolo scraper. Negli altri casi il catalogo si aggiorna ai normali scrape schedulati.

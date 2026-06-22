@@ -1,0 +1,30 @@
+{
+	"dragon_store": {
+		"title": "Dragon Store",
+		"blurb": "Watch Dragon Store product pages. Paste a product URL to start watching it; run a scrape to pull the latest into your catalog.",
+		"watches": {
+			"heading": "Watched products",
+			"url_placeholder": "https://…gp.35880.uw",
+			"add": "Add watch",
+			"empty": "No watched products yet. Paste a product URL above.",
+			"remove": "Remove",
+			"invalid": "Enter a product URL first."
+		},
+		"dry_run": {
+			"action": "Preview (dry-run)",
+			"heading": "Preview",
+			"hint": "A dry-run scrapes without saving anything."
+		},
+		"scrape_now": {
+			"action": "Scrape now",
+			"confirm_title": "Scrape Dragon Store now?",
+			"confirm_body": "This updates your catalog from this scraper. You can run it again {interval}.",
+			"every": "once every {interval}",
+			"started": "Scrape started — your catalog will update shortly.",
+			"cooldown_caption": "Next scrape available in {time}"
+		},
+		"available": "Available",
+		"unavailable": "Out of stock",
+		"error": "Request failed."
+	}
+}

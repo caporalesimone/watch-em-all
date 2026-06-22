@@ -5,6 +5,7 @@
 	import * as api from '$lib/api/client';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { auth, forceAnon } from '$lib/stores/auth';
+	import { theme } from '$lib/stores/theme';
 
 	let current = $state('');
 	let next = $state('');
@@ -63,6 +64,19 @@
 		<div class="flex justify-between">
 			<span class="text-slate-500 dark:text-slate-400">{$_('profile.language')}</span>
 			<span>{$_('profile.languageValue')}</span>
+		</div>
+	</section>
+
+	<section class="space-y-2 text-sm">
+		<h2 class="font-medium">{$_('profile.settings')}</h2>
+		<div class="flex items-center justify-between">
+			<span class="text-slate-500 dark:text-slate-400">{$_('profile.theme')}</span>
+			<button
+				class="rounded border border-slate-300 px-3 py-1 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+				onclick={() => theme.toggle()}
+			>
+				{$theme === 'dark' ? `☾ ${$_('profile.themeDark')}` : `☀ ${$_('profile.themeLight')}`}
+			</button>
 		</div>
 	</section>
 

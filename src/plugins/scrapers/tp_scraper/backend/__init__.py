@@ -31,6 +31,11 @@ class Ping(_Base):
 class TpScraperPlugin(ScraperPlugin):
     plugin_id = "tp_scraper"
 
+    def identity_seed(self, raw: object) -> str | None:
+        # Throwaway test plugin: it does not scrape, so it has no native id.
+        # The seed is required (abstract) only so the class can be instantiated.
+        return None
+
     def initialize(self, context: PluginContext) -> None:
         # Idempotently create the plugin's own table through the context engine.
         _Base.metadata.create_all(context.engine)

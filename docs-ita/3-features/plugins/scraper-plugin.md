@@ -30,10 +30,10 @@ Un produttore **stateless** e **internamente mono-thread** di prodotti: legge i 
 ### Input e configurazione
 - **SCR-R1** — Lo scraper possiede i **propri input** in tabelle dedicate (namespaced per plugin), per utente, che crea da sé se non esistono. Ogni configurazione utente (dalla pagina del plugin) crea una o più entry.
 - **SCR-R2** — Configurazione a due livelli come ogni plugin: **admin** (parametri operativi: timeout, identificazione, politeness, regole del sito) e **utente** (cosa osservare). Entrambe descritte da schemi dichiarativi per i form dinamici.
-- **SCR-R3** — Lo scraper sa rispondere al core se un utente lo ha configurato (serve per lo scrape-now: il core non legge le tabelle del plugin).
+- **SCR-R3** — Lo scraper sa rispondere al core **quali utenti l'hanno configurato** (serve al **runner schedulato**, che itera gli utenti senza che il core legga le tabelle del plugin). Lo scrape-now manuale non passa di qui: è per-scraper, parte dalla sua pagina e lo scraper conosce già l'utente richiedente (SCR-R15).
 
 ### Esecuzione
-- **SCR-R4** — L'unità di esecuzione è **per utente**: il core invoca lo scraper per ciascun utente configurato; la run schedulata itera tutti gli utenti, lo scrape-now uno solo. Lo scraper non decide mai *quando* girare.
+- **SCR-R4** — L'unità di esecuzione è **per utente**: il core invoca lo scraper per ciascun utente configurato. La **run schedulata** itera tutti gli utenti; lo **scrape-now** (manuale, dalla pagina dello scraper) gira per il **solo utente richiedente**. Lo scraper non decide mai *quando* girare.
 - **SCR-R5** — Lo scraper è **stateless**: produce solo lo stato corrente, non conosce lo storico né i delta (mestiere del core).
 - **SCR-R6** — Lo scraper è **internamente mono-thread**: nessun parallelismo interno verso il sito. Usa **esclusivamente il client HTTP fornito dal contesto**, che impone il ritmo (politeness), conta le richieste per il monitoraggio e può servire una risposta dalla **cache di scrape** in modo trasparente (stessa query entro l'emivita → niente chiamata al sito, [plugin-context](../../4-capabilities/core/plugin-context.md) CTX-R9).
 - **SCR-R7** — Restituisce **anche i prodotti non disponibili** (marcati); non li filtra mai. Le esclusioni specifiche del sito (es. prodotti in stati speciali che l'utente non vuole) avvengono dentro il plugin, e i prodotti esclusi sono conteggiati per il monitoraggio.
@@ -52,6 +52,9 @@ Un produttore **stateless** e **internamente mono-thread** di prodotti: legge i 
 
 ### Cancellazione dati utente
 - **SCR-R14** — Lo scraper implementa `delete_user_data(context, user_id)`: elimina **tutte** le righe di quell'utente dalle proprie tabelle (input, parametri personali), in modo **idempotente** (invocabile più volte senza errore). È invocato dal core durante il purge di un account, **prima** della cascata sui dati centrali ([user-management](../admin/user-management.md), USR-R10).
+
+### Scrape manuale (scrape-now)
+- **SCR-R15** — Ogni scraper espone, sulla **propria pagina utente**, un comando di **scrape immediato** per il **solo utente richiedente** (popola il catalogo — a differenza del dry-run, che non scrive). È soggetto a un **intervallo minimo per-scraper** (*cooldown*): un parametro **admin riservato** (SCR-R2, imposto dal core e uniforme, non lasciato al singolo plugin — stessa filosofia della politeness), con **default 1 ora**. Il blocco è **lato server**: una richiesta entro l'intervallo è **rifiutata** dichiarando il **tempo rimanente** (HTTP 429), mai solo nascosta in UI. La UI **disabilita** il bottone finché il cooldown non è trascorso, mostrando un **conto alla rovescia** alimentato dallo stato letto dal server; un **popup di conferma** alla pressione ricorda ogni quanto lo scrape è disponibile. Lo scrape-now condivide il **lock per-scraper** con le run schedulate ([SCHED-R4](../admin/scraper-scheduling-and-limits.md)). Il cooldown si appoggia a un **anchor "ultimo scrape" per *(scraper, utente)***, con un'asimmetria precisa: l'anchor è **scritto all'avvio di *ogni* scrape — manuale o schedulato — ma letto (e quindi vincolante) solo dallo scrape manuale**. Conseguenze volute: dopo una run **schedulata** non si può forzare subito un manuale (la run ha scritto l'anchor), mentre un **manuale** non blocca mai la run schedulata successiva (che l'anchor non lo legge); scrivere l'anchor **all'avvio** (non al termine) fa contare il cooldown dall'inizio e chiude la doppia-pressione ravvicinata. La meccanica (cooldown, anchor, dispatch alla run) è **fornita dalla base** comune agli scraper, non reimplementata dai plugin.
 
 ## Flusso di una run (vista contrattuale)
 
@@ -82,4 +85,6 @@ Come l'utente sceglie *cosa osservare* è una scelta libera del plugin (navigazi
 2. offre il **dry-run** di anteprima (senza persistenza);
 3. la selezione confermata crea le entry negli input del plugin.
 
-È **distinta** dal Product Picker del core (che lavora sul catalogo già estratto). La pagina **admin** del plugin è a sua volta distinta: parametri operativi + test, mai selezione di contenuti.
+La pagina ospita inoltre il comando **Scrape ora** per-scraper (SCR-R15) che — a differenza del dry-run — **scrive** nel catalogo, con il suo bottone soggetto a cooldown (disabilitato + conto alla rovescia quando non disponibile).
+
+È **distinta** dal Product Picker del core (che lavora sul catalogo già estratto). La pagina **admin** del plugin è a sua volta distinta: parametri operativi (incluso l'intervallo dello Scrape ora) + test, mai selezione di contenuti.

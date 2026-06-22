@@ -24,6 +24,9 @@ from src.core.plugins.base import ScraperPlugin
 class _Plugin(ScraperPlugin):
     plugin_id = "tp_scraper"
 
+    def identity_seed(self, raw):
+        return None
+
     def router(self):
         router = APIRouter()
 

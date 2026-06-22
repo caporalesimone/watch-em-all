@@ -40,3 +40,7 @@ This is the project's **English documentation**, the destined canonical wiki. It
 - [3-features/admin/user-management.md](3-features/admin/user-management.md) — create + list accounts, the role-split shell; plus the `/api/admin/users` endpoints in [api/endpoints.md](api/endpoints.md)
 
 The remaining business/architecture/feature layers arrive as the corresponding features land in later phases.
+
+---
+
+- **[future-improvements/](future-improvements/)** — forward-looking **ideas to revisit after 1.0** (ideas, not todos; not tied to any phase).

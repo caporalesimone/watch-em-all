@@ -55,7 +55,7 @@ def get_adjustments(self, cart_total):
 
 ## Route del plugin
 
-Sotto `/api/plugins/dragon-store` ([convenzione](../../api/endpoints.md#rotte-plugin-specific)): `config-schema/{admin|user}`, `admin-config` (GET/PUT), `test` (dry-run), `watches` (GET/POST/DELETE). Tag Swagger: `Plugin: Dragon Store`.
+Sotto `/api/plugins/dragon-store` ([convenzione](../../api/endpoints.md#rotte-plugin-specific)): `config-schema/{admin|user}`, `admin-config` (GET/PUT), `test` (dry-run), `scrape-now` (POST scrape immediato dell'utente + GET stato cooldown), `watches` (GET/POST/DELETE). Lo `scrape-now` e il suo cooldown sono forniti dalla base `ScraperPlugin` (convenzione del core, non riscritti dal plugin). Tag Swagger: `Plugin: Dragon Store`.
 
 ## Pre-analisi del sito (giugno 2026, una pagina di categoria)
 
