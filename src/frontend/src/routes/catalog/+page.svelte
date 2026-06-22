@@ -42,7 +42,22 @@
 		}
 	}
 
-	onMount(() => void load());
+	onMount(() => {
+		void load();
+		// scrape-now writes the catalog asynchronously; if the page is opened while a
+		// scrape is still running it would show empty. Retry briefly so the products
+		// appear on their own, without a manual search.
+		let tries = 0;
+		const timer = setInterval(() => {
+			if (data && data.total === 0 && tries < 4) {
+				tries += 1;
+				void load();
+			} else {
+				clearInterval(timer);
+			}
+		}, 1500);
+		return () => clearInterval(timer);
+	});
 
 	function search(event: Event): void {
 		event.preventDefault();

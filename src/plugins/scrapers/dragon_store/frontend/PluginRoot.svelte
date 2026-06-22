@@ -182,7 +182,10 @@
 
 <section class="space-y-8">
 	<header class="space-y-4">
-		<h1 class="text-xl font-semibold">{$_('dragon_store.title')}</h1>
+		<div class="flex items-center gap-2">
+			<img src="/api/plugin-assets/dragon_store/icon" alt="" class="h-6 w-6" />
+			<h1 class="text-xl font-semibold">{$_('dragon_store.title')}</h1>
+		</div>
 		<p class="max-w-prose text-sm text-slate-500">{$_('dragon_store.blurb')}</p>
 	</header>
 
@@ -277,7 +280,7 @@
 
 	<!-- Watched products list (3.F3) -->
 	<div class="mx-auto w-3/4 space-y-2">
-		<h2 class="text-sm font-semibold">{$_('dragon_store.watches.heading')}</h2>
+		<h2 class="text-sm font-semibold">{$_('dragon_store.watches.heading')}: {watches.length}</h2>
 		{#if watches.length === 0}
 			<p class="text-sm text-slate-500">{$_('dragon_store.watches.empty')}</p>
 		{:else}
@@ -318,7 +321,7 @@
 	<!-- Scrape now (3.F4) — sober: label + caption countdown when on cooldown -->
 	<div class="space-y-1">
 		<button
-			class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-6 py-3 text-base font-semibold text-white shadow hover:bg-emerald-700 active:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+			class="inline-flex items-center gap-2 rounded-md border-2 border-emerald-600 px-6 py-3 text-base font-semibold text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:text-emerald-400 dark:hover:text-white"
 			onclick={() => (confirming = true)}
 			disabled={locked || busy}
 		>
