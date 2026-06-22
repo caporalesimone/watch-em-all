@@ -158,6 +158,44 @@ def test_icon_served_and_unknown_is_404(tmp_path: Path) -> None:
         assert missing.json()["code"] == "not_found"
 
 
+def test_icon_convention_prefers_ico_over_svg(tmp_path: Path) -> None:
+    # No manifest.icon: the registry auto-detects frontend/assets/plugin-icon.{ico,svg},
+    # preferring .ico.
+    init_engine("sqlite+pysqlite:///:memory:")
+    manifest: dict[str, Any] = {
+        "name": "tp_scraper",
+        "display_name": "TP Scraper",
+        "type": "scraper",
+        "version": "1.0.0",
+        "api_version": 1,
+        "enabled": True,
+        "backend": {"entry": "backend/__init__.py"},
+        "frontend": {
+            "entry": "frontend/index.ts",
+            "route_base": "/plugins/tp-scraper",
+            "i18n": "frontend/i18n",
+        },
+    }
+    _write_plugin(tmp_path, "scrapers", "tp_scraper", manifest, _SCRAPER_BACKEND)
+    assets = tmp_path / "scrapers" / "tp_scraper" / "frontend" / "assets"
+    assets.mkdir(parents=True)
+    (assets / "plugin-icon.svg").write_text(_ICON_SVG, encoding="utf-8")
+    (assets / "plugin-icon.ico").write_bytes(b"\x00\x00\x01\x00")
+
+    app = FastAPI()
+    register_error_handlers(app)
+    app.include_router(plugins_router.router, prefix="/api")
+    app.dependency_overrides[require_user] = lambda: None
+    app.state.loaded_plugins = load_plugins(app, plugins_root=tmp_path)
+
+    with TestClient(app) as client:
+        by_name = {p["name"]: p for p in client.get("/api/plugins").json()}
+        assert by_name["tp_scraper"]["icon"] == "/api/plugin-assets/tp_scraper/icon"
+        icon = client.get("/api/plugin-assets/tp_scraper/icon")
+        assert icon.status_code == 200
+        assert icon.headers["content-type"] == "image/x-icon"  # .ico preferred over .svg
+
+
 def test_discovery_endpoint_wired_on_real_app(client: TestClient) -> None:
     # Discovery is behind auth (#3): an unauthenticated request is rejected.
     resp = client.get("/api/plugins")

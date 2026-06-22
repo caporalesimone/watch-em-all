@@ -5,7 +5,6 @@
 	"version": "0.1.0",
 	"api_version": 1,
 	"enabled": true,
-	"icon": "frontend/assets/icon.svg",
 	"backend": { "entry": "backend/__init__.py" },
 	"frontend": {
 		"entry": "frontend/index.ts",

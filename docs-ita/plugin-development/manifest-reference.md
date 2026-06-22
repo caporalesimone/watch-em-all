@@ -14,7 +14,7 @@ Il `manifest.json` è il contratto dichiarativo del plugin: tutto ciò che il si
 | `version` | string semver | ✅ | Versione del plugin (informativa). |
 | `api_version` | int | ✅ | Versione del **contratto plugin** supportata. Se diversa da quella del core = rifiutato. Attuale: `1`. |
 | `enabled` | bool | ✅ | **Unica source of truth** dell'attivazione. `false` = ignorato del tutto (nessun import). Cambiarlo richiede rebuild + restart. |
-| `icon` | path | consigliato | Relativo alla cartella del plugin. SVG (o PNG ≥48px) quadrata; resa a 24×24 nelle celle di provenienza. Assente = icona neutra. |
+| `icon` | path | opzionale | Override esplicito (relativo alla cartella del plugin). **Se omesso**, il core auto-rileva `frontend/assets/plugin-icon.{ico,svg}` (preferisce `.ico`), risolto **una volta al load**. Quadrata, resa a 24×24 nelle celle di provenienza. Nessun file = icona neutra. |
 | `backend.entry` | path | ✅ | **Relativo alla cartella del plugin** (es. `backend/__init__.py`). Deve esportare l'istanza del plugin. |
 | `backend.i18n` | path | notifier | Cartella dei file lingua backend (testi delle notifiche). `en.json` **sempre presente** (è il fallback). |
 | `frontend.entry` | path | ✅* | Relativo; esporta `default { component }`. *Omissibile solo per plugin senza UI propria (raro). |
@@ -31,7 +31,6 @@ Il `manifest.json` è il contratto dichiarativo del plugin: tutto ciò che il si
   "version": "1.2.0",
   "api_version": 1,
   "enabled": true,
-  "icon": "frontend/assets/icon.svg",
   "backend":  { "entry": "backend/__init__.py" },
   "frontend": { "entry": "frontend/index.ts",
                 "route_base": "/plugins/esempio-store",
