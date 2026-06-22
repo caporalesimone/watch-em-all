@@ -19,6 +19,7 @@
 		external_id: string;
 		name: string;
 		url: string;
+		image_url: string | null;
 		brand: BrandRef | null;
 		product_properties: string[];
 		price_current: string;
@@ -213,7 +214,26 @@
 					{#each preview as p (p.external_id)}
 						<tr class="border-b border-slate-100 dark:border-slate-800/60">
 							<td class="py-1 pr-4">
-								<div>{p.name}</div>
+								<a href={p.url} target="_blank" rel="noopener noreferrer" title={p.name}>
+									{#if p.image_url}
+										<img
+											src={p.image_url}
+											alt=""
+											class="h-10 w-10 rounded object-cover"
+											loading="lazy"
+										/>
+									{:else}
+										<div class="h-10 w-10 rounded bg-slate-100 dark:bg-slate-800"></div>
+									{/if}
+								</a>
+							</td>
+							<td class="py-1 pr-4">
+								<a
+									href={p.url}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="text-sky-700 hover:underline dark:text-sky-400">{p.name}</a
+								>
 								{#if p.brand}
 									<div class="text-xs text-slate-500">
 										{#if p.brand.link}
@@ -251,28 +271,42 @@
 	{/if}
 
 	<!-- Watched products list (3.F3) -->
-	<div class="space-y-2">
+	<div class="mx-auto w-3/4 space-y-2">
 		<h2 class="text-sm font-semibold">{$_('dragon_store.watches.heading')}</h2>
 		{#if watches.length === 0}
 			<p class="text-sm text-slate-500">{$_('dragon_store.watches.empty')}</p>
 		{:else}
-			<ul class="space-y-1">
-				{#each watches as w (w.id)}
-					<li class="flex items-center justify-between gap-3 text-sm">
-						<span class="truncate text-slate-600 dark:text-slate-300" title={w.url}>{w.url}</span>
-						<button class="text-xs text-red-500 hover:underline" onclick={() => removeWatch(w.id)}>
-							{$_('dragon_store.watches.remove')}
-						</button>
-					</li>
-				{/each}
-			</ul>
+			<table class="w-full text-left text-sm">
+				<tbody>
+					{#each watches as w (w.id)}
+						<tr class="border-b border-slate-100 dark:border-slate-800/60">
+							<td class="py-2 pr-4">
+								<a
+									href={w.url}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="break-all text-sky-700 hover:underline dark:text-sky-400">{w.url}</a
+								>
+							</td>
+							<td class="py-2 text-right whitespace-nowrap">
+								<button
+									class="text-xs text-red-500 hover:underline"
+									onclick={() => removeWatch(w.id)}
+								>
+									{$_('dragon_store.watches.remove')}
+								</button>
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
 		{/if}
 	</div>
 
 	<!-- Scrape now (3.F4) — sober: label + caption countdown when on cooldown -->
 	<div class="space-y-1">
 		<button
-			class="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-500 disabled:opacity-50"
+			class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
 			onclick={() => (confirming = true)}
 			disabled={locked || busy}
 		>

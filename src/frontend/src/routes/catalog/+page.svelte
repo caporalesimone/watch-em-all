@@ -73,9 +73,13 @@
 		}
 	}
 
-	function source(pluginId: string): { name: string; icon: string | null } {
+	function source(pluginId: string): { name: string; icon: string | null; route: string | null } {
 		const p = $mountedPlugins.find((m) => m.name === pluginId);
-		return { name: p?.display_name ?? pluginId, icon: p?.icon ?? null };
+		return {
+			name: p?.display_name ?? pluginId,
+			icon: p?.icon ?? null,
+			route: p?.route_base ?? null
+		};
 	}
 
 	function money(value: string, currency: string): string {
@@ -131,7 +135,6 @@
 						>{$_('catalog.colDiscount')}{arrow('discount_pct')}</th
 					>
 					<th class={th}>{$_('catalog.colAvailability')}</th>
-					<th class={th}>{$_('catalog.colOpen')}</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -142,27 +145,47 @@
 						class:opacity-50={item.removed}
 					>
 						<td class="py-2 pr-4">
-							<span class="flex items-center gap-2" title={src.name}>
-								{#if src.icon}
-									<img src={src.icon} alt="" class="h-4 w-4" />
-								{/if}
-								<span class="text-slate-500">{src.name}</span>
-							</span>
-						</td>
-						<td class="py-2 pr-4">
-							{#if item.image_url}
-								<img
-									src={item.image_url}
-									alt=""
-									class="h-10 w-10 rounded object-cover"
-									loading="lazy"
-								/>
+							{#if src.route}
+								<a
+									href={src.route}
+									class="flex items-center gap-2 text-slate-500 hover:text-slate-800 hover:underline dark:hover:text-slate-200"
+									title={src.name}
+								>
+									{#if src.icon}
+										<img src={src.icon} alt="" class="h-4 w-4" />
+									{/if}
+									<span>{src.name}</span>
+								</a>
 							{:else}
-								<div class="h-10 w-10 rounded bg-slate-100 dark:bg-slate-800"></div>
+								<span class="flex items-center gap-2 text-slate-500" title={src.name}>
+									{#if src.icon}
+										<img src={src.icon} alt="" class="h-4 w-4" />
+									{/if}
+									<span>{src.name}</span>
+								</span>
 							{/if}
 						</td>
 						<td class="py-2 pr-4">
-							<div class="font-medium">{item.name}</div>
+							<a href={item.url} target="_blank" rel="noopener noreferrer" title={item.name}>
+								{#if item.image_url}
+									<img
+										src={item.image_url}
+										alt=""
+										class="h-10 w-10 rounded object-cover"
+										loading="lazy"
+									/>
+								{:else}
+									<div class="h-10 w-10 rounded bg-slate-100 dark:bg-slate-800"></div>
+								{/if}
+							</a>
+						</td>
+						<td class="py-2 pr-4">
+							<a
+								href={item.url}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="font-medium text-sky-700 hover:underline dark:text-sky-400">{item.name}</a
+							>
 							{#if item.brand}
 								<div class="text-xs text-slate-500">
 									{#if item.brand.link}
@@ -202,16 +225,6 @@
 							{/if}
 						</td>
 						<td class="py-2 pr-4 text-slate-500">{availability(item)}</td>
-						<td class="py-2 pr-4">
-							<a
-								href={item.url}
-								target="_blank"
-								rel="noopener noreferrer"
-								class="text-sky-600 hover:underline dark:text-sky-400"
-							>
-								{$_('catalog.open')}
-							</a>
-						</td>
 					</tr>
 				{/each}
 			</tbody>

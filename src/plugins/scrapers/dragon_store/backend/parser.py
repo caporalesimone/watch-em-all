@@ -65,6 +65,13 @@ def _clean(value: object) -> str | None:
     return html.unescape(value).strip() or None
 
 
+def _fix_quotes(value: str | None) -> str | None:
+    """Dragon Store's JSON-LD mangles apostrophes into double-quotes (e.g.
+    ``Cthulhu "90`` for ``Cthulhu '90``); recover them in prose fields. The site
+    never uses real double-quotes in titles, so a blanket swap is safe here."""
+    return value.replace('"', "'") if value else value
+
+
 def _iter_jsonld_objects(decoded: str) -> Iterator[dict[str, Any]]:
     for block in _JSONLD_RE.findall(decoded):
         try:
@@ -144,7 +151,7 @@ def parse_product(content: bytes, url: str) -> ParsedProduct:
     if price_current is None:
         raise DragonStoreParseError(f"no offers.price in {url}")
 
-    name = _clean(product.get("name"))
+    name = _fix_quotes(_clean(product.get("name")))
     if name is None:
         raise DragonStoreParseError(f"no name in {url}")
 
@@ -163,5 +170,5 @@ def parse_product(content: bytes, url: str) -> ParsedProduct:
         sku=_clean(product.get("sku")),
         price_valid_until=_clean(offers.get("priceValidUntil")),
         category=_clean(product.get("category")),
-        description=_clean(product.get("description")),
+        description=_fix_quotes(_clean(product.get("description"))),
     )

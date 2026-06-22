@@ -38,6 +38,8 @@ def test_parse_discounted() -> None:
     assert p.brand_link == "https://www.dragonstore.it/giochi-uniti.1.0.0.br.86.uw"
     assert p.sku == "SL1300"
     assert "OFFERTA RAVEN PRIME" in p.name  # parser does NOT sanitise (the plugin does)
+    assert "Cthulhu '90" in p.name  # JSON-LD '"90' apostrophe artifact recovered
+    assert '"' not in p.name
     assert p.image_url is not None and p.image_url.endswith(".jpg")
 
 
