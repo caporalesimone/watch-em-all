@@ -14,6 +14,7 @@ Imposti "Dragon Store alle 14:30" e alle 14:30 lo scrape parte da solo; nella pa
 
 ### Backend
 
+- [ ] **4.B0 — Guardia di disallineamento schema DB (dev)** (~1h): all'avvio confronta il modello ORM (`Base.metadata`) con lo schema reale del DB (`sqlalchemy.inspect`) e segnala **tabelle/colonne mancanti** — `log.warning` per voce + salvataggio su `app.state.schema_drift`. `GET /api/health` espone `schema_drift` (lista) **solo a flag attivo**. Il flag `WEA_SCHEMA_DRIFT_ALERT` è **attivo di default** e si disattiva con `=false` nel `.env` (presente in `.env.example`). Copre le **tabelle core** (i plugin, con `MetaData` propria, in un secondo momento). Non sostituisce le migrazioni (Alembic non c'è ancora): in dev, per applicare un cambio di schema, resta il reset del volume. Nasce dal drift visto in fase 3 (colonne `brand`/`product_properties` aggiunte a un DB esistente → `GET /api/catalog` 500). *Verifica: aggiungo una colonna al modello senza ricreare il DB → warning nei log + (flag attivo) `schema_drift` non vuoto su `/api/health`; flag `false` → campo assente.*
 - [ ] **4.B1 — Worker reale + heartbeat** (~1h): container `worker` con tick al minuto (sostituisce lo stub 0.T4), heartbeat su file + healthcheck compose ([cron-worker](../4-capabilities/core/cron-worker.md), [deployment](../infrastructure/deployment.md)). *Verifica: heartbeat avanza; kill del worker → container unhealthy.*
 - [ ] **4.B2 — Tabella schedule + API** (~1h): `scraper_schedule` (times 1..N, enabled, last_slot), `GET/PUT /api/admin/scrapers/*` ([scheduling-models](../4-capabilities/contracts/scheduling-models.md)). *Verifica: slot salvati e riletti da Swagger.*
 - [ ] **4.B3 — latest_due_slot + catch-up** (~1h): calcolo del "dovuto", recupero cross-midnight. *Verifica: unit test tabellari su slot multipli, recupero, mezzanotte.*
@@ -27,6 +28,7 @@ Imposti "Dragon Store alle 14:30" e alle 14:30 lo scrape parte da solo; nella pa
 
 ### Frontend
 
+- [ ] **4.F0 — Banner disallineamento schema (dev)** (~0.5h): legge `schema_drift` da `GET /api/health`; se non vuoto mostra una **barra rossa fissa in basso** con l'elenco delle tabelle/colonne mancanti. Compare solo quando il flag `WEA_SCHEMA_DRIFT_ALERT` è attivo *e* c'è drift. *Verifica: con DB disallineato la barra rossa appare; flag `false` → niente barra.*
 - [ ] **4.F1 — Editor degli slot** (~1h): elenco scraper con aggiungi/rimuovi orari e sospensione. *Verifica: slot modificato → la run parte all'orario nuovo.*
 - [ ] **4.F2 — Parametri riservati nella pagina admin dello scraper** (~1h): form per politeness, timeout HTTP, emivita cache e **intervallo minimo dello Scrape ora** (le chiavi riservate di 4.B10). *Verifica: modifica da UI → effetto alla run/scrape successiva.*
 - [ ] **4.F3 — Pagina Log: polling con cursore** (~1h): lista incrementale near-real-time ([system-logs](../3-features/admin/system-logs-and-maintenance.md)). *Verifica: gli eventi della run appaiono mentre gira.*
