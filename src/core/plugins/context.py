@@ -10,17 +10,22 @@ and the calling plugin's ``plugin_id``, so a scraper delivers its products with
 ``context.update_catalog(user_id, products)`` and never writes the catalog
 directly (the Catalog Update Service does, and commits — catalog-update-service.md).
 
+Phase-3 PR3 adds ``http``: the polite, counted, retrying HTTP client every
+scraper must use (SCR-R6, plugin-context.md CTX-R1..R4). v0 with constant
+politeness/timeout (admin-configurable values arrive in phase 4); no scrape
+cache yet (CTX-R9, phase 9).
+
 Still simplified (declared, flow rule #7): ``logger`` writes to stdout until the
 ``system_log`` table exists (~phase 10); ``config`` is empty until the
 ConfigField admin-config infrastructure exists (phase 4 for the reserved keys);
-no ``http`` or ``markdown`` yet.
+no ``markdown`` yet.
 """
 
 from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from logging import Logger
 from typing import TYPE_CHECKING, Any
 
@@ -29,6 +34,7 @@ from sqlalchemy.orm import Session
 
 from src.core.catalog import update_catalog as _update_catalog_service
 from src.core.db import get_engine, new_session
+from src.core.http import HttpClient
 
 if TYPE_CHECKING:
     from src.core.contracts import DeltaCounters, Product
@@ -48,6 +54,7 @@ class PluginContext:
     logger: Logger  # namespaced; phase 2 -> stdout (system_log lands later)
     config: Mapping[str, Any]  # the plugin's admin-config section (empty in phase 2)
     update_catalog: UpdateCatalog  # deliver products to the core (the only write path)
+    http: HttpClient = field(default_factory=HttpClient)  # polite/counted/retrying client (SCR-R6)
 
 
 def build_context(manifest: Manifest, plugin: BasePlugin) -> PluginContext:
@@ -70,4 +77,5 @@ def build_context(manifest: Manifest, plugin: BasePlugin) -> PluginContext:
         logger=logging.getLogger(f"wea.plugin.{manifest.name}"),
         config={},
         update_catalog=_update_catalog,
+        http=HttpClient(),
     )
