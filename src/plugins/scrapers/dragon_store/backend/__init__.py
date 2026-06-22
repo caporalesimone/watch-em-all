@@ -55,6 +55,9 @@ class Watch(_Base):
     user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     kind: Mapped[str] = mapped_column(String(16), nullable=False, default="product")
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    # Product title, resolved by a one-off scrape on add and refreshed on each run.
+    # Nullable: a watch added while the site was unreachable falls back to its URL.
+    name: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -74,6 +77,18 @@ def _no_write(user_id: int, products: list[Product]) -> DeltaCounters:
     raise RuntimeError("run_test must not write to the catalog")
 
 
+def _dry_context(db: Session) -> PluginContext:
+    """A context for a read-only scrape (dry-run / add-time title resolution): a real
+    HTTP client, but writing to the catalog is a bug (``_no_write``)."""
+    return PluginContext(
+        engine=db.get_bind(),  # type: ignore[arg-type]
+        db=db,
+        logger=logging.getLogger(f"wea.plugin.{PLUGIN_ID}"),
+        config={},
+        update_catalog=_no_write,
+    )
+
+
 class WatchIn(BaseModel):
     url: str
 
@@ -82,6 +97,7 @@ class WatchOut(BaseModel):
     id: int
     kind: str
     url: str
+    name: str | None = None
 
 
 class DragonStorePlugin(ScraperPlugin):
@@ -173,11 +189,19 @@ class DragonStorePlugin(ScraperPlugin):
 
     # --- runtime (SCR-R4/R5/R11) ---
     def run_for_user(self, context: PluginContext, user_id: int) -> DeltaCounters:
-        urls = [w.url for w in _user_watches(context.db, user_id)]
-        if not urls:
+        watches = _user_watches(context.db, user_id)
+        if not watches:
             # No watches != "site returned nothing": deliver nothing, do NOT delist.
             return DeltaCounters()
-        return context.update_catalog(user_id, self._scrape_products(context, urls))
+        products = self._scrape_products(context, [w.url for w in watches])
+        # Keep each watch's stored title fresh from this run (best-effort); the
+        # update_catalog call below commits this session, persisting these too.
+        by_url = {p.url: p.name for p in products}
+        for watch in watches:
+            fresh = by_url.get(watch.url)
+            if fresh is not None and fresh != watch.name:
+                watch.name = fresh
+        return context.update_catalog(user_id, products)
 
     def run_test(self, context: PluginContext, params: dict[str, Any]) -> list[Product]:
         url = str(params.get("url", "")).strip()
@@ -192,7 +216,10 @@ class DragonStorePlugin(ScraperPlugin):
 
         @router.get("/watches", response_model=list[WatchOut])
         def list_watches(user: UserDep, db: SessionDep) -> list[WatchOut]:
-            return [WatchOut(id=w.id, kind=w.kind, url=w.url) for w in _user_watches(db, user.sub)]
+            return [
+                WatchOut(id=w.id, kind=w.kind, url=w.url, name=w.name)
+                for w in _user_watches(db, user.sub)
+            ]
 
         @router.post("/watches", response_model=WatchOut, status_code=201)
         def add_watch(body: WatchIn, user: UserDep, db: SessionDep) -> WatchOut:
@@ -202,10 +229,18 @@ class DragonStorePlugin(ScraperPlugin):
             already = db.scalar(select(Watch).where(Watch.user_id == user.sub, Watch.url == url))
             if already is not None:
                 raise APIError(409, "duplicate_watch", "this URL is already watched")
-            watch = Watch(user_id=user.sub, kind="product", url=url)
+            # The scraper intervenes once here to resolve the product title (best-effort,
+            # no catalog write); the watch stays valid even if the fetch fails.
+            product = self._scrape_one(_dry_context(db), url)
+            watch = Watch(
+                user_id=user.sub,
+                kind="product",
+                url=url,
+                name=product.name if product else None,
+            )
             db.add(watch)
             db.commit()
-            return WatchOut(id=watch.id, kind=watch.kind, url=watch.url)
+            return WatchOut(id=watch.id, kind=watch.kind, url=watch.url, name=watch.name)
 
         @router.delete("/watches/{watch_id}", status_code=204)
         def remove_watch(watch_id: int, user: UserDep, db: SessionDep) -> None:
@@ -217,14 +252,7 @@ class DragonStorePlugin(ScraperPlugin):
 
         @router.post("/test", response_model=list[Product])
         def test(body: WatchIn, user: UserDep, db: SessionDep) -> list[Product]:
-            ctx = PluginContext(
-                engine=db.get_bind(),  # type: ignore[arg-type]
-                db=db,
-                logger=logging.getLogger(f"wea.plugin.{PLUGIN_ID}"),
-                config={},
-                update_catalog=_no_write,  # dry-run: writing is a bug
-            )
-            return self.run_test(ctx, {"url": body.url})
+            return self.run_test(_dry_context(db), {"url": body.url})
 
         return router
 

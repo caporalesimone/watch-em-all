@@ -22,7 +22,6 @@ from src.core.http import HttpClient
 from src.core.plugins.context import build_context
 
 DS = "/api/plugins/dragon-store"
-URL_A = "https://shop.example/il-richiamo.1.1.192.gp.35880.uw"
 
 _FIX = Path(__file__).parent / "fixtures" / "dragon_store"
 _FIXTURES = {
@@ -140,14 +139,19 @@ def test_watches_crud(client: TestClient) -> None:
 
     assert client.get(f"{DS}/watches", headers=h).json() == []
 
-    created = client.post(f"{DS}/watches", json={"url": URL_A}, headers=h)
+    with DragonServer() as base:
+        url = gp_url(base, "896")
+        created = client.post(f"{DS}/watches", json={"url": url}, headers=h)
     assert created.status_code == 201
     watch_id = created.json()["id"]
-    assert created.json()["url"] == URL_A
+    assert created.json()["url"] == url
     assert created.json()["kind"] == "product"
+    # the scraper resolved the product title on add (shown instead of the URL)
+    assert "Cthulhu" in created.json()["name"]
 
     listed = client.get(f"{DS}/watches", headers=h).json()
-    assert [w["url"] for w in listed] == [URL_A]
+    assert [w["url"] for w in listed] == [url]
+    assert "Cthulhu" in listed[0]["name"]
 
     assert client.delete(f"{DS}/watches/{watch_id}", headers=h).status_code == 204
     assert client.get(f"{DS}/watches", headers=h).json() == []
@@ -157,15 +161,18 @@ def test_watches_are_per_user(client: TestClient) -> None:
     admin = _admin_token(client)
     _uid_a, ta = _make_user(client, admin, "alice")
     _uid_b, tb = _make_user(client, admin, "bob")
-    client.post(f"{DS}/watches", json={"url": URL_A}, headers=_bearer(ta))
+    with DragonServer() as base:
+        client.post(f"{DS}/watches", json={"url": gp_url(base, "896")}, headers=_bearer(ta))
     assert client.get(f"{DS}/watches", headers=_bearer(tb)).json() == []
 
 
 def test_add_duplicate_watch_rejected(client: TestClient) -> None:
     _uid, token = _user(client)
     h = _bearer(token)
-    assert client.post(f"{DS}/watches", json={"url": URL_A}, headers=h).status_code == 201
-    dup = client.post(f"{DS}/watches", json={"url": URL_A}, headers=h)
+    with DragonServer() as base:
+        url = gp_url(base, "896")
+        assert client.post(f"{DS}/watches", json={"url": url}, headers=h).status_code == 201
+        dup = client.post(f"{DS}/watches", json={"url": url}, headers=h)
     assert dup.status_code == 409
     assert dup.json()["code"] == "duplicate_watch"
     assert len(client.get(f"{DS}/watches", headers=h).json()) == 1  # still one

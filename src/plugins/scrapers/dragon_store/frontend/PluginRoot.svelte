@@ -10,6 +10,7 @@
 		id: number;
 		kind: string;
 		url: string;
+		name: string | null;
 	}
 	interface BrandRef {
 		text: string;
@@ -34,7 +35,6 @@
 	}
 
 	let watches = $state<Watch[]>([]);
-	let names = $state<Record<string, string>>({});
 	let url = $state('');
 	let preview = $state<PreviewProduct[] | null>(null);
 	let status = $state<ScrapeStatus | null>(null);
@@ -56,21 +56,6 @@
 		watches = await getJson<Watch[]>(`${BASE}/watches`);
 	}
 
-	async function loadNames(): Promise<void> {
-		// Resolve each watch's product name from the catalog (matched by URL); a watch
-		// not yet scraped has no entry and falls back to showing its URL.
-		try {
-			const page = await getJson<{ items: { url: string; name: string }[] }>(
-				'/api/catalog?page_size=100'
-			);
-			const map: Record<string, string> = {};
-			for (const item of page.items) map[item.url] = item.name;
-			names = map;
-		} catch {
-			names = {};
-		}
-	}
-
 	function applyStatus(s: ScrapeStatus): void {
 		status = s;
 		remaining = s.available ? 0 : s.retry_after_seconds;
@@ -82,7 +67,6 @@
 
 	onMount(() => {
 		void loadWatches();
-		void loadNames();
 		void loadStatus();
 		timer = setInterval(() => {
 			if (status && !status.available && remaining > 0) {
@@ -313,7 +297,7 @@
 									target="_blank"
 									rel="noopener noreferrer"
 									class="break-all text-sky-700 hover:underline dark:text-sky-400"
-									title={w.url}>{names[w.url] ?? w.url}</a
+									title={w.url}>{w.name ?? w.url}</a
 								>
 							</td>
 							<td class="py-2 text-right whitespace-nowrap">
