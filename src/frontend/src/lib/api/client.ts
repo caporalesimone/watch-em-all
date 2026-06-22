@@ -133,7 +133,14 @@ export interface CatalogPage {
 	page_size: number;
 }
 
-export type CatalogSort = 'name' | 'price_current' | 'discount_pct' | 'last_seen_at';
+export type CatalogSort =
+	| 'name'
+	| 'plugin_id'
+	| 'price_current'
+	| 'price_original'
+	| 'discount_pct'
+	| 'is_available'
+	| 'last_seen_at';
 
 export interface CatalogQuery {
 	page?: number;

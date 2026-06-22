@@ -122,19 +122,25 @@
 		<table class="w-full text-left text-sm">
 			<thead class="border-b border-slate-200 text-xs text-slate-500 dark:border-slate-800">
 				<tr>
-					<th class={th}>{$_('catalog.colSource')}</th>
+					<th class="{th} {sortable}" onclick={() => sortBy('plugin_id')}
+						>{$_('catalog.colSource')}{arrow('plugin_id')}</th
+					>
 					<th class={th}>{$_('catalog.colImage')}</th>
 					<th class="{th} {sortable}" onclick={() => sortBy('name')}
 						>{$_('catalog.colName')}{arrow('name')}</th
 					>
-					<th class={th}>{$_('catalog.colPriceOriginal')}</th>
+					<th class="{th} {sortable}" onclick={() => sortBy('price_original')}
+						>{$_('catalog.colPriceOriginal')}{arrow('price_original')}</th
+					>
 					<th class="{th} {sortable}" onclick={() => sortBy('price_current')}
 						>{$_('catalog.colPriceCurrent')}{arrow('price_current')}</th
 					>
 					<th class="{th} {sortable}" onclick={() => sortBy('discount_pct')}
 						>{$_('catalog.colDiscount')}{arrow('discount_pct')}</th
 					>
-					<th class={th}>{$_('catalog.colAvailability')}</th>
+					<th class="{th} {sortable}" onclick={() => sortBy('is_available')}
+						>{$_('catalog.colAvailability')}{arrow('is_available')}</th
+					>
 				</tr>
 			</thead>
 			<tbody>
@@ -166,18 +172,30 @@
 							{/if}
 						</td>
 						<td class="py-2 pr-4">
-							<a href={item.url} target="_blank" rel="noopener noreferrer" title={item.name}>
+							<div class="group relative inline-block">
 								{#if item.image_url}
 									<img
 										src={item.image_url}
 										alt=""
-										class="h-10 w-10 rounded object-cover"
+										class="h-10 w-10 rounded border border-slate-200 object-cover dark:border-slate-700"
 										loading="lazy"
 									/>
+									<!-- hover: full image (no crop), capped so it never fills the screen -->
+									<div
+										class="pointer-events-none absolute left-12 top-0 z-20 hidden group-hover:block"
+									>
+										<img
+											src={item.image_url}
+											alt=""
+											class="max-h-80 max-w-xs rounded-lg border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+										/>
+									</div>
 								{:else}
-									<div class="h-10 w-10 rounded bg-slate-100 dark:bg-slate-800"></div>
+									<div
+										class="h-10 w-10 rounded border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800"
+									></div>
 								{/if}
-							</a>
+							</div>
 						</td>
 						<td class="py-2 pr-4">
 							<a
