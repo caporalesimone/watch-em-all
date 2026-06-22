@@ -78,6 +78,14 @@ def test_parse_other_category() -> None:
     assert p.brand_link == "https://www.dragonstore.it/winning-moves.1.0.0.br.204.uw"
 
 
+def test_parse_breadcrumb_category() -> None:
+    p = parse_product(_read("gp_896_discounted.html"), "https://www.dragonstore.it/x.gp.896.uw")
+    names = [name for name, _url in p.breadcrumb]
+    assert names == ["Giochi di Ruolo", "GDR Italiano", "Il Richiamo di Cthulhu"]
+    # relative @id resolved to an absolute URL
+    assert all(url and url.startswith("https://www.dragonstore.it/") for _n, url in p.breadcrumb)
+
+
 def test_parse_raises_without_jsonld() -> None:
     with pytest.raises(DragonStoreParseError):
         parse_product(b"<html><body>no json-ld here</body></html>", "http://x/y.gp.1.uw")

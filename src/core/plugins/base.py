@@ -22,6 +22,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter
 
+from src.core.contracts import CategoryRef
+
 if TYPE_CHECKING:
     from src.core.contracts import DeltaCounters, Product
     from src.core.plugins.context import PluginContext
@@ -48,6 +50,25 @@ class ProductProperties:
             self._items.append(cleaned)
 
     def get_properties(self) -> list[str]:
+        return list(self._items)
+
+
+class CategoryPath:
+    """Per-product category breadcrumb builder (``category``, SCR-R17 / PROD-R7).
+
+    The base provides the mechanism; the plugin calls ``add_child(name, url)`` from
+    root to leaf as it discovers the path, then ``get_path()`` returns the ordered
+    list. One instance per product (never on the singleton plugin instance)."""
+
+    def __init__(self) -> None:
+        self._items: list[CategoryRef] = []
+
+    def add_child(self, name: str, url: str | None = None) -> None:
+        text = name.strip()
+        if text:
+            self._items.append(CategoryRef(text=text, link=url))
+
+    def get_path(self) -> list[CategoryRef]:
         return list(self._items)
 
 
@@ -114,6 +135,12 @@ class ScraperPlugin(BasePlugin, ABC):
         """A fresh per-product tag accumulator (SCR-R16). Use one per product;
         add tags via ``add_property`` and read them back with ``get_properties``."""
         return ProductProperties()
+
+    @staticmethod
+    def new_category() -> CategoryPath:
+        """A fresh per-product category breadcrumb builder (SCR-R17). Use one per
+        product; ``add_child(name, url)`` root → leaf, then ``get_path()``."""
+        return CategoryPath()
 
     def run_for_user(self, context: PluginContext, user_id: int) -> DeltaCounters:
         """Scrape this user's inputs and deliver the current products through

@@ -106,6 +106,11 @@ export interface BrandRef {
 	link: string | null;
 }
 
+export interface CategoryRef {
+	text: string;
+	link: string | null;
+}
+
 export interface CatalogItem {
 	id: number;
 	plugin_id: string;
@@ -115,6 +120,7 @@ export interface CatalogItem {
 	image_url: string | null;
 	brand: BrandRef | null;
 	product_properties: string[];
+	category: CategoryRef[];
 	currency: string;
 	price_current: string;
 	price_original: string;

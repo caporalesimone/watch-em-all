@@ -12,7 +12,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from src.core.contracts import BrandRef
+from src.core.contracts import BrandRef, CategoryRef
 
 
 class LoginRequest(BaseModel):
@@ -91,6 +91,7 @@ class CatalogItem(BaseModel):
     image_url: str | None
     brand: BrandRef | None = None
     product_properties: list[str] = Field(default_factory=list)
+    category: list[CategoryRef] = Field(default_factory=list)
     currency: str
     price_current: Decimal
     price_original: Decimal

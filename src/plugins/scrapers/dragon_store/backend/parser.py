@@ -54,8 +54,9 @@ class ParsedProduct:
     brand_link: str | None  # absolute URL, or None
     sku: str | None
     price_valid_until: str | None
-    category: str | None
+    category: str | None  # flat JSON-LD category string (→ extra)
     description: str | None
+    breadcrumb: list[tuple[str, str | None]]  # (name, absolute url) root → leaf
 
 
 def _clean(value: object) -> str | None:
@@ -94,6 +95,34 @@ def _find_product_jsonld(decoded: str) -> dict[str, Any] | None:
         if obj.get("@type") == "Product":
             return obj
     return None
+
+
+def _breadcrumb(decoded: str, base_url: str) -> list[tuple[str, str | None]]:
+    """The category breadcrumb (root → leaf) from JSON-LD ``BreadcrumbList``; each
+    step's relative ``@id`` is resolved to an absolute URL. Empty if absent."""
+    for obj in _iter_jsonld_objects(decoded):
+        if obj.get("@type") != "BreadcrumbList":
+            continue
+        elements = obj.get("itemListElement")
+        if not isinstance(elements, list):
+            continue
+        steps: list[tuple[int, str, str | None]] = []
+        for index, entry in enumerate(elements):
+            if not isinstance(entry, dict):
+                continue
+            item = entry.get("item")
+            if isinstance(item, dict):
+                name, ref = _clean(item.get("name")), item.get("@id") or item.get("url")
+            else:
+                name, ref = _clean(entry.get("name")), item if isinstance(item, str) else None
+            if name is None:
+                continue
+            position = entry.get("position")
+            order = position if isinstance(position, int) else index + 1
+            steps.append((order, name, urljoin(base_url, str(ref)) if ref else None))
+        steps.sort(key=lambda step: step[0])
+        return [(name, url) for _order, name, url in steps]
+    return []
 
 
 def _to_decimal(value: object) -> Decimal | None:
@@ -171,4 +200,5 @@ def parse_product(content: bytes, url: str) -> ParsedProduct:
         price_valid_until=_clean(offers.get("priceValidUntil")),
         category=_clean(product.get("category")),
         description=_fix_quotes(_clean(product.get("description"))),
+        breadcrumb=_breadcrumb(decoded, url),
     )

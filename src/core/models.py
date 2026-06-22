@@ -83,6 +83,8 @@ class CatalogProduct(Base):
     brand_link: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     # Generic product tags (PROD-R5): a JSON array of strings, persisted as-is.
     product_properties: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    # Category breadcrumb (PROD-R7): JSON array of {text, link}, root → leaf.
+    category: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
     # Plugin-specific data (DB-R3: Decimal as string, datetime ISO-8601 UTC inside).
     extra_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")

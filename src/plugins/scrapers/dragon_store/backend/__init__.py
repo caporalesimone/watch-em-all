@@ -20,11 +20,11 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter
-from pydantic import BaseModel
-from sqlalchemy import DateTime, Integer, String, delete, func, select
+from pydantic import BaseModel, Field
+from sqlalchemy import JSON, DateTime, Integer, String, delete, func, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
-from src.core.contracts import BrandRef, DeltaCounters, Product
+from src.core.contracts import BrandRef, CategoryRef, DeltaCounters, Product
 from src.core.errors import APIError
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.context import PluginContext
@@ -55,9 +55,10 @@ class Watch(_Base):
     user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     kind: Mapped[str] = mapped_column(String(16), nullable=False, default="product")
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
-    # Product title, resolved by a one-off scrape on add and refreshed on each run.
-    # Nullable: a watch added while the site was unreachable falls back to its URL.
-    name: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # Display snapshot of the last scraped product (name, image_url, brand,
+    # product_properties, category) — set by a one-off scrape on add and refreshed
+    # on each run. Null until the first successful scrape (UI falls back to the URL).
+    snapshot_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -97,7 +98,37 @@ class WatchOut(BaseModel):
     id: int
     kind: str
     url: str
+    # Display fields from the watch's product snapshot (null/empty until first scrape).
     name: str | None = None
+    image_url: str | None = None
+    brand: BrandRef | None = None
+    product_properties: list[str] = Field(default_factory=list)
+    category: list[CategoryRef] = Field(default_factory=list)
+
+
+def _snapshot(product: Product) -> dict[str, Any]:
+    """The watch's display snapshot of a scraped product (stored as JSON)."""
+    return {
+        "name": product.name,
+        "image_url": product.image_url,
+        "brand": product.brand.model_dump() if product.brand else None,
+        "product_properties": list(product.product_properties),
+        "category": [c.model_dump() for c in product.category],
+    }
+
+
+def _watch_out(watch: Watch) -> WatchOut:
+    snap = watch.snapshot_json or {}
+    return WatchOut(
+        id=watch.id,
+        kind=watch.kind,
+        url=watch.url,
+        name=snap.get("name"),
+        image_url=snap.get("image_url"),
+        brand=snap.get("brand"),
+        product_properties=snap.get("product_properties") or [],
+        category=snap.get("category") or [],
+    )
 
 
 class DragonStorePlugin(ScraperPlugin):
@@ -157,6 +188,10 @@ class DragonStorePlugin(ScraperPlugin):
         if parsed.availability == "PreOrder":
             props.add_property(_PREORDER_PROPERTY)
 
+        category = self.new_category()
+        for crumb_name, crumb_url in parsed.breadcrumb:
+            category.add_child(crumb_name, crumb_url)
+
         brand = (
             BrandRef(text=parsed.brand_text, link=parsed.brand_link) if parsed.brand_text else None
         )
@@ -178,6 +213,7 @@ class DragonStorePlugin(ScraperPlugin):
             image_url=parsed.image_url,
             brand=brand,
             product_properties=props.get_properties(),
+            category=category.get_path(),
             price_current=parsed.price_current,
             price_original=parsed.price_original,
             discount_pct=None,  # the core derives it from original/current (CATSVC)
@@ -194,13 +230,13 @@ class DragonStorePlugin(ScraperPlugin):
             # No watches != "site returned nothing": deliver nothing, do NOT delist.
             return DeltaCounters()
         products = self._scrape_products(context, [w.url for w in watches])
-        # Keep each watch's stored title fresh from this run (best-effort); the
-        # update_catalog call below commits this session, persisting these too.
-        by_url = {p.url: p.name for p in products}
+        # Refresh each watch's display snapshot from this run; the update_catalog
+        # call below commits this session, persisting these too.
+        by_url = {p.url: p for p in products}
         for watch in watches:
-            fresh = by_url.get(watch.url)
-            if fresh is not None and fresh != watch.name:
-                watch.name = fresh
+            product = by_url.get(watch.url)
+            if product is not None:
+                watch.snapshot_json = _snapshot(product)
         return context.update_catalog(user_id, products)
 
     def run_test(self, context: PluginContext, params: dict[str, Any]) -> list[Product]:
@@ -216,10 +252,7 @@ class DragonStorePlugin(ScraperPlugin):
 
         @router.get("/watches", response_model=list[WatchOut])
         def list_watches(user: UserDep, db: SessionDep) -> list[WatchOut]:
-            return [
-                WatchOut(id=w.id, kind=w.kind, url=w.url, name=w.name)
-                for w in _user_watches(db, user.sub)
-            ]
+            return [_watch_out(w) for w in _user_watches(db, user.sub)]
 
         @router.post("/watches", response_model=WatchOut, status_code=201)
         def add_watch(body: WatchIn, user: UserDep, db: SessionDep) -> WatchOut:
@@ -236,11 +269,11 @@ class DragonStorePlugin(ScraperPlugin):
                 user_id=user.sub,
                 kind="product",
                 url=url,
-                name=product.name if product else None,
+                snapshot_json=_snapshot(product) if product else None,
             )
             db.add(watch)
             db.commit()
-            return WatchOut(id=watch.id, kind=watch.kind, url=watch.url, name=watch.name)
+            return _watch_out(watch)
 
         @router.delete("/watches/{watch_id}", status_code=204)
         def remove_watch(watch_id: int, user: UserDep, db: SessionDep) -> None:

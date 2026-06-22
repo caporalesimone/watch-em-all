@@ -72,6 +72,7 @@ def _insert_product(
         brand_text=p.brand.text if p.brand else None,
         brand_link=p.brand.link if p.brand else None,
         product_properties=list(p.product_properties),
+        category=[c.model_dump() for c in p.category],
         extra_json=p.extra,
         currency=p.currency,
         price_current=p.price_current,
@@ -96,6 +97,7 @@ def _update_mutable_fields(
     row.brand_text = p.brand.text if p.brand else None
     row.brand_link = p.brand.link if p.brand else None
     row.product_properties = list(p.product_properties)
+    row.category = [c.model_dump() for c in p.category]
     row.extra_json = p.extra
     row.currency = p.currency
     row.price_current = p.price_current

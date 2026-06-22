@@ -30,6 +30,14 @@ class BrandRef(BaseModel):
     link: str | None = None
 
 
+class CategoryRef(BaseModel):
+    """One breadcrumb step of a product's category (PROD-R7): a label + optional
+    link. The full category is an ordered list, root → leaf."""
+
+    text: str
+    link: str | None = None
+
+
 class Product(BaseModel):
     """The current state of one product as a scraper sees it (product.md).
 
@@ -49,6 +57,8 @@ class Product(BaseModel):
     # Generic product "tags" (e.g. "Edizione Limitata", "Pre Order"); the scraper
     # populates it from any source, the core only persists it (PROD-R5).
     product_properties: list[str] = Field(default_factory=list)
+    # Category breadcrumb, root → leaf (PROD-R7); empty if the scraper has none.
+    category: list[CategoryRef] = Field(default_factory=list)
 
     price_current: Decimal  # discounted / current price
     price_original: Decimal | None = None  # None -> resolved from history, then current

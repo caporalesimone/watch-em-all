@@ -148,6 +148,7 @@ def test_watches_crud(client: TestClient) -> None:
     assert created.json()["kind"] == "product"
     # the scraper resolved the product title on add (shown instead of the URL)
     assert "Cthulhu" in created.json()["name"]
+    assert len(created.json()["category"]) >= 1  # snapshot includes the category
 
     listed = client.get(f"{DS}/watches", headers=h).json()
     assert [w["url"] for w in listed] == [url]
@@ -310,3 +311,4 @@ def test_run_for_user_brand_and_price_persisted(client: TestClient) -> None:
     assert item["brand"]["text"] == "Raven Distribution"
     assert "Edizione Limitata" in item["product_properties"]  # tag surfaced via the API
     assert "EDIZIONE LIMITATA" not in item["name"].upper()  # label stripped from the name
+    assert len(item["category"]) >= 1  # category breadcrumb persisted (PROD-R7)
