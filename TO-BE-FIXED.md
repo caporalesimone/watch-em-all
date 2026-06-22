@@ -54,6 +54,48 @@ New items get appended over time.
   (currently `hover:bg-red-50` — too subtle / not landing).
 - **Fix idea:** give it the same visible fill-on-hover treatment as the Preview button.
 
+### Swap Adminer → pgweb (dev DB browser), preconfigured & login-less
+- **Reported (Simone):** sostituire **Adminer** con **pgweb** come browser DB di sviluppo.
+  pgweb va **pre-configurato** (utente `admin` / pass `admin`), avviato **solo in debug**
+  (profilo `dev`) e **già connesso** al database `watchemall` senza compilare il form di
+  connessione. Sarebbe perfetto **evitare anche il login**.
+- **Where (touch points found in review):**
+  - [`compose.yml`](compose.yml#L97-L103) and [`compose-dev.yml`](compose-dev.yml#L89-L95):
+    the `adminer` service (`image: adminer:4`, `ports: ["8081:8080"]`, `profiles: [dev]`).
+  - [`compose-dev.yml:8`](compose-dev.yml#L8) header comment "# also adminer on :8081".
+  - [`.devcontainer/devcontainer.json:8`](.devcontainer/devcontainer.json#L8) —
+    `forwardPorts: [8080, 8081]` (8081 forwarded for the DB browser; can stay).
+  - Docs: [`README.md:98`](README.md#L98); [`docs/updates/phase-02.md:38`](docs/updates/phase-02.md#L38);
+    [`docs/updates/phase-03.md:33,37,47`](docs/updates/phase-03.md#L33-L47) (incl. the
+    "log in with…" step — pgweb shouldn't need it); deployment
+    ([`docs/infrastructure/deployment.md:44,110-112`](docs/infrastructure/deployment.md#L44)
+    + [`docs-ita`](docs-ita/infrastructure/deployment.md#L48) :48,119-121,137); dev-container
+    ([`docs/infrastructure/dev-container.md:44,55`](docs/infrastructure/dev-container.md#L44)
+    + [`docs-ita`](docs-ita/infrastructure/dev-container.md#L42) :42,54,70,86,101);
+    [`docs-ita/2-architecture/system-overview.md:18,38`](docs-ita/2-architecture/system-overview.md#L18);
+    [`docs-ita/4-capabilities/database/schema.md:86`](docs-ita/4-capabilities/database/schema.md#L86) (DB-R6);
+    [`docs-ita/developer-rules/infrastructure/rules.md:7,9`](docs-ita/developer-rules/infrastructure/rules.md#L7)
+    (INF-1 pins `adminer:4`; INF-3 "Adminer e simili");
+    [`docs-ita/plugin-development/checklist-and-testing.md:55`](docs-ita/plugin-development/checklist-and-testing.md#L55);
+    [`docs-ita/development-flow/phase-00-pipeline.md:31`](docs-ita/development-flow/phase-00-pipeline.md#L31),
+    [`phase-01-foundations.md:19`](docs-ita/development-flow/phase-01-foundations.md#L19).
+  - [`CHANGELOG.md:204`](CHANGELOG.md#L204) — historical released entry, **leave as-is**.
+- **.env / .env.example:** today **neither** references adminer (adminer needs no config —
+  you pick the DB in its UI). pgweb instead wants a connection: feed it a URL built from the
+  existing `POSTGRES_*` — `postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable`
+  (via `DATABASE_URL`/`--url`; confirm the exact env-var name + pgweb's listen port, likely
+  `8081:8081`, against the image at implementation time). Passing the URL makes pgweb open
+  straight on `watchemall` and **skip the connection form** → that already removes the
+  "login". Do **not** set pgweb's HTTP basic auth (`--auth-*`) since the request is to avoid
+  login — keep it locked down via the `dev` profile + never exposing 8081 in prod instead.
+  - **Credential note to confirm:** the request says "user admin / pass admin", but the dev
+    DB is `POSTGRES_USER=admin` / `POSTGRES_PASSWORD=change`. pgweb connects with the **DB**
+    creds, so it'd be `admin/change` unless we also set the dev DB password to `admin`. Decide.
+- **Fix idea:** replace the `adminer` service with `sosedoff/pgweb` (pin a tag, INF-1), keep
+  `profiles: [dev]` (INF-3) + `depends_on: db`, map `8081`, pass the connection URL. Then
+  sweep the doc touch points above (drop the Adminer "log in with…" step, rename to pgweb,
+  keep :8081) and update the INF-1 pin + INF-3 wording.
+
 ## Reminders / to discuss
 
 ### A standard set of core-frontend components reused by plugins
