@@ -34,6 +34,7 @@
 	}
 
 	let watches = $state<Watch[]>([]);
+	let names = $state<Record<string, string>>({});
 	let url = $state('');
 	let preview = $state<PreviewProduct[] | null>(null);
 	let status = $state<ScrapeStatus | null>(null);
@@ -55,6 +56,21 @@
 		watches = await getJson<Watch[]>(`${BASE}/watches`);
 	}
 
+	async function loadNames(): Promise<void> {
+		// Resolve each watch's product name from the catalog (matched by URL); a watch
+		// not yet scraped has no entry and falls back to showing its URL.
+		try {
+			const page = await getJson<{ items: { url: string; name: string }[] }>(
+				'/api/catalog?page_size=100'
+			);
+			const map: Record<string, string> = {};
+			for (const item of page.items) map[item.url] = item.name;
+			names = map;
+		} catch {
+			names = {};
+		}
+	}
+
 	function applyStatus(s: ScrapeStatus): void {
 		status = s;
 		remaining = s.available ? 0 : s.retry_after_seconds;
@@ -66,6 +82,7 @@
 
 	onMount(() => {
 		void loadWatches();
+		void loadNames();
 		void loadStatus();
 		timer = setInterval(() => {
 			if (status && !status.available && remaining > 0) {
@@ -276,7 +293,13 @@
 		{#if watches.length === 0}
 			<p class="text-sm text-slate-500">{$_('dragon_store.watches.empty')}</p>
 		{:else}
-			<table class="w-full text-left text-sm">
+			<table class="w-full border-collapse text-left text-sm">
+				<thead>
+					<tr class="border-b border-slate-200 text-xs text-slate-500 dark:border-slate-700">
+						<th class="py-2 pr-4 font-normal">{$_('dragon_store.watches.col_product')}</th>
+						<th class="py-2"></th>
+					</tr>
+				</thead>
 				<tbody>
 					{#each watches as w (w.id)}
 						<tr class="border-b border-slate-100 dark:border-slate-800/60">
@@ -285,12 +308,13 @@
 									href={w.url}
 									target="_blank"
 									rel="noopener noreferrer"
-									class="break-all text-sky-700 hover:underline dark:text-sky-400">{w.url}</a
+									class="break-all text-sky-700 hover:underline dark:text-sky-400"
+									title={w.url}>{names[w.url] ?? w.url}</a
 								>
 							</td>
 							<td class="py-2 text-right whitespace-nowrap">
 								<button
-									class="text-xs text-red-500 hover:underline"
+									class="rounded border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/40"
 									onclick={() => removeWatch(w.id)}
 								>
 									{$_('dragon_store.watches.remove')}
@@ -306,10 +330,11 @@
 	<!-- Scrape now (3.F4) — sober: label + caption countdown when on cooldown -->
 	<div class="space-y-1">
 		<button
-			class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+			class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-6 py-3 text-base font-semibold text-white shadow hover:bg-emerald-700 active:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
 			onclick={() => (confirming = true)}
 			disabled={locked || busy}
 		>
+			<span aria-hidden="true" class="text-lg leading-none">⟳</span>
 			{$_('dragon_store.scrape_now.action')}
 		</button>
 		{#if locked}
