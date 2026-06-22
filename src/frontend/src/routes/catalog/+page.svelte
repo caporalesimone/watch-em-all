@@ -161,7 +161,33 @@
 								<div class="h-10 w-10 rounded bg-slate-100 dark:bg-slate-800"></div>
 							{/if}
 						</td>
-						<td class="py-2 pr-4 font-medium">{item.name}</td>
+						<td class="py-2 pr-4">
+							<div class="font-medium">{item.name}</div>
+							{#if item.brand}
+								<div class="text-xs text-slate-500">
+									{#if item.brand.link}
+										<a
+											href={item.brand.link}
+											target="_blank"
+											rel="noopener noreferrer"
+											class="hover:underline">{item.brand.text}</a
+										>
+									{:else}
+										{item.brand.text}
+									{/if}
+								</div>
+							{/if}
+							{#if item.product_properties.length > 0}
+								<div class="mt-1 flex flex-wrap gap-1">
+									{#each item.product_properties as prop (prop)}
+										<span
+											class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+											>{prop}</span
+										>
+									{/each}
+								</div>
+							{/if}
+						</td>
 						<td class="py-2 pr-4 text-slate-400 line-through">
 							{money(item.price_original, item.currency)}
 						</td>

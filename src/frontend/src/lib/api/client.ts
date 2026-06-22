@@ -101,6 +101,11 @@ export function getPlugins(): Promise<PluginInfo[]> {
 
 // Catalog / Product Picker (CAT-*). Money fields are Decimal serialised as
 // strings (exact, no float drift) — rendered as-is, never parsed for maths.
+export interface BrandRef {
+	text: string;
+	link: string | null;
+}
+
 export interface CatalogItem {
 	id: number;
 	plugin_id: string;
@@ -108,6 +113,8 @@ export interface CatalogItem {
 	url: string;
 	name: string;
 	image_url: string | null;
+	brand: BrandRef | null;
+	product_properties: string[];
 	currency: string;
 	price_current: string;
 	price_original: string;

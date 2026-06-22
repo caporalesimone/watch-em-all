@@ -290,3 +290,6 @@ def test_run_for_user_brand_and_price_persisted(client: TestClient) -> None:
     item = page["items"][0]
     assert item["price_current"] == "89.99"  # full price
     assert item["is_available"] is True
+    assert item["brand"]["text"] == "Raven Distribution"
+    assert "Edizione Limitata" in item["product_properties"]  # tag surfaced via the API
+    assert "EDIZIONE LIMITATA" not in item["name"].upper()  # label stripped from the name

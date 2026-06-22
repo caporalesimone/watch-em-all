@@ -11,10 +11,16 @@
 		kind: string;
 		url: string;
 	}
+	interface BrandRef {
+		text: string;
+		link: string | null;
+	}
 	interface PreviewProduct {
 		external_id: string;
 		name: string;
 		url: string;
+		brand: BrandRef | null;
+		product_properties: string[];
 		price_current: string;
 		currency: string;
 		is_available: boolean;
@@ -206,7 +212,33 @@
 				<tbody>
 					{#each preview as p (p.external_id)}
 						<tr class="border-b border-slate-100 dark:border-slate-800/60">
-							<td class="py-1 pr-4">{p.name}</td>
+							<td class="py-1 pr-4">
+								<div>{p.name}</div>
+								{#if p.brand}
+									<div class="text-xs text-slate-500">
+										{#if p.brand.link}
+											<a
+												href={p.brand.link}
+												target="_blank"
+												rel="noopener noreferrer"
+												class="hover:underline">{p.brand.text}</a
+											>
+										{:else}
+											{p.brand.text}
+										{/if}
+									</div>
+								{/if}
+								{#if p.product_properties.length > 0}
+									<div class="mt-1 flex flex-wrap gap-1">
+										{#each p.product_properties as prop (prop)}
+											<span
+												class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+												>{prop}</span
+											>
+										{/each}
+									</div>
+								{/if}
+							</td>
 							<td class="py-1 pr-4 font-medium">€{p.price_current}</td>
 							<td class="py-1 pr-4 text-slate-500">
 								{p.is_available ? $_('dragon_store.available') : $_('dragon_store.unavailable')}

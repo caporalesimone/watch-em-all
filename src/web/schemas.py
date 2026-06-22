@@ -12,6 +12,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from src.core.contracts import BrandRef
+
 
 class LoginRequest(BaseModel):
     username: str = Field(min_length=1)
@@ -87,6 +89,8 @@ class CatalogItem(BaseModel):
     url: str
     name: str
     image_url: str | None
+    brand: BrandRef | None = None
+    product_properties: list[str] = Field(default_factory=list)
     currency: str
     price_current: Decimal
     price_original: Decimal

@@ -13,6 +13,7 @@ from fastapi import APIRouter, Query
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import InstrumentedAttribute
 
+from src.core.contracts import BrandRef
 from src.core.models import CatalogProduct
 from src.web.deps import SessionDep, UserDep
 from src.web.schemas import CatalogItem, CatalogPage
@@ -35,6 +36,8 @@ def _to_item(row: CatalogProduct) -> CatalogItem:
         url=row.url,
         name=row.name,
         image_url=row.image_url,
+        brand=BrandRef(text=row.brand_text, link=row.brand_link) if row.brand_text else None,
+        product_properties=row.product_properties,
         currency=row.currency,
         price_current=row.price_current,
         price_original=row.price_original,
