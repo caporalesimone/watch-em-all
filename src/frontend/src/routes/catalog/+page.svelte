@@ -22,6 +22,12 @@
 	let order = $state<'asc' | 'desc'>('desc');
 	let pageNum = $state(1);
 
+	// Image hover-zoom: only reveal the enlarged preview after the cursor rests on a
+	// thumbnail for HOVER_DELAY_MS, so it doesn't flash while scrolling past rows.
+	const HOVER_DELAY_MS = 500;
+	let hoveredId = $state<number | null>(null);
+	let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+
 	const pages = $derived(data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1);
 
 	async function load(silent = false): Promise<void> {
@@ -106,6 +112,22 @@
 		return item.is_available ? $_('catalog.available') : $_('catalog.unavailable');
 	}
 
+	function previewEnter(id: number): void {
+		if (hoverTimer) clearTimeout(hoverTimer);
+		hoverTimer = setTimeout(() => {
+			hoveredId = id;
+			hoverTimer = null;
+		}, HOVER_DELAY_MS);
+	}
+
+	function previewLeave(): void {
+		if (hoverTimer) {
+			clearTimeout(hoverTimer);
+			hoverTimer = null;
+		}
+		hoveredId = null;
+	}
+
 	const th = 'py-2 pr-4 font-normal';
 	const sortable = 'cursor-pointer select-none hover:text-slate-800 dark:hover:text-slate-200';
 </script>
@@ -187,7 +209,12 @@
 							{/if}
 						</td>
 						<td class="py-2 pr-4">
-							<div class="group relative inline-block">
+							<div
+								class="relative inline-block"
+								role="presentation"
+								onmouseenter={() => previewEnter(item.id)}
+								onmouseleave={previewLeave}
+							>
 								{#if item.image_url}
 									<img
 										src={item.image_url}
@@ -195,9 +222,10 @@
 										class="h-10 w-10 rounded border border-slate-200 object-cover dark:border-slate-700"
 										loading="lazy"
 									/>
-									<!-- hover: full image (no crop), capped so it never fills the screen -->
+									<!-- hover (after a ~500ms intent delay): full image (no crop), capped so it never fills the screen -->
 									<div
-										class="pointer-events-none absolute left-12 top-0 z-20 hidden group-hover:block"
+										class="pointer-events-none absolute left-12 top-0 z-20"
+										class:hidden={hoveredId !== item.id}
 									>
 										<img
 											src={item.image_url}
