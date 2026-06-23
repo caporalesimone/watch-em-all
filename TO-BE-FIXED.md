@@ -60,6 +60,27 @@ New items get appended over time.
   `profiles: [dev]` (INF-3) + `depends_on: db`, map `8081`, pass the connection URL. Then
   sweep the doc touch points above (drop the Adminer "log in with…" step, rename to pgweb,
   keep :8081) and update the INF-1 pin + INF-3 wording.
+- **Testing (once implemented):** `docker compose -f compose-dev.yml --profile dev up -d`
+  starts **pgweb** (not adminer) on :8081; opening **http://localhost:8081** lands **directly**
+  on the `watchemall` DB — **no connection form, no login** — and the tables are browsable.
+  **Without** the `dev` profile pgweb must **not** start (only db/web/worker). Confirm
+  `docker compose -f compose-dev.yml config` no longer lists an `adminer` service, and a repo
+  grep for "adminer" leaves only the historical CHANGELOG entry.
+
+### Catalog: prune the now-unused `discount_pct` **sort** key
+- **Reported (Simone):** dopo aver tolto la colonna Discount (badge ora sotto il prezzo,
+  commit `e4574f8`), l'ordinamento per sconto non ha più un controllo UI ma è rimasto nell'API.
+- **Where (the *sort* key only — NOT the data field):**
+  - frontend: `'discount_pct'` is still a member of `CatalogSort`
+    ([`client.ts:142-148`](src/frontend/src/lib/api/client.ts#L142-L148)).
+  - backend: the sort whitelist still accepts it — the `_SORT_COLUMNS` map
+    ([`web/routers/catalog.py:28`](src/web/routers/catalog.py#L28)) and the allowed-sort list
+    ([`web/routers/catalog.py:68`](src/web/routers/catalog.py#L68)).
+- **Keep:** the `discount_pct` **data field** stays everywhere (`contracts.py`, `models.py`,
+  `web/schemas.py`, `core/catalog.py`, the dragon_store backend, `CatalogItem` + the badge in
+  `+page.svelte`) — the under-price badge renders from it.
+- **Fix idea:** drop `'discount_pct'` from `CatalogSort` and from the backend sort whitelist
+  (map + list) if no other consumer needs that sort. Touches the API surface, so confirm first.
 
 ## Reminders / to discuss
 
