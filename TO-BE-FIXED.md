@@ -61,43 +61,6 @@ New items get appended over time.
   sweep the doc touch points above (drop the Adminer "log in with…" step, rename to pgweb,
   keep :8081) and update the INF-1 pin + INF-3 wording.
 
-### Catalog: drop the Discount column, show -% under Price; strike List price only when discounted
-- **Reported (Simone):** togliere la colonna **Sconto** (Discount) dal catalogo e mostrare lo
-  sconto — **esattamente com'è ora**, badge con background verde e testo tipo `-50%` — proprio
-  **sotto la cifra della colonna Prezzo** (Price), così appare qualcosa del tipo:
-
-  ```
-  9,90
-  -50%
-  ```
-
-  Inoltre il **List price** (Prezzo pieno) deve essere **barrato solo se esiste un Price
-  diverso**, cioè quando il prodotto è effettivamente scontato (oggi è sempre barrato).
-- **Where:** [`src/frontend/src/routes/catalog/+page.svelte`](src/frontend/src/routes/catalog/+page.svelte):
-  - Discount column header (sortable, `discount_pct`):
-    [`+page.svelte:153-155`](src/frontend/src/routes/catalog/+page.svelte#L153-L155) — to remove.
-  - Discount cell with the green `-50%` badge:
-    [`+page.svelte:268-276`](src/frontend/src/routes/catalog/+page.svelte#L268-L276) — to move
-    under the Price cell.
-  - List price (`price_original`) cell, **always** `line-through` today:
-    [`+page.svelte:264-266`](src/frontend/src/routes/catalog/+page.svelte#L264-L266).
-  - Price (`price_current`) cell, target for the badge:
-    [`+page.svelte:267`](src/frontend/src/routes/catalog/+page.svelte#L267).
-  - i18n key `catalog.colDiscount` ("Discount" / "Sconto"):
-    [`en.json:30`](src/frontend/src/i18n/en.json#L30), [`it.json:30`](src/frontend/src/i18n/it.json#L30) —
-    becomes unused once the header is gone.
-- **Fix idea:**
-  - Delete the Discount `<th>` and its `<td>`; move the green badge `<span>` (unchanged
-    styling) into the Price `<td>`, stacked **below** `money(item.price_current, …)` (e.g. wrap
-    both in a column flex / add a `block` under the price), keeping the existing
-    `{#if Number(item.discount_pct) > 0}` guard.
-  - Make the List price strikethrough **conditional** on a discount: apply `line-through` only
-    when `Number(item.discount_pct) > 0` (i.e. `price_current` differs from `price_original`),
-    otherwise render it plain.
-  - Note the lost **sort-by-discount** control (the column header was the only entry point for
-    `sortBy('discount_pct')`); decide whether that sort key is still needed and drop the now
-    unused `catalog.colDiscount` i18n key if not.
-
 ## Reminders / to discuss
 
 ### A standard set of core-frontend components reused by plugins

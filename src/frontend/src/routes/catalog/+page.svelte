@@ -172,9 +172,6 @@
 					<th class="{th} {sortable}" onclick={() => sortBy('price_current')}
 						>{$_('catalog.colPriceCurrent')}{arrow('price_current')}</th
 					>
-					<th class="{th} {sortable}" onclick={() => sortBy('discount_pct')}
-						>{$_('catalog.colDiscount')}{arrow('discount_pct')}</th
-					>
 					<th class="{th} {sortable}" onclick={() => sortBy('is_available')}
 						>{$_('catalog.colAvailability')}{arrow('is_available')}</th
 					>
@@ -289,14 +286,14 @@
 								</div>
 							{/if}
 						</td>
-						<td class="py-2 pr-4 text-slate-400 line-through">
+						<td class="py-2 pr-4 text-slate-400" class:line-through={Number(item.discount_pct) > 0}>
 							{money(item.price_original, item.currency)}
 						</td>
-						<td class="py-2 pr-4 font-medium">{money(item.price_current, item.currency)}</td>
-						<td class="py-2 pr-4">
+						<td class="py-2 pr-4 font-medium">
+							<div>{money(item.price_current, item.currency)}</div>
 							{#if Number(item.discount_pct) > 0}
 								<span
-									class="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700 dark:bg-green-900/40 dark:text-green-300"
+									class="mt-0.5 inline-block rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700 dark:bg-green-900/40 dark:text-green-300"
 								>
 									-{Math.round(Number(item.discount_pct))}%
 								</span>
