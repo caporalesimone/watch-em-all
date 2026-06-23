@@ -56,6 +56,7 @@ Regole:
 - Il registro generato non si scrive **mai** a mano (`FDISC-R1`).
 - Aggiungere un plugin = creare la cartella con manifest valido + `frontend/index.ts` conforme: **zero modifiche** a build o routing.
 - I plugin importano i componenti core via `$lib/components` (build unico: nessun problema cross-bundle).
+- **Tailwind scansiona sia `src/frontend` sia `src/plugins`**: i frontend dei plugin stanno **fuori** dalla root SvelteKit (che Tailwind 4 auto-scopre da sola), quindi si registrano esplicitamente come sorgenti (`@source '../../plugins/**/*.{svelte,ts,js}'` in `app.css`) affinché le utility usate **solo** dai plugin finiscano nel CSS buildato.
 - **Conseguenza operativa**: cambiare `enabled` richiede rebuild dell'immagine `web` (il bundle è cucinato nel Dockerfile: `RUN npm run build`) + restart. Documentato anche in [deployment](deployment.md).
 
 ## Tooling backend

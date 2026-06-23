@@ -12,7 +12,7 @@ Il catalogo è l'insieme dei prodotti estratti dagli scraper per l'utente. Il **
 - **CAT-R2** — Ogni prodotto mostra sempre la **provenienza** (icona + nome dello scraper), col nome **cliccabile** che porta alla pagina dello scraper. Fondamentale per i carrelli cross ([use case 2](../../1-business/use-cases.md)).
 - **CAT-R3** — I prodotti **non disponibili** restano nel catalogo (indicatore visivo), non vengono mai esclusi automaticamente.
 - **CAT-R4** — I prodotti **delistati** (`removed`, assenti dall'ultimo scrape) restano in tabella grigiati, esclusi da carrelli e alert, finché l'utente non li pulisce. Se ricompaiono in uno scrape, tornano attivi.
-- **CAT-R5** — La tabella è **paginata lato server**, ordinabile (provenienza, titolo, prezzo corrente, prezzo di listino, % sconto, disponibilità, ultimo aggiornamento), filtrabile per scraper e ricercabile per titolo. All'apertura si popola da sola (anche subito dopo uno scrape, che scrive in modo asincrono): nessun bisogno di lanciare la ricerca a mano.
+- **CAT-R5** — La tabella è **paginata lato server**, ordinabile (provenienza, titolo, prezzo corrente, prezzo di listino, disponibilità, ultimo aggiornamento), filtrabile per scraper e ricercabile per titolo. All'apertura si popola da sola (anche subito dopo uno scrape, che scrive in modo asincrono): nessun bisogno di lanciare la ricerca a mano.
 - **CAT-R6** — Azioni di pulizia: rimuovi delistati, rimozione selettiva (modalità delete), svuota catalogo. Tutte con conferma; la conferma **dichiara le conseguenze** (rimozione dai carrelli e perdita dello storico dei prodotti coinvolti).
 - **CAT-R7** — **Empty-state del catalogo**: a catalogo vuoto il Product Picker non offre azioni di scraping, ma **rimanda alle pagine degli scraper** per configurare cosa osservare e avviare il primo popolamento. Lo **Scrape ora** è **per-scraper** e vive sulla pagina dello scraper, non qui ([scraper-plugin](../plugins/scraper-plugin.md), SCR-R15).
 - **CAT-R8** — L'eliminazione di un prodotto dal catalogo lo rimuove **a cascata** dai carrelli e ne elimina lo storico prezzi.
@@ -22,11 +22,10 @@ Il catalogo è l'insieme dei prodotti estratti dagli scraper per l'utente. Il **
 | Colonna | Contenuto |
 |---|---|
 | Provenienza | Icona + nome dello scraper; **link alla pagina dello scraper** |
-| Foto | Immagine remota (miniatura con bordo); **in hover** si ingrandisce (intera, non ritagliata, con limiti di dimensione) |
+| Foto | Immagine remota (miniatura con bordo); **in hover** (dopo una breve pausa, così non compare scorrendo) si ingrandisce (intera, non ritagliata, con limiti di dimensione) |
 | Titolo | Nome prodotto, **link** alla pagina del prodotto (nuova tab); sotto: **marca** (link opzionale), **tag** (`product_properties`) e **categoria** (breadcrumb `testo / testo / …`, ogni voce cliccabile) |
-| Prezzo pieno | Listino (o ultimo noto) |
-| Prezzo scontato | Prezzo corrente |
-| % sconto | Badge |
+| Prezzo pieno | Listino (o ultimo noto), **barrato solo quando c'è uno sconto** |
+| Prezzo | Prezzo corrente; sotto la cifra, un **badge `-NN%`** quando il prodotto è scontato (non c'è una colonna "% sconto" separata) |
 | Disponibilità | Indicatore (disponibile / esaurito / delistato) |
 
 > La foto e il titolo fanno da link al prodotto: non c'è una colonna "Apri" dedicata.
