@@ -5,27 +5,6 @@ New items get appended over time.
 
 ## Open
 
-### Catalog page "blinks" when empty
-- **Reported:** blink nella pagina del catalog se è vuoto.
-- **Likely cause:** the empty-state auto-retry added for the post-scrape race in
-  [`src/frontend/src/routes/catalog/+page.svelte`](src/frontend/src/routes/catalog/+page.svelte)
-  (`onMount`) re-runs `load()` every ~1.5s while `total === 0`, and `load()` flips
-  `loading = true` each time → the "Loading…" ⇄ empty-state swap reads as a blink
-  (up to 4 retries).
-- **Fix idea:** don't toggle the full `loading` flag on the background retries (only on
-  the first/explicit load), or stop once a genuine empty result is confirmed, or poll
-  silently without re-rendering the loading branch.
-
-### Watched-list product image is oversized
-- **Reported:** l'immagine nella watch list è gigante; va forzata la dimensione, stessa
-  altezza della riga di preview.
-- **Where:** watched table in
-  [`src/plugins/scrapers/dragon_store/frontend/PluginRoot.svelte`](src/plugins/scrapers/dragon_store/frontend/PluginRoot.svelte)
-  (watched image is currently `h-12 w-12`; the dry-run **preview** row image is `h-10 w-10`).
-- **Fix idea:** force the watched image to a fixed size matching the preview row
-  (`h-10 w-10`, `object-cover`), and make sure the size constraint actually applies (the
-  class isn't being overridden / is included in the build).
-
 ### Scrape-now: make the UI core-provided + rework the popup
 - **Reported:** rivedere graficamente il popup dello Scrape now. Se possibile lo Scrape now
   (i **componenti grafici**, non solo il backend) va implementato nel **core**, non nel
@@ -39,12 +18,6 @@ New items get appended over time.
   scraper gets the button + cooldown countdown + confirm popup for free. Render the popup
   through a top-level portal/overlay anchored **top-center**, with a z-index above the app
   shell.
-
-### Scrape-now still doesn't read as a button
-- **Reported:** Scrape now ancora non risulta essere come un bottone.
-- **Note:** the previous attempt (outlined emerald that fills on hover) didn't land —
-  needs a clearer button affordance. Best solved together with the core-provided
-  `ScrapeNow` component above.
 
 ### Remove button has no hover-fill (unlike the Preview button)
 - **Reported:** il tasto Remove non ha un effetto grafico di riempimento sull'hover come

@@ -24,8 +24,8 @@
 
 	const pages = $derived(data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1);
 
-	async function load(): Promise<void> {
-		loading = true;
+	async function load(silent = false): Promise<void> {
+		if (!silent) loading = true;
 		error = null;
 		try {
 			data = await listCatalog({
@@ -38,7 +38,7 @@
 		} catch {
 			error = $_('catalog.error');
 		} finally {
-			loading = false;
+			if (!silent) loading = false;
 		}
 	}
 
@@ -51,7 +51,7 @@
 		const timer = setInterval(() => {
 			if (data && data.total === 0 && tries < 4) {
 				tries += 1;
-				void load();
+				void load(true);
 			} else {
 				clearInterval(timer);
 			}

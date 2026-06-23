@@ -302,12 +302,12 @@
 										<img
 											src={w.image_url}
 											alt=""
-											class="h-12 w-12 rounded border border-slate-200 object-cover dark:border-slate-700"
+											class="h-10 w-10 rounded border border-slate-200 object-cover dark:border-slate-700"
 											loading="lazy"
 										/>
 									{:else}
 										<div
-											class="h-12 w-12 rounded border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800"
+											class="h-10 w-10 rounded border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800"
 										></div>
 									{/if}
 								</a>
@@ -371,7 +371,7 @@
 	<!-- Scrape now (3.F4) — sober: label + caption countdown when on cooldown -->
 	<div class="space-y-1">
 		<button
-			class="inline-flex items-center gap-2 rounded-md border-2 border-emerald-600 px-6 py-3 text-base font-semibold text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:text-emerald-400 dark:hover:text-white"
+			class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-6 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
 			onclick={() => (confirming = true)}
 			disabled={locked || busy}
 		>
