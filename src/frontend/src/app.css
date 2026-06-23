@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+/* Plugin frontends live outside this SvelteKit project root (src/plugins), so
+   Tailwind's automatic source detection (scoped to src/frontend) misses them.
+   Register them explicitly so plugin-only utilities are generated (2.F1). */
+@source '../../plugins/**/*.{svelte,ts,js}';
+
 /* Class-based dark mode (FE-9): `.dark` on <html> enables the dark variant. */
 @custom-variant dark (&:where(.dark, .dark *));
 
