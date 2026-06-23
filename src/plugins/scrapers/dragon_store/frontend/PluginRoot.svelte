@@ -355,7 +355,7 @@
 							</td>
 							<td class="py-2 text-right whitespace-nowrap">
 								<button
-									class="rounded border border-red-300 px-3 py-1 text-sm text-red-600 transition-colors hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/40"
+									class="rounded border border-red-300 px-3 py-1 text-sm text-red-600 transition-colors hover:bg-red-100 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/40"
 									onclick={() => removeWatch(w.id)}
 								>
 									{$_('dragon_store.watches.remove')}
