@@ -15,8 +15,8 @@ import sys
 import time
 from types import FrameType
 
-HEARTBEAT_FILE = os.environ.get("HEARTBEAT_FILE", "/tmp/worker-heartbeat")
-TICK_SECONDS = int(os.environ.get("TICK_SECONDS", "60"))
+HEARTBEAT_FILE = os.environ.get("WEA_HEARTBEAT_FILE", "/tmp/worker-heartbeat")
+TICK_SECONDS = int(os.environ.get("WEA_TICK_SECONDS", "60"))
 
 
 def _shutdown(signum: int, _frame: FrameType | None) -> None:

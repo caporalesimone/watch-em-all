@@ -9,7 +9,7 @@ La configurazione **operativa** vive nel DB ed è editabile dalla UI **senza ria
 | Livello | Dove | Esempi | Cambia con |
 |---|---|---|---|
 | Bootstrap | `config.yaml` (default **nell'immagine**; override locale via mount) | URL DB, durate token, locale default | restart |
-| Segreti | `.env` | credenziali Postgres, SECRET_KEY, password admin iniziale | restart |
+| Segreti | `.env` | credenziali Postgres, WEA_SECRET_KEY, password admin iniziale | restart |
 | Operativa di sistema | DB `system_settings` | timeout run, retention, periodo di grazia cancellazione utenti | UI admin, a caldo |
 | Schedule | DB `scraper_schedule` etc. | slot degli scraper, cadenze | UI, a caldo |
 | Plugin (admin) | DB `notifier_admin_config` / tabelle plugin | SMTP, politeness, regole sito | UI admin, a caldo |
@@ -21,7 +21,7 @@ La configurazione **operativa** vive nel DB ed è editabile dalla UI **senza ria
 ```yaml
 core:
   database_url: "postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
-  secret_key: "${SECRET_KEY}"
+  secret_key: "${WEA_SECRET_KEY}"
   default_locale: "en"        # lingua dei nuovi utenti (V1 English-first)
   access_token_ttl_min: 15
   refresh_token_ttl_days: 7
@@ -41,9 +41,9 @@ POSTGRES_USER=watchemall
 POSTGRES_PASSWORD=change-me
 POSTGRES_DB=watchemall
 # Core — generare con: openssl rand -hex 32
-SECRET_KEY=change-me
+WEA_SECRET_KEY=change-me
 # Admin iniziale (cambio forzato al primo login)
-ADMIN_INITIAL_PASSWORD=change-me
+WEA_ADMIN_INITIAL_PASSWORD=change-me
 # Fuso orario dell'installazione (orari inseriti interpretati qui; timestamp salvati in UTC)
 TZ=Europe/Rome
 ```

@@ -17,13 +17,13 @@ def _write(tmp_path: Path, body: str) -> Path:
 def test_interpolation_resolves_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PGUSER", "alice")
     monkeypatch.setenv("PGPASS", "s3cret")
-    monkeypatch.setenv("SECRET_KEY", "k" * 32)
+    monkeypatch.setenv("WEA_SECRET_KEY", "k" * 32)
     monkeypatch.setattr(config_mod, "VERSION_PATH", str(tmp_path / "missing"))  # → fallback
     cfg = _write(
         tmp_path,
         "core:\n"
         '  database_url: "postgresql+psycopg://${PGUSER}:${PGPASS}@db:5432/wea"\n'
-        '  secret_key: "${SECRET_KEY}"\n'
+        '  secret_key: "${WEA_SECRET_KEY}"\n'
         "  access_token_ttl_min: 15\n"
         "  refresh_token_ttl_days: 7\n",
     )

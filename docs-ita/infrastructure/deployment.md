@@ -130,7 +130,7 @@ cp .env.example .env            # poi compilare i valori
 docker compose up -d            # produzione (nessun browser DB; ispezione via `compose exec db psql` o `ops`)
 ```
 
-Primo avvio: lo schema viene creato, l'admin iniziale nasce con la password di `ADMIN_INITIAL_PASSWORD` e cambio forzato al primo login.
+Primo avvio: lo schema viene creato, l'admin iniziale nasce con la password di `WEA_ADMIN_INITIAL_PASSWORD` e cambio forzato al primo login.
 
 ## Salute e monitoraggio
 

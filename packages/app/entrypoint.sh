@@ -5,7 +5,7 @@ set -eu
 
 case "${1:-}" in
   web)
-    exec python -m uvicorn src.web.app:app --host 0.0.0.0 --port "${PORT:-8080}"
+    exec python -m uvicorn src.web.app:app --host 0.0.0.0 --port "${WEA_PORT:-8080}"
     ;;
   worker)
     exec python /app/stub/worker.py

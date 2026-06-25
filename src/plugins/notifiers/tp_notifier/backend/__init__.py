@@ -29,6 +29,7 @@ class Outbox(_Base):
 
 class TpNotifierPlugin(NotifierPlugin):
     plugin_id = "tp_notifier"
+    table_metadata = _Base.metadata  # DB-R7: declare the plugin's own schema
 
     def initialize(self, context: PluginContext) -> None:
         _Base.metadata.create_all(context.engine)

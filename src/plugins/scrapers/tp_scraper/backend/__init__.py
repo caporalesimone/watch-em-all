@@ -30,6 +30,7 @@ class Ping(_Base):
 
 class TpScraperPlugin(ScraperPlugin):
     plugin_id = "tp_scraper"
+    table_metadata = _Base.metadata  # DB-R7: declare the plugin's own schema
 
     def identity_seed(self, raw: object) -> str | None:
         # Throwaway test plugin: it does not scrape, so it has no native id.

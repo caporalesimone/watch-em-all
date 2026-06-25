@@ -8,12 +8,14 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 ## [0.4.0] - Unreleased
 
-**Phase 4 — dev tooling: a friendlier database browser, and a leaner release kit.**
+**Phase 4 — dev tooling: a schema-drift safety net, a friendlier database browser, and tidier configuration.**
 
+- **Schema-drift safety net** (dev): at startup the app compares the database with the code's data model and, when a table or column the code expects is missing from the DB — the situation a model change creates on an existing dev database (there are no migrations yet) — it logs a clear warning, and with the alert on it reports the drift on `GET /api/health`. No more silent 500s after a model change; a red dev banner follows next.
 - The development stack now ships **pgweb** as its database browser (in place of Adminer): it comes up with the normal `docker compose -f compose-dev.yml up` and opens **straight on the database** — no connection form, no login.
 - The **release** deploy kit no longer carries a database browser at all, staying strictly production-shaped. To inspect the database on a server, use `docker compose exec db psql …` or the `ops` container.
+- **Heads-up for existing installs:** every Watch 'Em All environment variable is now prefixed **`WEA_`** (e.g. `SECRET_KEY` → `WEA_SECRET_KEY`, `ADMIN_INITIAL_USERNAME`/`ADMIN_INITIAL_PASSWORD` → `WEA_ADMIN_INITIAL_*`). Update your `.env`; a new [`docs/env-variables.md`](docs/env-variables.md) lists every variable.
 
-_Under the hood:_ pgweb is dev-only and always-on (no Compose profile) — its connection string is built from the `POSTGRES_*` values so it auto-connects. Adminer and the `dev` Compose profile are gone; the gate that keeps debug tools out of production moves from a profile to **file separation** (`compose-dev.yml` vs `compose.yml`), reworded in rule INF-3. Docs swept across the README, dev-container, deployment, architecture overview and the developer rules.
+_Under the hood:_ the drift check (`src/core/schema_drift.py`) runs after the schema is ensured and iterates the core `Base.metadata` plus each plugin's declared `table_metadata`; it always logs, while `WEA_SCHEMA_DRIFT_ALERT` only gates the `/api/health` exposure (default off; the env files ship it on). Plugins that own tables now declare their schema via a `table_metadata` attribute, **enforced at load** by the registry (DB-R7) — which is what lets the drift check see plugin tables. pgweb is dev-only and always-on (no Compose profile); Adminer and the `dev` profile are gone, the gate moving from a profile to file separation (`compose-dev.yml` vs `compose.yml`, INF-3). All app-managed env vars now carry the `WEA_` prefix (external `POSTGRES_*`/`TZ` keep the names their images expect); `pyproject`/`package.json` stay inert placeholders (the product version is baked from the git tag).
 
 ## [0.3.4] - 2026-06-25
 

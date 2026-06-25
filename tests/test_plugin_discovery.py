@@ -216,15 +216,15 @@ def test_spa_catch_all_mounted_last_so_api_wins(
     cfg = tmp_path / "config.yaml"
     cfg.write_text(
         'core:\n  database_url: "sqlite+pysqlite:///:memory:"\n'
-        '  secret_key: "${SECRET_KEY}"\n  default_locale: "en"\n'
+        '  secret_key: "${WEA_SECRET_KEY}"\n  default_locale: "en"\n'
         "  access_token_ttl_min: 15\n  refresh_token_ttl_days: 7\n",
         encoding="utf-8",
     )
     ver = tmp_path / "VERSION"
     ver.write_text("9.9.9-test\n", encoding="utf-8")
-    monkeypatch.setenv("SECRET_KEY", "x" * 64)
-    monkeypatch.setenv("ADMIN_INITIAL_USERNAME", "admin")
-    monkeypatch.setenv("ADMIN_INITIAL_PASSWORD", "initpass123")
+    monkeypatch.setenv("WEA_SECRET_KEY", "x" * 64)
+    monkeypatch.setenv("WEA_ADMIN_INITIAL_USERNAME", "admin")
+    monkeypatch.setenv("WEA_ADMIN_INITIAL_PASSWORD", "initpass123")
 
     from src.core import config as config_mod
 

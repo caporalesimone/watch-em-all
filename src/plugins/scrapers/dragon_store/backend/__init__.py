@@ -133,6 +133,7 @@ def _watch_out(watch: Watch) -> WatchOut:
 
 class DragonStorePlugin(ScraperPlugin):
     plugin_id = PLUGIN_ID
+    table_metadata = _Base.metadata  # DB-R7: declare the plugin's own schema
 
     # --- identity (SCR-R10): the native gp id, else None -> URL fallback ---
     def identity_seed(self, raw: Any) -> str | None:

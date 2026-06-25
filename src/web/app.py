@@ -17,9 +17,10 @@ from fastapi import Depends, FastAPI
 
 from src.core.bootstrap import ensure_initial_admin
 from src.core.config import get_settings
-from src.core.db import create_schema, init_engine, new_session
+from src.core.db import Base, create_schema, get_engine, init_engine, new_session
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.registry import load_plugins
+from src.core.schema_drift import SchemaDriftItem, check_schema_drift
 from src.core.scrape import implements_scraping
 from src.web.deps import require_user
 from src.web.error_handlers import register_error_handlers
@@ -55,6 +56,31 @@ def create_app() -> FastAPI:
         # are logged; the core stays up. Stored for the discovery endpoint. Every
         # plugin route sits behind authentication (#3).
         _app.state.loaded_plugins = load_plugins(_app, router_dependencies=[Depends(require_user)])
+        # Schema-drift guard (4.B0): now that the schema is ensured (create_schema +
+        # each plugin's initialize), compare the ORM model — core Base.metadata plus
+        # every plugin's declared table_metadata — against the live DB. It ALWAYS runs
+        # and logs warnings; WEA_SCHEMA_DRIFT_ALERT only gates the /api/health exposure
+        # (health.py). A check failure must never block startup.
+        metadatas = [Base.metadata] + [
+            lp.plugin.table_metadata
+            for lp in _app.state.loaded_plugins
+            if lp.plugin.table_metadata is not None
+        ]
+        drift: list[SchemaDriftItem] = []
+        try:
+            drift = check_schema_drift(get_engine(), metadatas)
+        except Exception:
+            log.exception("schema-drift check failed")
+        for item in drift:
+            if item.missing_table:
+                log.warning("schema drift: table %r is missing from the database", item.table)
+            else:
+                log.warning(
+                    "schema drift: table %r is missing column(s): %s",
+                    item.table,
+                    ", ".join(item.missing_columns),
+                )
+        _app.state.schema_drift = drift
         # Standard per-scraper scrape-now routes (SCR-R15): mounted here in the web
         # (they need the authenticated user + a request session, so they cannot
         # live in the web-free core base) for every scraper that actually implements
