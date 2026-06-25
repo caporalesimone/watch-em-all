@@ -26,7 +26,7 @@ def health(response: Response, settings: SettingsDep, db: SessionDep) -> HealthR
     if db_status != "ok":
         response.status_code = 503
     # Public liveness probe — no admin-only signals here. Schema drift (4.B0) is an
-    # admin diagnostic, served by GET /api/admin/schema-drift, never on this probe.
+    # admin diagnostic, served by GET /api/admin/errors, never on this public probe.
     # worker heartbeat is informative and shared via the DB from phase 4; null here.
     return HealthResponse(
         status="ok" if db_status == "ok" else "degraded",

@@ -1,9 +1,8 @@
 <script lang="ts">
-	// Generic fixed bottom alert bar (extracted from the schema-drift banner — FE-8/FE-18:
-	// reusable, props-driven). The consumer decides WHEN to show it (wrap in {#if …});
-	// this is just the frame: a big icon on the left and the title + slotted body to its
-	// right. `sidebarOffset` keeps the bar to the RIGHT of the app sidebar (w-56) so it
-	// never covers the menu buttons.
+	// Generic alert block (FE-8/FE-18): a bordered, translucent bar with a big icon on
+	// the left, the title + slotted body to its right, and an optional top-right action.
+	// It does NOT position itself — the caller places/stacks it (e.g. a fixed container),
+	// so it is reusable anywhere, not only as a bottom bar.
 	import type { Snippet } from 'svelte';
 
 	type Variant = 'error' | 'warning' | 'info' | 'success';
@@ -12,33 +11,28 @@
 		variant = 'info',
 		icon,
 		title,
-		sidebarOffset = false,
 		action,
 		children
 	}: {
 		variant?: Variant;
 		icon?: string;
 		title?: string;
-		sidebarOffset?: boolean;
-		action?: Snippet; // optional top-right action (e.g. a button), pinned in the bar
+		action?: Snippet; // optional top-right action (e.g. a button)
 		children?: Snippet;
 	} = $props();
 
-	// top border + background per variant; text colour picked for contrast. The
-	// backgrounds are translucent so the bar reads as a darker, softer overlay.
+	// top border + translucent background per variant; text colour picked for contrast.
 	const VARIANT: Record<Variant, string> = {
 		error: 'border-red-950 bg-red-800/75 text-white',
-		warning: 'border-amber-600 bg-amber-400 text-amber-950',
-		info: 'border-sky-800 bg-sky-600 text-white',
-		success: 'border-emerald-800 bg-emerald-600 text-white'
+		warning: 'border-amber-800 bg-amber-500/80 text-amber-950',
+		info: 'border-sky-950 bg-sky-700/80 text-white',
+		success: 'border-emerald-950 bg-emerald-700/80 text-white'
 	};
 </script>
 
 <div
 	role="alert"
-	class="fixed right-0 bottom-0 z-50 flex max-h-48 items-start gap-3 overflow-auto border-t-2 px-4 py-2 text-sm shadow-lg {VARIANT[
-		variant
-	]} {sidebarOffset ? 'left-56' : 'left-0'}"
+	class="flex w-full items-start gap-3 border-t-2 px-4 py-2 text-sm shadow-lg {VARIANT[variant]}"
 >
 	{#if icon}
 		<span class="shrink-0 self-start text-4xl leading-none" aria-hidden="true">{icon}</span>

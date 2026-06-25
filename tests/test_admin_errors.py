@@ -1,7 +1,7 @@
-"""Tests for the admin-only schema-drift endpoint (4.B0).
+"""Tests for the admin-only error feed (4.B0+, GET /api/admin/errors).
 
-The drift report is admin-only by contract: never on the public /api/health probe,
-never to a normal user or an anonymous caller.
+Admin-facing errors/warnings are admin-only by contract: never on the public
+/api/health probe, never to a normal user or an anonymous caller.
 """
 
 from __future__ import annotations
@@ -52,17 +52,17 @@ def _user_token(client: TestClient, admin: str) -> str:
     return str(relogin.json()["access_token"])
 
 
-def test_schema_drift_is_admin_only(client: TestClient) -> None:
+def test_admin_errors_is_admin_only(client: TestClient) -> None:
     # Anonymous → 401; a normal user → 403. Never exposed off /api/admin.
-    assert client.get("/api/admin/schema-drift").status_code == 401
+    assert client.get("/api/admin/errors").status_code == 401
     admin = _admin_token(client)
     user = _user_token(client, admin)
-    assert client.get("/api/admin/schema-drift", headers=_bearer(user)).status_code == 403
+    assert client.get("/api/admin/errors", headers=_bearer(user)).status_code == 403
 
 
-def test_schema_drift_admin_clean_schema_is_empty(client: TestClient) -> None:
+def test_admin_errors_clean_is_empty(client: TestClient) -> None:
     admin = _admin_token(client)
-    resp = client.get("/api/admin/schema-drift", headers=_bearer(admin))
+    resp = client.get("/api/admin/errors", headers=_bearer(admin))
     assert resp.status_code == 200
     # Fresh test DB matches the models, and the conftest leaves the flag off → empty list.
     assert resp.json() == []

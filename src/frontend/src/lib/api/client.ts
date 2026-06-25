@@ -19,11 +19,12 @@ interface TokenPair {
 	expires_at: string;
 }
 
-// Schema-drift findings (4.B0); present on /api/health only when the alert is on.
-export interface SchemaDriftItem {
-	table: string;
-	missing_table: boolean;
-	missing_columns: string[];
+// Admin-facing errors/warnings (admin-only feed, 4.B0+); copyable as {type,title,description}.
+export interface AdminError {
+	source: string;
+	type: 'error' | 'warning';
+	title: string;
+	description: string;
 }
 
 export interface Health {
@@ -107,10 +108,10 @@ export function getPlugins(): Promise<PluginInfo[]> {
 	return apiFetch('/api/plugins').then(asJson<PluginInfo[]>);
 }
 
-// Admin-only schema-drift report (4.B0): empty unless WEA_SCHEMA_DRIFT_ALERT is on.
-// Requires an admin token (403 for a normal user, 401 anonymous) — never on /api/health.
-export function getSchemaDrift(): Promise<SchemaDriftItem[]> {
-	return apiFetch('/api/admin/schema-drift').then(asJson<SchemaDriftItem[]>);
+// Admin-only errors/warnings feed (admin token required: 403 user, 401 anonymous).
+// Never on the public /api/health.
+export function getAdminErrors(): Promise<AdminError[]> {
+	return apiFetch('/api/admin/errors').then(asJson<AdminError[]>);
 }
 
 // Catalog / Product Picker (CAT-*). Money fields are Decimal serialised as

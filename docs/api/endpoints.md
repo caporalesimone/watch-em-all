@@ -33,7 +33,7 @@ Role legend: 🌐 public · 👤 user · 🛡 admin
 
 | Method | Path | Role | Response | Notes |
 |---|---|---|---|---|
-| GET | `/api/admin/schema-drift` | 🛡 | `[{table, missing_table, missing_columns}]` | dev schema-drift found at startup (4.B0); **admin-only** — kept off the public `/api/health` probe. Empty unless `WEA_SCHEMA_DRIFT_ALERT` is on |
+| GET | `/api/admin/errors` | 🛡 | `[{source, type, title, description}]` | **admin-only** feed of errors/warnings (admin diagnostics), kept off the public `/api/health` probe. First source: schema drift (4.B0), behind `WEA_SCHEMA_DRIFT_ALERT` |
 
 ## Plugin discovery — [plugin-registry](../4-capabilities/core/plugin-registry.md)
 

@@ -6,13 +6,13 @@
 	import { page } from '$app/stores';
 	import { _ } from 'svelte-i18n';
 
-	import { getHealth, getSchemaDrift } from '$lib/api/client';
-	import SchemaDriftBanner from '$lib/components/SchemaDriftBanner.svelte';
+	import { getAdminErrors, getHealth } from '$lib/api/client';
+	import AdminErrors from '$lib/components/AdminErrors.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import { setupI18n } from '$lib/i18n';
+	import { adminErrors } from '$lib/stores/adminErrors';
 	import { auth, bootstrap } from '$lib/stores/auth';
 	import { loadPlugins, resetPlugins } from '$lib/stores/plugins';
-	import { schemaDrift } from '$lib/stores/schemaDrift';
 	import { theme } from '$lib/stores/theme';
 	import { version } from '$lib/stores/version';
 
@@ -74,9 +74,9 @@
 		}
 	});
 
-	// Schema drift is an ADMIN-ONLY diagnostic (served by an admin endpoint, not the
-	// public health probe): fetch it once when an admin is in the shell, and clear it
-	// otherwise so it never lingers for a normal user.
+	// Admin errors are an ADMIN-ONLY feed (served by an admin endpoint, not the public
+	// health probe): fetch once when an admin is in the shell, clear it otherwise so it
+	// never lingers for a normal user.
 	$effect(() => {
 		if (!ready) return;
 		const state = $auth;
@@ -86,12 +86,12 @@
 			!state.user?.must_change_password;
 		if (isAdmin && !driftLoaded) {
 			driftLoaded = true;
-			void getSchemaDrift()
-				.then((d) => schemaDrift.set(d))
+			void getAdminErrors()
+				.then((d) => adminErrors.set(d))
 				.catch(() => {});
 		} else if (!isAdmin && driftLoaded) {
 			driftLoaded = false;
-			schemaDrift.set([]);
+			adminErrors.set([]);
 		}
 	});
 
@@ -113,5 +113,5 @@
 	<main class="flex h-full items-center justify-center p-6">{@render children()}</main>
 {/if}
 
-<!-- Dev-only; self-hides unless GET /api/health reports schema drift (4.F0). -->
-<SchemaDriftBanner />
+<!-- Admin-only; self-hides unless GET /api/admin/errors reports something (4.B0/4.F0). -->
+<AdminErrors />
