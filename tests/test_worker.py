@@ -14,7 +14,7 @@ from sqlalchemy.pool import StaticPool
 
 from src.core.contracts import DeltaCounters, Product
 from src.core.db import Base
-from src.core.models import ScrapeCooldown, ScraperSchedule
+from src.core.models import ScrapeCooldown, ScraperSchedule, ScrapeRun, ScrapeUserLog
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.context import PluginContext
 from src.worker import main as worker
@@ -97,6 +97,13 @@ def test_run_scraper_iterates_users_stamps_cooldown_and_marks_slot() -> None:
     assert pairs == {("fake", 1), ("fake", 2)}
     sched = session.get(ScraperSchedule, "fake")
     assert sched is not None and sched.last_slot is not None
+
+    runs = list(session.scalars(select(ScrapeRun)))
+    assert len(runs) == 1
+    assert runs[0].status == "ok" and runs[0].users_processed == 2
+    user_logs = list(session.scalars(select(ScrapeUserLog)))
+    assert {u.user_id for u in user_logs} == {1, 2}
+    assert all(u.status == "ok" for u in user_logs)
     session.close()
     engine.dispose()
 
@@ -154,5 +161,8 @@ def test_run_scraper_stops_at_deadline() -> None:
     assert fake.users_run == []  # deadline already passed → no users processed
     sched = session.get(ScraperSchedule, "fake")
     assert sched is not None and sched.last_slot is not None  # slot still recorded (CRON-R6)
+    runs = list(session.scalars(select(ScrapeRun)))
+    assert len(runs) == 1 and runs[0].status == "timeout"
+    assert list(session.scalars(select(ScrapeUserLog))) == []
     session.close()
     engine.dispose()

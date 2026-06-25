@@ -24,7 +24,7 @@ from src.core.config import get_settings
 from src.core.db import Base, create_schema, get_engine, init_engine, new_session
 from src.core.feature_flags import worker_tick_seconds
 from src.core.locks import scraper_lock
-from src.core.models import ScraperSchedule
+from src.core.models import ScraperSchedule, ScrapeRun, ScrapeUserLog
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.context import PluginContext, build_context
 from src.core.plugins.registry import LoadedPlugin, load_plugins
@@ -84,30 +84,73 @@ def _boot() -> None:
         log.exception("schema-drift check failed")
 
 
+def _aggregate_status(outcomes: list[str], timed_out: bool) -> str:
+    """Run status from the per-user outcomes (scheduling-models.md)."""
+    if timed_out:
+        return "timeout"
+    if not outcomes or all(o == "ok" for o in outcomes):
+        return "ok"
+    if any(o == "ok" for o in outcomes):
+        return "partial"
+    return "error"
+
+
 def _run_scraper(
     plugin: ScraperPlugin,
     ctx: PluginContext,
     scraper_id: str,
     slot: datetime,
     deadline: datetime | None = None,
+    trigger: str = "scheduled",
 ) -> None:
-    """Run one scheduled scrape for every configured user, one at a time, stamping the
-    manual-cooldown anchor (SCR-R15) per user. A per-user error doesn't stop the others
-    (POOL-R5); a run past ``deadline`` stops between users (SCHED-R7, cooperative); the
-    last slot is recorded even on failure/timeout (CRON-R6)."""
+    """Run one scheduled scrape for every configured user, one at a time, recording a
+    ``scrape_run`` + a ``scrape_user_log`` per user with counters (4.B6). Stamps the
+    manual-cooldown anchor (SCR-R15) per user; a per-user error doesn't stop the others
+    (POOL-R5); a run past ``deadline`` stops between users (SCHED-R7); the last slot is
+    recorded even on failure/timeout (CRON-R6)."""
+    run = ScrapeRun(scraper_id=scraper_id, trigger=trigger, slot=slot, started_at=datetime.now(UTC))
+    ctx.db.add(run)
+    ctx.db.commit()
+    outcomes: list[str] = []
+    timed_out = False
     try:
         for user_id in plugin.configured_users(ctx):
             if deadline is not None and datetime.now(UTC) >= deadline:
+                timed_out = True
                 log.warning("scrape timed out: %s (slot %s)", scraper_id, slot)
                 break
+            ulog = ScrapeUserLog(run_id=run.run_id, user_id=user_id, started_at=datetime.now(UTC))
+            ctx.db.add(ulog)
+            before = ctx.http.request_count
             try:
                 stamp_cooldown(ctx.db, scraper_id, user_id)
-                plugin.run_for_user(ctx, user_id)
-            except Exception:
+                delta = plugin.run_for_user(ctx, user_id)
+                ulog.products_found = delta.found
+                ulog.products_new = delta.new
+                ulog.price_changes = delta.price_changes
+                run.products_removed += delta.removed
+                ulog.status = "ok"
+                outcomes.append("ok")
+            except Exception as exc:
                 log.exception("scrape failed: %s user %s", scraper_id, user_id)
-    except Exception:
+                ulog.status = "error"
+                ulog.error_message = str(exc)[:500]
+                outcomes.append("error")
+            ulog.http_requests = ctx.http.request_count - before
+            ulog.finished_at = datetime.now(UTC)
+            run.users_processed += 1
+            run.products_found += ulog.products_found
+            run.products_new += ulog.products_new
+            run.price_changes += ulog.price_changes
+            run.http_requests += ulog.http_requests
+            ctx.db.commit()
+    except Exception as exc:
         log.exception("scrape run failed: %s", scraper_id)
+        run.error_message = str(exc)[:500]
     finally:
+        run.status = _aggregate_status(outcomes, timed_out)
+        run.finished_at = datetime.now(UTC)
+        ctx.db.commit()
         set_last_slot(ctx.db, scraper_id, slot)
 
 

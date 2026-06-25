@@ -188,3 +188,52 @@ class SystemSetting(Base):
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[Any] = mapped_column(JSON, nullable=False)
+
+
+class ScrapeRun(Base):
+    """One scraper run — scheduled or manual (scheduling-models.md, 4.B6). Counters are
+    aggregated from the per-user deltas + the instrumented HTTP client."""
+
+    __tablename__ = "scrape_run"
+    __table_args__ = (Index("ix_scrape_run_scraper_started", "scraper_id", "started_at"),)
+
+    run_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    scraper_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    trigger: Mapped[str] = mapped_column(String(16), nullable=False)  # "scheduled" | "manual"
+    slot: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # running | ok | partial | error | timeout
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="running")
+    users_processed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    products_found: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    products_new: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    price_changes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    products_removed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    products_excluded: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    http_requests: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cache_hits: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+
+class ScrapeUserLog(Base):
+    """Per-user detail of a run (one row per user per run, 4.B6). http_requests/cache_hits
+    are the share attributed to the user in flight (the run is mono-thread)."""
+
+    __tablename__ = "scrape_user_log"
+    __table_args__ = (Index("ix_scrape_user_log_run", "run_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("scrape_run.run_id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    products_found: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    products_new: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    price_changes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    http_requests: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cache_hits: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="ok")  # ok | error
+    error_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
