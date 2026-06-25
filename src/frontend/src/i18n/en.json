@@ -14,7 +14,8 @@
 		"profile": "Profile",
 		"logout": "Log out",
 		"scrapers": "Scrapers",
-		"users": "Users"
+		"users": "Users",
+		"plugins": "Plugins"
 	},
 	"catalog": {
 		"title": "Catalog",
@@ -63,6 +64,13 @@
 			"created": "Created \"{username}\" — share the temporary password; they must change it at first login.",
 			"errorTaken": "That username is already in use.",
 			"errorGeneric": "Could not create the user."
+		},
+		"plugins": {
+			"title": "Plugins",
+			"colName": "Plugin",
+			"colType": "Type",
+			"colVersion": "Version",
+			"empty": "No plugins are loaded."
 		}
 	},
 	"theme": {

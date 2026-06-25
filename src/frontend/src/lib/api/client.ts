@@ -42,6 +42,7 @@ export interface PluginInfo {
 	route_base: string | null;
 	icon: string | null;
 	display_name: string;
+	version: string;
 }
 
 // Public endpoint; returns its body on 200 and 503 alike (we only want `version`).

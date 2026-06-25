@@ -11,7 +11,10 @@
 	const isAdmin = $derived(($auth.user?.role ?? 'user') === 'admin');
 	const primary = $derived(
 		isAdmin
-			? [{ href: '/admin/users', key: 'nav.users' }]
+			? [
+					{ href: '/admin/users', key: 'nav.users' },
+					{ href: '/admin/plugins', key: 'nav.plugins' }
+				]
 			: [
 					{ href: '/', key: 'nav.dashboard' },
 					{ href: '/catalog', key: 'nav.catalog' }

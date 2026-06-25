@@ -33,7 +33,7 @@ Role legend: 🌐 public · 👤 user · 🛡 admin
 
 | Method | Path | Role | Response | Notes |
 |---|---|---|---|---|
-| GET | `/api/plugins` | 👤🛡 | `[{name, type, route_base, icon, display_name}]` | only enabled + loaded plugins; no internal paths. `route_base`/`icon` are `null` for a plugin without a frontend (notifiers) |
+| GET | `/api/plugins` | 👤🛡 | `[{name, type, route_base, icon, display_name, version}]` | only enabled + loaded plugins; no internal paths. `route_base`/`icon` are `null` for a plugin without a frontend (notifiers); `version` is the plugin's own manifest version (4.B0a) |
 | GET | `/api/plugin-assets/{name}/icon` | 🌐 | image | the plugin's manifest `icon`, served as a static asset (path-traversal guarded); 404 if absent. Public like the SPA bundle — the browser loads it as an `<img>`, which cannot carry the bearer token |
 
 Plugin-specific routes are registered by each plugin under `/api{route_base}` (e.g. `/api/plugins/my-store/...`), **behind authentication** (the registry applies a user dependency to every plugin router), and documented in OpenAPI under the `Plugin: <name>` tag.

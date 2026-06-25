@@ -14,7 +14,8 @@
 		"profile": "Profilo",
 		"logout": "Esci",
 		"scrapers": "Scraper",
-		"users": "Utenti"
+		"users": "Utenti",
+		"plugins": "Plugin"
 	},
 	"catalog": {
 		"title": "Catalogo",
@@ -63,6 +64,13 @@
 			"created": "Creato \"{username}\" — comunica la password temporanea; dovrà cambiarla al primo accesso.",
 			"errorTaken": "Questo nome utente è già in uso.",
 			"errorGeneric": "Impossibile creare l'utente."
+		},
+		"plugins": {
+			"title": "Plugin",
+			"colName": "Plugin",
+			"colType": "Tipo",
+			"colVersion": "Versione",
+			"empty": "Nessun plugin caricato."
 		}
 	},
 	"theme": {

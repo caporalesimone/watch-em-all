@@ -124,8 +124,9 @@ def test_discovery_lists_plugins_with_route_and_icon(tmp_path: Path) -> None:
         assert scraper["route_base"] == "/plugins/tp-scraper"
         assert scraper["icon"] == "/api/plugin-assets/tp_scraper/icon"
         assert scraper["display_name"] == "TP Scraper"
+        assert scraper["version"] == "1.0.0"  # 4.B0a: manifest version exposed
         # No internal paths leak (REG-R6): exactly the contract fields.
-        assert set(scraper) == {"name", "type", "route_base", "icon", "display_name"}
+        assert set(scraper) == {"name", "type", "route_base", "icon", "display_name", "version"}
 
         notifier = by_name["tp_notifier"]
         assert notifier["type"] == "notifier"
