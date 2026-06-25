@@ -224,12 +224,19 @@ def _loop(submit: Submit, max_ticks: int | None = None) -> None:
         finally:
             session.close()
         ticks += 1
-        if max_ticks is None or ticks < max_ticks:
+        if max_ticks is not None and ticks >= max_ticks:
+            break
+        # Wait for the next tick, re-reading the (runtime-overridable) interval every
+        # second — so a feature-flag change takes effect within ~1s, not only after the
+        # previous interval has elapsed.
+        while True:
             interval = _current_tick_seconds()
             if interval != last_interval:
                 log.info("worker tick interval: %ss", interval)
                 last_interval = interval
-            time.sleep(interval)
+            if (datetime.now(UTC) - now).total_seconds() >= interval:
+                break
+            time.sleep(1)
 
 
 def run() -> None:
