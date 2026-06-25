@@ -67,6 +67,16 @@ New items get appended over time.
   `docker compose -f compose-dev.yml config` no longer lists an `adminer` service, and a repo
   grep for "adminer" leaves only the historical CHANGELOG entry.
 
+### Auto-login after the forced first-login password change
+- **Reported (Simone):** dopo il cambio password al primo accesso, fare **direttamente il login**
+  invece di tornare alla pagina di login — si risparmia un passaggio.
+- **Where:** [`change-password/+page.svelte`](src/frontend/src/routes/change-password/+page.svelte#L31-L34)
+  oggi fa `api.changePassword(next)` → `forceAnon()` → `goto('/login')` (commento **AUTH-R5**: il cambio
+  password è un **logout globale**, quindi serve ri-login). L'utente ha **appena digitato** la nuova password.
+- **Fix idea:** dopo `changePassword(next)`, chiamare `api.login(username, next)` e instradare alla home
+  utente (`/`) invece che a `/login`. Rispetta comunque AUTH-R5 — il logout globale invalida i vecchi token,
+  il nuovo login ne emette uno fresco; non si *salta* il logout, lo si ri-fa subito. Confermare con auth.md.
+
 ## Reminders / to discuss
 
 ### A standard set of core-frontend components reused by plugins
@@ -78,3 +88,15 @@ New items get appended over time.
 - Possible shape: a small design-system exposed via `$lib`, with the plugin host injecting
   the higher-level widgets (Scrape now, dry-run table) so plugins don't re-implement them
   and the look stays consistent. Ties together the three button/popup items above.
+
+### compose-dev.yml: serve ancora il profilo `dev`?
+- **Reported (Simone):** in `compose-dev.yml` c'è il profilo `dev`; ma lancio già un compose diverso da
+  quello ufficiale — non ha senso toglierlo?
+- **Perché esiste (analisi):** il profilo è **ortogonale** alla scelta del file. `compose-dev.yml` vs
+  `compose.yml` sceglie *build-da-sorgenti vs immagini GHCR*. Il profilo `dev` invece fa il **gating** dei
+  servizi *opzionali / on-demand* DENTRO lo stack dev: i servizi senza profilo (`db`/`web`/`worker`) partono
+  sempre con un `up`; quelli con profilo partono **solo se lo attivi**. Oggi solo `adminer` ha `profiles:[dev]`
+  (browser DB); `ops` ha `profiles:[ops]`. Quindi `up` = solo db/web/worker; `--profile dev` aggiunge il browser DB.
+- **Conseguenza del toglierlo:** adminer (poi pgweb, vedi item Adminer→pgweb) partirebbe **a ogni `up`**, sempre acceso.
+- **Da decidere:** tenerlo (pattern standard Compose per servizi opzionali; consigliato), eventualmente
+  **rinominarlo** in qualcosa di più chiaro tipo `tools`/`debug` (il file è già "dev", così non confonde).
