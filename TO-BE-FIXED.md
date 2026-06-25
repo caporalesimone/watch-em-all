@@ -25,6 +25,25 @@ New items get appended over time.
   the [phase-7 "discuss before you start" gate](docs-ita/development-flow/phase-07-email-notifier.md)
   plus rule [FE-18](docs-ita/developer-rules/frontend/rules.md).
 
+- **Admin — a live log page, early.** It would help to have an admin web page to read the system logs
+  **live** (and browse past ones) sooner rather than later — a single place to see what the system is
+  doing. The full design already lives in phase 4: `4.B7` (`system_log` table + `GET /api/admin/logs?since=`
+  cursor) and `4.F3`/`4.F4` (the polling page with filters, autoscroll, heartbeat). **Needs analysis**:
+  decide whether to pull a *minimal* version forward — a simple page that shows recent log lines
+  (present + past) — and, deliberately, **how much to show and how** (which sources/levels, a tail of
+  N lines, plain polling vs cursor). Goal: a simple place to read logs now, improved later; the
+  analysis decides if it belongs in phase 4 or stays as `4.F3/F4`.
+
+## Off topic
+
+- **Two Claude Code skills: start-of-work and end-of-work.** Create a `/start-work` skill that opens a
+  phase/PR (branch, dated status header, empty CHANGELOG placeholder, version bookkeeping) and an
+  `/end-work` skill that closes it (finalize the CHANGELOG entry, tick the checklist, the tag +
+  GitHub-release steps, image/version sanity check). They'd encode the repeatable versioning/tagging
+  ritual — one tag per phase, no `v` prefix, `WEA_VERSION` in `.env`, version baked from `git describe`
+  — so it isn't re-derived by hand each time. See [`docs/env-variables.md`](docs/env-variables.md) and
+  the version notes in [ci](docs-ita/infrastructure/ci.md) for what the skills should automate.
+
 ## Done / moved
 
 - The **shared plugin design-system** (Scrape-now-in-core + the common core-frontend widget set) is the
