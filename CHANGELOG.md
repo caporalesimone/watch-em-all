@@ -10,6 +10,9 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 **Phase 3 — consolidation: close the open items and round off the documentation.**
 
+- **Dragon Store** plugin:
+  - bumped to **0.2.0**, marking the move from the initial mock to real `.gp` product scraping.
+
 _Under the hood:_ the English wiki (`docs/`) gains the phase-3 canonical pages, translated from `docs-ita/` and limited to what is implemented (DOC-12): the `Product` contract, the Catalog Update Service, the scraper-plugin contract, the Catalog & Product Picker, and the Dragon Store plugin (overview / features / capabilities).
 
 ## [0.3.3] - 2026-06-23
