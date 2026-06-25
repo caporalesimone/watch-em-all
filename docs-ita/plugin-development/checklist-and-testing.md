@@ -52,7 +52,7 @@ class TestMioScraper(ScraperContractSuite):
 
 - [ ] Manifest completo (`api_version` corrente, icona, cartelle i18n)
 - [ ] Cartelle `i18n/` con `en.json` presente e completo (è il fallback obbligatorio)
-- [ ] Dry-run dalla UI: risultati sensati, **nessuna riga scritta** (verifica con Adminer in dev)
+- [ ] Dry-run dalla UI: risultati sensati, **nessuna riga scritta** (verifica con pgweb in dev)
 - [ ] Pagina utente: selezione → entry negli input; pagina admin: parametri + test funzionante
 - [ ] Run completa in dev: prodotti a catalogo, provenienza visibile nel Product Picker
 - [ ] Seconda run senza modifiche al sito: **zero** nuovi prodotti, zero variazioni spurie (conferma stabilità `external_id`)

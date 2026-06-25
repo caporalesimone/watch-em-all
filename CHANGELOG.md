@@ -8,9 +8,12 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 ## [0.4.0] - Unreleased
 
-**Phase 4 — worker and scheduling.**
+**Phase 4 — dev tooling: a friendlier database browser, and a leaner release kit.**
 
-_Work in progress — placeholder for the first phase-4 MVP. Bullets and the `_under the hood_` note land here as the PR ships; the date is set when the version is cut._
+- The development stack now ships **pgweb** as its database browser (in place of Adminer): it comes up with the normal `docker compose -f compose-dev.yml up` and opens **straight on the database** — no connection form, no login.
+- The **release** deploy kit no longer carries a database browser at all, staying strictly production-shaped. To inspect the database on a server, use `docker compose exec db psql …` or the `ops` container.
+
+_Under the hood:_ pgweb is dev-only and always-on (no Compose profile) — its connection string is built from the `POSTGRES_*` values so it auto-connects. Adminer and the `dev` Compose profile are gone; the gate that keeps debug tools out of production moves from a profile to **file separation** (`compose-dev.yml` vs `compose.yml`), reworded in rule INF-3. Docs swept across the README, dev-container, deployment, architecture overview and the developer rules.
 
 ## [0.3.4] - 2026-06-25
 

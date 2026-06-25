@@ -84,4 +84,4 @@ Naming `plugin_<nomeplugin>_<nometabella>` (underscore: gli identificatori SQL c
 - **DB-R3** — Serializzazione nei campi `*_json`: `Decimal` come stringa, `datetime` ISO-8601 UTC; i confronti "è cambiato?" avvengono sul dato deserializzato.
 - **DB-R4** — **Migrazioni V1**: schema additivo con `CREATE ... IF NOT EXISTS`; per i breaking change, script SQL manuali documentati nel changelog — **mai** drop&recreate dell'intero schema: `price_history` non è ricostruibile. (Alembic: [future improvement](../../future-improvements/README.md).)
 - **DB-R5** — Backup/export/ripristino: script versionati in `ops/` e cucinati nell'immagine `ops`, eseguiti a mano (`docker compose run --rm ops …`); il dump include tutte le configurazioni (config DB-first) e l'archivio anche i file di bootstrap locali ([backup-and-restore](../../infrastructure/backup-and-restore.md)).
-- **DB-R6** — Ispezione dev: Adminer, solo profilo `dev`.
+- **DB-R6** — Ispezione dev: pgweb, nello stack di sviluppo (`compose-dev.yml`; assente dal release, in cui si usa `docker compose exec db psql` o il container `ops`).

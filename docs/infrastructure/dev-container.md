@@ -41,7 +41,7 @@ The `.devcontainer/` folder at the repo root defines the full development enviro
 
 Declared choices:
 
-- **docker-outside-of-docker**: the dev container mounts the host's Docker socket and runs `docker compose` from inside — the application containers (`db`, `web`, `worker`, `adminer`) run on the host's engine, not nested. Simpler and lighter than Docker-in-Docker.
+- **docker-outside-of-docker**: the dev container mounts the host's Docker socket and runs `docker compose` from inside — the application containers (`db`, `web`, `worker`, `pgweb`) run on the host's engine, not nested. Simpler and lighter than Docker-in-Docker.
 - The dev container toolchain (Python+Poetry, Node+npm) **mirrors the build stages** of the package Dockerfiles: same major version, so "works in the dev container" implies "builds in the image".
 - **Git and GitHub are used from the host, never from the container**: the dev container is for building and running; commit, push and PR (`git`, `gh`) happen **outside**, on the host — the single declared exception to zero-install (the `gh` CLI is installed on the host). The `git` binary still ships in the image because Poetry/npm need it for repository dependencies.
 - **`root` user in the container** (declared simplification): non-root access to the Docker socket would require aligning the host `docker` group GID; inside a local dev container, root is accepted practice and removes that complexity.
@@ -52,12 +52,12 @@ Declared choices:
 ```mermaid
 flowchart LR
     E[Editor on the host<br/>no toolchain] -->|attach| DC[Dev container<br/>Python, Poetry, Node, npm, git]
-    DC -->|docker compose<br/>via socket| STACK[db / web / worker / adminer<br/>on the host engine]
+    DC -->|docker compose<br/>via socket| STACK[db / web / worker / pgweb<br/>on the host engine]
 ```
 
 1. Clone the repo in WSL2 (or on the Linux dev server).
 2. Open the folder in the editor → "Reopen in Container".
-3. Inside the container: `cp .env.example .env`, `docker compose -f compose-dev.yml --profile dev up`.
+3. Inside the container: `cp .env.example .env`, `docker compose -f compose-dev.yml up`.
 4. Test, lint, build: always from the dev container terminal — never from the host.
 5. Commit, push and PR: **from the host** (`git` and `gh` live outside the container).
 

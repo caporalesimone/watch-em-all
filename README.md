@@ -94,8 +94,7 @@ Development happens inside the [dev container](docs/infrastructure/dev-container
 
 ```bash
 cp .env.example .env                                    # single config source
-docker compose -f compose-dev.yml up -d --build         # db + web + worker
-docker compose -f compose-dev.yml --profile dev up -d   # also Adminer on :8081
+docker compose -f compose-dev.yml up -d --build         # db + web + worker + pgweb (DB browser on :8081)
 ```
 
 ## Releasing (maintainer)

@@ -41,7 +41,8 @@ The repo and the GHCR packages are **public**: the `pull` is **anonymous**, no `
 | `web` | app role: serves the page and `GET /api/health` | `:8080` |
 | `worker` | worker role: heartbeat loop (real scheduling in 4.B1) | none |
 | `ops` | backup/export/restore scripts, **ephemeral** (`run --rm`, profile `ops`) | none |
-| `adminer` | DB inspection from the browser | `:8081`, **profile `dev` only** |
+
+The release kit ships **no DB browser** (production-shaped): inspect the database with `docker compose exec db psql -U $POSTGRES_USER $POSTGRES_DB` or the `ops` container. The pgweb browser lives only in `compose-dev.yml`.
 
 `web` and `worker` are **two services from the same image** `watch-em-all` (the role is chosen by `command`); both wait for `db` to be healthy.
 
@@ -106,14 +107,6 @@ services:
       - ./backups:/backups               # archive destination
     depends_on:
       db: { condition: service_healthy }
-
-  adminer:
-    image: adminer:4
-    ports: ["8081:8080"]
-    profiles: [dev]
-    depends_on:
-      db: { condition: service_healthy }
-    restart: unless-stopped
 
 volumes:
   pgdata:

@@ -39,24 +39,24 @@ La cartella `.devcontainer/` alla radice del repo definisce l'ambiente di svilup
 
 Scelte dichiarate:
 
-- **docker-outside-of-docker**: il dev container monta il socket Docker dell'host e lancia `docker compose` da dentro — i container applicativi (`db`, `web`, `worker`, `adminer`) girano sull'engine dell'host, non annidati. Più semplice e leggero del Docker-in-Docker.
+- **docker-outside-of-docker**: il dev container monta il socket Docker dell'host e lancia `docker compose` da dentro — i container applicativi (`db`, `web`, `worker`, `pgweb`) girano sull'engine dell'host, non annidati. Più semplice e leggero del Docker-in-Docker.
 - La toolchain del dev container (Python+Poetry, Node+npm) **rispecchia gli stage di build** dei Dockerfile dei package: stessa versione maggiore, così "funziona nel dev container" implica "builda nell'immagine".
 - **Git e GitHub si usano dall'host, mai dal container**: il dev container serve a buildare ed eseguire; commit, push e PR (`git`, `gh`) si fanno **fuori**, dall'host — è l'unica eccezione dichiarata allo zero-install (la CLI `gh` si installa sull'host). Il binario `git` resta comunque nell'immagine perché poetry/npm ne hanno bisogno per le dipendenze da repository.
 - **Utente `root` nel container** (semplificazione dichiarata): l'accesso al socket Docker da non-root richiederebbe l'allineamento del GID del gruppo `docker` dell'host; dentro un dev container locale il root è prassi accettata e azzera quella complessità.
 - **Post-create tollerante**: `post-create.sh` installa le dipendenze solo se i file toolchain esistono (`pyproject.toml` arriva con 1.B1, `src/frontend/package.json` con 1.F1) — il dev container nasce in fase 0, prima del codice, senza fallire.
-- Il flusso quotidiano non cambia: `docker compose -f compose-dev.yml --profile dev up` (dal terminale **dentro** il dev container), hot-reload tramite i bind-mount del profilo dev.
+- Il flusso quotidiano non cambia: `docker compose -f compose-dev.yml up` (dal terminale **dentro** il dev container) tira su tutto lo stack di sviluppo, pgweb incluso.
 
 ## Flusso di lavoro
 
 ```mermaid
 flowchart LR
     E[Editor sull'host<br/>nessuna toolchain] -->|attach| DC[Dev container<br/>Python, Poetry, Node, npm, git]
-    DC -->|docker compose<br/>via socket| STACK[db / web / worker / adminer<br/>sull'engine dell'host]
+    DC -->|docker compose<br/>via socket| STACK[db / web / worker / pgweb<br/>sull'engine dell'host]
 ```
 
 1. Clona il repo in WSL2 (o sul server di sviluppo Linux).
 2. Apri la cartella nell'editor → "Reopen in Container".
-3. Dentro il container: `cp .env.example .env`, `docker compose -f compose-dev.yml --profile dev up`.
+3. Dentro il container: `cp .env.example .env`, `docker compose -f compose-dev.yml up`.
 4. Test, lint, build: sempre dal terminale del dev container — mai dall'host.
 5. Commit, push e PR: **dall'host** (`git` e `gh` vivono fuori dal container).
 
@@ -83,7 +83,7 @@ flowchart TB
             DB[("db<br/>PostgreSQL 16")]
             WEB["web<br/>FastAPI + SPA"]
             WK["worker"]
-            ADM["adminer<br/>(profilo dev)"]
+            ADM["pgweb<br/>(browser DB)"]
         end
     end
 
@@ -98,7 +98,7 @@ flowchart TB
     WK --- DB
     ADM --- DB
     GIT -- "commit · push · PR" --> GITHUB
-    BROWSER -- "forward 8080 (web) · 8081 (adminer)" --> WEB & ADM
+    BROWSER -- "forward 8080 (web) · 8081 (pgweb)" --> WEB & ADM
 ```
 
 Da leggere nel disegno: i container applicativi creati da dentro il dev container nascono **accanto** a lui (un `docker ps` dall'host vede tutto, dev container incluso); il confine è netto — **dentro** il container si builda, si testa e si esegue, **dall'host** si fanno commit, push e PR (`git`/`gh`, l'eccezione dichiarata allo zero-install); verso l'esterno escono solo le porte forwardate e il traffico VCS dell'host.
