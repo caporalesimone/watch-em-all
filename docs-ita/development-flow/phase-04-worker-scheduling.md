@@ -1,6 +1,6 @@
 # Fase 4 — Worker e scheduling
 
-> Stato: ☐ da iniziare · Prerequisiti: Fase 3 · [Indice del flusso](README.md)
+> Stato: 🚧 in corso — avviata 2026-06-25, versione di lavoro `0.4.x` · Prerequisiti: Fase 3 ✅ · [Indice del flusso](README.md)
 
 ## Obiettivo
 

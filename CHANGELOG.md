@@ -6,6 +6,12 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 Each entry is **short** and reads as a user-facing story: first a **bullet list of what changed for you** (additions, removals and changes together, light on jargon), then a brief **_under the hood_** paragraph on the architectural/technical changes. Older entries predate this style and are left as they are.
 
+## [0.4.0] - Unreleased
+
+**Phase 4 — worker and scheduling.**
+
+_Work in progress — placeholder for the first phase-4 MVP. Bullets and the `_under the hood_` note land here as the PR ships; the date is set when the version is cut._
+
 ## [0.3.4] - 2026-06-25
 
 **Phase 3 — consolidation: close the open items and round off the documentation.**
