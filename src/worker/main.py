@@ -1,10 +1,9 @@
-"""Worker process (4.B1): the temporal dispatcher.
+"""Worker process (4.B1–4.B4): the temporal dispatcher + serial runner.
 
-Replaces the phase-0 heartbeat stub. Boots like the web — engine, schema, plugins —
-then runs a per-minute tick loop: each tick writes the heartbeat (the file the compose
-healthcheck watches, CRON-R7) and runs ``tick(now)``, the seam where scheduling lands
-(scrapers, then alerts/summary — 4.B2+). Single replica (CRON-R9). Runs as PID 1, so it
-installs SIGTERM/SIGINT handlers to stop promptly on ``docker stop``.
+Boots like the web (engine, schema, plugins), then ticks every interval: it writes the
+heartbeat (CRON-R7) and dispatches **due** scraper slots (CRON-R2) to a serial runner —
+one scraper at a time (SCHED-R6). The dispatcher itself never does long work (CRON-R5).
+Single replica (CRON-R9). Runs as PID 1, so SIGTERM/SIGINT stop it promptly.
 """
 
 from __future__ import annotations
@@ -13,18 +12,35 @@ import logging
 import os
 import signal
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from types import FrameType
+from zoneinfo import ZoneInfo
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from src.core.config import get_settings
 from src.core.db import Base, create_schema, get_engine, init_engine, new_session
 from src.core.feature_flags import worker_tick_seconds
-from src.core.plugins.registry import load_plugins
+from src.core.models import ScraperSchedule
+from src.core.plugins.base import ScraperPlugin
+from src.core.plugins.context import PluginContext, build_context
+from src.core.plugins.registry import LoadedPlugin, load_plugins
+from src.core.schedule import due_slot, install_tz, set_last_slot
 from src.core.schema_drift import check_schema_drift
+from src.core.scrape import implements_scraping, stamp_cooldown
+from src.worker.runner import Runner
 
 log = logging.getLogger("wea.worker")
 
 HEARTBEAT_FILE = os.environ.get("WEA_HEARTBEAT_FILE", "/tmp/worker-heartbeat")
+
+# Schedulable scrapers (scraper_id -> LoadedPlugin), populated at boot.
+_loaded: dict[str, LoadedPlugin] = {}
+
+# Submit a scraper run to the runner: (scraper_id, slot, trigger) -> enqueued?
+Submit = Callable[[str, datetime, str], bool]
 
 
 def _shutdown(signum: int, _frame: FrameType | None) -> None:
@@ -38,22 +54,17 @@ def _heartbeat(now: datetime) -> None:
         fh.write(str(int(now.timestamp())))
 
 
-def tick(now: datetime) -> None:
-    """One dispatcher tick. Pure w.r.t. ``now`` (injected) so it stays testable.
-
-    Today it only writes the heartbeat; the due-slot dispatch (scrapers to the serial
-    runner, then alerts/summary) plugs in here in 4.B2+.
-    """
-    _heartbeat(now)
-
-
 def _boot() -> None:
-    """Bring up the same foundations as the web: engine, schema, plugins. Logs schema
-    drift (4.B0) — the worker has no /api/health, so it only warns in the log."""
+    """Bring up the same foundations as the web (engine, schema, plugins); cache the
+    schedulable scrapers and log any schema drift (4.B0)."""
     settings = get_settings()
     init_engine(settings.core.database_url)
     create_schema()
     loaded = load_plugins(None)  # initialize plugins; the worker serves no HTTP
+    _loaded.clear()
+    for lp in loaded:
+        if isinstance(lp.plugin, ScraperPlugin) and implements_scraping(lp.plugin):
+            _loaded[lp.plugin.plugin_id] = lp
     metadatas = [Base.metadata] + [
         lp.plugin.table_metadata for lp in loaded if lp.plugin.table_metadata is not None
     ]
@@ -71,8 +82,49 @@ def _boot() -> None:
         log.exception("schema-drift check failed")
 
 
+def _run_scraper(
+    plugin: ScraperPlugin, ctx: PluginContext, scraper_id: str, slot: datetime
+) -> None:
+    """Run one scheduled scrape for every configured user, one at a time, stamping the
+    manual-cooldown anchor (SCR-R15) per user. A per-user error doesn't stop the others
+    (POOL-R5); the last slot is recorded even on failure (CRON-R6)."""
+    try:
+        for user_id in plugin.configured_users(ctx):
+            try:
+                stamp_cooldown(ctx.db, scraper_id, user_id)
+                plugin.run_for_user(ctx, user_id)
+            except Exception:
+                log.exception("scrape failed: %s user %s", scraper_id, user_id)
+    except Exception:
+        log.exception("scrape run failed: %s", scraper_id)
+    finally:
+        set_last_slot(ctx.db, scraper_id, slot)
+
+
+def scraper_job(scraper_id: str, slot: datetime, trigger: str = "scheduled") -> None:
+    """Runner entry point: run one scraper (one Plugin Context per run)."""
+    lp = _loaded.get(scraper_id)
+    if lp is None:
+        log.warning("runner: no schedulable scraper %r", scraper_id)
+        return
+    plugin = lp.plugin
+    assert isinstance(plugin, ScraperPlugin)  # only scrapers are cached in _loaded
+    ctx = build_context(lp.manifest, plugin)
+    try:
+        _run_scraper(plugin, ctx, scraper_id, slot)
+    finally:
+        ctx.db.close()
+
+
+def dispatch_due(session: Session, now: datetime, tz: ZoneInfo, submit: Submit) -> None:
+    """Submit every scraper that is due now (CRON-R2) to the runner."""
+    for sched in session.scalars(select(ScraperSchedule)):
+        slot = due_slot(sched, now, tz)
+        if slot is not None:
+            submit(sched.scraper_id, slot, "scheduled")
+
+
 def _current_tick_seconds() -> int:
-    """The worker tick interval from the dev feature flag (override or default)."""
     session = new_session()
     try:
         return worker_tick_seconds(session)
@@ -80,12 +132,18 @@ def _current_tick_seconds() -> int:
         session.close()
 
 
-def _loop(max_ticks: int | None = None) -> None:
-    """Tick forever (or ``max_ticks`` times, for tests), sleeping the flag-driven
-    interval between ticks."""
+def _loop(submit: Submit, max_ticks: int | None = None) -> None:
+    """Tick forever (or ``max_ticks`` times, for tests): heartbeat + dispatch due slots."""
+    tz = install_tz()
     ticks = 0
     while max_ticks is None or ticks < max_ticks:
-        tick(datetime.now(UTC))
+        now = datetime.now(UTC)
+        _heartbeat(now)
+        session = new_session()
+        try:
+            dispatch_due(session, now, tz, submit)
+        finally:
+            session.close()
         ticks += 1
         if max_ticks is None or ticks < max_ticks:
             time.sleep(_current_tick_seconds())
@@ -96,5 +154,7 @@ def run() -> None:
     signal.signal(signal.SIGTERM, _shutdown)
     signal.signal(signal.SIGINT, _shutdown)
     _boot()
+    runner = Runner(scraper_job)
+    runner.start()
     log.info("worker started; heartbeat on %s (tick from feature flag)", HEARTBEAT_FILE)
-    _loop()
+    _loop(runner.submit)

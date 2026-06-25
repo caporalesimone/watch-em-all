@@ -163,6 +163,13 @@ class ScraperPlugin(BasePlugin, ABC):
         override it."""
         raise NotImplementedError(f"{self.plugin_id}: run_test not implemented")
 
+    def configured_users(self, context: PluginContext) -> list[int]:
+        """User ids that have configured this scraper — the users a SCHEDULED run
+        iterates (SCR-R3 reframed: the scraper tells the core whom to scrape). Default:
+        none; a real scraper returns e.g. the users with at least one watch. Not used by
+        scrape-now, which targets only the requesting user."""
+        return []
+
 
 class NotifierPlugin(BasePlugin):
     """Notifier family. Phase 2: marker base; send/config contracts land later."""

@@ -148,6 +148,10 @@ class DragonStorePlugin(ScraperPlugin):
         context.db.execute(delete(Watch).where(Watch.user_id == user_id))
         context.db.commit()
 
+    def configured_users(self, context: PluginContext) -> list[int]:
+        # Users a scheduled run scrapes: everyone with at least one watch (SCR-R3).
+        return list(context.db.scalars(select(Watch.user_id).distinct().order_by(Watch.user_id)))
+
     # --- scraping (SCR-R4/R5/R6): one HTTP request per watch, via context.http ---
     def _scrape_products(self, context: PluginContext, urls: list[str]) -> list[Product]:
         by_id: dict[str, Product] = {}  # dedup on external_id (PROD-R3)
