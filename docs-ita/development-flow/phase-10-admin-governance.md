@@ -32,6 +32,7 @@ L'admin apre il monitoraggio e capisce in un colpo d'occhio quanto lavorano gli 
 - [ ] **10.B16 — Messaggi di sistema: catalogo e risoluzione** (~1h): registro chiavi+default nel core, tabella `system_message_template` (solo override), risoluzione unica override→default → punto di traduzione identità → placeholder, usata da tutti i call-site (ADMSG-R7..R10); `user.marked_for_deletion` dichiara `{deletion_due_date}` (USR-R11). *Verifica: override attivo → l'avviso di disattivazione usa il testo custom.*
 - [ ] **10.B17 — API message-templates** (~1h): `GET/PUT/DELETE /api/admin/message-templates`, validazione dei placeholder in PUT. *Verifica: DELETE → torna il default; placeholder sconosciuto segnalato.*
 - [ ] **10.B18 — API calendario scraper** (~1h): `GET /api/admin/scrapers/calendar?date=` — slot pianificati del giorno + durata media delle run recenti (SCHED-R10). *Verifica: gli slot rispecchiano gli schedule; sospesi esclusi o marcati.*
+- [ ] **10.B19 — Scadenza password configurabile (admin)** (~1h): impostazione di sistema `password_expiry` (in `system_settings`, 10.B7) con **opzioni fisse** — **Mai (default)**, 1 mese, 3 mesi, 6 mesi, 1 anno; nuova colonna `password_changed_at` su `users`, aggiornata a ogni cambio password; al login, se la password è più vecchia della finestra configurata, si **forza il cambio** riusando `must_change_password` e il flusso di cambio forzato già esistente. *Verifica: impostata a 1 mese → un utente con password più vecchia di un mese è forzato al cambio al login; "Mai" → nessun forzamento.*
 
 ### Frontend
 
@@ -48,6 +49,7 @@ L'admin apre il monitoraggio e capisce in un colpo d'occhio quanto lavorano gli 
 - [ ] **10.F11 — Tab messaggi di sistema** (~1h): lista del catalogo con stato default/override, editor Markdown con anteprima e placeholder mostrati, ripristino al default con conferma (ADMSG-R7/R8). *Verifica: override → ripristino → il testo torna quello del core.*
 - [ ] **10.F12 — Vista calendario del giorno** (~1h): blocchi per ogni run pianificata (dimensionati sulla durata media), read-only, click sullo scraper → la sua pagina di configurazione, selettore di data (SCHED-R10). *Verifica: gli slot configurati appaiono; il click porta alla config giusta.*
 - [ ] **10.F13 — Config plugin-declared degli scraper** (~1h): nella pagina admin dello scraper, **form dinamico** (componente di 7.F1) per le chiavi dichiarate dal plugin nel suo schema — es. le soglie degli adjustments di Dragon Store — accanto ai parametri riservati di 4.F2 ([plugin-configuration](../3-features/admin/plugin-configuration.md)). *Verifica: soglia Dragon Store cambiata da UI → adjustments ricalcolati di conseguenza.*
+- [ ] **10.F14 — Impostazione scadenza password** (~1h): nella pagina impostazioni di sistema (10.F6), un selettore per la **scadenza della password** tra le opzioni fisse — Mai (default), 1 mese, 3 mesi, 6 mesi, 1 anno (10.B19). *Verifica: l'opzione scelta persiste e si riflette sull'enforcement al login.*
 
 ## Definition of Done
 
