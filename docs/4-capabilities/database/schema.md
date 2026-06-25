@@ -2,7 +2,7 @@
 
 > **Layer 4 — Capability** · Audience: developer.
 >
-> English translation of the Italian reference [`docs-ita/4-capabilities/database/schema.md`](../../../docs-ita/4-capabilities/database/schema.md), limited to what is implemented (DOC-12). Phase 1 ships the `users` table; phase 3 adds the per-user catalog (`products`) and its append-only price history (`price_history`); carts, alerts and scheduling tables arrive in later phases.
+> English translation of the Italian reference [`docs-ita/4-capabilities/database/schema.md`](../../../docs-ita/4-capabilities/database/schema.md), limited to what is implemented (DOC-12). Phase 1 ships the `users` table; phase 3 adds the per-user catalog (`products`), its append-only price history (`price_history`) and the manual-scrape cooldown anchor (`scrape_cooldown`); carts, alerts and scheduling tables arrive in later phases.
 
 Engine **PostgreSQL 16**, accessed via SQLAlchemy, I/O validated with Pydantic v2. The schema is created idempotently at startup by web and worker (`create_all`).
 
@@ -18,6 +18,12 @@ Engine **PostgreSQL 16**, accessed via SQLAlchemy, I/O validated with Pydantic v
 |---|---|---|
 | `products` | id, user_id FK **CASCADE**, plugin_id, external_id, url, name, image_url, brand_text, brand_link, tags (JSON), category (JSON), extra_json (JSON), currency, price_current, price_original, discount_pct, is_available, removed, first_seen_at, last_seen_at | **UNIQUE (user_id, plugin_id, external_id)** = product identity; per-user catalog. `brand_text`/`brand_link` (PROD-R6, optional link), `tags` (JSON array of strings, PROD-R5) and `category` (JSON array of `{text, link}`, breadcrumb, PROD-R7) are scraper data, persisted without interpretation |
 | `price_history` | id, product_id FK **CASCADE**, user_id, price_current, price_original, discount_pct, is_available, recorded_at | Append-only; one entry **only** on a price **or** availability change; INDEX (product_id, recorded_at); **no retention** |
+
+## Manual scrape
+
+| Table | Columns | Notes |
+|---|---|---|
+| `scrape_cooldown` | id, plugin_id, user_id FK **CASCADE**, last_scraped_at — **UNIQUE (plugin_id, user_id)** | the "last scrape" anchor per *(scraper, user)* for the manual **scrape-now** cooldown (SCR-R15): written at the **start** of **every** scrape (manual now; scheduled from phase 4), but **read** — and therefore binding — **only** by the manual scrape-now; upserted, one row per pair (not a run log) |
 
 ## Cross-cutting rules (implemented subset)
 
