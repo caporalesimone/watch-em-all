@@ -150,6 +150,7 @@ def _run_scraper(
             ulog = ScrapeUserLog(run_id=run.run_id, user_id=user_id, started_at=datetime.now(UTC))
             ctx.db.add(ulog)
             before = ctx.http.request_count
+            before_hits = ctx.http.cache_hits
             try:
                 stamp_cooldown(ctx.db, scraper_id, user_id)
                 delta = plugin.run_for_user(ctx, user_id)
@@ -165,12 +166,14 @@ def _run_scraper(
                 ulog.error_message = str(exc)[:500]
                 outcomes.append("error")
             ulog.http_requests = ctx.http.request_count - before
+            ulog.cache_hits = ctx.http.cache_hits - before_hits
             ulog.finished_at = datetime.now(UTC)
             run.users_processed += 1
             run.products_found += ulog.products_found
             run.products_new += ulog.products_new
             run.price_changes += ulog.price_changes
             run.http_requests += ulog.http_requests
+            run.cache_hits += ulog.cache_hits
             ctx.db.commit()
     except Exception as exc:
         log.exception("scrape run failed: %s", scraper_id)
@@ -181,7 +184,8 @@ def _run_scraper(
         ctx.db.commit()
         set_last_slot(ctx.db, scraper_id, slot)
         log.info(
-            "run %s (%s): %s — %d user(s), found=%d new=%d price_changes=%d removed=%d http=%d",
+            "run %s (%s): %s — %d user(s), found=%d new=%d price_changes=%d removed=%d "
+            "http=%d cache=%d",
             scraper_id,
             trigger,
             run.status,
@@ -191,6 +195,7 @@ def _run_scraper(
             run.price_changes,
             run.products_removed,
             run.http_requests,
+            run.cache_hits,
         )
 
 

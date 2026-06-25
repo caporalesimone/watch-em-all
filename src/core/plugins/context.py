@@ -35,6 +35,7 @@ from sqlalchemy.orm import Session
 from src.core.catalog import update_catalog as _update_catalog_service
 from src.core.db import get_engine, new_session
 from src.core.http import HttpClient
+from src.core.scrape_cache import ScrapeCache
 
 if TYPE_CHECKING:
     from src.core.contracts import DeltaCounters, Product
@@ -77,5 +78,6 @@ def build_context(manifest: Manifest, plugin: BasePlugin) -> PluginContext:
         logger=logging.getLogger(f"wea.plugin.{manifest.name}"),
         config={},
         update_catalog=_update_catalog,
-        http=HttpClient(),
+        # Scrape cache (CTX-R9): per-plugin, default half-life; transparent to the plugin.
+        http=HttpClient(cache=ScrapeCache(get_engine(), plugin_id)),
     )

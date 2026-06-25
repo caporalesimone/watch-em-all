@@ -18,6 +18,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     String,
     UniqueConstraint,
@@ -256,3 +257,25 @@ class SystemLog(Base):
     source: Mapped[str] = mapped_column(String(16), nullable=False)
     message: Mapped[str] = mapped_column(String(2048), nullable=False)
     context_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
+
+class ScrapeCache(Base):
+    """Scrape response cache (CTX-R9, 4.B8). One row per (plugin_id, cache_key); the key is
+    the sha256 of the normalised request (method + URL, sorted query) scoped to the plugin.
+    ``expires_at`` enforces the per-plugin half-life: expired rows are ignored on read and
+    purged at run start (4.B9). ``response_body`` is the raw bytes; ``response_meta_json``
+    keeps status + content-type so a hit reconstructs the response faithfully."""
+
+    __tablename__ = "scrape_cache"
+    __table_args__ = (
+        UniqueConstraint("plugin_id", "cache_key", name="uq_scrape_cache_identity"),
+        Index("ix_scrape_cache_expires", "expires_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    plugin_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    cache_key: Mapped[str] = mapped_column(String(64), nullable=False)  # sha256 hex
+    response_body: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    response_meta_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
