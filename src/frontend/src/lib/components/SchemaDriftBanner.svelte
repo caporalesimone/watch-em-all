@@ -1,7 +1,8 @@
 <script lang="ts">
 	// 4.F0 — dev schema-drift notice, ADMIN-ONLY. Reads the drift the layout pulled
-	// from GET /api/health and renders it through the generic <Banner>; a top-right
-	// "Copy Message" button copies it as a JSON {type, title, description}.
+	// from the admin endpoint and renders it through the generic <Banner>; the
+	// "Copy Message" button lives in the bar's top-right and copies it as a JSON
+	// {type, title, description}.
 	import { onDestroy } from 'svelte';
 
 	import type { SchemaDriftItem } from '$lib/api/client';
@@ -50,36 +51,38 @@
 </script>
 
 {#if show}
-	<button
-		type="button"
-		onclick={copyMessage}
-		class="fixed top-2 right-2 z-50 inline-flex items-center gap-2 rounded border border-red-800 bg-red-600/90 px-3 py-1.5 text-sm font-medium text-white shadow hover:bg-red-700"
-	>
-		<svg
-			class="h-4 w-4 shrink-0"
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="2"
-			stroke-linecap="round"
-			stroke-linejoin="round"
-			aria-hidden="true"
-		>
-			<rect x="9" y="9" width="11" height="11" rx="2" />
-			<path d="M5 15V5a2 2 0 0 1 2-2h10" />
-		</svg>
-		<!-- Both labels live in one grid cell so the button never resizes on toggle. -->
-		<span class="grid">
-			<span class="col-start-1 row-start-1 whitespace-nowrap"
-				>{copied ? $_('schemaDrift.copied') : $_('schemaDrift.copy')}</span
-			>
-			<span class="invisible col-start-1 row-start-1 whitespace-nowrap" aria-hidden="true"
-				>{copied ? $_('schemaDrift.copy') : $_('schemaDrift.copied')}</span
-			>
-		</span>
-	</button>
-
 	<Banner variant="error" icon="⚠️" title={$_('schemaDrift.title')} sidebarOffset>
+		{#snippet action()}
+			<!-- White on the dark-red bar so it stands out (never hides in the bar). -->
+			<button
+				type="button"
+				onclick={copyMessage}
+				class="inline-flex items-center gap-2 rounded bg-white px-3 py-1.5 text-sm font-medium text-red-800 shadow hover:bg-red-50"
+			>
+				<svg
+					class="h-4 w-4 shrink-0"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					aria-hidden="true"
+				>
+					<rect x="9" y="9" width="11" height="11" rx="2" />
+					<path d="M5 15V5a2 2 0 0 1 2-2h10" />
+				</svg>
+				<!-- Both labels share one grid cell so the button never resizes on toggle. -->
+				<span class="grid">
+					<span class="col-start-1 row-start-1 whitespace-nowrap"
+						>{copied ? $_('schemaDrift.copied') : $_('schemaDrift.copy')}</span
+					>
+					<span class="invisible col-start-1 row-start-1 whitespace-nowrap" aria-hidden="true"
+						>{copied ? $_('schemaDrift.copy') : $_('schemaDrift.copied')}</span
+					>
+				</span>
+			</button>
+		{/snippet}
 		<p>{$_('schemaDrift.intro')}</p>
 		<ul class="mt-1 list-disc pl-5">
 			{#each $schemaDrift as item (item.table)}

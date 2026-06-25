@@ -13,18 +13,21 @@
 		icon,
 		title,
 		sidebarOffset = false,
+		action,
 		children
 	}: {
 		variant?: Variant;
 		icon?: string;
 		title?: string;
 		sidebarOffset?: boolean;
+		action?: Snippet; // optional top-right action (e.g. a button), pinned in the bar
 		children?: Snippet;
 	} = $props();
 
-	// top border + background per variant; text colour picked for contrast.
+	// top border + background per variant; text colour picked for contrast. The
+	// backgrounds are translucent so the bar reads as a darker, softer overlay.
 	const VARIANT: Record<Variant, string> = {
-		error: 'border-red-800 bg-red-600/90 text-white',
+		error: 'border-red-950 bg-red-800/75 text-white',
 		warning: 'border-amber-600 bg-amber-400 text-amber-950',
 		info: 'border-sky-800 bg-sky-600 text-white',
 		success: 'border-emerald-800 bg-emerald-600 text-white'
@@ -44,4 +47,5 @@
 		{#if title}<p class="font-semibold">{title}</p>{/if}
 		{#if children}{@render children()}{/if}
 	</div>
+	{#if action}<div class="shrink-0 self-start">{@render action()}</div>{/if}
 </div>
