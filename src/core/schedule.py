@@ -16,24 +16,38 @@ from sqlalchemy.orm import Session
 from src.core.models import ScraperSchedule
 
 
+def _to_time(value: str) -> time:
+    """Parse a ``"HH:MM"`` or ``"HH:MM:SS"`` wall-clock string. Raises ``ValueError``."""
+    parts = value.split(":") if isinstance(value, str) else []
+    if len(parts) not in (2, 3):
+        raise ValueError(f"invalid time {value!r}; expected 'HH:MM' or 'HH:MM:SS'")
+    try:
+        hour, minute = int(parts[0]), int(parts[1])
+        second = int(parts[2]) if len(parts) == 3 else 0
+        return time(hour, minute, second)
+    except ValueError as exc:
+        raise ValueError(f"invalid time {value!r}; expected 'HH:MM' or 'HH:MM:SS'") from exc
+
+
+def _fmt_time(t: time) -> str:
+    """Canonical string: ``HH:MM`` on a whole minute, else ``HH:MM:SS``."""
+    if t.second:
+        return f"{t.hour:02d}:{t.minute:02d}:{t.second:02d}"
+    return f"{t.hour:02d}:{t.minute:02d}"
+
+
 def parse_times(values: list[str]) -> list[str]:
-    """Validate ``"HH:MM"`` entries; return them de-duplicated and sorted. Raises
-    ``ValueError`` on a malformed or out-of-range entry."""
+    """Validate ``"HH:MM"`` / ``"HH:MM:SS"`` entries; return them de-duplicated and
+    sorted (seconds kept only when non-zero). Raises ``ValueError`` on a bad entry."""
     seen: set[time] = set()
     parsed: list[time] = []
     for value in values:
-        parts = value.split(":") if isinstance(value, str) else []
-        if len(parts) != 2:
-            raise ValueError(f"invalid time {value!r}; expected 'HH:MM'")
-        try:
-            slot = time(int(parts[0]), int(parts[1]))
-        except ValueError as exc:
-            raise ValueError(f"invalid time {value!r}; expected 'HH:MM'") from exc
+        slot = _to_time(value)
         if slot not in seen:
             seen.add(slot)
             parsed.append(slot)
     parsed.sort()
-    return [f"{t.hour:02d}:{t.minute:02d}" for t in parsed]
+    return [_fmt_time(t) for t in parsed]
 
 
 def get_schedule(session: Session, scraper_id: str) -> ScraperSchedule | None:
@@ -93,8 +107,7 @@ def latest_due_slot(times: list[str], now: datetime, tz: ZoneInfo) -> datetime |
     today = now_local.date()
     passed: list[datetime] = []
     for entry in times:
-        hh, mm = entry.split(":")
-        slot_time = time(int(hh), int(mm))
+        slot_time = _to_time(entry)
         for day in (today, today - timedelta(days=1)):
             local_dt = datetime.combine(day, slot_time, tzinfo=tz)
             if local_dt <= now_local:

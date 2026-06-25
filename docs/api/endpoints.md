@@ -42,7 +42,7 @@ Role legend: 🌐 public · 👤 user · 🛡 admin
 | Method | Path | Role | Response | Notes |
 |---|---|---|---|---|
 | GET | `/api/admin/scrapers` | 🛡 | `[{scraper_id, display_name, times, enabled, last_slot}]` | schedulable scrapers (those that implement scraping) + their schedule (4.B2) |
-| PUT | `/api/admin/scrapers/{scraper_id}` | 🛡 | `{times, enabled}` → the updated schedule | set the slots (`"HH:MM"`, de-duplicated/sorted; **422** on a bad time) and the enabled flag; unknown scraper → **404** |
+| PUT | `/api/admin/scrapers/{scraper_id}` | 🛡 | `{times, enabled}` → the updated schedule | set the slots (`"HH:MM"` or `"HH:MM:SS"`, de-duplicated/sorted; **422** on a bad time) and the enabled flag; unknown scraper → **404** |
 
 ## Plugin discovery — [plugin-registry](../4-capabilities/core/plugin-registry.md)
 

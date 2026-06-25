@@ -15,6 +15,18 @@ def test_parse_times_dedupes_and_sorts() -> None:
     assert parse_times(["22:00", "06:00", "06:00"]) == ["06:00", "22:00"]
 
 
+def test_parse_times_accepts_seconds() -> None:
+    # HH:MM:SS accepted; seconds kept only when non-zero; sorted with second precision.
+    assert parse_times(["23:10:30", "23:10", "23:10:00"]) == ["23:10", "23:10:30"]
+
+
+def test_latest_due_slot_with_seconds() -> None:
+    # 23:00:30 local has passed at 23:01 local → returned (21:00:30 UTC).
+    now = datetime(2026, 6, 25, 21, 1, tzinfo=UTC)
+    slot = latest_due_slot(["23:00:30"], now, ROME)
+    assert slot == datetime(2026, 6, 25, 21, 0, 30, tzinfo=UTC)
+
+
 def test_latest_due_slot_picks_most_recent_today() -> None:
     # 10:00 local (08:00 UTC) → most recent passed slot is today 06:00 local = 04:00 UTC.
     now = datetime(2026, 6, 25, 8, 0, tzinfo=UTC)
