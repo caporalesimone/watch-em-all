@@ -13,7 +13,8 @@
 		isAdmin
 			? [
 					{ href: '/admin/users', key: 'nav.users' },
-					{ href: '/admin/plugins', key: 'nav.plugins' }
+					{ href: '/admin/plugins', key: 'nav.plugins' },
+					{ href: '/admin/feature-flags', key: 'nav.featureFlags' }
 				]
 			: [
 					{ href: '/', key: 'nav.dashboard' },

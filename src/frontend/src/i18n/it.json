@@ -15,7 +15,8 @@
 		"logout": "Esci",
 		"scrapers": "Scraper",
 		"users": "Utenti",
-		"plugins": "Plugin"
+		"plugins": "Plugin",
+		"featureFlags": "Feature flag"
 	},
 	"catalog": {
 		"title": "Catalogo",
@@ -71,6 +72,13 @@
 			"colType": "Tipo",
 			"colVersion": "Versione",
 			"empty": "Nessun plugin caricato."
+		},
+		"featureFlags": {
+			"title": "Feature flag",
+			"hint": "Interruttori di sviluppo a runtime. Le modifiche hanno effetto subito e non sono persistenti — tornano ai default al riavvio del web.",
+			"empty": "Nessun feature flag definito.",
+			"loadError": "Impossibile caricare i feature flag.",
+			"saveError": "Impossibile salvare i feature flag."
 		}
 	},
 	"theme": {

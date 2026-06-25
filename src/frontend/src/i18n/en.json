@@ -15,7 +15,8 @@
 		"logout": "Log out",
 		"scrapers": "Scrapers",
 		"users": "Users",
-		"plugins": "Plugins"
+		"plugins": "Plugins",
+		"featureFlags": "Feature flags"
 	},
 	"catalog": {
 		"title": "Catalog",
@@ -71,6 +72,13 @@
 			"colType": "Type",
 			"colVersion": "Version",
 			"empty": "No plugins are loaded."
+		},
+		"featureFlags": {
+			"title": "Feature flags",
+			"hint": "Dev runtime toggles. Changes apply immediately and are non-persistent — they reset to defaults when the web restarts.",
+			"empty": "No feature flags are defined.",
+			"loadError": "Could not load the feature flags.",
+			"saveError": "Could not save the feature flags."
 		}
 	},
 	"theme": {

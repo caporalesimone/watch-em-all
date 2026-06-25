@@ -114,6 +114,23 @@ export function getAdminErrors(): Promise<AdminError[]> {
 	return apiFetch('/api/admin/errors').then(asJson<AdminError[]>);
 }
 
+// Dev feature flags (4.B1a/4.F6): a dynamic key -> params map. Admin-only, non-persistent.
+// The UI renders inputs from the value types, so new flags appear with no frontend change.
+export type FeatureFlags = Record<string, Record<string, unknown>>;
+
+export function getFeatureFlags(): Promise<FeatureFlags> {
+	return apiFetch('/api/admin/feature-flags').then(asJson<FeatureFlags>);
+}
+
+export async function patchFeatureFlags(partial: FeatureFlags): Promise<FeatureFlags> {
+	const res = await apiFetch('/api/admin/feature-flags', {
+		method: 'PATCH',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(partial)
+	});
+	return asJson<FeatureFlags>(res);
+}
+
 // Catalog / Product Picker (CAT-*). Money fields are Decimal serialised as
 // strings (exact, no float drift) — rendered as-is, never parsed for maths.
 export interface BrandRef {
