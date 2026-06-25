@@ -67,15 +67,6 @@ New items get appended over time.
   `docker compose -f compose-dev.yml config` no longer lists an `adminer` service, and a repo
   grep for "adminer" leaves only the historical CHANGELOG entry.
 
-### Admin must be able to see each plugin's version
-- **Reported (Simone):** l'admin deve poter vedere la **versione** di ogni plugin.
-- **Where:** la versione vive nel `manifest.json` (`version`, es. dragon_store `0.2.0`) ma **non è esposta**: il
-  registry ([`registry.py`](src/core/plugins/registry.py)) non legge il campo `version`, e `/api/plugins` / `PluginInfo`
-  ([`client.ts`](src/frontend/src/lib/api/client.ts)) espongono name/type/route_base/icon/display_name, **non** `version`;
-  non esiste ancora una pagina admin dei plugin.
-- **Fix idea:** far transitare `version` dal manifest → registry → `/api/plugins` (o un endpoint admin-only) →
-  `PluginInfo`, e mostrarla nella (futura) pagina admin dei plugin accanto a nome/tipo/stato `enabled`.
-
 ## Reminders / to discuss
 
 ### A standard set of core-frontend components reused by plugins
