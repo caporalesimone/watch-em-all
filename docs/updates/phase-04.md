@@ -1,76 +1,128 @@
 # Phase 4 — Worker & scheduling
 
-> Feature-level recap. Phase 4 is **in progress**. The headline — automatic scheduled
-> scraping with an observable worker — is still ahead (4.B2+). What's landed so far
-> (`0.4.0`) is the **developer / admin tooling** the rest of the phase builds on: a
-> schema-drift safety net, a friendlier dev database browser, admin plugin versions,
-> and a tidy-up of the environment variables.
+> Feature-level recap. Phase 4 is **in progress**. The headline — **automatic scheduled
+> scraping with an observable worker** — is now in (`0.4.0`), together with the dev/admin
+> tooling around it: a transparent scrape cache, a system log with retention, dev feature
+> flags and the admin pages, on top of the earlier groundwork (a friendlier dev database
+> browser, a schema-drift safety net, admin plugin versions, tidier environment variables).
+> The slot editor and the live log page are the remaining frontend MVPs.
 
 ## What's implemented (so far, 0.4.0)
 
-### 1) Dev database browser: Adminer → pgweb
+### 1) Automatic scheduled scraping (the worker)
 
-- The development stack now ships **pgweb** instead of Adminer. It comes up with the
-  normal `docker compose -f compose-dev.yml up` (no profile to remember) and opens
-  **straight on the `watchemall` database** — no connection form, no login (the
-  connection is built from your `POSTGRES_*`).
+- An admin sets per-scraper **daily times** (`PUT /api/admin/scrapers/{id}`) and the worker
+  runs each scraper automatically at those times — **one scraper at a time** — so your
+  catalog refreshes on its own, no need to hit *Scrape now*.
+- After downtime the worker **catches up** only the *most recent* missed slot (never a
+  replay of every slot it was down for).
+- A manual *Scrape now* and a scheduled run share the **same per-scraper lock**: a manual
+  run started while one is in progress gets a clear `409`, and a scheduled slot is skipped
+  if a manual run holds the lock.
+- Every run is recorded (`scrape_run` + a per-user `scrape_user_log`) with counters —
+  products found / new / price-changes / removed, HTTP requests, **cache hits** — and a
+  status (`ok` / `partial` / `error` / `timeout`); a run that overruns the configured
+  timeout is stopped between users and marked.
+- Schedules are set through the API for now; the **slot editor** UI is a coming MVP.
+
+### 2) Scrape cache — fewer visits to the shop
+
+- The scraper's HTTP client now serves repeated `GET`s from a per-scraper **cache** within
+  a **half-life** (default 60 min): two users watching the same page in one run — or runs
+  close together — cost a **single visit** to the site, counted as `cache_hits`.
+- It's transparent to the plugin, only caches successful reads (never errors), and is
+  bypassed when the half-life is set to 0. Expired entries are dropped at the start of each
+  run, and an admin can **clear** a scraper's cache on demand
+  (`DELETE /api/admin/scrapers/{id}/cache`).
+
+### 3) A system log the admin can read
+
+- Worker and scraper events (runs, skips, errors) are persisted to a **system log**,
+  readable by the admin via `GET /api/admin/logs` — a cursor: the latest entries first,
+  then only newer rows, filterable by level and source. It never carries users' product
+  data, only ids and metrics.
+- The worker prunes the log **and** old run records past `log_retention_days` (default 90)
+  once a day; the **price history is never pruned** — it is the system's value.
+- This is API-only today; the live log **page** is a coming MVP.
+
+### 4) Dev feature flags + an admin page that builds itself
+
+- A dev-only **feature flags** facility lets an admin tweak runtime knobs without a restart:
+  the **worker tick** interval and the **scrape-now cooldown**. They are shared with the
+  worker through the database and **reset when the web restarts** (non-persistent).
+- An **Admin → Feature flags** page renders itself from the API — each flag's input is
+  inferred from its value's type — so a new flag shows up with **no frontend change**.
+
+### 5) Admin can see plugin versions
+
+- An **Admin → Plugins** page lists each loaded plugin with its **type and version**
+  (e.g. Dragon Store `0.2.0`) — the first slice of admin plugin visibility.
+
+### 6) Dev database browser: Adminer → pgweb
+
+- The development stack ships **pgweb** instead of Adminer. It comes up with the normal
+  `docker compose -f compose-dev.yml up` (no profile to remember) and opens **straight on
+  the `watchemall` database** — no connection form, no login.
 - The **release** deploy kit no longer carries any DB browser: it stays strictly
   production-shaped. To inspect the DB on a server, use `docker compose exec db psql …`
   or the `ops` container.
 
-### 2) Schema-drift safety net + admin errors feed
+### 7) Schema-drift safety net + admin errors feed
 
 - On startup the app compares the database with the code's data model. If a table or
-  column the code expects is **missing** from the DB — the situation a model change
-  creates on an existing dev database, since there are no migrations yet — it logs a
-  clear warning and (with the alert on) surfaces it to the **admin**.
-- The admin sees a **red banner** (bottom-right, detached from the edges) with a
-  **Copy Message** button that copies the problem as JSON and a **✕** to dismiss it.
-  It's **admin-only**: a normal or anonymous user never sees it, and the data is served
-  by an admin-only endpoint (`GET /api/admin/errors`), never the public health probe.
-- It's a generic **admin errors feed**: schema drift is the first entry; future admin
-  problems (worker down, a plugin that failed to load, …) will appear the same way,
-  stacked one card per problem.
+  column the code expects is **missing** — the situation a model change creates on an
+  existing dev database, since there are no migrations yet — it logs a clear warning and
+  (with the alert on) surfaces it to the **admin**.
+- The admin sees a **red banner** with a **Copy Message** button and a **✕** to dismiss it.
+  It's **admin-only**: served by `GET /api/admin/errors`, never the public health probe.
+  It's a generic feed — future admin problems will appear the same way.
 
-### 3) Admin can see plugin versions
-
-- A new **Admin → Plugins** page lists each loaded plugin with its **type and version**
-  (e.g. Dragon Store `0.2.0`) — the first slice of admin plugin visibility.
-
-### 4) Environment variables standardized
+### 8) Environment variables standardized
 
 - Every Watch 'Em All variable is now prefixed **`WEA_`** (e.g. `SECRET_KEY` →
-  `WEA_SECRET_KEY`, `ADMIN_INITIAL_USERNAME`/`ADMIN_INITIAL_PASSWORD` →
-  `WEA_ADMIN_INITIAL_*`). External names the images expect (`POSTGRES_*`, `TZ`) are
-  unchanged. A new [`docs/env-variables.md`](../env-variables.md) lists them all.
+  `WEA_SECRET_KEY`). External names the images expect (`POSTGRES_*`, `TZ`) are unchanged.
+  A [`docs/env-variables.md`](../env-variables.md) lists them all.
 
-_Under the hood:_ the drift check (`src/core/schema_drift.py`) runs after the schema is
-ensured and iterates the core `Base.metadata` plus each plugin's declared
-`table_metadata` — a new contract (DB-R7) the registry enforces at load, so a plugin
-that owns tables but doesn't declare them is rejected. pgweb is dev-only and always-on
-(no Compose profile); the gate that keeps debug tools out of production moved from a
-profile to file separation (`compose-dev.yml` vs `compose.yml`). The product version is
-still baked from the git tag; `WEA_VERSION` only selects which image the release compose
-pulls.
+_Under the hood:_ the `worker` container runs the real dispatcher (`src/worker`): it boots
+like the web (engine, schema, plugins) and ticks at an interval read from the
+`worker_tick` feature flag (base `WEA_TICK_SECONDS`), re-read each second so a change takes
+effect within ~1 s. Scheduling is a `scraper_schedule` table + admin API, a TZ-aware
+due-slot/catch-up calculation, a **serial runner** (one scraper at a time, a per-scraper
+advisory lock shared with scrape-now, a run timeout from `system_settings`), and
+`scrape_run`/`scrape_user_log` records. The feature flags live in a `feature_flags` table
+shared between web and worker and cleared at web startup. The system log is fed by a
+logging handler attached to the `wea` logger in both processes — only `wea.worker.*` and
+`wea.plugin.*` records are persisted (the web's own logs stay on stdout); retention runs
+from the worker via `src/core/maintenance.py`. The scrape cache sits behind a small,
+**swappable** interface (`src/core/scrape_cache.py`, today Postgres-backed) used by the
+context's HTTP client, so a future Redis backend would be a localized change leaving the
+client and runner untouched. The drift check (`src/core/schema_drift.py`) iterates the
+core `Base.metadata` plus each plugin's declared `table_metadata` (DB-R7, enforced at
+load); the product version is still baked from the git tag.
 
 ## Good to know
 
-- The **worker is now the real dispatcher skeleton** (it boots like the web and writes
-  a per-minute heartbeat), but the automatic **scheduling** — per-scraper slots, the
-  serial runner, run/log records — arrives in the next MVPs (4.B2+). `/api/health` still
-  shows `worker_heartbeat_age_s: null` (the worker's heartbeat is a file for the
-  container healthcheck; surfacing it on health comes later).
-- The schema-drift alert ships **on in dev**: `WEA_SCHEMA_DRIFT_ALERT=true` in
-  `.env`/`.env.example`; if the variable is unset the app defaults to **off**. It never
+- **Scheduled scraping works today**, but it is configured via the API (`/api/admin/scrapers`)
+  until the **slot editor** lands. A single daily time means one run per day — the worker is
+  a *daily-times* scheduler, not an "every N minutes" interval.
+- The **system log is API-only** for now; the near-real-time **log page** (filters,
+  autoscroll) is the next frontend MVP and consumes the same cursor endpoint.
+- The cache half-life and the scrape-now cooldown are **global defaults / dev flags** today;
+  they become **per-scraper admin settings** in a later MVP.
+- Feature flags are **dev-only and non-persistent** — they reset to defaults on web restart.
+- The schema-drift alert ships **on in dev** (`WEA_SCHEMA_DRIFT_ALERT=true`); it never
   reaches a non-admin.
-- To see the drift banner: as **admin**, break the schema on purpose, then restart web
-  (see Useful Commands). Reset the dev DB to clear it.
 
 ## Useful Commands
 
 ```bash
 docker compose -f compose-dev.yml up -d --build         # db + web + worker + pgweb (DB browser on :8081)
 docker compose -f compose-dev.yml down -v               # reset the DB (admin recreated from .env)
+
+# Schedule a scraper (admin token required); the worker runs it at those daily times
+#   PUT /api/admin/scrapers/dragon_store  {"times": ["09:00","21:00"], "enabled": true}
+# Read the system log (admin):  GET /api/admin/logs?level=error&limit=50
+# Clear a scraper's cache (admin):  DELETE /api/admin/scrapers/dragon_store/cache
 
 # See the admin schema-drift banner: as admin, create drift then restart web
 docker compose -f compose-dev.yml exec db psql -U admin -d watchemall -c "ALTER TABLE products DROP COLUMN tags;"

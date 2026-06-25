@@ -25,22 +25,22 @@ New items get appended over time.
   the [phase-7 "discuss before you start" gate](docs-ita/development-flow/phase-07-email-notifier.md)
   plus rule [FE-18](docs-ita/developer-rules/frontend/rules.md).
 
-- **Admin — a live log page, early.** It would help to have an admin web page to read the system logs
-  **live** (and browse past ones) sooner rather than later — a single place to see what the system is
-  doing. The full design already lives in phase 4: `4.B7` (`system_log` table + `GET /api/admin/logs?since=`
-  cursor) and `4.F3`/`4.F4` (the polling page with filters, autoscroll, heartbeat). **Needs analysis**:
-  decide whether to pull a *minimal* version forward — a simple page that shows recent log lines
-  (present + past) — and, deliberately, **how much to show and how** (which sources/levels, a tail of
-  N lines, plain polling vs cursor). Goal: a simple place to read logs now, improved later; the
-  analysis decides if it belongs in phase 4 or stays as `4.F3/F4`.
+- **Admin — a live log page (frontend only now).** `4.B7` shipped in `0.4.0`: the `system_log`
+  table + the cursor API `GET /api/admin/logs` (no `since` → latest N; `since=<id>` → only newer rows;
+  `level`/`source` filters; `limit` 1–1000). So the **backend is done** — what's left is just the UI,
+  `4.F3`/`4.F4` (the polling page with filters, autoscroll). A *minimal* page is now a thin consumer of
+  that endpoint: load the latest N, then poll with `since=<maxId>`. Decisions already taken: **no
+  heartbeat log row** (the page's heartbeat/liveness cue must come from `/api/health` + the file
+  heartbeat, not from a log line); the worker/scraper are the only sources persisted. Still open for
+  `4.F3/F4`: polling cadence, sidebar placement, one page vs two (cursor page + filters page).
 
 - **Worker container exposes `8080/tcp` but serves nothing (cosmetic).** `docker ps` on the dev
   stack shows the `worker` container with `8080/tcp` exposed even though the worker serves no HTTP
-  (it's the heartbeat stub today, the real dispatcher in 4.B1) — the port is just `EXPOSE 8080`
+  (now the real dispatcher, 4.B1, shipped in 0.4.0 — still no HTTP) — the port is just `EXPOSE 8080`
   metadata inherited from the shared `watch-em-all` image (one image, two roles `web`/`worker` by
   command, by design). It is **not published** (no host mapping) so it's harmless, only noisy in
-  `docker ps`. Revisit with 4.B1: either accept/document it, or split the EXPOSE so only the `web`
-  role advertises the port. Observed:
+  `docker ps`. Either accept/document it, or split the EXPOSE so only the `web` role advertises the
+  port. Observed:
   ```
   7ab0f417bb56  watch-em-all:dev  …  Up (healthy)  8080/tcp                       …-worker-1
   26f3f3ce703f  watch-em-all:dev  …  Up (healthy)  0.0.0.0:8080->8080/tcp         …-web-1
