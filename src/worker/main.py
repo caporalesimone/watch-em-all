@@ -152,6 +152,18 @@ def _run_scraper(
         run.finished_at = datetime.now(UTC)
         ctx.db.commit()
         set_last_slot(ctx.db, scraper_id, slot)
+        log.info(
+            "run %s (%s): %s — %d user(s), found=%d new=%d price_changes=%d removed=%d http=%d",
+            scraper_id,
+            trigger,
+            run.status,
+            run.users_processed,
+            run.products_found,
+            run.products_new,
+            run.price_changes,
+            run.products_removed,
+            run.http_requests,
+        )
 
 
 def scraper_job(scraper_id: str, slot: datetime, trigger: str = "scheduled") -> None:
@@ -167,6 +179,7 @@ def scraper_job(scraper_id: str, slot: datetime, trigger: str = "scheduled") -> 
         if not acquired:
             log.warning("runner: %s already running, slot %s skipped", scraper_id, slot)
             return
+        log.info("running %s (slot %s, %s)", scraper_id, slot, trigger)
         ctx = build_context(lp.manifest, plugin)
         try:
             timeout_min = get_system_settings(ctx.db).scraper_run_timeout_min
@@ -180,8 +193,8 @@ def dispatch_due(session: Session, now: datetime, tz: ZoneInfo, submit: Submit) 
     """Submit every scraper that is due now (CRON-R2) to the runner."""
     for sched in session.scalars(select(ScraperSchedule)):
         slot = due_slot(sched, now, tz)
-        if slot is not None:
-            submit(sched.scraper_id, slot, "scheduled")
+        if slot is not None and submit(sched.scraper_id, slot, "scheduled"):
+            log.info("scheduled run due: %s (slot %s) → queued", sched.scraper_id, slot)
 
 
 def _current_tick_seconds() -> int:
