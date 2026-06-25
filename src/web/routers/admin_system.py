@@ -10,6 +10,7 @@ add entries without a new endpoint.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Literal
 
 from fastapi import APIRouter, Request
@@ -21,6 +22,7 @@ from src.core.schema_drift import SchemaDriftItem
 from src.web.deps import AdminDep, SessionDep, SettingsDep
 
 router = APIRouter(prefix="/admin", tags=["Admin: system"])
+log = logging.getLogger(__name__)
 
 
 class AdminError(BaseModel):
@@ -80,6 +82,8 @@ def patch_feature_flags(
     body: dict[str, dict[str, Any]], _admin: AdminDep, db: SessionDep
 ) -> dict[str, dict[str, Any]]:
     try:
-        return set_flags(db, body)
+        result = set_flags(db, body)
     except ValueError as exc:
         raise APIError(422, "unknown_flag", str(exc)) from exc
+    log.info("feature flags changed: %s", result)
+    return result

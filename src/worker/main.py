@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from src.core.config import get_settings
 from src.core.db import Base, create_schema, get_engine, init_engine, new_session
-from src.core.feature_flags import worker_tick_seconds
+from src.core.feature_flags import effective_flags, worker_tick_seconds
 from src.core.locks import scraper_lock
 from src.core.models import ScraperSchedule, ScrapeRun, ScrapeUserLog
 from src.core.plugins.base import ScraperPlugin
@@ -82,6 +82,11 @@ def _boot() -> None:
                 )
     except Exception:
         log.exception("schema-drift check failed")
+    session = new_session()
+    try:
+        log.info("feature flags: %s", effective_flags(session))
+    finally:
+        session.close()
 
 
 def _aggregate_status(outcomes: list[str], timed_out: bool) -> str:
@@ -208,6 +213,7 @@ def _current_tick_seconds() -> int:
 def _loop(submit: Submit, max_ticks: int | None = None) -> None:
     """Tick forever (or ``max_ticks`` times, for tests): heartbeat + dispatch due slots."""
     tz = install_tz()
+    last_interval: int | None = None
     ticks = 0
     while max_ticks is None or ticks < max_ticks:
         now = datetime.now(UTC)
@@ -219,7 +225,11 @@ def _loop(submit: Submit, max_ticks: int | None = None) -> None:
             session.close()
         ticks += 1
         if max_ticks is None or ticks < max_ticks:
-            time.sleep(_current_tick_seconds())
+            interval = _current_tick_seconds()
+            if interval != last_interval:
+                log.info("worker tick interval: %ss", interval)
+                last_interval = interval
+            time.sleep(interval)
 
 
 def run() -> None:

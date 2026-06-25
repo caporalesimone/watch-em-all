@@ -18,7 +18,7 @@ from fastapi import Depends, FastAPI
 from src.core.bootstrap import ensure_initial_admin
 from src.core.config import get_settings
 from src.core.db import Base, create_schema, get_engine, init_engine, new_session
-from src.core.feature_flags import clear_flags
+from src.core.feature_flags import clear_flags, effective_flags
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.registry import load_plugins
 from src.core.schema_drift import SchemaDriftItem, check_schema_drift
@@ -62,6 +62,7 @@ def create_app() -> FastAPI:
             )
             # Dev feature flags are non-persistent: reset to defaults on each boot (4.B1a).
             clear_flags(session)
+            log.info("feature flags: %s", effective_flags(session))
         finally:
             session.close()
         # Discover, load and mount the enabled plugins (REG-*). Isolated failures
