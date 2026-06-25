@@ -37,6 +37,8 @@ Role legend: 🌐 public · 👤 user · 🛡 admin
 | GET | `/api/admin/feature-flags` | 🛡 | `{key: {…}}` | dev feature flags, effective values (defaults + overrides). Admin-only (4.B1a) |
 | PATCH | `/api/admin/feature-flags` | 🛡 | `{key: {…}}` | set one or more flags (known keys only); returns the effective map. Non-persistent — reset at web startup |
 
+Known flags (params shown with their defaults): `worker_tick` `{seconds: 60}` (worker dispatcher tick); `scrape_now_cooldown` `{seconds: 3600}` (manual scrape-now cooldown — lower it, e.g. `30`, to exercise the countdown without waiting the hour).
+
 ## Admin — scrapers — [scraper-scheduling-and-limits](../3-features/admin/scraper-scheduling-and-limits.md)
 
 | Method | Path | Role | Response | Notes |

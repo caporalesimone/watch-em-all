@@ -16,6 +16,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from src.core.models import FeatureFlag
+from src.core.scrape import SCRAPE_NOW_COOLDOWN_SECONDS
 
 
 def _default_tick_seconds() -> int:
@@ -30,6 +31,9 @@ def _default_tick_seconds() -> int:
 KNOWN_FLAGS: dict[str, dict[str, Any]] = {
     # Worker dispatcher tick interval — override to test scheduling without waiting.
     "worker_tick": {"seconds": _default_tick_seconds()},
+    # Manual scrape-now cooldown — override (e.g. to 30s) to exercise the countdown
+    # without waiting the full hour. Default mirrors the production constant.
+    "scrape_now_cooldown": {"seconds": SCRAPE_NOW_COOLDOWN_SECONDS},
 }
 
 
@@ -70,3 +74,12 @@ def worker_tick_seconds(session: Session) -> int:
         return max(1, int(value))
     except (TypeError, ValueError):
         return _default_tick_seconds()
+
+
+def scrape_now_cooldown_seconds(session: Session) -> int:
+    """Effective manual scrape-now cooldown (override or default), clamped to >= 1s."""
+    value: Any = effective_flags(session)["scrape_now_cooldown"].get("seconds")
+    try:
+        return max(1, int(value))
+    except (TypeError, ValueError):
+        return SCRAPE_NOW_COOLDOWN_SECONDS
