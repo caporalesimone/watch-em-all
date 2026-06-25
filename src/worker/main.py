@@ -13,7 +13,7 @@ import os
 import signal
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import FrameType
 from zoneinfo import ZoneInfo
 
@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from src.core.config import get_settings
 from src.core.db import Base, create_schema, get_engine, init_engine, new_session
 from src.core.feature_flags import worker_tick_seconds
+from src.core.locks import scraper_lock
 from src.core.models import ScraperSchedule
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.context import PluginContext, build_context
@@ -30,6 +31,7 @@ from src.core.plugins.registry import LoadedPlugin, load_plugins
 from src.core.schedule import due_slot, install_tz, set_last_slot
 from src.core.schema_drift import check_schema_drift
 from src.core.scrape import implements_scraping, stamp_cooldown
+from src.core.settings import get_system_settings
 from src.worker.runner import Runner
 
 log = logging.getLogger("wea.worker")
@@ -83,13 +85,21 @@ def _boot() -> None:
 
 
 def _run_scraper(
-    plugin: ScraperPlugin, ctx: PluginContext, scraper_id: str, slot: datetime
+    plugin: ScraperPlugin,
+    ctx: PluginContext,
+    scraper_id: str,
+    slot: datetime,
+    deadline: datetime | None = None,
 ) -> None:
     """Run one scheduled scrape for every configured user, one at a time, stamping the
     manual-cooldown anchor (SCR-R15) per user. A per-user error doesn't stop the others
-    (POOL-R5); the last slot is recorded even on failure (CRON-R6)."""
+    (POOL-R5); a run past ``deadline`` stops between users (SCHED-R7, cooperative); the
+    last slot is recorded even on failure/timeout (CRON-R6)."""
     try:
         for user_id in plugin.configured_users(ctx):
+            if deadline is not None and datetime.now(UTC) >= deadline:
+                log.warning("scrape timed out: %s (slot %s)", scraper_id, slot)
+                break
             try:
                 stamp_cooldown(ctx.db, scraper_id, user_id)
                 plugin.run_for_user(ctx, user_id)
@@ -102,18 +112,25 @@ def _run_scraper(
 
 
 def scraper_job(scraper_id: str, slot: datetime, trigger: str = "scheduled") -> None:
-    """Runner entry point: run one scraper (one Plugin Context per run)."""
+    """Runner entry point: run one scraper (one Plugin Context per run), under the
+    per-scraper lock (SCHED-R4) and the run timeout (SCHED-R7)."""
     lp = _loaded.get(scraper_id)
     if lp is None:
         log.warning("runner: no schedulable scraper %r", scraper_id)
         return
     plugin = lp.plugin
     assert isinstance(plugin, ScraperPlugin)  # only scrapers are cached in _loaded
-    ctx = build_context(lp.manifest, plugin)
-    try:
-        _run_scraper(plugin, ctx, scraper_id, slot)
-    finally:
-        ctx.db.close()
+    with scraper_lock(get_engine(), scraper_id) as acquired:
+        if not acquired:
+            log.warning("runner: %s already running, slot %s skipped", scraper_id, slot)
+            return
+        ctx = build_context(lp.manifest, plugin)
+        try:
+            timeout_min = get_system_settings(ctx.db).scraper_run_timeout_min
+            deadline = datetime.now(UTC) + timedelta(minutes=timeout_min)
+            _run_scraper(plugin, ctx, scraper_id, slot, deadline)
+        finally:
+            ctx.db.close()
 
 
 def dispatch_due(session: Session, now: datetime, tz: ZoneInfo, submit: Submit) -> None:

@@ -176,3 +176,15 @@ class ScraperSchedule(Base):
     times: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     last_slot: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class SystemSetting(Base):
+    """Global system settings (MNT-R3), key → JSON value, editable at runtime and
+    **persistent** (unlike feature_flags). Typed access via
+    :func:`src.core.settings.get_system_settings`; 4.B5 reads ``scraper_run_timeout_min``,
+    later MVPs grow it (retention, grace period) + the admin editor."""
+
+    __tablename__ = "system_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[Any] = mapped_column(JSON, nullable=False)

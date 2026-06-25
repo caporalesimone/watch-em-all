@@ -130,3 +130,29 @@ def test_boot_and_loop_runs_one_tick(tmp_path: Path, monkeypatch: pytest.MonkeyP
     config_mod.get_settings.cache_clear()
 
     assert int(hb.read_text()) > 0
+
+
+def test_run_scraper_stops_at_deadline() -> None:
+    engine, session = _mem()
+    session.add(ScraperSchedule(scraper_id="fake", times=["00:00"], enabled=True, last_slot=None))
+    session.commit()
+    fake = _FakeScraper()
+
+    def _update_catalog(user_id: int, products: list[Product]) -> DeltaCounters:
+        return DeltaCounters()
+
+    ctx = PluginContext(
+        engine=engine,
+        db=session,
+        logger=logging.getLogger("test.worker"),
+        config={},
+        update_catalog=_update_catalog,
+    )
+    past = datetime(2000, 1, 1, tzinfo=UTC)
+    worker._run_scraper(fake, ctx, "fake", datetime(2026, 6, 25, 6, 0, tzinfo=UTC), past)
+
+    assert fake.users_run == []  # deadline already passed → no users processed
+    sched = session.get(ScraperSchedule, "fake")
+    assert sched is not None and sched.last_slot is not None  # slot still recorded (CRON-R6)
+    session.close()
+    engine.dispose()
