@@ -54,9 +54,9 @@ class Product(BaseModel):
     name: str
     image_url: str | None = None  # remote URL, never downloaded locally (PROD)
     brand: BrandRef | None = None  # text + optional link; None if not extracted (PROD-R6)
-    # Generic product "tags" (e.g. "Edizione Limitata", "Pre Order"); the scraper
-    # populates it from any source, the core only persists it (PROD-R5).
-    product_properties: list[str] = Field(default_factory=list)
+    # Generic product tags (e.g. "Edizione Limitata", "Pre Order"); the scraper
+    # populates them from any source, the core only persists them (PROD-R5).
+    tags: list[str] = Field(default_factory=list)
     # Category breadcrumb, root → leaf (PROD-R7); empty if the scraper has none.
     category: list[CategoryRef] = Field(default_factory=list)
 

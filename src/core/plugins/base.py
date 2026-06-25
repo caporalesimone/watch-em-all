@@ -29,8 +29,8 @@ if TYPE_CHECKING:
     from src.core.plugins.context import PluginContext
 
 
-class ProductProperties:
-    """Per-product accumulator of tags (``product_properties``, SCR-R16 / PROD-R5).
+class Tags:
+    """Per-product accumulator of tags (``tags``, SCR-R16 / PROD-R5).
 
     The base provides the *mechanism*; what to add is the plugin's choice (a label
     cleaned off the title, a special availability state, …). One instance per
@@ -44,12 +44,12 @@ class ProductProperties:
     def __init__(self) -> None:
         self._items: list[str] = []
 
-    def add_property(self, value: str) -> None:
+    def add_tag(self, value: str) -> None:
         cleaned = value.strip(self._STRIP).strip()
         if cleaned and cleaned not in self._items:
             self._items.append(cleaned)
 
-    def get_properties(self) -> list[str]:
+    def get_tags(self) -> list[str]:
         return list(self._items)
 
 
@@ -131,10 +131,10 @@ class ScraperPlugin(BasePlugin, ABC):
         return self._stable_id(self.identity_seed(raw) or self.normalize_url(url))
 
     @staticmethod
-    def new_properties() -> ProductProperties:
+    def new_tags() -> Tags:
         """A fresh per-product tag accumulator (SCR-R16). Use one per product;
-        add tags via ``add_property`` and read them back with ``get_properties``."""
-        return ProductProperties()
+        add tags via ``add_tag`` and read them back with ``get_tags``."""
+        return Tags()
 
     @staticmethod
     def new_category() -> CategoryPath:

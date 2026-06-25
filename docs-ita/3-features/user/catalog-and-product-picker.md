@@ -23,7 +23,8 @@ Il catalogo è l'insieme dei prodotti estratti dagli scraper per l'utente. Il **
 |---|---|
 | Provenienza | Icona + nome dello scraper; **link alla pagina dello scraper** |
 | Foto | Immagine remota (miniatura con bordo); **in hover** (dopo una breve pausa, così non compare scorrendo) si ingrandisce (intera, non ritagliata, con limiti di dimensione) |
-| Titolo | Nome prodotto, **link** alla pagina del prodotto (nuova tab); sotto: **marca** (link opzionale), **tag** (`product_properties`) e **categoria** (breadcrumb `testo / testo / …`, ogni voce cliccabile) |
+| Titolo | Nome prodotto, **link** alla pagina del prodotto (nuova tab); sotto: **marca** (link opzionale) e **categoria** (breadcrumb `testo / testo / …`, ogni voce cliccabile) |
+| Tag | I **tag** del prodotto (`tags`), in **colonna dedicata** (uno chip per tag, es. _Edizione Limitata_, _Pre Order_) |
 | Prezzo pieno | Listino (o ultimo noto), **barrato solo quando c'è uno sconto** |
 | Prezzo | Prezzo corrente; sotto la cifra, un **badge `-NN%`** quando il prodotto è scontato (non c'è una colonna "% sconto" separata) |
 | Disponibilità | Indicatore (disponibile / esaurito / delistato) |

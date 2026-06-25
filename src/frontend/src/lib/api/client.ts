@@ -119,7 +119,7 @@ export interface CatalogItem {
 	name: string;
 	image_url: string | null;
 	brand: BrandRef | null;
-	product_properties: string[];
+	tags: string[];
 	category: CategoryRef[];
 	currency: string;
 	price_current: string;

@@ -25,6 +25,7 @@
 		"colSource": "Source",
 		"colImage": "Photo",
 		"colName": "Title",
+		"colTags": "Tags",
 		"colPriceOriginal": "List price",
 		"colPriceCurrent": "Price",
 		"colAvailability": "Availability",

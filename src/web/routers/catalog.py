@@ -39,7 +39,7 @@ def _to_item(row: CatalogProduct) -> CatalogItem:
         name=row.name,
         image_url=row.image_url,
         brand=BrandRef(text=row.brand_text, link=row.brand_link) if row.brand_text else None,
-        product_properties=row.product_properties,
+        tags=row.tags,
         category=[CategoryRef(**c) for c in row.category],
         currency=row.currency,
         price_current=row.price_current,

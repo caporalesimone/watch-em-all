@@ -3,7 +3,7 @@
 One HTTP request per product watch (``kind=product``) via ``context.http``; the
 page is parsed by :mod:`parser` (JSON-LD ``Product`` primary, DOM list price) and
 the title is cleaned by :mod:`sanitizer` (marketing/edition labels become
-``product_properties`` tags). The native id (``.gp.<id>.uw``) drives
+``tags``). The native id (``.gp.<id>.uw``) drives
 ``external_id`` through the base identity template-method (stable across runs).
 Categories, pagination and the "ammaccato" filter are phase 9.
 
@@ -39,7 +39,7 @@ _GP_ID_RE = re.compile(r"\.gp\.(\d+)\.uw")
 # schema.org availability tokens treated as "orderable now" (PreOrder is buyable).
 _AVAILABLE_STATES = frozenset({"InStock", "PreOrder"})
 _KNOWN_STATES = frozenset({"InStock", "OutOfStock", "PreOrder"})
-_PREORDER_PROPERTY = "Pre Order"
+_PREORDER_TAG = "Pre Order"
 
 
 class _Base(DeclarativeBase):
@@ -56,7 +56,7 @@ class Watch(_Base):
     kind: Mapped[str] = mapped_column(String(16), nullable=False, default="product")
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
     # Display snapshot of the last scraped product (name, image_url, brand,
-    # product_properties, category) — set by a one-off scrape on add and refreshed
+    # tags, category) — set by a one-off scrape on add and refreshed
     # on each run. Null until the first successful scrape (UI falls back to the URL).
     snapshot_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -102,7 +102,7 @@ class WatchOut(BaseModel):
     name: str | None = None
     image_url: str | None = None
     brand: BrandRef | None = None
-    product_properties: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
     category: list[CategoryRef] = Field(default_factory=list)
 
 
@@ -112,7 +112,7 @@ def _snapshot(product: Product) -> dict[str, Any]:
         "name": product.name,
         "image_url": product.image_url,
         "brand": product.brand.model_dump() if product.brand else None,
-        "product_properties": list(product.product_properties),
+        "tags": list(product.tags),
         "category": [c.model_dump() for c in product.category],
     }
 
@@ -126,7 +126,7 @@ def _watch_out(watch: Watch) -> WatchOut:
         name=snap.get("name"),
         image_url=snap.get("image_url"),
         brand=snap.get("brand"),
-        product_properties=snap.get("product_properties") or [],
+        tags=snap.get("tags") or [],
         category=snap.get("category") or [],
     )
 
@@ -176,9 +176,9 @@ class DragonStorePlugin(ScraperPlugin):
 
     def _to_product(self, context: PluginContext, url: str, parsed: ParsedProduct) -> Product:
         clean_name, labels = sanitize_title(parsed.name, load_title_labels())
-        props = self.new_properties()
+        tags = self.new_tags()
         for label in labels:
-            props.add_property(label)
+            tags.add_tag(label)
 
         if parsed.availability and parsed.availability not in _KNOWN_STATES:
             context.logger.warning(
@@ -186,7 +186,7 @@ class DragonStorePlugin(ScraperPlugin):
             )
         is_available = parsed.availability in _AVAILABLE_STATES
         if parsed.availability == "PreOrder":
-            props.add_property(_PREORDER_PROPERTY)
+            tags.add_tag(_PREORDER_TAG)
 
         category = self.new_category()
         for crumb_name, crumb_url in parsed.breadcrumb:
@@ -212,7 +212,7 @@ class DragonStorePlugin(ScraperPlugin):
             name=clean_name or parsed.name,  # fall back if the title was all label
             image_url=parsed.image_url,
             brand=brand,
-            product_properties=props.get_properties(),
+            tags=tags.get_tags(),
             category=category.get_path(),
             price_current=parsed.price_current,
             price_original=parsed.price_original,

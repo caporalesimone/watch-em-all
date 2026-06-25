@@ -5,7 +5,7 @@ name (e.g. ``"OFFERTA RAVEN PRIME - ..."``, ``"EDIZIONE LIMITATA - ..."``). The
 known labels live in a plugin-local JSON (``title_labels.json``), loaded once and
 maintained by hand over time. ``sanitize_title`` removes any present label from
 the title (case-insensitive) and returns the cleaned title plus the canonical
-labels found — the plugin turns those into ``product_properties`` tags
+labels found — the plugin turns those into ``tags``
 (PROD-R5 / SCR-R16).
 
 Scraper-specific by design: NOT a core capability. Another scraper may have no

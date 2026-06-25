@@ -29,7 +29,7 @@ flowchart TD
 - **CATSVC-R2** — Matching per identità `(user_id, plugin_id, external_id)` (vincolo UNIQUE sul DB): trovata → aggiorna; non trovata → prodotto nuovo; riga esistente assente dalla lista → delistata (`removed = true`).
 - **CATSVC-R3** — Risolve i prezzi mancanti secondo il contratto Product (sotto).
 - **CATSVC-R4** — Scrive in `price_history` **solo** se cambia il **prezzo corrente** o la **disponibilità** rispetto all'ultima entry (append-only; ogni entry porta anche `is_available`).
-- **CATSVC-R5** — Aggiorna sul record di catalogo tutto ciò che può cambiare: `name`, `url`, `image_url`, `brand`, `product_properties`, `category`, `extra_json`, `is_available`, `removed` (un delistato che ricompare torna `removed = false`). `brand`, `product_properties` e `category` ([product](../contracts/product.md) PROD-R5/R6/R7) sono dati che lo scraper consegna e il core **persiste senza interpretare**.
+- **CATSVC-R5** — Aggiorna sul record di catalogo tutto ciò che può cambiare: `name`, `url`, `image_url`, `brand`, `tags`, `category`, `extra_json`, `is_available`, `removed` (un delistato che ricompare torna `removed = false`). `brand`, `tags` e `category` ([product](../contracts/product.md) PROD-R5/R6/R7) sono dati che lo scraper consegna e il core **persiste senza interpretare**.
 - **CATSVC-R6** — Restituisce al chiamante i **contatori del delta** (found/new/price_changes/removed) per il record di run del runner.
 - **CATSVC-R7** — Un prodotto non disponibile **non viene mai escluso**: resta con `is_available = false`. Le esclusioni specifiche del sito avvengono prima, nel plugin.
 

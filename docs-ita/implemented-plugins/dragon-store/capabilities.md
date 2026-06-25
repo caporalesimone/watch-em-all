@@ -76,7 +76,7 @@ def get_adjustments(self, cart_total):
 | `is_available` | JSON-LD `offers.availability` | mappa sotto |
 | `image_url` | JSON-LD `image` | URL già assoluto |
 | `brand` | `text` = JSON-LD `brand.name`; `link` = DOM `tr.T9 > a[href]` reso assoluto | `link` opzionale (PROD-R6) |
-| `product_properties` | sanitizer del titolo + disponibilità | vedi sotto (PROD-R5) |
+| `tags` | sanitizer del titolo + disponibilità | vedi sotto (PROD-R5) |
 | `category` | JSON-LD `BreadcrumbList` (`itemListElement` → `name` + `@id` relativo reso assoluto), root → leaf | breadcrumb (PROD-R7), costruito con `add_child` |
 | `extra` | JSON-LD | `sku` (codice articolo), `priceValidUntil`, `category` (stringa piatta), `description` |
 
@@ -89,15 +89,15 @@ def get_adjustments(self, cart_total):
 | `PreOrder` | `span.inArrivalAV` ("Prossimamente") | **`True`** (ordinabile) | **"Pre Order"** |
 | *altro / sconosciuto* | — | `False` | — (+ log per scoprire il nuovo stato) |
 
-## Sanitizer del titolo e `product_properties`
+## Sanitizer del titolo e `tags`
 
 Il titolo del sito porta a volte **etichette commerciali / di edizione** che non fanno parte del nome del prodotto (es. `OFFERTA RAVEN PRIME - …`, `EDIZIONE LIMITATA - …`). Il sanitizer **è specifico di Dragon Store** (non del core; altri scraper possono non averne):
 
-- una lista di etichette **hardcoded in un JSON del plugin**, caricata all'avvio — popolata nel tempo dal manutentore; rappresenta le `product_properties` **possibili** estraibili dal titolo;
-- ad ogni scrape, per ogni etichetta presente nel titolo (match **case-insensitive**): viene **tolta dal titolo** e **aggiunta** ai tag via `add_property` (SCR-R16) nella sua **forma canonica** dal JSON;
+- una lista di etichette **hardcoded in un JSON del plugin**, caricata all'avvio — popolata nel tempo dal manutentore; rappresenta i `tags` **possibili** estraibili dal titolo;
+- ad ogni scrape, per ogni etichetta presente nel titolo (match **case-insensitive**): viene **tolta dal titolo** e **aggiunta** ai tag via `add_tag` (SCR-R16) nella sua **forma canonica** dal JSON;
 - sia l'etichetta sia il **titolo residuo** sono **trimmati** da spazi e simboli in testa/coda (es. `"OFFERTA RAVEN PRIME -  "` → `"OFFERTA RAVEN PRIME"`; il titolo perde il `" - "` iniziale rimasto).
 
-Oltre al sanitizer, lo stato **`PreOrder`** aggiunge il tag **"Pre Order"** (che non viene dal titolo). Tutti i tag finiscono in `product_properties` (PROD-R5); la UI li mostra come elenco. L'elenco delle etichette del JSON è **consultabile dall'admin** (vista read-only; arriva con le pagine admin).
+Oltre al sanitizer, lo stato **`PreOrder`** aggiunge il tag **"Pre Order"** (che non viene dal titolo). Tutti i tag finiscono in `tags` (PROD-R5); la UI li mostra come elenco. L'elenco delle etichette del JSON è **consultabile dall'admin** (vista read-only; arriva con le pagine admin).
 
 ## Route del plugin
 

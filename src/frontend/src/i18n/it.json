@@ -25,6 +25,7 @@
 		"colSource": "Provenienza",
 		"colImage": "Foto",
 		"colName": "Titolo",
+		"colTags": "Tag",
 		"colPriceOriginal": "Prezzo pieno",
 		"colPriceCurrent": "Prezzo",
 		"colAvailability": "Disponibilità",

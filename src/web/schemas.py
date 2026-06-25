@@ -90,7 +90,7 @@ class CatalogItem(BaseModel):
     name: str
     image_url: str | None
     brand: BrandRef | None = None
-    product_properties: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
     category: list[CategoryRef] = Field(default_factory=list)
     currency: str
     price_current: Decimal

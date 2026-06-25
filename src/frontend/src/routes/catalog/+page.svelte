@@ -166,6 +166,7 @@
 					<th class="{th} {sortable}" onclick={() => sortBy('name')}
 						>{$_('catalog.colName')}{arrow('name')}</th
 					>
+					<th class={th}>{$_('catalog.colTags')}</th>
 					<th class="{th} {sortable}" onclick={() => sortBy('price_original')}
 						>{$_('catalog.colPriceOriginal')}{arrow('price_original')}</th
 					>
@@ -258,16 +259,6 @@
 									{/if}
 								</div>
 							{/if}
-							{#if item.product_properties.length > 0}
-								<div class="mt-1 flex flex-wrap gap-1">
-									{#each item.product_properties as prop (prop)}
-										<span
-											class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-											>{prop}</span
-										>
-									{/each}
-								</div>
-							{/if}
 							{#if item.category.length > 0}
 								<div class="mt-1 text-xs text-slate-400">
 									{#each item.category as cat, i (cat.text + i)}
@@ -282,6 +273,18 @@
 										{:else}
 											{cat.text}
 										{/if}
+									{/each}
+								</div>
+							{/if}
+						</td>
+						<td class="py-2 pr-4">
+							{#if item.tags.length > 0}
+								<div class="flex flex-wrap gap-1">
+									{#each item.tags as tag (tag)}
+										<span
+											class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+											>{tag}</span
+										>
 									{/each}
 								</div>
 							{/if}

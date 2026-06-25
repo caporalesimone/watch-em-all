@@ -198,7 +198,7 @@ def test_dry_run_discounted_sanitises_title_and_writes_nothing(client: TestClien
     assert product["brand"]["text"] == "Giochi Uniti"
     # title label stripped from the name and surfaced as a tag
     assert "OFFERTA RAVEN PRIME" not in product["name"].upper()
-    assert "Offerta Raven Prime" in product["product_properties"]
+    assert "Offerta Raven Prime" in product["tags"]
     # nothing persisted (dry-run)
     assert client.get("/api/catalog", headers=h).json()["total"] == 0
 
@@ -210,7 +210,7 @@ def test_dry_run_preorder_tags_pre_order_and_is_available(client: TestClient) ->
         resp = client.post(f"{DS}/test", json={"url": gp_url(base, "36099")}, headers=h)
     product = resp.json()[0]
     assert product["is_available"] is True  # PreOrder is orderable
-    assert "Pre Order" in product["product_properties"]
+    assert "Pre Order" in product["tags"]
 
 
 def test_dry_run_out_of_stock_is_unavailable(client: TestClient) -> None:
@@ -309,6 +309,6 @@ def test_run_for_user_brand_and_price_persisted(client: TestClient) -> None:
     assert item["price_current"] == "89.99"  # full price
     assert item["is_available"] is True
     assert item["brand"]["text"] == "Raven Distribution"
-    assert "Edizione Limitata" in item["product_properties"]  # tag surfaced via the API
+    assert "Edizione Limitata" in item["tags"]  # tag surfaced via the API
     assert "EDIZIONE LIMITATA" not in item["name"].upper()  # label stripped from the name
     assert len(item["category"]) >= 1  # category breadcrumb persisted (PROD-R7)

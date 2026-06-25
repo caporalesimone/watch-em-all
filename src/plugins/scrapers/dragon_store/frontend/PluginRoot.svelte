@@ -21,7 +21,7 @@
 		name: string | null;
 		image_url: string | null;
 		brand: BrandRef | null;
-		product_properties: string[];
+		tags: string[];
 		category: CategoryRef[];
 	}
 	interface PreviewProduct {
@@ -30,7 +30,7 @@
 		url: string;
 		image_url: string | null;
 		brand: BrandRef | null;
-		product_properties: string[];
+		tags: string[];
 		price_current: string;
 		currency: string;
 		is_available: boolean;
@@ -264,9 +264,9 @@
 										{/if}
 									</div>
 								{/if}
-								{#if p.product_properties.length > 0}
+								{#if p.tags.length > 0}
 									<div class="mt-1 flex flex-wrap gap-1">
-										{#each p.product_properties as prop (prop)}
+										{#each p.tags as prop (prop)}
 											<span
 												class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"
 												>{prop}</span
@@ -342,9 +342,9 @@
 								{/if}
 							</td>
 							<td class="py-2 pr-4">
-								{#if w.product_properties.length > 0}
+								{#if w.tags.length > 0}
 									<div class="flex flex-wrap gap-1">
-										{#each w.product_properties as prop (prop)}
+										{#each w.tags as prop (prop)}
 											<span
 												class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"
 												>{prop}</span
