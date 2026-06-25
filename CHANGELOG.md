@@ -10,6 +10,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 **Phase 3 — consolidation: close the open items and round off the documentation.**
 
+- After the **forced first-login password change** you're now **signed in automatically** and taken straight to your home — no second trip through the login page.
 - **Dragon Store** plugin:
   - bumped to **0.2.0**, marking the move from the initial mock to real `.gp` product scraping.
 
