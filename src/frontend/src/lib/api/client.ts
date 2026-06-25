@@ -19,11 +19,20 @@ interface TokenPair {
 	expires_at: string;
 }
 
+// Schema-drift findings (4.B0); present on /api/health only when the alert is on.
+export interface SchemaDriftItem {
+	table: string;
+	missing_table: boolean;
+	missing_columns: string[];
+}
+
 export interface Health {
 	status: string;
 	db: string;
 	version: string;
 	worker_heartbeat_age_s: number | null;
+	// Null unless WEA_SCHEMA_DRIFT_ALERT is on; a non-empty list drives the dev banner (4.F0).
+	schema_drift: SchemaDriftItem[] | null;
 }
 
 // Plugin discovery (REG-R6): enabled + loaded plugins, no internal paths.

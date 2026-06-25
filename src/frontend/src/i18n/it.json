@@ -71,6 +71,12 @@
 	"plugins": {
 		"notFound": "Questa pagina del plugin non è disponibile."
 	},
+	"schemaDrift": {
+		"title": "Disallineamento schema del database (dev)",
+		"intro": "Al database manca ciò che il codice si aspetta — resetta il volume di dev o applica la modifica:",
+		"missingTable": "tabella {table} mancante",
+		"missingColumns": "{table}: colonna/e mancante/i {columns}"
+	},
 	"login": {
 		"title": "Accedi",
 		"username": "Nome utente",

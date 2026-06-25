@@ -71,6 +71,12 @@
 	"plugins": {
 		"notFound": "This plugin page is not available."
 	},
+	"schemaDrift": {
+		"title": "Database schema drift (dev)",
+		"intro": "The database is missing what the code expects — reset the dev volume or apply the change:",
+		"missingTable": "table {table} is missing",
+		"missingColumns": "{table}: missing column(s) {columns}"
+	},
 	"login": {
 		"title": "Sign in",
 		"username": "Username",

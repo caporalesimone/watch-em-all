@@ -31,7 +31,7 @@ Imposti "Dragon Store alle 14:30" e alle 14:30 lo scrape parte da solo; nella pa
 
 ### Frontend
 
-- [ ] **4.F0 — Banner disallineamento schema (dev)** (~0.5h): legge `schema_drift` da `GET /api/health`; se non vuoto mostra una **barra rossa fissa in basso** con l'elenco delle tabelle/colonne mancanti. Compare solo quando il flag `WEA_SCHEMA_DRIFT_ALERT` è attivo *e* c'è drift. *Verifica: con DB disallineato la barra rossa appare; flag `false` → niente barra.*
+- [x] **4.F0 — Banner disallineamento schema (dev)** ✅ (0.4.0): legge `schema_drift` da `GET /api/health`; se non vuoto mostra una **barra rossa fissa in basso** con l'elenco delle tabelle/colonne mancanti. Compare solo quando il flag `WEA_SCHEMA_DRIFT_ALERT` è attivo *e* c'è drift. *Verifica: con DB disallineato la barra rossa appare; flag `false` → niente barra.*
 - [ ] **4.F1 — Editor degli slot** (~1h): elenco scraper con aggiungi/rimuovi orari e sospensione. *Verifica: slot modificato → la run parte all'orario nuovo.*
 - [ ] **4.F2 — Parametri riservati nella pagina admin dello scraper** (~1h): form per politeness, timeout HTTP, emivita cache e **intervallo minimo dello Scrape ora** (le chiavi riservate di 4.B10). *Verifica: modifica da UI → effetto alla run/scrape successiva.*
 - [ ] **4.F3 — Pagina Log: polling con cursore** (~1h): lista incrementale near-real-time ([system-logs](../3-features/admin/system-logs-and-maintenance.md)). *Verifica: gli eventi della run appaiono mentre gira.*

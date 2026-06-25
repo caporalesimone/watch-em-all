@@ -7,10 +7,12 @@
 	import { _ } from 'svelte-i18n';
 
 	import { getHealth } from '$lib/api/client';
+	import SchemaDriftBanner from '$lib/components/SchemaDriftBanner.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import { setupI18n } from '$lib/i18n';
 	import { auth, bootstrap } from '$lib/stores/auth';
 	import { loadPlugins, resetPlugins } from '$lib/stores/plugins';
+	import { schemaDrift } from '$lib/stores/schemaDrift';
 	import { theme } from '$lib/stores/theme';
 	import { version } from '$lib/stores/version';
 
@@ -22,9 +24,13 @@
 		theme.init();
 		await setupI18n();
 		await bootstrap();
-		// Non-blocking: fill the version shown in the shell.
+		// Non-blocking: fill the version shown in the shell and the dev schema-drift
+		// banner (4.F0; null when the alert is off → empty → hidden).
 		void getHealth()
-			.then((h) => version.set(h.version))
+			.then((h) => {
+				version.set(h.version);
+				schemaDrift.set(h.schema_drift ?? []);
+			})
 			.catch(() => {});
 		ready = true;
 	});
@@ -88,3 +94,6 @@
 {:else}
 	<main class="flex h-full items-center justify-center p-6">{@render children()}</main>
 {/if}
+
+<!-- Dev-only; self-hides unless GET /api/health reports schema drift (4.F0). -->
+<SchemaDriftBanner />
