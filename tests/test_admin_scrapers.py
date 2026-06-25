@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 from fastapi.testclient import TestClient
+
+from src.core.db import new_session
+from src.core.models import ScrapeCache as ScrapeCacheRow
+from src.core.scrape_cache import cache_key
 
 
 def _bearer(token: str) -> dict[str, str]:
@@ -61,3 +67,35 @@ def test_rejects_unknown_scraper_and_bad_time(client: TestClient) -> None:
             headers=h,
         )
     ).status_code == 422
+
+
+def _seed_cache(plugin_id: str, paths: list[str]) -> None:
+    session = new_session()
+    try:
+        for p in paths:
+            session.add(
+                ScrapeCacheRow(
+                    plugin_id=plugin_id,
+                    cache_key=cache_key(plugin_id, "GET", f"http://h/{p}"),
+                    response_body=b"x",
+                    response_meta_json={"status": 200, "content_type": "text/html"},
+                    fetched_at=datetime.now(UTC),
+                    expires_at=datetime.now(UTC) + timedelta(minutes=30),
+                )
+            )
+        session.commit()
+    finally:
+        session.close()
+
+
+def test_clear_cache_admin_only_unknown_404_and_counts(client: TestClient) -> None:
+    assert client.delete("/api/admin/scrapers/dragon_store/cache").status_code == 401
+    h = _bearer(_admin_token(client))
+    assert client.delete("/api/admin/scrapers/nope/cache", headers=h).status_code == 404
+
+    _seed_cache("dragon_store", ["a", "b"])
+    resp = client.delete("/api/admin/scrapers/dragon_store/cache", headers=h)
+    assert resp.status_code == 200
+    assert resp.json()["deleted"] == 2
+    # A second clear removes nothing.
+    assert client.delete("/api/admin/scrapers/dragon_store/cache", headers=h).json()["deleted"] == 0

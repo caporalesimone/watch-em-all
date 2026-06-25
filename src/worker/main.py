@@ -32,6 +32,7 @@ from src.core.plugins.registry import LoadedPlugin, load_plugins
 from src.core.schedule import due_slot, install_tz, set_last_slot
 from src.core.schema_drift import check_schema_drift
 from src.core.scrape import implements_scraping, stamp_cooldown
+from src.core.scrape_cache import purge_expired as purge_expired_cache
 from src.core.settings import get_system_settings
 from src.core.system_log import install_system_log_handler
 from src.worker.runner import Runner
@@ -215,6 +216,7 @@ def scraper_job(scraper_id: str, slot: datetime, trigger: str = "scheduled") -> 
         log.info("running %s (slot %s, %s)", scraper_id, slot, trigger)
         ctx = build_context(lp.manifest, plugin)
         try:
+            purge_expired_cache(ctx.db, scraper_id)  # POOL-R3: drop expired cache before the run
             timeout_min = get_system_settings(ctx.db).scraper_run_timeout_min
             deadline = datetime.now(UTC) + timedelta(minutes=timeout_min)
             _run_scraper(plugin, ctx, scraper_id, slot, deadline)

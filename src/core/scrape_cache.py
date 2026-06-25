@@ -15,7 +15,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, delete, select
+from sqlalchemy.orm import Session
 
 from src.core.db import new_session
 from src.core.models import ScrapeCache as ScrapeCacheRow
@@ -44,6 +45,27 @@ def cache_key(plugin_id: str, method: str, url: str) -> str:
     """sha256 of the normalised request, scoped to the plugin (CTX-R9)."""
     raw = f"{plugin_id}\n{method.upper()}\n{_normalize_url(url)}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def purge_expired(session: Session, plugin_id: str, now: datetime | None = None) -> int:
+    """Delete this plugin's **expired** cache rows (POOL-R3: run-start cleanup). Returns the
+    number removed. Commits."""
+    cutoff = now if now is not None else datetime.now(UTC)
+    res = session.execute(
+        delete(ScrapeCacheRow).where(
+            ScrapeCacheRow.plugin_id == plugin_id, ScrapeCacheRow.expires_at <= cutoff
+        )
+    )
+    session.commit()
+    return int(getattr(res, "rowcount", 0) or 0)
+
+
+def clear(session: Session, plugin_id: str) -> int:
+    """Delete **all** cache rows for a plugin (manual *Svuota cache*, 4.B9). Returns the
+    number removed. Commits."""
+    res = session.execute(delete(ScrapeCacheRow).where(ScrapeCacheRow.plugin_id == plugin_id))
+    session.commit()
+    return int(getattr(res, "rowcount", 0) or 0)
 
 
 def _aware(dt: datetime) -> datetime:

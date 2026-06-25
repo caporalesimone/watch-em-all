@@ -12,6 +12,7 @@ from datetime import datetime
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
+from src.core import scrape_cache
 from src.core.errors import APIError
 from src.core.models import ScraperSchedule
 from src.core.plugins.base import ScraperPlugin
@@ -34,6 +35,10 @@ class ScraperScheduleOut(BaseModel):
 class ScraperScheduleUpdate(BaseModel):
     times: list[str] = Field(default_factory=list)
     enabled: bool = True
+
+
+class CacheCleared(BaseModel):
+    deleted: int
 
 
 def _schedulable(request: Request) -> dict[str, LoadedPlugin]:
@@ -85,3 +90,19 @@ def set_scraper(
     except ValueError as exc:
         raise APIError(422, "invalid_time", str(exc)) from exc
     return _out(lp, sched)
+
+
+@router.delete(
+    "/scrapers/{scraper_id}/cache",
+    response_model=CacheCleared,
+    summary="Clear a scraper's scrape cache (admin only); returns how many entries were removed.",
+)
+def clear_scraper_cache(
+    scraper_id: str,
+    request: Request,
+    _admin: AdminDep,
+    db: SessionDep,
+) -> CacheCleared:
+    if scraper_id not in _schedulable(request):
+        raise APIError(404, "not_found", f"no schedulable scraper {scraper_id!r}")
+    return CacheCleared(deleted=scrape_cache.clear(db, scraper_id))

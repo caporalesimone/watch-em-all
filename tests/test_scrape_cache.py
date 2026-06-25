@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from src.core.db import get_engine, new_session
 from src.core.http import HttpClient
 from src.core.models import ScrapeCache as ScrapeCacheRow
-from src.core.scrape_cache import ScrapeCache, cache_key
+from src.core.scrape_cache import ScrapeCache, cache_key, clear, purge_expired
 
 URL = "http://shop.test/cat?b=2&a=1"
 
@@ -81,3 +81,49 @@ def test_httpclient_serves_from_cache_without_http(client: TestClient) -> None:
     http.get(URL)
     assert http.request_count == 0
     assert http.cache_hits == 2
+
+
+def _seed(plugin_id: str, url: str, expires: datetime) -> None:
+    session = new_session()
+    try:
+        session.add(
+            ScrapeCacheRow(
+                plugin_id=plugin_id,
+                cache_key=cache_key(plugin_id, "GET", url),
+                response_body=b"x",
+                response_meta_json={"status": 200, "content_type": "text/html"},
+                fetched_at=datetime.now(UTC),
+                expires_at=expires,
+            )
+        )
+        session.commit()
+    finally:
+        session.close()
+
+
+def test_purge_expired_removes_only_expired_for_plugin(client: TestClient) -> None:
+    now = datetime.now(UTC)
+    _seed("p1", "http://h/expired", now - timedelta(minutes=1))
+    _seed("p1", "http://h/fresh", now + timedelta(minutes=30))
+    _seed("p2", "http://h/expired", now - timedelta(minutes=1))  # other plugin, untouched
+    session = new_session()
+    try:
+        assert purge_expired(session, "p1", now) == 1
+        assert ScrapeCache(get_engine(), "p1").get("GET", "http://h/fresh") is not None
+        assert ScrapeCache(get_engine(), "p2").get("GET", "http://h/expired") is None  # expired
+    finally:
+        session.close()
+
+
+def test_clear_removes_all_for_plugin_only(client: TestClient) -> None:
+    now = datetime.now(UTC)
+    _seed("p1", "http://h/a", now + timedelta(minutes=30))
+    _seed("p1", "http://h/b", now + timedelta(minutes=30))
+    _seed("p2", "http://h/a", now + timedelta(minutes=30))
+    session = new_session()
+    try:
+        assert clear(session, "p1") == 2
+        assert ScrapeCache(get_engine(), "p1").get("GET", "http://h/a") is None
+        assert ScrapeCache(get_engine(), "p2").get("GET", "http://h/a") is not None
+    finally:
+        session.close()

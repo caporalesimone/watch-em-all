@@ -46,6 +46,7 @@ Known flags (params shown with their defaults): `worker_tick` `{seconds: 60}` (w
 |---|---|---|---|---|
 | GET | `/api/admin/scrapers` | 🛡 | `[{scraper_id, display_name, times, enabled, last_slot}]` | schedulable scrapers (those that implement scraping) + their schedule (4.B2) |
 | PUT | `/api/admin/scrapers/{scraper_id}` | 🛡 | `{times, enabled}` → the updated schedule | set the slots (`"HH:MM"` or `"HH:MM:SS"`, de-duplicated/sorted; **422** on a bad time) and the enabled flag; unknown scraper → **404** |
+| DELETE | `/api/admin/scrapers/{scraper_id}/cache` | 🛡 | `{deleted}` | clear the scraper's scrape cache (CTX-R9, 4.B9); returns how many entries were removed; unknown scraper → **404** |
 
 ## Plugin discovery — [plugin-registry](../4-capabilities/core/plugin-registry.md)
 
