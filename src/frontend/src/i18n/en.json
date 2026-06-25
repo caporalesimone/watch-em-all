@@ -80,10 +80,12 @@
 		"notFound": "This plugin page is not available."
 	},
 	"schemaDrift": {
-		"title": "Database schema drift (dev)",
+		"title": "Database schema drift",
 		"intro": "The database is missing what the code expects — reset the dev volume or apply the change:",
 		"missingTable": "table {table} is missing",
-		"missingColumns": "{table}: missing column(s) {columns}"
+		"missingColumns": "{table}: missing column(s) {columns}",
+		"copy": "Copy Message",
+		"copied": "Message copied"
 	},
 	"login": {
 		"title": "Sign in",

@@ -80,10 +80,12 @@
 		"notFound": "Questa pagina del plugin non è disponibile."
 	},
 	"schemaDrift": {
-		"title": "Disallineamento schema del database (dev)",
+		"title": "Disallineamento schema del database",
 		"intro": "Al database manca ciò che il codice si aspetta — resetta il volume di dev o applica la modifica:",
 		"missingTable": "tabella {table} mancante",
-		"missingColumns": "{table}: colonna/e mancante/i {columns}"
+		"missingColumns": "{table}: colonna/e mancante/i {columns}",
+		"copy": "Copia messaggio",
+		"copied": "Messaggio copiato"
 	},
 	"login": {
 		"title": "Accedi",

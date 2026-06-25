@@ -24,7 +24,7 @@
 
 	// top border + background per variant; text colour picked for contrast.
 	const VARIANT: Record<Variant, string> = {
-		error: 'border-red-800 bg-red-600 text-white',
+		error: 'border-red-800 bg-red-600/90 text-white',
 		warning: 'border-amber-600 bg-amber-400 text-amber-950',
 		info: 'border-sky-800 bg-sky-600 text-white',
 		success: 'border-emerald-800 bg-emerald-600 text-white'
