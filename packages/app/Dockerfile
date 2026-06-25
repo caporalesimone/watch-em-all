@@ -1,6 +1,6 @@
 # Container app — web + worker roles (build-system.md). web runs the real FastAPI
-# app (1.B2) and serves the built SPA (1.F*); worker is still a stub until phase 4
-# (4.B1). One image, role chosen by the entrypoint command. Multi-stage (INF-5):
+# app (1.B2) and serves the built SPA (1.F*); worker runs the dispatcher (src/worker,
+# 4.B1). One image, role chosen by the entrypoint command. Multi-stage (INF-5):
 # a node stage builds the SPA, a python stage installs deps and derives the
 # version; the final image has no build tools, no node, no git, no .git.
 # Build context is the REPO ROOT: docker build -f packages/app/Dockerfile .
@@ -58,10 +58,10 @@ COPY config.yaml /app/config.yaml
 COPY src/__init__.py /app/src/__init__.py
 COPY src/core /app/src/core
 COPY src/web /app/src/web
+COPY src/worker /app/src/worker
 # Plugins are auto-discovered at startup (registry) and their icons are served as
 # static assets, so the whole folder (manifest + backend + icon) ships in the image.
 COPY src/plugins /app/src/plugins
-COPY packages/app/stub/worker.py /app/stub/worker.py
 COPY --chmod=0755 packages/app/entrypoint.sh /app/entrypoint.sh
 USER app
 EXPOSE 8080

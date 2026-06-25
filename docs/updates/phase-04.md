@@ -1,7 +1,7 @@
 # Phase 4 — Worker & scheduling
 
 > Feature-level recap. Phase 4 is **in progress**. The headline — automatic scheduled
-> scraping with an observable worker — is still ahead (4.B1+). What's landed so far
+> scraping with an observable worker — is still ahead (4.B2+). What's landed so far
 > (`0.4.0`) is the **developer / admin tooling** the rest of the phase builds on: a
 > schema-drift safety net, a friendlier dev database browser, admin plugin versions,
 > and a tidy-up of the environment variables.
@@ -55,9 +55,11 @@ pulls.
 
 ## Good to know
 
-- The **worker is still a stub** this phase — automatic scheduling (the real worker,
-  per-scraper slots, the serial runner, run/log records) arrives in the next MVPs
-  (4.B1+). `/api/health` still shows `worker_heartbeat_age_s: null`.
+- The **worker is now the real dispatcher skeleton** (it boots like the web and writes
+  a per-minute heartbeat), but the automatic **scheduling** — per-scraper slots, the
+  serial runner, run/log records — arrives in the next MVPs (4.B2+). `/api/health` still
+  shows `worker_heartbeat_age_s: null` (the worker's heartbeat is a file for the
+  container healthcheck; surfacing it on health comes later).
 - The schema-drift alert ships **on in dev**: `WEA_SCHEMA_DRIFT_ALERT=true` in
   `.env`/`.env.example`; if the variable is unset the app defaults to **off**. It never
   reaches a non-admin.
