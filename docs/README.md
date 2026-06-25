@@ -44,6 +44,7 @@ This is the project's **English documentation**, the destined canonical wiki. It
 - [3-features/user/catalog-and-product-picker.md](3-features/user/catalog-and-product-picker.md) — the read-only catalog table (search, sort, paginate)
 - [implemented-plugins/dragon-store/overview.md](implemented-plugins/dragon-store/overview.md) — the first scraper: real `.gp` product scraping (+ [features](implemented-plugins/dragon-store/features.md), [capabilities](implemented-plugins/dragon-store/capabilities.md))
 - [4-capabilities/core/plugin-context.md](4-capabilities/core/plugin-context.md) gained `update_catalog` + a v0 `http` client (politeness, timeout, retries)
+- the catalog read endpoint + scraper plugin routes in [api/endpoints.md](api/endpoints.md), and the `products` / `price_history` tables in [4-capabilities/database/schema.md](4-capabilities/database/schema.md)
 
 The remaining business/architecture/feature layers arrive as the corresponding features land in later phases.
 
