@@ -25,7 +25,16 @@ from src.core.schema_drift import SchemaDriftItem, check_schema_drift
 from src.core.scrape import implements_scraping
 from src.web.deps import require_user
 from src.web.error_handlers import register_error_handlers
-from src.web.routers import admin_system, admin_users, auth, catalog, health, me, plugins
+from src.web.routers import (
+    admin_scrapers,
+    admin_system,
+    admin_users,
+    auth,
+    catalog,
+    health,
+    me,
+    plugins,
+)
 from src.web.routers.scrape import make_scrape_now_router
 from src.web.spa import SpaStaticFiles
 
@@ -124,6 +133,7 @@ def create_app() -> FastAPI:
     app.include_router(me.router, prefix="/api")
     app.include_router(admin_users.router, prefix="/api")
     app.include_router(admin_system.router, prefix="/api")
+    app.include_router(admin_scrapers.router, prefix="/api")
     app.include_router(catalog.router, prefix="/api")
     app.include_router(plugins.router, prefix="/api")
     # The SPA catch-all is mounted in the lifespan, after the plugins (see above).

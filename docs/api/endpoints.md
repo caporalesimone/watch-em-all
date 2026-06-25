@@ -37,6 +37,13 @@ Role legend: 🌐 public · 👤 user · 🛡 admin
 | GET | `/api/admin/feature-flags` | 🛡 | `{key: {…}}` | dev feature flags, effective values (defaults + overrides). Admin-only (4.B1a) |
 | PATCH | `/api/admin/feature-flags` | 🛡 | `{key: {…}}` | set one or more flags (known keys only); returns the effective map. Non-persistent — reset at web startup |
 
+## Admin — scrapers — [scraper-scheduling-and-limits](../3-features/admin/scraper-scheduling-and-limits.md)
+
+| Method | Path | Role | Response | Notes |
+|---|---|---|---|---|
+| GET | `/api/admin/scrapers` | 🛡 | `[{scraper_id, display_name, times, enabled, last_slot}]` | schedulable scrapers (those that implement scraping) + their schedule (4.B2) |
+| PUT | `/api/admin/scrapers/{scraper_id}` | 🛡 | `{times, enabled}` → the updated schedule | set the slots (`"HH:MM"`, de-duplicated/sorted; **422** on a bad time) and the enabled flag; unknown scraper → **404** |
+
 ## Plugin discovery — [plugin-registry](../4-capabilities/core/plugin-registry.md)
 
 | Method | Path | Role | Response | Notes |

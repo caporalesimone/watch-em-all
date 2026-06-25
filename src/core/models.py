@@ -161,3 +161,18 @@ class FeatureFlag(Base):
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+
+
+class ScraperSchedule(Base):
+    """Per-scraper schedule (SCHED-R1, scheduling-models.md): 1..N daily slots, an
+    enabled flag, and the last EXECUTED slot. ``times`` are wall-clock ``"HH:MM"`` in the
+    installation timezone (sorted, unique); ``last_slot`` is a UTC datetime (not a date)
+    so it supports N slots/day and cross-midnight catch-up. One row per scraper (= plugin_id).
+    """
+
+    __tablename__ = "scraper_schedule"
+
+    scraper_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    times: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    last_slot: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
