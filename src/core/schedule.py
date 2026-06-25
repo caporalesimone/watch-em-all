@@ -6,7 +6,9 @@ and de-duplicated. The "due slot" logic (4.B3) builds on this.
 
 from __future__ import annotations
 
-from datetime import datetime, time
+import os
+from datetime import UTC, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -64,3 +66,52 @@ def set_last_slot(session: Session, scraper_id: str, slot: datetime) -> None:
     if row is not None:
         row.last_slot = slot
         session.commit()
+
+
+def install_tz() -> ZoneInfo:
+    """The installation timezone (TZ env, default Europe/Rome). Slots are wall-clock
+    in this zone; persisted timestamps stay UTC (BE-13)."""
+    try:
+        return ZoneInfo(os.environ.get("TZ", "Europe/Rome"))
+    except Exception:
+        return ZoneInfo("UTC")
+
+
+def _as_utc(value: datetime) -> datetime:
+    """SQLite returns naive datetimes; treat a naive value as UTC."""
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+
+def latest_due_slot(times: list[str], now: datetime, tz: ZoneInfo) -> datetime | None:
+    """The most recent slot already passed (today or yesterday, in ``tz``), as a UTC
+    datetime — or ``None`` if no slot has passed. Considering yesterday gives the
+    cross-midnight catch-up (CRON-R2); only the single most recent slot is returned,
+    never a replay of all missed ones."""
+    if not times:
+        return None
+    now_local = now.astimezone(tz)
+    today = now_local.date()
+    passed: list[datetime] = []
+    for entry in times:
+        hh, mm = entry.split(":")
+        slot_time = time(int(hh), int(mm))
+        for day in (today, today - timedelta(days=1)):
+            local_dt = datetime.combine(day, slot_time, tzinfo=tz)
+            if local_dt <= now_local:
+                passed.append(local_dt)
+    if not passed:
+        return None
+    return max(passed).astimezone(UTC)
+
+
+def due_slot(schedule: ScraperSchedule, now: datetime, tz: ZoneInfo) -> datetime | None:
+    """The slot this schedule is due for now (CRON-R2): the latest passed slot, if the
+    schedule is enabled and that slot is newer than ``last_slot``. ``None`` otherwise."""
+    if not schedule.enabled:
+        return None
+    slot = latest_due_slot(schedule.times, now, tz)
+    if slot is None:
+        return None
+    if schedule.last_slot is not None and slot <= _as_utc(schedule.last_slot):
+        return None
+    return slot
