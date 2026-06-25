@@ -34,6 +34,20 @@ New items get appended over time.
   N lines, plain polling vs cursor). Goal: a simple place to read logs now, improved later; the
   analysis decides if it belongs in phase 4 or stays as `4.F3/F4`.
 
+- **Worker container exposes `8080/tcp` but serves nothing (cosmetic).** `docker ps` on the dev
+  stack shows the `worker` container with `8080/tcp` exposed even though the worker serves no HTTP
+  (it's the heartbeat stub today, the real dispatcher in 4.B1) — the port is just `EXPOSE 8080`
+  metadata inherited from the shared `watch-em-all` image (one image, two roles `web`/`worker` by
+  command, by design). It is **not published** (no host mapping) so it's harmless, only noisy in
+  `docker ps`. Revisit with 4.B1: either accept/document it, or split the EXPOSE so only the `web`
+  role advertises the port. Observed:
+  ```
+  7ab0f417bb56  watch-em-all:dev  …  Up (healthy)  8080/tcp                       …-worker-1
+  26f3f3ce703f  watch-em-all:dev  …  Up (healthy)  0.0.0.0:8080->8080/tcp         …-web-1
+  0f7c989370fe  sosedoff/pgweb…   …  Up            0.0.0.0:8081->8081/tcp         …-pgweb-1
+  14eb07aee657  postgres:16       …  Up (healthy)  5432/tcp                       …-db-1
+  ```
+
 ## Off topic
 
 - **Two Claude Code skills: start-of-work and end-of-work.** Create a `/start-work` skill that opens a
