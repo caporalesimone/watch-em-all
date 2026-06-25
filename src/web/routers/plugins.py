@@ -20,6 +20,9 @@ from src.web.deps import UserDep
 
 router = APIRouter()
 
+# Explicit MIME for the icon types we serve (Python's mimetypes is shaky on .ico).
+_ICON_MEDIA = {".ico": "image/x-icon", ".svg": "image/svg+xml"}
+
 
 class PluginInfo(BaseModel):
     """What the SPA needs to mount a plugin — nothing internal (REG-R6)."""
@@ -46,7 +49,7 @@ def list_plugins(request: Request, _user: UserDep) -> list[PluginInfo]:
     for loaded in _loaded(request):
         manifest = loaded.manifest
         route_base = manifest.frontend.route_base if manifest.frontend else None
-        icon = f"/api/plugin-assets/{manifest.name}/icon" if manifest.icon else None
+        icon = f"/api/plugin-assets/{manifest.name}/icon" if loaded.icon_path else None
         infos.append(
             PluginInfo(
                 name=manifest.name,
@@ -66,12 +69,12 @@ def list_plugins(request: Request, _user: UserDep) -> list[PluginInfo]:
 )
 def plugin_icon(plugin_name: str, request: Request) -> FileResponse:
     for loaded in _loaded(request):
-        if loaded.manifest.name != plugin_name or not loaded.manifest.icon:
+        if loaded.manifest.name != plugin_name or loaded.icon_path is None:
             continue
         base = loaded.directory.resolve()
-        icon_path = (base / loaded.manifest.icon).resolve()
+        icon_path = loaded.icon_path.resolve()
         # The icon must resolve to a real file strictly inside the plugin folder.
         if icon_path.is_file() and base in icon_path.parents:
-            return FileResponse(icon_path)
+            return FileResponse(icon_path, media_type=_ICON_MEDIA.get(icon_path.suffix.lower()))
         break
     raise APIError(404, "not_found", "plugin icon not found")

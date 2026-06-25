@@ -22,10 +22,16 @@
 	let order = $state<'asc' | 'desc'>('desc');
 	let pageNum = $state(1);
 
+	// Image hover-zoom: only reveal the enlarged preview after the cursor rests on a
+	// thumbnail for HOVER_DELAY_MS, so it doesn't flash while scrolling past rows.
+	const HOVER_DELAY_MS = 500;
+	let hoveredId = $state<number | null>(null);
+	let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+
 	const pages = $derived(data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1);
 
-	async function load(): Promise<void> {
-		loading = true;
+	async function load(silent = false): Promise<void> {
+		if (!silent) loading = true;
 		error = null;
 		try {
 			data = await listCatalog({
@@ -38,11 +44,26 @@
 		} catch {
 			error = $_('catalog.error');
 		} finally {
-			loading = false;
+			if (!silent) loading = false;
 		}
 	}
 
-	onMount(() => void load());
+	onMount(() => {
+		void load();
+		// scrape-now writes the catalog asynchronously; if the page is opened while a
+		// scrape is still running it would show empty. Retry briefly so the products
+		// appear on their own, without a manual search.
+		let tries = 0;
+		const timer = setInterval(() => {
+			if (data && data.total === 0 && tries < 4) {
+				tries += 1;
+				void load(true);
+			} else {
+				clearInterval(timer);
+			}
+		}, 1500);
+		return () => clearInterval(timer);
+	});
 
 	function search(event: Event): void {
 		event.preventDefault();
@@ -73,9 +94,13 @@
 		}
 	}
 
-	function source(pluginId: string): { name: string; icon: string | null } {
+	function source(pluginId: string): { name: string; icon: string | null; route: string | null } {
 		const p = $mountedPlugins.find((m) => m.name === pluginId);
-		return { name: p?.display_name ?? pluginId, icon: p?.icon ?? null };
+		return {
+			name: p?.display_name ?? pluginId,
+			icon: p?.icon ?? null,
+			route: p?.route_base ?? null
+		};
 	}
 
 	function money(value: string, currency: string): string {
@@ -85,6 +110,22 @@
 	function availability(item: CatalogItem): string {
 		if (item.removed) return $_('catalog.removed');
 		return item.is_available ? $_('catalog.available') : $_('catalog.unavailable');
+	}
+
+	function previewEnter(id: number): void {
+		if (hoverTimer) clearTimeout(hoverTimer);
+		hoverTimer = setTimeout(() => {
+			hoveredId = id;
+			hoverTimer = null;
+		}, HOVER_DELAY_MS);
+	}
+
+	function previewLeave(): void {
+		if (hoverTimer) {
+			clearTimeout(hoverTimer);
+			hoverTimer = null;
+		}
+		hoveredId = null;
 	}
 
 	const th = 'py-2 pr-4 font-normal';
@@ -118,20 +159,23 @@
 		<table class="w-full text-left text-sm">
 			<thead class="border-b border-slate-200 text-xs text-slate-500 dark:border-slate-800">
 				<tr>
-					<th class={th}>{$_('catalog.colSource')}</th>
+					<th class="{th} {sortable}" onclick={() => sortBy('plugin_id')}
+						>{$_('catalog.colSource')}{arrow('plugin_id')}</th
+					>
 					<th class={th}>{$_('catalog.colImage')}</th>
 					<th class="{th} {sortable}" onclick={() => sortBy('name')}
 						>{$_('catalog.colName')}{arrow('name')}</th
 					>
-					<th class={th}>{$_('catalog.colPriceOriginal')}</th>
+					<th class={th}>{$_('catalog.colTags')}</th>
+					<th class="{th} {sortable}" onclick={() => sortBy('price_original')}
+						>{$_('catalog.colPriceOriginal')}{arrow('price_original')}</th
+					>
 					<th class="{th} {sortable}" onclick={() => sortBy('price_current')}
 						>{$_('catalog.colPriceCurrent')}{arrow('price_current')}</th
 					>
-					<th class="{th} {sortable}" onclick={() => sortBy('discount_pct')}
-						>{$_('catalog.colDiscount')}{arrow('discount_pct')}</th
+					<th class="{th} {sortable}" onclick={() => sortBy('is_available')}
+						>{$_('catalog.colAvailability')}{arrow('is_available')}</th
 					>
-					<th class={th}>{$_('catalog.colAvailability')}</th>
-					<th class={th}>{$_('catalog.colOpen')}</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -142,50 +186,123 @@
 						class:opacity-50={item.removed}
 					>
 						<td class="py-2 pr-4">
-							<span class="flex items-center gap-2" title={src.name}>
-								{#if src.icon}
-									<img src={src.icon} alt="" class="h-4 w-4" />
-								{/if}
-								<span class="text-slate-500">{src.name}</span>
-							</span>
-						</td>
-						<td class="py-2 pr-4">
-							{#if item.image_url}
-								<img
-									src={item.image_url}
-									alt=""
-									class="h-10 w-10 rounded object-cover"
-									loading="lazy"
-								/>
+							{#if src.route}
+								<a
+									href={src.route}
+									class="flex items-center gap-2 text-slate-500 hover:text-slate-800 hover:underline dark:hover:text-slate-200"
+									title={src.name}
+								>
+									{#if src.icon}
+										<img src={src.icon} alt="" class="h-4 w-4" />
+									{/if}
+									<span>{src.name}</span>
+								</a>
 							{:else}
-								<div class="h-10 w-10 rounded bg-slate-100 dark:bg-slate-800"></div>
+								<span class="flex items-center gap-2 text-slate-500" title={src.name}>
+									{#if src.icon}
+										<img src={src.icon} alt="" class="h-4 w-4" />
+									{/if}
+									<span>{src.name}</span>
+								</span>
 							{/if}
 						</td>
-						<td class="py-2 pr-4 font-medium">{item.name}</td>
-						<td class="py-2 pr-4 text-slate-400 line-through">
+						<td class="py-2 pr-4">
+							<div
+								class="relative inline-block"
+								role="presentation"
+								onmouseenter={() => previewEnter(item.id)}
+								onmouseleave={previewLeave}
+							>
+								{#if item.image_url}
+									<img
+										src={item.image_url}
+										alt=""
+										class="h-10 w-10 rounded border border-slate-200 object-cover dark:border-slate-700"
+										loading="lazy"
+									/>
+									<!-- hover (after a ~500ms intent delay): full image (no crop), capped so it never fills the screen -->
+									<div
+										class="pointer-events-none absolute left-12 top-0 z-20"
+										class:hidden={hoveredId !== item.id}
+									>
+										<img
+											src={item.image_url}
+											alt=""
+											class="max-h-80 max-w-xs rounded-lg border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+										/>
+									</div>
+								{:else}
+									<div
+										class="h-10 w-10 rounded border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800"
+									></div>
+								{/if}
+							</div>
+						</td>
+						<td class="py-2 pr-4">
+							<a
+								href={item.url}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="font-medium text-sky-700 hover:underline dark:text-sky-400">{item.name}</a
+							>
+							{#if item.brand}
+								<div class="text-xs text-slate-500">
+									{#if item.brand.link}
+										<a
+											href={item.brand.link}
+											target="_blank"
+											rel="noopener noreferrer"
+											class="hover:underline">{item.brand.text}</a
+										>
+									{:else}
+										{item.brand.text}
+									{/if}
+								</div>
+							{/if}
+							{#if item.category.length > 0}
+								<div class="mt-1 text-xs text-slate-400">
+									{#each item.category as cat, i (cat.text + i)}
+										{#if i > 0}<span class="px-1">/</span>{/if}
+										{#if cat.link}
+											<a
+												href={cat.link}
+												target="_blank"
+												rel="noopener noreferrer"
+												class="hover:underline">{cat.text}</a
+											>
+										{:else}
+											{cat.text}
+										{/if}
+									{/each}
+								</div>
+							{/if}
+						</td>
+						<td class="py-2 pr-4">
+							{#if item.tags.length > 0}
+								<div class="flex flex-wrap gap-1">
+									{#each item.tags as tag (tag)}
+										<span
+											class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+											>{tag}</span
+										>
+									{/each}
+								</div>
+							{/if}
+						</td>
+						<td class="py-2 pr-4 text-slate-400" class:line-through={Number(item.discount_pct) > 0}>
 							{money(item.price_original, item.currency)}
 						</td>
-						<td class="py-2 pr-4 font-medium">{money(item.price_current, item.currency)}</td>
-						<td class="py-2 pr-4">
+						<td class="py-2 pr-4 font-medium">
+							<div>{money(item.price_current, item.currency)}</div>
 							{#if Number(item.discount_pct) > 0}
 								<span
-									class="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700 dark:bg-green-900/40 dark:text-green-300"
+									class="mt-0.5 inline-block rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700 dark:bg-green-900/40 dark:text-green-300"
 								>
 									-{Math.round(Number(item.discount_pct))}%
 								</span>
 							{/if}
 						</td>
 						<td class="py-2 pr-4 text-slate-500">{availability(item)}</td>
-						<td class="py-2 pr-4">
-							<a
-								href={item.url}
-								target="_blank"
-								rel="noopener noreferrer"
-								class="text-sky-600 hover:underline dark:text-sky-400"
-							>
-								{$_('catalog.open')}
-							</a>
-						</td>
 					</tr>
 				{/each}
 			</tbody>

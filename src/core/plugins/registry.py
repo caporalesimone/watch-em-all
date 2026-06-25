@@ -51,7 +51,28 @@ class LoadedPlugin:
 
     manifest: Manifest
     plugin: BasePlugin
-    directory: Path  # the plugin's folder on disk (to resolve its icon asset)
+    directory: Path  # the plugin's folder on disk
+    icon_path: Path | None = None  # resolved once at load (None if the plugin has no icon)
+
+
+# Icon discovery convention, tried in order (preferred first); an explicit
+# manifest.icon overrides it. Resolved once at load, not per request.
+_ICON_CANDIDATES = ("plugin-icon.ico", "plugin-icon.svg")
+
+
+def _resolve_icon(plugin_dir: Path, manifest: Manifest) -> Path | None:
+    """The plugin's icon file. An explicit ``manifest.icon`` wins if it exists;
+    otherwise look for ``frontend/assets/plugin-icon.{ico,svg}`` (``.ico`` first)."""
+    if manifest.icon:
+        explicit = plugin_dir / manifest.icon
+        if explicit.is_file():
+            return explicit
+    assets = plugin_dir / "frontend" / "assets"
+    for candidate in _ICON_CANDIDATES:
+        path = assets / candidate
+        if path.is_file():
+            return path
+    return None
 
 
 def load_plugins(
@@ -124,7 +145,14 @@ def _load_one(
     plugin.initialize(context_builder(manifest, plugin))
     _mount_router(app, manifest, plugin, router_dependencies)
     names.add(manifest.name)
-    loaded.append(LoadedPlugin(manifest=manifest, plugin=plugin, directory=plugin_dir))
+    loaded.append(
+        LoadedPlugin(
+            manifest=manifest,
+            plugin=plugin,
+            directory=plugin_dir,
+            icon_path=_resolve_icon(plugin_dir, manifest),
+        )
+    )
     log.info("plugin %s loaded (%s)", manifest.name, manifest.type)
 
 

@@ -2,7 +2,7 @@
 
 > **Layer 4 — Capability** · Audience: developer.
 >
-> English translation of the Italian reference [`docs-ita/4-capabilities/core/plugin-context.md`](../../../docs-ita/4-capabilities/core/plugin-context.md), limited to what is implemented (DOC-12). Phase 2 ships the **minimal** context (DB, logger, config). The HTTP client (politeness, cache), `update_catalog` and the Markdown helper arrive with the scraper/notifier runtime in later phases.
+> English translation of the Italian reference [`docs-ita/4-capabilities/core/plugin-context.md`](../../../docs-ita/4-capabilities/core/plugin-context.md), limited to what is implemented (DOC-12). Phase 2 shipped the **minimal** context (DB, logger, config); phase 3 added `update_catalog` (the catalog write path) and a v0 `http` client (politeness, timeout, identifiable user-agent, request counter, retry/backoff — no scrape cache yet). The Markdown helper arrives later.
 
 ## Purpose
 

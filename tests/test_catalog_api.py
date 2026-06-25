@@ -139,6 +139,30 @@ def test_sort_by_price(client: TestClient) -> None:
     assert [i["name"] for i in body["items"]] == ["Cheap", "Dear"]
 
 
+def test_sort_by_list_price(client: TestClient) -> None:
+    admin = _admin_token(client)
+    uid, token = _make_user(client, admin, "alice")
+    _seed(
+        uid,
+        {"external_id": "a", "name": "Low list", "price_original": Decimal("20.00")},
+        {"external_id": "b", "name": "High list", "price_original": Decimal("80.00")},
+    )
+    body = client.get("/api/catalog?sort=price_original&order=desc", headers=_bearer(token)).json()
+    assert [i["name"] for i in body["items"]] == ["High list", "Low list"]
+
+
+def test_sort_by_availability(client: TestClient) -> None:
+    admin = _admin_token(client)
+    uid, token = _make_user(client, admin, "alice")
+    _seed(
+        uid,
+        {"external_id": "a", "name": "Available", "is_available": True},
+        {"external_id": "b", "name": "Sold out", "is_available": False},
+    )
+    body = client.get("/api/catalog?sort=is_available&order=asc", headers=_bearer(token)).json()
+    assert body["items"][0]["name"] == "Sold out"  # False sorts before True (asc)
+
+
 def test_pagination(client: TestClient) -> None:
     admin = _admin_token(client)
     uid, token = _make_user(client, admin, "alice")

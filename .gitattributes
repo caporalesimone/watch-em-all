@@ -11,3 +11,10 @@ docker-compose.yml text eol=lf
 # The env template is copied to .env and read on a Linux host: CRLF would leave a
 # trailing \r in every value (e.g. passwords). Keep it LF.
 .env.example text eol=lf
+
+# Real scraper fixtures are byte-exact (windows-1252, embedded HTML entities):
+# never let git rewrite line endings or normalise them, or the parser tests drift.
+tests/fixtures/** binary
+
+# Icon assets are binary; never apply EOL conversion.
+*.ico binary

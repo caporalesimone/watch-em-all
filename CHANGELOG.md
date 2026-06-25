@@ -6,6 +6,21 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 Each entry is **short** and reads as a user-facing story: first a **bullet list of what changed for you** (additions, removals and changes together, light on jargon), then a brief **_under the hood_** paragraph on the architectural/technical changes. Older entries predate this style and are left as they are.
 
+## [0.3.3] - 2026-06-23
+
+**Phase 3 — real Dragon Store scraping, with a catalog that shows the real product.**
+
+- **Scrape now** and the dry-run preview read the real product page: title, price, list price, availability, image, **brand** and **category**.
+- Products carry their **brand** (a link to the shop when available), a **category** breadcrumb (each step clickable), and **tags** like _Edizione Limitata_, _Offerta Raven Prime_ or _Pre Order_ — shown in the Catalog, the watched list and the dry-run preview.
+- Marketing/edition labels are stripped from the product name and shown as tags instead, so titles stay clean.
+- Pre-order items ("Prossimamente") count as orderable and are tagged _Pre Order_; out-of-stock items are marked unavailable.
+- **Watched products** now appear like the preview — image, title, brand, category and a tags column — with the product **title resolved as soon as you add it** (not just the URL).
+- Adding a product **already watched** is rejected with a clear message.
+- **Catalog** page: the photo enlarges on hover (after a short pause, so it doesn't pop up while you scroll past), the product photo/title link to the shop (the separate "Open" column is gone), the **source** links to its scraper page, the **tags** sit in their own column, and you can sort by source, list price and availability too. The **discount** shows as a `-NN%` badge **under the price** (no separate Discount column), and the list price is struck through only when there's an actual discount. It also fills in on its own right after a scrape — no need to hit Search, and the empty page no longer flickers while it retries.
+- Each scraper shows its **icon** next to the title and in the menu.
+
+_Under the hood:_ a new stdlib `context.http` client gives every scraper politeness, a timeout, an identifiable user-agent, a request counter and short retries with backoff (no new dependency). The Dragon Store parser reads the page's JSON-LD `Product` (primary, unambiguous) for most fields and the JSON-LD `BreadcrumbList` for the category, taking the list price from the detail table and decoding windows-1252 + HTML entities while ignoring the page's many related products. `Product` gains `brand` (text + optional link), `tags` (a generic tag list) and `category` (a breadcrumb of `{text, link}`); the base scraper supplies the `add_tag`/`get_tags` and `add_child`/`get_path` mechanisms (the `tags` field/column is the renamed, generic former "product properties"). The Catalog's dormant `discount_pct` sort option was dropped (the discount has no column to sort). The title sanitizer is Dragon-Store-specific (hand-maintained label list). The watched list is backed by a product snapshot stored on the watch (set on add, refreshed each run). Plugin icons are auto-detected at load (`plugin-icon.ico` → `.svg`). Plugin frontends live outside the SvelteKit root, so they're registered as Tailwind sources (`@source` in `app.css`) to ensure plugin-only utility classes ship in the built CSS. Verified offline against saved real-page fixtures.
+
 ## [0.3.2] - 2026-06-20
 
 **Phase 3 — watch a Dragon Store product and find it in your catalog.**

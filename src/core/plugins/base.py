@@ -22,9 +22,54 @@ from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter
 
+from src.core.contracts import CategoryRef
+
 if TYPE_CHECKING:
     from src.core.contracts import DeltaCounters, Product
     from src.core.plugins.context import PluginContext
+
+
+class Tags:
+    """Per-product accumulator of tags (``tags``, SCR-R16 / PROD-R5).
+
+    The base provides the *mechanism*; what to add is the plugin's choice (a label
+    cleaned off the title, a special availability state, …). One instance per
+    product being built — never stored on the (singleton) plugin instance, so tags
+    never leak across products/users. Strings are trimmed of surrounding whitespace
+    and separator symbols, and deduplicated.
+    """
+
+    _STRIP = " \t\r\n-–—:|·"
+
+    def __init__(self) -> None:
+        self._items: list[str] = []
+
+    def add_tag(self, value: str) -> None:
+        cleaned = value.strip(self._STRIP).strip()
+        if cleaned and cleaned not in self._items:
+            self._items.append(cleaned)
+
+    def get_tags(self) -> list[str]:
+        return list(self._items)
+
+
+class CategoryPath:
+    """Per-product category breadcrumb builder (``category``, SCR-R17 / PROD-R7).
+
+    The base provides the mechanism; the plugin calls ``add_child(name, url)`` from
+    root to leaf as it discovers the path, then ``get_path()`` returns the ordered
+    list. One instance per product (never on the singleton plugin instance)."""
+
+    def __init__(self) -> None:
+        self._items: list[CategoryRef] = []
+
+    def add_child(self, name: str, url: str | None = None) -> None:
+        text = name.strip()
+        if text:
+            self._items.append(CategoryRef(text=text, link=url))
+
+    def get_path(self) -> list[CategoryRef]:
+        return list(self._items)
 
 
 class BasePlugin:
@@ -84,6 +129,18 @@ class ScraperPlugin(BasePlugin, ABC):
         plugin never fills ``external_id`` by hand; it calls this when building a
         ``Product``."""
         return self._stable_id(self.identity_seed(raw) or self.normalize_url(url))
+
+    @staticmethod
+    def new_tags() -> Tags:
+        """A fresh per-product tag accumulator (SCR-R16). Use one per product;
+        add tags via ``add_tag`` and read them back with ``get_tags``."""
+        return Tags()
+
+    @staticmethod
+    def new_category() -> CategoryPath:
+        """A fresh per-product category breadcrumb builder (SCR-R17). Use one per
+        product; ``add_child(name, url)`` root → leaf, then ``get_path()``."""
+        return CategoryPath()
 
     def run_for_user(self, context: PluginContext, user_id: int) -> DeltaCounters:
         """Scrape this user's inputs and deliver the current products through

@@ -18,6 +18,9 @@ Un produttore **stateless** e **internamente mono-thread** di prodotti: legge i 
 | Identità del prodotto: **seme** (`identity_seed`) | ✅ (fornirlo) | usa |
 | Identità del prodotto: **hashing/normalizzazione** in `external_id` | — | ✅ (imposto, uniforme) |
 | Decidere la disponibilità (`is_available`) | ✅ | — |
+| Tag del prodotto (`tags`) | ✅ (popola) | persiste (non interpreta) |
+| Marca (`brand`: testo + link) | ✅ (estrae) | persiste |
+| Categoria (`category`: breadcrumb) | ✅ (costruisce) | persiste |
 | Esclusioni specifiche del sito (stati speciali del prodotto) | ✅ | — |
 | Calcolo adjustments del carrello (regole del sito) | ✅ | applica |
 | Storico, delta, delisting | — | ✅ |
@@ -38,6 +41,10 @@ Un produttore **stateless** e **internamente mono-thread** di prodotti: legge i 
 - **SCR-R6** — Lo scraper è **internamente mono-thread**: nessun parallelismo interno verso il sito. Usa **esclusivamente il client HTTP fornito dal contesto**, che impone il ritmo (politeness), conta le richieste per il monitoraggio e può servire una risposta dalla **cache di scrape** in modo trasparente (stessa query entro l'emivita → niente chiamata al sito, [plugin-context](../../4-capabilities/core/plugin-context.md) CTX-R9).
 - **SCR-R7** — Restituisce **anche i prodotti non disponibili** (marcati); non li filtra mai. Le esclusioni specifiche del sito (es. prodotti in stati speciali che l'utente non vuole) avvengono dentro il plugin, e i prodotti esclusi sono conteggiati per il monitoraggio.
 - **SCR-R8** — La lista consegnata è **piatta e deduplicata** sull'identità: se lo stesso prodotto emerge da più input (es. input singolo + categoria che lo contiene), compare una volta sola.
+
+### Tag e categoria
+- **SCR-R16** — La base scraper fornisce il **meccanismo** per attaccare a un prodotto una lista di **tag** (`tags`, [product](../../4-capabilities/contracts/product.md) PROD-R5): due metodi `add_tag(value)` (aggiunge una stringa, già **trimmata** e **deduplicata**) e `get_tags()` (restituisce la lista). Operano sul **prodotto in costruzione**, non come stato dell'istanza del plugin (che è un **singleton condiviso**): i tag di un prodotto/utente non devono mai sbordare su un altro. **Cosa** mettere nei tag è scelta del plugin (un'etichetta ripulita dal titolo, uno stato di disponibilità particolare, …); uno scraper a cui non serve non chiama nulla e la lista resta vuota. Il core non interpreta i tag: li persiste e la UI li mostra (visione a lungo termine: tag grafici). Le regole *site-specific* (quali etichette esistono, come riconoscerle) restano nel plugin concreto, mai nella base.
+- **SCR-R17** — Stessa filosofia per la **categoria** (`category`, PROD-R7): la base fornisce un costruttore di **breadcrumb** — `add_child(name, url)` (chiamato root → leaf man mano che lo scraper scopre il percorso) e `get_path()` (restituisce la lista ordinata di `CategoryRef`). Per-prodotto (mai sull'istanza singleton). Dove e come si scopre il breadcrumb è site-specific (DOM, JSON-LD `BreadcrumbList`, …); uno scraper senza categoria non chiama nulla e la lista resta vuota. Il core la persiste e la UI la mostra (`testo / testo / …`, l'ultima senza `/`).
 
 ### Identità del prodotto (il punto più delicato)
 - **SCR-R9** — Ogni prodotto porta un **`external_id` stabile tra run e univoco** nello spazio del plugin. È l'aggancio di tutto: riconoscimento, storico, disponibilità, delisting. Se cambia, il core vede un prodotto nuovo e lo storico si spezza.

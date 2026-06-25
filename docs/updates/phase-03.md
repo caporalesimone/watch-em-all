@@ -1,6 +1,6 @@
 # Phase 3 — Catalog & first scrape
 
-> Feature-level recap. **In progress** — this file grows as the phase-3 MVPs land. The **first MVP is user management** (0.3.0), pulled forward from phase 10 so a standard `user` account can exist before the catalog itself; the catalog, the Dragon Store scraper and the Product Picker follow.
+> Feature-level recap. **In progress** — this file grows as the phase-3 MVPs land. User management came first (0.3.0, pulled forward from phase 10 so a standard `user` account can exist before the catalog); the catalog, the Dragon Store scraper and the Product Picker followed, with **real** scraping replacing the initial mock in 0.3.3.
 
 ## What's implemented
 
@@ -11,6 +11,15 @@ So that a standard `user` account can exist (and be used to test the catalog and
 - **Roles don't overlap.** An admin **governs** (creates accounts; later: scrapers, settings) and has **no** personal catalog/cart/notifications. Whoever wants to monitor prices uses a separate `user` account. There is **no self-registration**.
 - **Admin → Users page** (`/admin/users`): a create form (username, first/last name, role, temporary password) + a list (username, name, role, status, last login). The new account must change its temporary password at first login.
 - **The shell splits by role:** an admin lands in the admin area and never sees the user dashboard / SCRAPERS group; a standard user sees the user area. Profile and Log out are common.
+
+### 2) Catalog, Dragon Store scraper & Product Picker — 0.3.1 → 0.3.3
+
+- **Watch a Dragon Store product** by pasting its URL on the scraper's page; **preview** a scrape without saving (dry-run), or **Scrape now** to pull your watched products into the catalog. Scrape now is rate-limited per scraper by a cooldown. Adding a URL you already watch is rejected with a clear message.
+- **Watched products** show like the preview — image, title (link), brand, category and a tags column, with a Remove button — and the title appears **as soon as you add it** (a one-off scrape resolves it).
+- **Catalog page:** your products in a searchable, sortable, paginated table; each row shows photo (which enlarges on hover after a short pause), title, **brand**, **category** breadcrumb and a dedicated **tags** column, with sorting by source, list price and availability too. The **discount** appears as a `-NN%` badge under the current price (no separate Discount column), and the list price is struck through only when the product is actually discounted. Photo and title link to the shop; the source links to its scraper page. It fills in on its own right after a scrape (without flicker).
+- **Real scraping (0.3.3):** the scraper reads the live product page — real title, prices, availability, image, **brand** and **category** breadcrumb. Marketing/edition labels (e.g. _Edizione Limitata_, _Offerta Raven Prime_) are stripped from the title and shown as **tags**; pre-order items are tagged _Pre Order_ and count as orderable, while out-of-stock items are marked unavailable. Each scraper also shows its icon.
+
+_Under the hood:_ the `Product` contract + per-user catalog tables (`products` / append-only `price_history`) with the Catalog Update Service as the single write path (delta, history, delisting). A polite, counted, retrying stdlib `context.http` client; the Dragon Store parser reads the page's JSON-LD `Product` (and `BreadcrumbList` for the category), taking the list price from the detail table (decoding windows-1252 + HTML entities) and ignoring the page's many related products. `brand` (text + optional link), `tags` (a generic tag list) and `category` (a breadcrumb of `{text, link}`) are generic `Product` fields the core just persists; the base scraper supplies the `add_tag`/`add_child` mechanisms. The title sanitizer is Dragon-Store-specific; the watched list is backed by a product snapshot on the watch; plugin icons are auto-detected at load (`plugin-icon.ico` → `.svg`). Plugin frontends live outside the SvelteKit root, so they're registered as Tailwind sources (`@source` in `app.css`) so plugin-only utility classes ship in the built CSS.
 
 ## Good to know
 

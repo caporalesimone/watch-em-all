@@ -13,12 +13,27 @@ from pydantic import BaseModel
 from decimal import Decimal
 from datetime import datetime
 
+class BrandRef(BaseModel):
+    text: str                   # nome della marca
+    link: str | None = None     # URL (assoluto) alla pagina marca; opzionale
+
+class CategoryRef(BaseModel):
+    text: str                   # nome della voce di categoria (un passo del breadcrumb)
+    link: str | None = None     # URL (assoluto) alla pagina categoria; opzionale
+
 class Product(BaseModel):
     plugin_id: str
     external_id: str            # ID STABILE e UNIVOCO nello spazio del plugin (vedi sotto)
     url: str
-    name: str
+    name: str                   # titolo già "sanificato" dallo scraper (vedi tags)
     image_url: str | None       # URL remoto, mai scaricata localmente
+    brand: BrandRef | None = None   # marca: testo + link opzionale; None se assente
+
+    tags: list[str] = []
+    # "tag" del prodotto (es. "Edizione Limitata", "Offerta Raven Prime", "Pre Order").
+    # Lista generica popolata dallo scraper (vuota se non gli serve); vedi PROD-R5.
+    category: list[CategoryRef] = []
+    # breadcrumb di categoria, root → leaf (vuoto se assente); vedi PROD-R7.
 
     price_current: Decimal      # prezzo scontato/corrente
     price_original: Decimal | None
@@ -38,6 +53,9 @@ class Product(BaseModel):
 - **PROD-R2** — Lo scraper restituisce **anche** i non disponibili (`is_available = false`); mai filtrarli.
 - **PROD-R3** — La lista consegnata è piatta e **deduplicata su `external_id`**.
 - **PROD-R4** — `currency` esiste per non rendere breaking l'arrivo di scraper esteri; la UI rende il simbolo (default €).
+- **PROD-R5** — `tags` è una lista (array JSON) di stringhe = **"tag" del prodotto**, generica e **opzionale** (default vuota). Lo scraper la popola da qualunque sorgente decida (etichette estratte dal titolo, stato di disponibilità, …); uno scraper a cui non serve la lascia vuota. Il core la **persiste soltanto**, non la interpreta; la UI la mostra come elenco (visione a lungo termine: tag grafici). Il **meccanismo** per accumularla è fornito dalla base scraper ([scraper-plugin](../../3-features/plugins/scraper-plugin.md) SCR-R16); le stringhe sono già **trimmate** e **deduplicate**.
+- **PROD-R6** — `brand` è un oggetto `{text, link?}` (`BrandRef`): `text` obbligatorio, `link` **opzionale** (URL assoluto alla pagina marca). La UI rende testo semplice, o testo **cliccabile** (apre una nuova tab) quando il link c'è. `None` se lo scraper non estrae la marca. È un attributo strutturato a sé, **distinto** dal campo `tags`.
+- **PROD-R7** — `category` è il **breadcrumb** di categoria: lista ordinata **root → leaf** di `CategoryRef{text, link?}` (vuota se assente). La UI la rende come `testo / testo / testo`, ogni voce cliccabile sul suo `link` (nuova tab), **senza `/` finale** dopo l'ultima. Generica: il core la **persiste soltanto**; il **meccanismo** per costruirla (`add_child`/`get_path`) è fornito dalla base scraper ([scraper-plugin](../../3-features/plugins/scraper-plugin.md) SCR-R17).
 
 ## `external_id`: identità del prodotto
 

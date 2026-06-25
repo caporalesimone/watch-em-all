@@ -77,6 +77,14 @@ class CatalogProduct(Base):
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
     name: Mapped[str] = mapped_column(String(512), nullable=False)
     image_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    # Brand: label + optional link (PROD-R6). Two columns rather than a blob so the
+    # UI can render a (clickable) brand without unpacking JSON; both nullable.
+    brand_text: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    brand_link: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    # Generic product tags (PROD-R5): a JSON array of strings, persisted as-is.
+    tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    # Category breadcrumb (PROD-R7): JSON array of {text, link}, root → leaf.
+    category: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
     # Plugin-specific data (DB-R3: Decimal as string, datetime ISO-8601 UTC inside).
     extra_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")
