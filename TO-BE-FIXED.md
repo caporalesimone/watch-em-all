@@ -67,21 +67,6 @@ New items get appended over time.
   `docker compose -f compose-dev.yml config` no longer lists an `adminer` service, and a repo
   grep for "adminer" leaves only the historical CHANGELOG entry.
 
-### Catalog: prune the now-unused `discount_pct` **sort** key
-- **Reported (Simone):** dopo aver tolto la colonna Discount (badge ora sotto il prezzo,
-  commit `e4574f8`), l'ordinamento per sconto non ha più un controllo UI ma è rimasto nell'API.
-- **Where (the *sort* key only — NOT the data field):**
-  - frontend: `'discount_pct'` is still a member of `CatalogSort`
-    ([`client.ts:142-148`](src/frontend/src/lib/api/client.ts#L142-L148)).
-  - backend: the sort whitelist still accepts it — the `_SORT_COLUMNS` map
-    ([`web/routers/catalog.py:28`](src/web/routers/catalog.py#L28)) and the allowed-sort list
-    ([`web/routers/catalog.py:68`](src/web/routers/catalog.py#L68)).
-- **Keep:** the `discount_pct` **data field** stays everywhere (`contracts.py`, `models.py`,
-  `web/schemas.py`, `core/catalog.py`, the dragon_store backend, `CatalogItem` + the badge in
-  `+page.svelte`) — the under-price badge renders from it.
-- **Fix idea:** drop `'discount_pct'` from `CatalogSort` and from the backend sort whitelist
-  (map + list) if no other consumer needs that sort. Touches the API surface, so confirm first.
-
 ## Reminders / to discuss
 
 ### A standard set of core-frontend components reused by plugins
@@ -93,19 +78,3 @@ New items get appended over time.
 - Possible shape: a small design-system exposed via `$lib`, with the plugin host injecting
   the higher-level widgets (Scrape now, dry-run table) so plugins don't re-implement them
   and the look stays consistent. Ties together the three button/popup items above.
-
-### Rename "product properties" → "tags" + dedicated Catalog column
-- **Reported (Simone):** the Catalog should have a **dedicated `tags` column**. For Dragon
-  Store, the "title labels" show up there. In dragon_store the JSON may stay
-  `title_labels.json` (site-specific source), but in the **core** the concept/logic should
-  be called **tags**, and the add method **`add_tags`**.
-- **Current naming (what to rename):**
-  - field `Product.product_properties: list[str]` (PROD-R5) → **`tags`**.
-  - base mechanism `new_properties()` → `ProductProperties` with **`add_property(value)`** /
-    `get_properties()` (SCR-R16) → e.g. `add_tag`/`get_tags` (Simone asked for `add_tags`).
-  - Catalog: tags are currently shown **under the title** → move to a **dedicated column**.
-  - Dragon Store `title_labels.json` / `load_title_labels()` / `sanitize_title()` stay; they
-    feed the generic tags via the (renamed) add method.
-- **Touch points:** `contracts.py`, `base.py`, `models.py` (`products` column), `catalog.py`,
-  `web/schemas.py` (`CatalogItem`), `web/routers/catalog.py`, the dragon_store plugin, the
-  frontend (client types, catalog column, watched table), docs. Schema change → DB reset.
