@@ -23,6 +23,7 @@ from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.registry import load_plugins
 from src.core.schema_drift import SchemaDriftItem, check_schema_drift
 from src.core.scrape import implements_scraping
+from src.core.system_log import install_system_log_handler
 from src.web.deps import require_user
 from src.web.error_handlers import register_error_handlers
 from src.web.routers import (
@@ -48,6 +49,8 @@ STATIC_DIR = Path(os.environ.get("WEA_STATIC_DIR", "/app/static"))
 def create_app() -> FastAPI:
     settings = get_settings()
     init_engine(settings.core.database_url)
+    # Scraper events that run in the web process (manual scrape-now) reach system_log too.
+    install_system_log_handler()
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:

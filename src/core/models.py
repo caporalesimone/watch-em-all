@@ -237,3 +237,22 @@ class ScrapeUserLog(Base):
     cache_hits: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="ok")  # ok | error
     error_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+
+class SystemLog(Base):
+    """Operational event log (LOG-R1..R4, 4.B7). The incremental ``id`` doubles as the
+    polling cursor (LOG-R3). ``source`` is one of worker | scraper | notifier | alert |
+    summary; ``level`` info | warning | error. Messages never carry user operational
+    content (LOG-R4) — only ids and metrics. Retention by MNT-R2 (worker daily purge)."""
+
+    __tablename__ = "system_log"
+    __table_args__ = (Index("ix_system_log_created", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    level: Mapped[str] = mapped_column(String(16), nullable=False)  # info | warning | error
+    source: Mapped[str] = mapped_column(String(16), nullable=False)
+    message: Mapped[str] = mapped_column(String(2048), nullable=False)
+    context_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)

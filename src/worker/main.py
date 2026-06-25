@@ -24,6 +24,7 @@ from src.core.config import get_settings
 from src.core.db import Base, create_schema, get_engine, init_engine, new_session
 from src.core.feature_flags import effective_flags, worker_tick_seconds
 from src.core.locks import scraper_lock
+from src.core.maintenance import purge_expired
 from src.core.models import ScraperSchedule, ScrapeRun, ScrapeUserLog
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.context import PluginContext, build_context
@@ -32,6 +33,7 @@ from src.core.schedule import due_slot, install_tz, set_last_slot
 from src.core.schema_drift import check_schema_drift
 from src.core.scrape import implements_scraping, stamp_cooldown
 from src.core.settings import get_system_settings
+from src.core.system_log import install_system_log_handler
 from src.worker.runner import Runner
 
 log = logging.getLogger("wea.worker")
@@ -87,6 +89,27 @@ def _boot() -> None:
         log.info("feature flags: %s", effective_flags(session))
     finally:
         session.close()
+
+
+def _daily_maintenance(now: datetime) -> None:
+    """Prune old system logs and run records beyond ``log_retention_days`` (MNT-R2).
+    Runs once a day from the loop; a failure must never stop the worker."""
+    try:
+        session = new_session()
+        try:
+            days = get_system_settings(session).log_retention_days
+            counts = purge_expired(session, now, days)
+        finally:
+            session.close()
+        if counts["system_log"] or counts["scrape_run"]:
+            log.info(
+                "retention: purged %d log row(s), %d run(s) older than %d days",
+                counts["system_log"],
+                counts["scrape_run"],
+                days,
+            )
+    except Exception:
+        log.exception("daily maintenance failed")
 
 
 def _aggregate_status(outcomes: list[str], timed_out: bool) -> str:
@@ -214,9 +237,13 @@ def _loop(submit: Submit, max_ticks: int | None = None) -> None:
     """Tick forever (or ``max_ticks`` times, for tests): heartbeat + dispatch due slots."""
     tz = install_tz()
     last_interval: int | None = None
+    last_maint_date = None
     ticks = 0
     while max_ticks is None or ticks < max_ticks:
         now = datetime.now(UTC)
+        if now.date() != last_maint_date:  # once per (UTC) day, and at the first tick
+            _daily_maintenance(now)
+            last_maint_date = now.date()
         _heartbeat(now)
         session = new_session()
         try:
@@ -241,6 +268,7 @@ def _loop(submit: Submit, max_ticks: int | None = None) -> None:
 
 def run() -> None:
     logging.basicConfig(level=logging.INFO)
+    install_system_log_handler()  # worker/scraper logs -> system_log (4.B7), plus stdout
     signal.signal(signal.SIGTERM, _shutdown)
     signal.signal(signal.SIGINT, _shutdown)
     _boot()

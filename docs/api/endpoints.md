@@ -34,6 +34,7 @@ Role legend: 🌐 public · 👤 user · 🛡 admin
 | Method | Path | Role | Response | Notes |
 |---|---|---|---|---|
 | GET | `/api/admin/errors` | 🛡 | `[{source, type, title, description}]` | **admin-only** feed of errors/warnings (admin diagnostics), kept off the public `/api/health` probe. First source: schema drift (4.B0), behind `WEA_SCHEMA_DRIFT_ALERT` |
+| GET | `/api/admin/logs` | 🛡 | `[{id, created_at, level, source, message, context}]` | **admin-only** system log (4.B7). Cursor by `id`: no `since` → latest `limit`; `since=<id>` → rows with `id > since`. Filters `level` (info/warning/error), `source`; `limit` 1–1000 (default 200). Worker/scraper events only |
 | GET | `/api/admin/feature-flags` | 🛡 | `{key: {…}}` | dev feature flags, effective values (defaults + overrides). Admin-only (4.B1a) |
 | PATCH | `/api/admin/feature-flags` | 🛡 | `{key: {…}}` | set one or more flags (known keys only); returns the effective map. Non-persistent — reset at web startup |
 

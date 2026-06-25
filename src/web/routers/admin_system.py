@@ -11,14 +11,16 @@ add entries without a new endpoint.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any, Literal
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel
 
 from src.core.errors import APIError
 from src.core.feature_flags import effective_flags, set_flags
 from src.core.schema_drift import SchemaDriftItem
+from src.core.system_log import list_logs
 from src.web.deps import AdminDep, SessionDep, SettingsDep
 
 router = APIRouter(prefix="/admin", tags=["Admin: system"])
@@ -62,6 +64,44 @@ def admin_errors(request: Request, settings: SettingsDep, _admin: AdminDep) -> l
         if drift:
             errors.append(_schema_drift_error(drift))
     return errors
+
+
+class SystemLogEntry(BaseModel):
+    """One operational log row (LOG-R1..R4). ``id`` is the polling cursor."""
+
+    id: int
+    created_at: datetime
+    level: Literal["info", "warning", "error"]
+    source: str
+    message: str
+    context: dict[str, Any] | None = None
+
+
+@router.get(
+    "/logs",
+    response_model=list[SystemLogEntry],
+    summary="System log (admin only): cursor by id. No 'since' = latest N; 'since' = newer rows.",
+)
+def admin_logs(
+    _admin: AdminDep,
+    db: SessionDep,
+    since: int | None = Query(None, description="return rows with id > since (else the latest N)"),
+    level: Literal["info", "warning", "error"] | None = Query(None),
+    source: str | None = Query(None),
+    limit: int = Query(200, ge=1, le=1000),
+) -> list[SystemLogEntry]:
+    rows = list_logs(db, since=since, level=level, source=source, limit=limit)
+    return [
+        SystemLogEntry(
+            id=r.id,
+            created_at=r.created_at,
+            level=r.level,  # type: ignore[arg-type]
+            source=r.source,
+            message=r.message,
+            context=r.context_json,
+        )
+        for r in rows
+    ]
 
 
 @router.get(
