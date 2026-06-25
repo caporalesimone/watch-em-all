@@ -1,8 +1,8 @@
 <script lang="ts">
 	// Admin-only error feed (4.B0+). Reads the errors the layout pulled from
-	// GET /api/admin/errors and stacks one <Banner> per entry at the bottom, to the
-	// right of the sidebar. Each bar carries a Copy button that copies the entry as
-	// JSON {type, title, description}. Shows only to an admin in the shell.
+	// GET /api/admin/errors and stacks one <Banner> card per entry, bottom-right of the
+	// content area (detached from the edges, clear of the scrollbar). Each card has a
+	// Copy button and a ✕ to dismiss it. Shows only to an admin in the shell.
 	import { onDestroy } from 'svelte';
 
 	import type { AdminError } from '$lib/api/client';
@@ -11,12 +11,19 @@
 	import { adminErrors } from '$lib/stores/adminErrors';
 	import { auth } from '$lib/stores/auth';
 
-	const show = $derived(
-		$auth.status === 'authed' &&
-			$auth.user?.role === 'admin' &&
-			!$auth.user?.must_change_password &&
-			$adminErrors.length > 0
+	const isAdminInShell = $derived(
+		$auth.status === 'authed' && $auth.user?.role === 'admin' && !$auth.user?.must_change_password
 	);
+
+	// Dismissed sources (session-only; reset on reload). New/undismissed errors show.
+	let dismissed = $state<Set<string>>(new Set());
+	const visible = $derived(
+		isAdminInShell ? $adminErrors.filter((e) => !dismissed.has(e.source)) : []
+	);
+
+	function dismiss(source: string): void {
+		dismissed = new Set([...dismissed, source]);
+	}
 
 	let copiedSource = $state<string | null>(null);
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -38,10 +45,11 @@
 	});
 </script>
 
-{#if show}
-	<div class="fixed right-0 bottom-0 left-56 z-50 flex max-h-[60vh] flex-col overflow-auto">
-		{#each $adminErrors as err (err.source)}
-			<Banner variant={err.type} icon="⚠️" title={err.title}>
+{#if visible.length > 0}
+	<!-- Detached from the edges and clear of the main scrollbar (right-6). -->
+	<div class="fixed right-6 bottom-4 left-60 z-50 flex max-h-[60vh] flex-col gap-2 overflow-y-auto">
+		{#each visible as err (err.source)}
+			<Banner variant={err.type} icon="⚠️" title={err.title} onClose={() => dismiss(err.source)}>
 				{#snippet action()}
 					<!-- White button so it stands out on any variant colour. -->
 					<button
