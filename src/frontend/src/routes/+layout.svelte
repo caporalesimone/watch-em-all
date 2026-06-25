@@ -6,7 +6,7 @@
 	import { page } from '$app/stores';
 	import { _ } from 'svelte-i18n';
 
-	import { getHealth } from '$lib/api/client';
+	import { getHealth, getSchemaDrift } from '$lib/api/client';
 	import SchemaDriftBanner from '$lib/components/SchemaDriftBanner.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import { setupI18n } from '$lib/i18n';
@@ -19,18 +19,15 @@
 	let { children } = $props();
 	let ready = $state(false);
 	let pluginsLoaded = $state(false);
+	let driftLoaded = $state(false);
 
 	onMount(async () => {
 		theme.init();
 		await setupI18n();
 		await bootstrap();
-		// Non-blocking: fill the version shown in the shell and the dev schema-drift
-		// banner (4.F0; null when the alert is off → empty → hidden).
+		// Non-blocking: fill the version shown in the shell.
 		void getHealth()
-			.then((h) => {
-				version.set(h.version);
-				schemaDrift.set(h.schema_drift ?? []);
-			})
+			.then((h) => version.set(h.version))
 			.catch(() => {});
 		ready = true;
 	});
@@ -74,6 +71,27 @@
 		} else if (state.status === 'anon' && pluginsLoaded) {
 			pluginsLoaded = false;
 			resetPlugins();
+		}
+	});
+
+	// Schema drift is an ADMIN-ONLY diagnostic (served by an admin endpoint, not the
+	// public health probe): fetch it once when an admin is in the shell, and clear it
+	// otherwise so it never lingers for a normal user.
+	$effect(() => {
+		if (!ready) return;
+		const state = $auth;
+		const isAdmin =
+			state.status === 'authed' &&
+			state.user?.role === 'admin' &&
+			!state.user?.must_change_password;
+		if (isAdmin && !driftLoaded) {
+			driftLoaded = true;
+			void getSchemaDrift()
+				.then((d) => schemaDrift.set(d))
+				.catch(() => {});
+		} else if (!isAdmin && driftLoaded) {
+			driftLoaded = false;
+			schemaDrift.set([]);
 		}
 	});
 

@@ -13,7 +13,6 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from src.core.contracts import BrandRef, CategoryRef
-from src.core.schema_drift import SchemaDriftItem
 
 
 class LoginRequest(BaseModel):
@@ -57,8 +56,6 @@ class HealthResponse(BaseModel):
     db: str
     version: str
     worker_heartbeat_age_s: float | None = None
-    # 4.B0: populated only when WEA_SCHEMA_DRIFT_ALERT is on; null otherwise.
-    schema_drift: list[SchemaDriftItem] | None = None
 
 
 class UserCreate(BaseModel):

@@ -29,6 +29,12 @@ Role legend: 🌐 public · 👤 user · 🛡 admin
 | POST | `/api/admin/users` | 🛡 | `{username, first_name, last_name, role, temp_password}` | creates an account with a forced first-login password change; duplicate username → 409 (USR-R1/R2/R15) |
 | GET | `/api/admin/users` | 🛡 | — | lists all accounts (username, name, role, status, last login) |
 
+## Admin — system
+
+| Method | Path | Role | Response | Notes |
+|---|---|---|---|---|
+| GET | `/api/admin/schema-drift` | 🛡 | `[{table, missing_table, missing_columns}]` | dev schema-drift found at startup (4.B0); **admin-only** — kept off the public `/api/health` probe. Empty unless `WEA_SCHEMA_DRIFT_ALERT` is on |
+
 ## Plugin discovery — [plugin-registry](../4-capabilities/core/plugin-registry.md)
 
 | Method | Path | Role | Response | Notes |

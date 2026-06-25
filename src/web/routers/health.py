@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Response
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -17,9 +17,7 @@ router = APIRouter(tags=["Health"])
     response_model=HealthResponse,
     summary="Liveness probe: app status, database reachability, and the product version (public).",
 )
-def health(
-    request: Request, response: Response, settings: SettingsDep, db: SessionDep
-) -> HealthResponse:
+def health(response: Response, settings: SettingsDep, db: SessionDep) -> HealthResponse:
     try:
         db.execute(text("SELECT 1"))
         db_status = "ok"
@@ -27,14 +25,12 @@ def health(
         db_status = "down"
     if db_status != "ok":
         response.status_code = 503
-    # Schema drift (4.B0) is computed at startup and stashed on app.state; expose it
-    # only when WEA_SCHEMA_DRIFT_ALERT is on (otherwise the field stays null).
-    drift = getattr(request.app.state, "schema_drift", None)
+    # Public liveness probe — no admin-only signals here. Schema drift (4.B0) is an
+    # admin diagnostic, served by GET /api/admin/schema-drift, never on this probe.
     # worker heartbeat is informative and shared via the DB from phase 4; null here.
     return HealthResponse(
         status="ok" if db_status == "ok" else "degraded",
         db=db_status,
         version=settings.version,
         worker_heartbeat_age_s=None,
-        schema_drift=drift if settings.schema_drift_alert else None,
     )

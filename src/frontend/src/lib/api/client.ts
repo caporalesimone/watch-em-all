@@ -31,8 +31,6 @@ export interface Health {
 	db: string;
 	version: string;
 	worker_heartbeat_age_s: number | null;
-	// Null unless WEA_SCHEMA_DRIFT_ALERT is on; a non-empty list drives the dev banner (4.F0).
-	schema_drift: SchemaDriftItem[] | null;
 }
 
 // Plugin discovery (REG-R6): enabled + loaded plugins, no internal paths.
@@ -107,6 +105,12 @@ export function getMe(): Promise<Me> {
 
 export function getPlugins(): Promise<PluginInfo[]> {
 	return apiFetch('/api/plugins').then(asJson<PluginInfo[]>);
+}
+
+// Admin-only schema-drift report (4.B0): empty unless WEA_SCHEMA_DRIFT_ALERT is on.
+// Requires an admin token (403 for a normal user, 401 anonymous) — never on /api/health.
+export function getSchemaDrift(): Promise<SchemaDriftItem[]> {
+	return apiFetch('/api/admin/schema-drift').then(asJson<SchemaDriftItem[]>);
 }
 
 // Catalog / Product Picker (CAT-*). Money fields are Decimal serialised as
