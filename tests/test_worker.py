@@ -41,7 +41,7 @@ def test_boot_and_loop_runs_one_tick(tmp_path: Path, monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(worker, "HEARTBEAT_FILE", str(hb))
 
     worker._boot()
-    worker._loop(tick_seconds=0, max_ticks=1)
+    worker._loop(max_ticks=1)
     config_mod.get_settings.cache_clear()
 
     assert int(hb.read_text()) > 0

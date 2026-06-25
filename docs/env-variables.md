@@ -25,7 +25,7 @@ container vars come straight from the environment.
 | `WEA_CONFIG_FILE` | web, worker | `/app/config.yaml` | Path to the bootstrap `config.yaml`. |
 | `WEA_VERSION_FILE` | web, worker | `/app/VERSION` | Path to the version file baked at build (see below). |
 | `WEA_HEARTBEAT_FILE` | worker | `/tmp/worker-heartbeat` | Heartbeat file the worker touches each tick; watched by the compose healthcheck. (Stub today; real worker in 4.B1.) |
-| `WEA_TICK_SECONDS` | worker | `60` | Worker tick interval, seconds. (Stub today.) |
+| `WEA_TICK_SECONDS` | worker | `60` | Worker tick interval, seconds — the base default; overridable at runtime via the `worker_tick` dev feature flag (`PATCH /api/admin/feature-flags`). |
 
 ## The product version (read this before bumping)
 

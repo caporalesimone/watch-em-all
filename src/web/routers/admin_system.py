@@ -10,13 +10,15 @@ add entries without a new endpoint.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
+from src.core.errors import APIError
+from src.core.feature_flags import effective_flags, set_flags
 from src.core.schema_drift import SchemaDriftItem
-from src.web.deps import AdminDep, SettingsDep
+from src.web.deps import AdminDep, SessionDep, SettingsDep
 
 router = APIRouter(prefix="/admin", tags=["Admin: system"])
 
@@ -58,3 +60,26 @@ def admin_errors(request: Request, settings: SettingsDep, _admin: AdminDep) -> l
         if drift:
             errors.append(_schema_drift_error(drift))
     return errors
+
+
+@router.get(
+    "/feature-flags",
+    response_model=dict[str, dict[str, Any]],
+    summary="Dev feature flags: effective values (defaults + overrides). Admin only.",
+)
+def get_feature_flags(_admin: AdminDep, db: SessionDep) -> dict[str, dict[str, Any]]:
+    return effective_flags(db)
+
+
+@router.patch(
+    "/feature-flags",
+    response_model=dict[str, dict[str, Any]],
+    summary="Set one or more dev feature flags (known keys only); returns the effective map.",
+)
+def patch_feature_flags(
+    body: dict[str, dict[str, Any]], _admin: AdminDep, db: SessionDep
+) -> dict[str, dict[str, Any]]:
+    try:
+        return set_flags(db, body)
+    except ValueError as exc:
+        raise APIError(422, "unknown_flag", str(exc)) from exc

@@ -147,3 +147,17 @@ class ScrapeCooldown(Base):
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     last_scraped_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class FeatureFlag(Base):
+    """Dev-only runtime feature flags (4.B1a). ``key`` → JSON ``value`` (the flag's own
+    params). Kept in the DB so the web (which sets them via the admin API) and the
+    worker (which reads them each tick) — separate processes — share the same values.
+    The web clears the table at startup, so flags are **non-persistent**: every boot
+    reverts to the code defaults. Admin-only, dev-oriented — not a production toggle.
+    """
+
+    __tablename__ = "feature_flags"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)

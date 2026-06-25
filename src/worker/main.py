@@ -17,14 +17,14 @@ from datetime import UTC, datetime
 from types import FrameType
 
 from src.core.config import get_settings
-from src.core.db import Base, create_schema, get_engine, init_engine
+from src.core.db import Base, create_schema, get_engine, init_engine, new_session
+from src.core.feature_flags import worker_tick_seconds
 from src.core.plugins.registry import load_plugins
 from src.core.schema_drift import check_schema_drift
 
 log = logging.getLogger("wea.worker")
 
 HEARTBEAT_FILE = os.environ.get("WEA_HEARTBEAT_FILE", "/tmp/worker-heartbeat")
-TICK_SECONDS = int(os.environ.get("WEA_TICK_SECONDS", "60"))
 
 
 def _shutdown(signum: int, _frame: FrameType | None) -> None:
@@ -71,20 +71,30 @@ def _boot() -> None:
         log.exception("schema-drift check failed")
 
 
-def _loop(tick_seconds: int, max_ticks: int | None = None) -> None:
-    """Tick forever (or ``max_ticks`` times, for tests), sleeping between ticks."""
+def _current_tick_seconds() -> int:
+    """The worker tick interval from the dev feature flag (override or default)."""
+    session = new_session()
+    try:
+        return worker_tick_seconds(session)
+    finally:
+        session.close()
+
+
+def _loop(max_ticks: int | None = None) -> None:
+    """Tick forever (or ``max_ticks`` times, for tests), sleeping the flag-driven
+    interval between ticks."""
     ticks = 0
     while max_ticks is None or ticks < max_ticks:
         tick(datetime.now(UTC))
         ticks += 1
         if max_ticks is None or ticks < max_ticks:
-            time.sleep(tick_seconds)
+            time.sleep(_current_tick_seconds())
 
 
-def run(tick_seconds: int = TICK_SECONDS) -> None:
+def run() -> None:
     logging.basicConfig(level=logging.INFO)
     signal.signal(signal.SIGTERM, _shutdown)
     signal.signal(signal.SIGINT, _shutdown)
     _boot()
-    log.info("worker started; heartbeat on %s every %ss", HEARTBEAT_FILE, tick_seconds)
-    _loop(tick_seconds)
+    log.info("worker started; heartbeat on %s (tick from feature flag)", HEARTBEAT_FILE)
+    _loop()
