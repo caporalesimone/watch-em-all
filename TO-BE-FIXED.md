@@ -67,16 +67,6 @@ New items get appended over time.
   `docker compose -f compose-dev.yml config` no longer lists an `adminer` service, and a repo
   grep for "adminer" leaves only the historical CHANGELOG entry.
 
-### Auto-login after the forced first-login password change
-- **Reported (Simone):** dopo il cambio password al primo accesso, fare **direttamente il login**
-  invece di tornare alla pagina di login — si risparmia un passaggio.
-- **Where:** [`change-password/+page.svelte`](src/frontend/src/routes/change-password/+page.svelte#L31-L34)
-  oggi fa `api.changePassword(next)` → `forceAnon()` → `goto('/login')` (commento **AUTH-R5**: il cambio
-  password è un **logout globale**, quindi serve ri-login). L'utente ha **appena digitato** la nuova password.
-- **Fix idea:** dopo `changePassword(next)`, chiamare `api.login(username, next)` e instradare alla home
-  utente (`/`) invece che a `/login`. Rispetta comunque AUTH-R5 — il logout globale invalida i vecchi token,
-  il nuovo login ne emette uno fresco; non si *salta* il logout, lo si ri-fa subito. Confermare con auth.md.
-
 ## Reminders / to discuss
 
 ### A standard set of core-frontend components reused by plugins

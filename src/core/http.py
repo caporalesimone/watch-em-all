@@ -46,7 +46,7 @@ class HttpResponse:
     @property
     def text(self) -> str:
         """Best-effort UTF-8 text. Scrapers whose pages lie about their charset
-        (e.g. Dragon Store, really windows-1252) should decode ``content`` themselves."""
+        (e.g. one really served as windows-1252) should decode ``content`` themselves."""
         return self.content.decode("utf-8", errors="replace")
 
 

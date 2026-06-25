@@ -10,6 +10,24 @@ Il primo canale di consegna reale: contratto notifier, configurazione a due live
 
 L'admin configura l'SMTP dalla sua pagina; l'utente mette il suo indirizzo nel Profilo, preme Test e riceve la prova; alla prossima cadenza con eventi, **il digest arriva in casella**, formattato e leggibile.
 
+## ⚠️ Da discutere PRIMA di iniziare — design system condiviso dei plugin
+
+La Fase 7 introduce il **primo notifier** ed è il **primo caso multi-plugin della stessa famiglia** (sono previsti **2-3 notifier**). È il momento giusto per decidere *come* i plugin condividono la UI **prima** di scrivere tre notifier che divergono. L'astrazione vera resta rimandata (con un solo scraper sarebbe prematura, [discussione 0.3.4]), ma le scelte qui sotto vanno fissate ora per **non obbligare un refactor importante** dopo. Vincoli già vigenti: [FE-8/FE-13/FE-16/FE-17/FE-18](../developer-rules/frontend/rules.md) (riuso in `$lib/components`, "un pattern usato due volte si estrae", i plugin **devono** usare il design system, widget condivisi self-contained/props-driven), [SCR-R12](../3-features/plugins/scraper-plugin.md) (tabella dry-run condivisa) e 7.F1 (form di config = "componente unico del DS").
+
+**Argomenti di discussione:**
+
+1. **Modello di condivisione** — libreria (`import` da `$lib/components`) vs **host-injection** (l'app monta il widget intorno alla pagina del plugin) vs ibrido. Quali widget sono primitive importate e quali iniettati dall'host?
+2. **Inventario widget per i notifier** — quali nascono già con l'email e vanno condivisi (non inline): **form di config dinamico** (7.F1/7.F2, inclusi i campi secret), **bottone Test/Send**, **esiti di consegna** (tabella), **banner "nessun notifier attivo"** (7.F4), **chip di stato canale**, popup/overlay.
+3. **Overlay/popup** — modal (bloccante, per le conferme) vs toast (esiti, non bloccante); ancoraggio **top-center**; **portal unico** alla radice dell'app-shell per garantire lo z-index "sopra tutto".
+4. **i18n dei widget condivisi** — namespace **core** (`ui.*`) vs duplicazione per-plugin; si lega al tool di consistenza i18n ([4.B11](phase-04-worker-scheduling.md)).
+5. **Token/tema e varianti** — `<Button variant>` per chiudere i ripetuti fix di hover/fill; dark mode coerente.
+6. **Contratto e stabilità** — superficie pubblica del DS in `$lib/components`; quanto è "stabile" l'API su cui i plugin dipendono.
+7. **Scope al 1° notifier** — cosa estrarre **subito** con l'email (applicando FE-8 in modo proattivo, dato che 2°/3° notifier arriveranno) vs cosa lasciare al secondo uso.
+8. **Lato scraper** — Scrape-now + tabella dry-run: mantenere il seam, estrazione al **2° scraper** (stesso principio); allineamento di dragon_store quando conviene.
+9. **Host-injection dello Scrape-now** — come il widget conosce il plugin (`route_base`), dove si renderizza il bottone, stato cooldown/countdown (store core keyed per plugin).
+
+> **Esito atteso:** decidere modello (#1), inventario minimo da estrarre col 1° notifier (#2/#7) e meccanica overlay (#3); il resto (token, host-injection scraper) può seguire. Finché non si decide, il 1° notifier si scrive **self-contained/props-driven** (FE-18) per non precludere nessuna opzione.
+
 ## MVP
 
 ### Backend

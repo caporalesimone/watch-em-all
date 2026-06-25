@@ -1,6 +1,6 @@
 # Phase 3 — Catalog & first scrape
 
-> Feature-level recap. **In progress** — this file grows as the phase-3 MVPs land. User management came first (0.3.0, pulled forward from phase 10 so a standard `user` account can exist before the catalog); the catalog, the Dragon Store scraper and the Product Picker followed, with **real** scraping replacing the initial mock in 0.3.3.
+> Feature-level recap. Phase 3 is **complete** (0.3.0 → 0.3.4). User management came first (0.3.0, pulled forward from phase 10 so a standard `user` account can exist before the catalog); the catalog, the Dragon Store scraper and the Product Picker followed, with **real** scraping replacing the initial mock in 0.3.3; 0.3.4 consolidated the open items and the English docs.
 
 ## What's implemented
 

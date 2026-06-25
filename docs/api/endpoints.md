@@ -2,7 +2,7 @@
 
 > The single, canonical reference of the core HTTP endpoints. Conventions and Swagger: [README.md](README.md).
 >
-> English translation of the Italian reference [`docs-ita/api/endpoints.md`](../../docs-ita/api/endpoints.md), limited to what is implemented (DOC-12). Phase 1 ships Auth, Me and Health; catalog, carts, history, alerts, notifiers and admin endpoints arrive in later phases.
+> English translation of the Italian reference [`docs-ita/api/endpoints.md`](../../docs-ita/api/endpoints.md), limited to what is implemented (DOC-12). Phase 1 ships Auth, Me and Health; phase 3 adds admin user management, plugin discovery, the read-only **catalog** and the scraper plugin's own routes; carts, history, alerts, notifiers and scheduling arrive in later phases.
 
 Role legend: 🌐 public · 👤 user · 🛡 admin
 
@@ -37,6 +37,25 @@ Role legend: 🌐 public · 👤 user · 🛡 admin
 | GET | `/api/plugin-assets/{name}/icon` | 🌐 | image | the plugin's manifest `icon`, served as a static asset (path-traversal guarded); 404 if absent. Public like the SPA bundle — the browser loads it as an `<img>`, which cannot carry the bearer token |
 
 Plugin-specific routes are registered by each plugin under `/api{route_base}` (e.g. `/api/plugins/my-store/...`), **behind authentication** (the registry applies a user dependency to every plugin router), and documented in OpenAPI under the `Plugin: <name>` tag.
+
+## Catalog — [catalog-update-service](../4-capabilities/core/catalog-update-service.md)
+
+| Method | Path | Role | Query | Notes |
+|---|---|---|---|---|
+| GET | `/api/catalog` | 👤 | `?page=&page_size=&sort=&order=&q=&available=&removed=` | the current user's catalog as the Product Picker table: paginated server-side, returns `{items, total, page, page_size}`. `sort` ∈ {`name`, `plugin_id`, `price_current`, `price_original`, `is_available`, `last_seen_at`} (default `last_seen_at`); `order` `asc`\|`desc`; `q` = case-insensitive name search; `available`/`removed` = optional boolean filters |
+
+The catalog is **read-only** here: it is written only through the Catalog Update Service (a scrape). The cleanup/mutation endpoints (remove delisted, selective/empty) arrive in a later phase, with the cart/Product Picker selection role.
+
+## Scraper plugin routes — Dragon Store (implemented)
+
+Registered under `/api/plugins/dragon-store` (the generic convention above); the scrape-now command and its per-scraper cooldown are provided by the `ScraperPlugin` base, not re-implemented by the plugin.
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| POST | `/api/plugins/dragon-store/test` | 👤 | dry-run: returns `list[Product]`, writes nothing (SCR-R11) |
+| POST | `/api/plugins/dragon-store/scrape-now` | 👤 | immediate scrape for the requesting user only (writes the catalog); within the cooldown → **429** with the time remaining; otherwise **202** + a background job (SCR-R15) |
+| GET | `/api/plugins/dragon-store/scrape-now` | 👤 | cooldown status: `{available, available_at, retry_after_seconds, interval_seconds}` (feeds the UI countdown) |
+| GET/POST/DELETE | `/api/plugins/dragon-store/watches` | 👤 | the user's watched product URLs; `POST` rejects a duplicate URL with **409** |
 
 ## Health — [deployment](../infrastructure/deployment.md)
 

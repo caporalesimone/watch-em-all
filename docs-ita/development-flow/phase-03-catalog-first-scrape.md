@@ -1,6 +1,6 @@
 # Fase 3 — Catalogo e primo scrape
 
-> Stato: 🚧 in corso — **primo MVP fatto: Gestione utenti (`0.3.0`)**; il catalogo/scrape segue · Prerequisiti: Fase 2 · [Indice del flusso](README.md)
+> Stato: ✅ completata — catalogo + scraping reale completi e mergiati (`0.3.0` → `0.3.3`); docs EN DOC-12 (`0.3.4`); DoD verificata (102 test verdi, core senza codice Dragon-Store) · Prerequisiti: Fase 2 · [Indice del flusso](README.md)
 
 ## Obiettivo
 
@@ -39,10 +39,10 @@ Incolli l'URL di un prodotto Dragon Store nella pagina del plugin → "Scrape or
 
 ## Definition of Done
 
-- [ ] Flusso end-to-end da browser: aggiungi URL → scrape-now → prodotto in tabella.
-- [ ] Idempotenza: secondo scrape senza cambi sul sito → zero nuovi prodotti, zero entry di storico.
-- [ ] Il core non contiene una riga specifica di Dragon Store.
-- [ ] [docs](../../docs/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
+- [x] Flusso end-to-end da browser: aggiungi URL → scrape-now → prodotto in tabella. *(coperto dall'integrazione `test_dragon_store.py` + prove live in dev container)*
+- [x] Idempotenza: secondo scrape senza cambi sul sito → zero nuovi prodotti, zero entry di storico. *(`test_catalog_service.py`)*
+- [x] Il core non contiene una riga specifica di Dragon Store. *(grep `src/core` pulito)*
+- [x] [docs](../../docs/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12). *(0.3.4)*
 
 ## Riferimenti
 

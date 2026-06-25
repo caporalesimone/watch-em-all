@@ -4,7 +4,7 @@
 	import { _ } from 'svelte-i18n';
 
 	import * as api from '$lib/api/client';
-	import { auth, forceAnon } from '$lib/stores/auth';
+	import { auth, forceAnon, signIn } from '$lib/stores/auth';
 
 	let next = $state('');
 	let confirm = $state('');
@@ -26,17 +26,28 @@
 			return;
 		}
 		busy = true;
+		// Capture the username before the change: the re-login below refreshes the store.
+		const username = $auth.user?.username ?? '';
 		try {
 			// Forced first change: the current password is not required (auth.md).
 			await api.changePassword(next);
-			// AUTH-R5: the change is a global logout — sign in again with the new one.
-			forceAnon();
-			await goto('/login');
 		} catch (err) {
 			error =
 				err instanceof api.ApiErr
 					? $_(`errors.${err.code}`, { default: $_('errors.generic') })
 					: $_('errors.generic');
+			busy = false;
+			return;
+		}
+		// AUTH-R5: the change invalidated every token. The user just typed the new
+		// password, so sign straight back in and let the route guard land them on
+		// their home — no detour through the login page. If the re-login somehow
+		// fails, fall back to /login.
+		try {
+			await signIn(username, next);
+		} catch {
+			forceAnon();
+			await goto('/login');
 		} finally {
 			busy = false;
 		}

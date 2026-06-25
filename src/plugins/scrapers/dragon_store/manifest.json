@@ -2,7 +2,7 @@
 	"name": "dragon_store",
 	"display_name": "Dragon Store",
 	"type": "scraper",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"api_version": 1,
 	"enabled": true,
 	"backend": { "entry": "backend/__init__.py" },
