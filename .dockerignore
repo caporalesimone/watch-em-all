@@ -13,3 +13,11 @@ src/frontend/build/
 **/__pycache__/
 .venv/
 .env
+# Not used by any build stage — kept out of the context so they aren't shipped to
+# the daemon on every build (the app image never COPYies these).
+tests/
+.github/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.env.example
