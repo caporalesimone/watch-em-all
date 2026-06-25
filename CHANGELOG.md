@@ -6,6 +6,12 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 Each entry is **short** and reads as a user-facing story: first a **bullet list of what changed for you** (additions, removals and changes together, light on jargon), then a brief **_under the hood_** paragraph on the architectural/technical changes. Older entries predate this style and are left as they are.
 
+## [0.3.4] - 2026-06-25
+
+**Phase 3 — consolidation: close the open items and round off the documentation.**
+
+_Under the hood:_ the English wiki (`docs/`) gains the phase-3 canonical pages, translated from `docs-ita/` and limited to what is implemented (DOC-12): the `Product` contract, the Catalog Update Service, the scraper-plugin contract, the Catalog & Product Picker, and the Dragon Store plugin (overview / features / capabilities).
+
 ## [0.3.3] - 2026-06-23
 
 **Phase 3 — real Dragon Store scraping, with a catalog that shows the real product.**
