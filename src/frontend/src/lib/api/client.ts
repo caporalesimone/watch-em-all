@@ -144,7 +144,6 @@ export type CatalogSort =
 	| 'plugin_id'
 	| 'price_current'
 	| 'price_original'
-	| 'discount_pct'
 	| 'is_available'
 	| 'last_seen_at';
 

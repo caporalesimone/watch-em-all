@@ -25,7 +25,6 @@ _SORT_COLUMNS: dict[str, InstrumentedAttribute[Any]] = {
     "plugin_id": CatalogProduct.plugin_id,  # "source"
     "price_current": CatalogProduct.price_current,
     "price_original": CatalogProduct.price_original,  # "list price"
-    "discount_pct": CatalogProduct.discount_pct,
     "is_available": CatalogProduct.is_available,  # "availability"
     "last_seen_at": CatalogProduct.last_seen_at,
 }
@@ -65,7 +64,6 @@ def list_catalog(
         "plugin_id",
         "price_current",
         "price_original",
-        "discount_pct",
         "is_available",
         "last_seen_at",
     ] = "last_seen_at",
