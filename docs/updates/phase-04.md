@@ -5,7 +5,7 @@
 > tooling around it: a transparent scrape cache, a system log with retention, dev feature
 > flags and the admin pages, on top of the earlier groundwork (a friendlier dev database
 > browser, a schema-drift safety net, admin plugin versions, tidier environment variables).
-> The live log page and the system-settings page are the remaining frontend MVPs.
+> The i18n consistency tool (dev/CI) is the last remaining MVP before the phase closes.
 
 ## What's implemented (so far, 0.4.0)
 
@@ -50,13 +50,17 @@
   or paged **history** (page numbers + total + per-level counts), with level tabs, multi-source
   chips, message search, and a `{ }` viewer for a row's context JSON.
 
-### 4) Dev feature flags + an admin page that builds itself
+### 4) System settings + dev feature flags
 
-- A dev-only **feature flags** facility lets an admin tweak a runtime knob without a restart:
-  the **worker tick** interval. It is shared with the worker through the database and
-  **resets when the web restarts** (non-persistent).
-- An **Admin → Feature flags** page renders itself from the API — each flag's input is
-  inferred from its value's type — so a new flag shows up with **no frontend change**.
+- An **Admin → Settings** page edits the runtime `system_settings` (run timeout, log
+  retention, catch-up threshold, user-deletion grace) **without a restart** (`GET`/`PATCH
+  /api/admin/settings`, known keys with validated ranges); the worker re-reads them on each
+  run/purge.
+- **Feature flags** live as a child page under Settings: a dev-only facility to tweak a
+  runtime knob (the **worker tick** interval), shared with the worker through the database
+  and **reset when the web restarts** (non-persistent). The page renders itself from the API
+  — each flag's input is inferred from its value's type — so a new flag shows up with no
+  frontend change.
 
 ### 5) Admin sees plugins by kind — Scrapers & Notifiers
 

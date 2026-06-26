@@ -105,8 +105,8 @@ Il **purge definitivo non ha endpoint**: è il job giornaliero del worker a elim
 | GET | `/api/admin/runs/{run_id}` | 🛡 | — | dettaglio per-utente (`scrape_user_log`) |
 | GET | `/api/admin/scrapers/{id}/stats` | 🛡 | `?days=30` | serie per i trend (durate, richieste, variazioni) |
 | DELETE | `/api/admin/scrapers/{id}/cache` | 🛡 | — | **svuota la cache di scrape** del plugin (CTX-R9); pulsante nella pagina admin del plugin |
-| GET | `/api/admin/settings` | 🛡 | — | `SystemSettings` |
-| PUT | `/api/admin/settings` | 🛡 | `{scraper_run_timeout_min?, catchup_warning_min?, log_retention_days?, user_deletion_retention_days?}` | effetto immediato, senza riavvio |
+| GET | `/api/admin/settings` | 🛡 | — | `SystemSettings` (effettive: default + override); admin-only (4.F7) |
+| PATCH | `/api/admin/settings` | 🛡 | `{scraper_run_timeout_min?, catchup_warning_min?, log_retention_days?, user_deletion_retention_days?}` | imposta una o più chiavi note (merge, range validati → **422**); DB-first, effetto immediato senza riavvio |
 | GET | `/api/admin/logs` | 🛡 | `?since=<id>&level=&sources=&q=&limit=` | **tail live** (4.F3): righe con id > since (asc); senza `since` = ultime N. Filtri `level`, `sources` (multi), `q` (ILIKE sul messaggio) |
 | GET | `/api/admin/logs/page` | 🛡 | `?page=&size=&level=&sources=&q=` → `{items, total, counts, sources}` | **storico paginato** (4.F4): finestra newest-first + totale + conteggi per livello (sui filtri sorgente/ricerca) + sorgenti distinte (chip) |
 | DELETE | `/api/admin/alerts` | 🛡 | `?before=<date>` | purge globale storico alert per data |

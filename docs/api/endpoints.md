@@ -38,6 +38,8 @@ Role legend: 🌐 public · 👤 user · 🛡 admin
 | GET | `/api/admin/logs/page` | 🛡 | `{items, total, counts:{info,warning,error}, sources}` | **admin-only** system log **paged history** (4.F4): `page`+`size` (newest-first window) + `total` + per-level `counts` (over the source/search filters) + distinct `sources` (filter chips). Same `level`/`sources`/`q` filters |
 | GET | `/api/admin/feature-flags` | 🛡 | `{key: {…}}` | dev feature flags, effective values (defaults + overrides). Admin-only (4.B1a) |
 | PATCH | `/api/admin/feature-flags` | 🛡 | `{key: {…}}` | set one or more flags (known keys only); returns the effective map. Non-persistent — reset at web startup |
+| GET | `/api/admin/settings` | 🛡 | `{scraper_run_timeout_min, catchup_warning_min, log_retention_days, user_deletion_retention_days}` | system settings, effective (defaults + overrides). Admin only (4.F7) |
+| PATCH | `/api/admin/settings` | 🛡 | same shape (partial) | set one or more known settings (merged, ranges validated); **422** on unknown key / out-of-range. DB-first, no restart |
 
 Known flags (params shown with their defaults): `worker_tick` `{seconds: 60}` (worker dispatcher tick). _(The manual scrape-now cooldown is no longer a dev flag — it is the per-scraper reserved key `scrape_now_min_interval_s`, 4.B10.)_
 
