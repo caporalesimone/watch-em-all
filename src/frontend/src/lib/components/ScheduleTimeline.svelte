@@ -75,7 +75,14 @@
 		return `${s}s`;
 	}
 
-	type Marker = { id: string; name: string; icon: string | null; time: string; sec: number };
+	type Marker = {
+		id: string;
+		name: string;
+		icon: string | null;
+		time: string;
+		sec: number;
+		enabled: boolean;
+	};
 
 	const legendScrapers = $derived(scrapers.filter((s) => s.schedulable));
 
@@ -91,7 +98,8 @@
 					name: s.name,
 					icon: s.icon,
 					time: t,
-					sec
+					sec,
+					enabled: s.enabled
 				});
 			}
 		}
@@ -183,9 +191,11 @@
 	function markerClass(m: Marker): string {
 		const base =
 			'absolute -translate-x-1/2 -translate-y-1/2 rounded-full shadow-md transition-transform hover:brightness-110';
+		// Suspended scraper → grayed out (still clickable to remove).
+		const dim = m.enabled ? '' : ' opacity-40 grayscale';
 		return isNext(m)
-			? `${base} z-20 scale-150 ring-[3px] ring-slate-900 dark:ring-white`
-			: `${base} z-10 ring-1 ring-white/25`;
+			? `${base}${dim} z-20 scale-150 ring-[3px] ring-slate-900 dark:ring-white`
+			: `${base}${dim} z-10 ring-1 ring-white/25`;
 	}
 </script>
 
@@ -203,9 +213,9 @@
 	<!-- legend (schedulable scrapers only) -->
 	<div class="mt-4 flex flex-wrap gap-x-5 gap-y-2">
 		{#each legendScrapers as s (s.id)}
-			<span class="flex items-center gap-2 text-sm">
+			<span class="flex items-center gap-2 text-sm" class:opacity-50={!s.enabled}>
 				{#if s.icon}
-					<img src={s.icon} alt="" class="h-3.5 w-3.5" />
+					<img src={s.icon} alt="" class="h-3.5 w-3.5" class:grayscale={!s.enabled} />
 				{:else}
 					<span class="inline-block h-2.5 w-2.5 rounded-full bg-slate-400"></span>
 				{/if}
