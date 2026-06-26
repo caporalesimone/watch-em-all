@@ -47,9 +47,9 @@
 
 ### 4) Dev feature flags + an admin page that builds itself
 
-- A dev-only **feature flags** facility lets an admin tweak runtime knobs without a restart:
-  the **worker tick** interval and the **scrape-now cooldown**. They are shared with the
-  worker through the database and **reset when the web restarts** (non-persistent).
+- A dev-only **feature flags** facility lets an admin tweak a runtime knob without a restart:
+  the **worker tick** interval. It is shared with the worker through the database and
+  **resets when the web restarts** (non-persistent).
 - An **Admin → Feature flags** page renders itself from the API — each flag's input is
   inferred from its value's type — so a new flag shows up with **no frontend change**.
 
@@ -83,6 +83,14 @@
   `WEA_SECRET_KEY`). External names the images expect (`POSTGRES_*`, `TZ`) are unchanged.
   A [`docs/env-variables.md`](../env-variables.md) lists them all.
 
+### 9) Per-scraper operational settings (admin)
+
+- An **Admin → Scrapers** area lists the schedulable scrapers (version + schedule summary)
+  and opens, per scraper, a config page for the **operational parameters** the core applies
+  on every run and manual scrape: **politeness delay**, **HTTP timeout**, **cache half-life**
+  and the **manual scrape-now interval** (`GET`/`PATCH /api/admin/scrapers/{id}/config`). The
+  **Clear cache** button lives here too. Changes take effect on the next run — no restart.
+
 _Under the hood:_ the `worker` container runs the real dispatcher (`src/worker`): it boots
 like the web (engine, schema, plugins) and ticks at an interval read from the
 `worker_tick` feature flag (base `WEA_TICK_SECONDS`), re-read each second so a change takes
@@ -90,7 +98,9 @@ effect within ~1 s. Scheduling is a `scraper_schedule` table + admin API, a TZ-a
 due-slot/catch-up calculation, a **serial runner** (one scraper at a time, a per-scraper
 advisory lock shared with scrape-now, a run timeout from `system_settings`), and
 `scrape_run`/`scrape_user_log` records. The feature flags live in a `feature_flags` table
-shared between web and worker and cleared at web startup. The system log is fed by a
+shared between web and worker and cleared at web startup. The per-scraper reserved settings
+live in `scraper_admin_config`, read by `build_context` for every run and scrape-now
+(superseding the former hard-coded constants and the `scrape_now_cooldown` dev flag). The system log is fed by a
 logging handler attached to the `wea` logger in both processes — only `wea.worker.*` and
 `wea.plugin.*` records are persisted (the web's own logs stay on stdout); retention runs
 from the worker via `src/core/maintenance.py`. The scrape cache sits behind a small,
@@ -107,8 +117,9 @@ load); the product version is still baked from the git tag.
   a *daily-times* scheduler, not an "every N minutes" interval.
 - The **system log is API-only** for now; the near-real-time **log page** (filters,
   autoscroll) is the next frontend MVP and consumes the same cursor endpoint.
-- The cache half-life and the scrape-now cooldown are **global defaults / dev flags** today;
-  they become **per-scraper admin settings** in a later MVP.
+- The cache half-life and the manual scrape-now interval are now **per-scraper admin
+  settings** (Admin → Scrapers), editable without a restart; their defaults match the
+  former built-in constants.
 - Feature flags are **dev-only and non-persistent** — they reset to defaults on web restart.
 - The schema-drift alert ships **on in dev** (`WEA_SCHEMA_DRIFT_ALERT=true`); it never
   reaches a non-admin.

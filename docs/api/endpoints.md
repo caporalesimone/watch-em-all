@@ -38,7 +38,7 @@ Role legend: 🌐 public · 👤 user · 🛡 admin
 | GET | `/api/admin/feature-flags` | 🛡 | `{key: {…}}` | dev feature flags, effective values (defaults + overrides). Admin-only (4.B1a) |
 | PATCH | `/api/admin/feature-flags` | 🛡 | `{key: {…}}` | set one or more flags (known keys only); returns the effective map. Non-persistent — reset at web startup |
 
-Known flags (params shown with their defaults): `worker_tick` `{seconds: 60}` (worker dispatcher tick); `scrape_now_cooldown` `{seconds: 3600}` (manual scrape-now cooldown — lower it, e.g. `30`, to exercise the countdown without waiting the hour).
+Known flags (params shown with their defaults): `worker_tick` `{seconds: 60}` (worker dispatcher tick). _(The manual scrape-now cooldown is no longer a dev flag — it is the per-scraper reserved key `scrape_now_min_interval_s`, 4.B10.)_
 
 ## Admin — scrapers — [scraper-scheduling-and-limits](../3-features/admin/scraper-scheduling-and-limits.md)
 
@@ -47,6 +47,8 @@ Known flags (params shown with their defaults): `worker_tick` `{seconds: 60}` (w
 | GET | `/api/admin/scrapers` | 🛡 | `[{scraper_id, display_name, times, enabled, last_slot}]` | schedulable scrapers (those that implement scraping) + their schedule (4.B2) |
 | PUT | `/api/admin/scrapers/{scraper_id}` | 🛡 | `{times, enabled}` → the updated schedule | set the slots (`"HH:MM"` or `"HH:MM:SS"`, de-duplicated/sorted; **422** on a bad time) and the enabled flag; unknown scraper → **404** |
 | DELETE | `/api/admin/scrapers/{scraper_id}/cache` | 🛡 | `{deleted}` | clear the scraper's scrape cache (CTX-R9, 4.B9); returns how many entries were removed; unknown scraper → **404** |
+| GET | `/api/admin/scrapers/{scraper_id}/config` | 🛡 | `{politeness_delay_s, http_timeout_s, cache_ttl_min, scrape_now_min_interval_s}` | the scraper's **core reserved config** — effective values (defaults + overrides, 4.B10); unknown scraper → **404** |
+| PATCH | `/api/admin/scrapers/{scraper_id}/config` | 🛡 | same shape | set one or more reserved keys (merged over the current values); **422** on an unknown key or out-of-range value, **404** unknown scraper |
 
 ## Plugin discovery — [plugin-registry](../4-capabilities/core/plugin-registry.md)
 
