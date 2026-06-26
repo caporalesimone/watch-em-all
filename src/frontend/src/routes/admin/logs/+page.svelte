@@ -259,16 +259,16 @@
 		<table class="w-full table-fixed text-left text-sm">
 			<colgroup>
 				<col style="width: 7rem" />
-				<col style="width: 9rem" />
+				<col style="width: 6rem" />
 				<col style="width: 5rem" />
 				<col />
 				<col style="width: 3rem" />
 			</colgroup>
 			<thead class="border-b border-slate-200 text-xs text-slate-500 dark:border-slate-800">
 				<tr>
-					<th class="py-2 pr-4">{$_('admin.logs.colTime')}</th>
-					<th class="py-2 pr-4">{$_('admin.logs.colSource')}</th>
-					<th class="py-2 pr-4">{$_('admin.logs.colLevel')}</th>
+					<th class="py-2 text-center">{$_('admin.logs.colTime')}</th>
+					<th class="py-2 text-center">{$_('admin.logs.colSource')}</th>
+					<th class="py-2 text-center">{$_('admin.logs.colLevel')}</th>
 					<th class="py-2 pr-4">{$_('admin.logs.colMessage')}</th>
 					<th class="py-2"></th>
 				</tr>
@@ -276,16 +276,16 @@
 			<tbody>
 				{#each entries as e (e.id)}
 					<tr class="border-b border-slate-100 dark:border-slate-800/60">
-						<td class="py-1.5 pr-4 font-mono text-xs whitespace-nowrap text-slate-500"
+						<td class="py-1.5 text-center font-mono text-xs whitespace-nowrap text-slate-500"
 							>{fmtTime(e.created_at)}</td
 						>
-						<td class="py-1.5 pr-4">
+						<td class="py-1.5 text-center">
 							<span class="inline-flex items-center gap-1.5">
 								<span class="h-2 w-2 rounded-full {sourceDot(e.source)}"></span>
 								<span class="text-xs">{e.source}</span>
 							</span>
 						</td>
-						<td class="py-1.5 pr-4">
+						<td class="py-1.5 text-center">
 							<span class="rounded px-1.5 py-0.5 font-mono text-[11px] {LEVEL_BADGE[e.level]}">
 								{LEVEL_LABEL[e.level]}
 							</span>
