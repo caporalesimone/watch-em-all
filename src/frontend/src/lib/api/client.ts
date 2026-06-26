@@ -240,6 +240,27 @@ export function tailLogs(query: LogQuery = {}): Promise<SystemLogEntry[]> {
 	return apiFetch(`/api/admin/logs?${logParams(query)}`).then(asJson<SystemLogEntry[]>);
 }
 
+// System settings (MNT-R3, 4.F7): runtime, DB-first, admin-only. Effective = defaults + overrides.
+export interface SystemSettings {
+	scraper_run_timeout_min: number;
+	catchup_warning_min: number;
+	log_retention_days: number;
+	user_deletion_retention_days: number;
+}
+
+export function getSettings(): Promise<SystemSettings> {
+	return apiFetch('/api/admin/settings').then(asJson<SystemSettings>);
+}
+
+export async function patchSettings(partial: Partial<SystemSettings>): Promise<SystemSettings> {
+	const res = await apiFetch('/api/admin/settings', {
+		method: 'PATCH',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(partial)
+	});
+	return asJson<SystemSettings>(res);
+}
+
 // Catalog / Product Picker (CAT-*). Money fields are Decimal serialised as
 // strings (exact, no float drift) — rendered as-is, never parsed for maths.
 export interface BrandRef {

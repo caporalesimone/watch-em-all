@@ -22,7 +22,11 @@
 						children: [{ href: '/admin/scrapers/schedule', key: 'admin.scrapers.scheduleTitle' }]
 					},
 					{ href: '/admin/notifiers', key: 'nav.notifiers' },
-					{ href: '/admin/feature-flags', key: 'nav.featureFlags' }
+					{
+						href: '/admin/settings',
+						key: 'nav.settings',
+						children: [{ href: '/admin/feature-flags', key: 'nav.featureFlags' }]
+					}
 				]
 			: [
 					{ href: '/', key: 'nav.dashboard' },

@@ -17,7 +17,8 @@
 		"users": "Utenti",
 		"notifiers": "Notifier",
 		"featureFlags": "Feature flag",
-		"systemLogs": "Log di sistema"
+		"systemLogs": "Log di sistema",
+		"settings": "Impostazioni"
 	},
 	"catalog": {
 		"title": "Catalogo",
@@ -91,6 +92,24 @@
 			"empty": "Nessun log.",
 			"loadError": "Impossibile caricare i log.",
 			"showing": "Mostra {from}–{to} di {total}"
+		},
+		"settings": {
+			"title": "Impostazioni",
+			"hint": "Impostazioni di sistema a runtime, applicate senza riavvio.",
+			"loadError": "Impossibile caricare le impostazioni.",
+			"saveError": "Impossibile salvare le impostazioni.",
+			"fields": {
+				"scraper_run_timeout_min": "Timeout di run (minuti)",
+				"log_retention_days": "Retention log (giorni)",
+				"catchup_warning_min": "Soglia avviso recuperi (minuti)",
+				"user_deletion_retention_days": "Grazia cancellazione utenti (giorni)"
+			},
+			"fieldHints": {
+				"scraper_run_timeout_min": "Una run schedulata viene terminata se supera questo limite.",
+				"log_retention_days": "Log e record di run più vecchi vengono eliminati ogni giorno; 0 = mai. Lo storico prezzi non si tocca.",
+				"catchup_warning_min": "Avvisa quando uno slot recuperato è più vecchio di così (attivo quando arriva la feature).",
+				"user_deletion_retention_days": "Finestra di grazia prima della cancellazione definitiva di un utente (fase 10)."
+			}
 		},
 		"featureFlags": {
 			"title": "Feature flag",

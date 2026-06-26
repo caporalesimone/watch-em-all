@@ -17,7 +17,8 @@
 		"users": "Users",
 		"notifiers": "Notifiers",
 		"featureFlags": "Feature flags",
-		"systemLogs": "System logs"
+		"systemLogs": "System logs",
+		"settings": "Settings"
 	},
 	"catalog": {
 		"title": "Catalog",
@@ -91,6 +92,24 @@
 			"empty": "No log entries.",
 			"loadError": "Could not load the logs.",
 			"showing": "Showing {from}–{to} of {total}"
+		},
+		"settings": {
+			"title": "Settings",
+			"hint": "Runtime system settings, applied without a restart.",
+			"loadError": "Could not load the settings.",
+			"saveError": "Could not save the settings.",
+			"fields": {
+				"scraper_run_timeout_min": "Run timeout (minutes)",
+				"log_retention_days": "Log retention (days)",
+				"catchup_warning_min": "Catch-up warning threshold (minutes)",
+				"user_deletion_retention_days": "User deletion grace (days)"
+			},
+			"fieldHints": {
+				"scraper_run_timeout_min": "A scheduled run is stopped if it runs longer than this.",
+				"log_retention_days": "Logs and run records older than this are purged daily; 0 = never. Price history is never pruned.",
+				"catchup_warning_min": "Warn when a recovered slot is older than this (takes effect as the feature lands).",
+				"user_deletion_retention_days": "Grace window before a deleted user is removed for good (phase 10)."
+			}
 		},
 		"featureFlags": {
 			"title": "Feature flags",
