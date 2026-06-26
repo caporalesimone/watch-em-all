@@ -12,7 +12,8 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 ### New
 
-- **Scheduled scraping.** Set per-scraper daily times; the worker runs each scraper automatically, **one at a time**, catching up the last missed slot after downtime. (Slot-editor UI is next.)
+- **Scheduled scraping.** Set per-scraper daily times; the worker runs each scraper automatically, **one at a time**, catching up the last missed slot after downtime.
+- **Schedule editor + 24-hour view.** A **Scrapers → Schedule** admin page sets each scraper's daily run times (HH:MM:SS chips, add/remove, suspend), with a **24-hour timeline** showing every run as a clickable plugin-icon marker and a live "now" marker on the server clock. Two runs must be at least 1 minute apart.
 - **Scrape cache.** Repeated page reads within a half-life come from a cache instead of the shop — fewer visits; an admin can clear a scraper's cache.
 - **System log.** Worker/scraper events are recorded and readable by the admin (`GET /api/admin/logs`); old logs and runs auto-prune after `log_retention_days` (price history never does).
 - **Feature flags page.** A self-building **Feature flags** page (dev knob: worker tick — non-persistent).

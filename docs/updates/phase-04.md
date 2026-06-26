@@ -5,7 +5,7 @@
 > tooling around it: a transparent scrape cache, a system log with retention, dev feature
 > flags and the admin pages, on top of the earlier groundwork (a friendlier dev database
 > browser, a schema-drift safety net, admin plugin versions, tidier environment variables).
-> The slot editor and the live log page are the remaining frontend MVPs.
+> The live log page and the system-settings page are the remaining frontend MVPs.
 
 ## What's implemented (so far, 0.4.0)
 
@@ -23,7 +23,8 @@
   products found / new / price-changes / removed, HTTP requests, **cache hits** — and a
   status (`ok` / `partial` / `error` / `timeout`); a run that overruns the configured
   timeout is stopped between users and marked.
-- Schedules are set through the API for now; the **slot editor** UI is a coming MVP.
+- Schedules are set from the **Scrapers → Schedule** page (daily-times chips + a 24-hour
+  timeline with clickable markers and a live "now" marker), or via the API.
 
 ### 2) Scrape cache — fewer visits to the shop
 
@@ -115,9 +116,9 @@ load); the product version is still baked from the git tag.
 
 ## Good to know
 
-- **Scheduled scraping works today**, but it is configured via the API (`/api/admin/scrapers`)
-  until the **slot editor** lands. A single daily time means one run per day — the worker is
-  a *daily-times* scheduler, not an "every N minutes" interval.
+- **Scheduled scraping works today**, configured from the **Scrapers → Schedule** page (or the
+  API `/api/admin/scrapers`), with a 24-hour timeline. A single daily time means one run per
+  day — the worker is a *daily-times* scheduler, not an "every N minutes" interval.
 - The **system log is API-only** for now; the near-real-time **log page** (filters,
   autoscroll) is the next frontend MVP and consumes the same cursor endpoint.
 - The cache half-life and the manual scrape-now cooldown are now **per-scraper admin
