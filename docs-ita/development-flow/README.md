@@ -42,6 +42,8 @@
   *Risultato: report periodico, badge minimo storico e convenienza, export dei dati.*
 - [ ] **Fase 12 — Rifinitura e 1.0** → [phase-12-polish-v1.md](phase-12-polish-v1.md)
   *Risultato: secondo canale (Discord), audit i18n English-first, CI piena: release 1.0.*
+- 💡 **Fase 13 — Resilienza dello scraping** (post-1.0, idea da dettagliare) → [phase-13-scraping-resilience.md](phase-13-scraping-resilience.md)
+  *Risultato: le connessioni verso i siti usano user-agent (e opzioni di richiesta) decisi dal core, con eventuale preferenza per-scraper. Annotazione, oltre il perimetro 1.0.*
 
 ## La logica dell'ordine
 
@@ -50,9 +52,11 @@ flowchart LR
     F0[0 Pipeline] --> F1[1 Fondamenta] --> F2[2 Plugin system] --> F3[3 Primo scrape] --> F4[4 Worker]
     F4 --> F5[5 Carrelli] --> F6[6 Alert in-app] --> F7[7 Email 🎉 0.1]
     F7 --> F8[8 Grafici] --> F9[9 DragonStore full] --> F10[10 Admin] --> F11[11 Insight] --> F12[12 1.0]
+    F12 -.post-1.0.-> F13[13 Resilienza scraping 💡]
 ```
 
 - La fase 0 costruisce e **roda il processo** (CI, immagini dev sul branch, release sul tag, deploy kit) con container stub: **prima che esista il prodotto, esiste il suo flusso di rilascio** — ogni fase successiva ne beneficia dalla prima PR.
 - Le fasi 1-7 percorrono la **catena del valore minima** del prodotto (login → plugin → dati → automazione → carrelli → alert → consegna): alla fase 7 il sistema fa già, per intero, il suo mestiere su prodotti singoli.
 - Le fasi 8-11 **arricchiscono** (grafici, categorie, governo, insight) su un prodotto che già si usa tutti i giorni — ogni fase è valore visibile, non infrastruttura.
 - La fase 12 chiude il perimetro della [1.0](../1-business/product-overview.md).
+- Dalla **fase 13** in poi sono **enhancement post-1.0** (idee annotate, da dettagliare): non fanno parte del perimetro 1.0 e si promuovono quando diventano attuali — affini ai [future improvements](../future-improvements/README.md), ma tenute qui perché sono fasi di lavoro vere e proprie quando partiranno.
