@@ -32,6 +32,7 @@ class PluginInfo(BaseModel):
     route_base: str | None
     icon: str | None
     display_name: str
+    version: str  # the plugin's own manifest version (4.B0a), informative
 
 
 def _loaded(request: Request) -> list[LoadedPlugin]:
@@ -57,6 +58,7 @@ def list_plugins(request: Request, _user: UserDep) -> list[PluginInfo]:
                 route_base=route_base,
                 icon=icon,
                 display_name=manifest.display_name,
+                version=manifest.version,
             )
         )
     return infos

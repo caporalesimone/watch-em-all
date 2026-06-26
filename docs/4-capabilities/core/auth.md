@@ -14,7 +14,7 @@ Refresh rotation is the delicate part: every refresh issues a new pair and inval
 
 - **AUTH-R1** — `access_token` (15 min) is verified **without the DB** (signature + expiry + type); `refresh_token` (7 days) is verified **against the DB** only on refresh. Lifetimes are configurable from bootstrap.
 - **AUTH-R2** — Token claims: `sub` (user id), `role`, `tv` (token_version), `jti` (refresh only), `mcp` (`must_change_password`, access only), `typ` (`"access"` | `"refresh"`), `exp`. Verification **rejects** a token with the wrong `typ` for the context. The `mcp` claim lets the per-request guard enforce AUTH-R7 **without a DB read**.
-- **AUTH-R3** — HS256 signature with `SECRET_KEY` (≥256 bits of entropy, from `.env`).
+- **AUTH-R3** — HS256 signature with `WEA_SECRET_KEY` (≥256 bits of entropy, from `.env`).
 - **AUTH-R4** — **Refresh rotation**: each refresh issues a new pair and persists the new `jti` in `users.refresh_jti`. A refresh is valid only if `jti == users.refresh_jti` **and** `tv == users.token_version`. Reusing an old refresh (jti mismatch) is treated as possible theft: `token_version += 1` (global logout) + a log warning.
 - **AUTH-R5** — **Global invalidation** via `token_version += 1`: logout, password change, password reset, disable. Declared tolerance: an already-issued access token lives up to 15 min.
 - **AUTH-R6** — Login with an in-memory **rate limit** per IP+username (5 attempts/min; 429 over the threshold) and bcrypt password hashing, minimum length 8.

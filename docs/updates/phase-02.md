@@ -34,8 +34,7 @@ Dev stack (builds from sources, reads `.env`):
 
 ```bash
 cp .env.example .env                                    # once
-docker compose -f compose-dev.yml up -d --build         # db + web + worker
-docker compose -f compose-dev.yml --profile dev up -d   # + Adminer on :8081
+docker compose -f compose-dev.yml up -d --build         # db + web + worker + pgweb (DB browser on :8081)
 docker compose -f compose-dev.yml down -v               # stop + reset the DB
 ```
 

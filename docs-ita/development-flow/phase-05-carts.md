@@ -12,6 +12,10 @@ Crei "Wishlist giochi" (scraper-specific): la card mostra totale pieno barrato, 
 
 ## MVP
 
+### Trasversali (da fare tra le prime cose)
+
+- [ ] **5.T1 — Tag `latest` sulle immagini al release** (~30m): in `publish.yml`, oltre a `:x.y.z`, pushare anche **`:latest`** per `watch-em-all` e `watch-em-all-ops` (due tag nello stesso build-push, o `docker/metadata-action`). **Decisione (2026-06-27, Simone)**: si vuole `latest` come comodità — **inverte la chiosa "mai `latest`"** sulle *nostre* immagini in [ci.md](../infrastructure/ci.md) e [deployment.md](../infrastructure/deployment.md): quando atterra, aggiornare quelle due note. Il **pinning di `WEA_VERSION` resta il default consigliato** in deployment (`latest` = prova rapida / "ultima"). **INF-1 non cambia**: riguarda il pinning delle immagini *upstream* (`postgres:16`, `pgweb`, base images), non la pubblicazione di un `latest` per i nostri artefatti. *Verifica: push di un tag `x.y.z` → su GHCR compaiono sia `x.y.z` sia `latest` per entrambe le immagini.*
+
 ### Backend
 
 - [ ] **5.B1 — Tabelle + CRUD carrelli** (~1h): `carts`/`cart_members` (UNIQUE, cascate), API CRUD ([endpoints](../api/endpoints.md#carrelli--cart-engine)). *Verifica: ciclo completo via Swagger.*

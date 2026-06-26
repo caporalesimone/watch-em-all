@@ -29,19 +29,8 @@ _Under the hood:_ the `Product` contract + per-user catalog tables (`products` /
 ## Useful Commands
 
 ```bash
-docker compose -f compose-dev.yml up -d --build         # rebuild + restart — app on http://localhost:8080
-docker compose -f compose-dev.yml --profile dev up -d   # also start Adminer (DB browser) on http://localhost:8081
+docker compose -f compose-dev.yml up -d --build         # rebuild + restart — app on :8080, pgweb (DB browser) on :8081
 docker compose -f compose-dev.yml down -v               # reset the DB (admin recreated from .env, must change password)
 ```
 
-**Adminer** (DB browser) — once started with the `dev` profile, open **http://localhost:8081** and log in with:
-
-| Field | Value |
-|---|---|
-| System | PostgreSQL |
-| Server | `db` (the Compose service name, not `localhost`) |
-| Username | `POSTGRES_USER` from `.env` |
-| Password | `POSTGRES_PASSWORD` from `.env` |
-| Database | `POSTGRES_DB` from `.env` |
-
-> The `dev` profile must be passed every time you want Adminer; without it only `db`/`web`/`worker` start.
+**pgweb** (DB browser) — comes up with the dev stack and opens **http://localhost:8081** straight on the `watchemall` database: no connection form, no login (the connection is built from the `POSTGRES_*` values in `.env`).

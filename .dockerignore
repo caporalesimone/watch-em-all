@@ -7,9 +7,21 @@ docs/
 docs-ita/
 backups/
 compose*.yml
-node_modules/
+# Match at ANY depth: the real one is src/frontend/node_modules (~109MB, tens of
+# thousands of files). A bare `node_modules/` only matches the (non-existent) root
+# one, so BuildKit would still walk the nested tree on every build (slow on the
+# Windows mount). The frontend stage rebuilds it with `npm ci` anyway.
+**/node_modules/
 src/frontend/.svelte-kit/
 src/frontend/build/
 **/__pycache__/
 .venv/
 .env
+# Not used by any build stage — kept out of the context so they aren't shipped to
+# the daemon on every build (the app image never COPYies these).
+tests/
+.github/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.env.example

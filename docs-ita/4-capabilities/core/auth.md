@@ -29,7 +29,7 @@ sequenceDiagram
 
 - **AUTH-R1** — `access_token` (15 min) verificato **senza DB** (firma + scadenza + tipo); `refresh_token` (7 giorni) verificato **con DB** al solo refresh. Durate configurabili da bootstrap.
 - **AUTH-R2** — Claim dei token: `sub` (user_id), `role`, `tv` (token_version), `jti` (solo refresh), `mcp` (`must_change_password`, solo access), `typ` (`"access"` | `"refresh"`), `exp`. La verifica **rifiuta** un token col `typ` sbagliato per il contesto: un refresh non è spendibile come access. Il claim `mcp` consente alla guardia per-request di applicare AUTH-R7 **senza leggere il DB** (AUTH-R1).
-- **AUTH-R3** — Firma HS256 con `SECRET_KEY` (≥256 bit di entropia, da `.env`).
+- **AUTH-R3** — Firma HS256 con `WEA_SECRET_KEY` (≥256 bit di entropia, da `.env`).
 - **AUTH-R4** — **Rotazione del refresh**: a ogni refresh si emette una nuova coppia e si persiste il nuovo `jti` in `users.refresh_jti`. Un refresh è valido solo se `jti == users.refresh_jti` **e** `tv == users.token_version`. Il riuso di un refresh vecchio (jti mismatch) è trattato come possibile furto: `token_version += 1` (logout globale) + warning nel log.
 - **AUTH-R5** — **Invalidazione globale** via `token_version += 1`: logout, cambio password, reset password, disabilitazione. Tolleranza dichiarata: un access già emesso vale fino a 15 min.
 - **AUTH-R6** — Login con **rate limit** in-memory per IP+username (es. 5 tentativi/min, backoff; 429 oltre soglia) e hashing password bcrypt (o argon2), lunghezza minima 8.

@@ -18,6 +18,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     String,
     UniqueConstraint,
@@ -147,3 +148,152 @@ class ScrapeCooldown(Base):
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     last_scraped_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class FeatureFlag(Base):
+    """Dev-only runtime feature flags (4.B1a). ``key`` → JSON ``value`` (the flag's own
+    params). Kept in the DB so the web (which sets them via the admin API) and the
+    worker (which reads them each tick) — separate processes — share the same values.
+    The web clears the table at startup, so flags are **non-persistent**: every boot
+    reverts to the code defaults. Admin-only, dev-oriented — not a production toggle.
+    """
+
+    __tablename__ = "feature_flags"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+
+
+class ScraperSchedule(Base):
+    """Per-scraper schedule (SCHED-R1, scheduling-models.md): 1..N daily slots, an
+    enabled flag, and the last EXECUTED slot. ``times`` are wall-clock ``"HH:MM"`` in the
+    installation timezone (sorted, unique); ``last_slot`` is a UTC datetime (not a date)
+    so it supports N slots/day and cross-midnight catch-up. One row per scraper (= plugin_id).
+    """
+
+    __tablename__ = "scraper_schedule"
+
+    scraper_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    times: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    last_slot: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ScraperAdminConfig(Base):
+    """Per-scraper admin config (PCFG-R2, 4.B10): one row per scraper (= plugin_id),
+    ``config_json`` holding the **core reserved keys** (``politeness_delay_ms``,
+    ``http_timeout_s``, ``cache_ttl_min``, ``scrape_now_min_interval_s``) the core reads on
+    the plugin's behalf (HTTP client, cache, scrape-now cooldown) and, from phase 7+, the
+    fields the plugin itself declares (site rules). Typed access via
+    :func:`src.core.scraper_config.get_scraper_config`; unknown keys are ignored. No
+    ``enabled`` flag — suspension lives in ``scraper_schedule``."""
+
+    __tablename__ = "scraper_admin_config"
+
+    plugin_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    config_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class SystemSetting(Base):
+    """Global system settings (MNT-R3), key → JSON value, editable at runtime and
+    **persistent** (unlike feature_flags). Typed access via
+    :func:`src.core.settings.get_system_settings`; 4.B5 reads ``scraper_run_timeout_min``,
+    later MVPs grow it (retention, grace period) + the admin editor."""
+
+    __tablename__ = "system_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[Any] = mapped_column(JSON, nullable=False)
+
+
+class ScrapeRun(Base):
+    """One scraper run — scheduled or manual (scheduling-models.md, 4.B6). Counters are
+    aggregated from the per-user deltas + the instrumented HTTP client."""
+
+    __tablename__ = "scrape_run"
+    __table_args__ = (Index("ix_scrape_run_scraper_started", "scraper_id", "started_at"),)
+
+    run_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    scraper_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    trigger: Mapped[str] = mapped_column(String(16), nullable=False)  # "scheduled" | "manual"
+    slot: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # running | ok | partial | error | timeout
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="running")
+    users_processed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    products_found: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    products_new: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    price_changes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    products_removed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    products_excluded: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    http_requests: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cache_hits: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+
+class ScrapeUserLog(Base):
+    """Per-user detail of a run (one row per user per run, 4.B6). http_requests/cache_hits
+    are the share attributed to the user in flight (the run is mono-thread)."""
+
+    __tablename__ = "scrape_user_log"
+    __table_args__ = (Index("ix_scrape_user_log_run", "run_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("scrape_run.run_id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    products_found: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    products_new: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    price_changes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    http_requests: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cache_hits: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="ok")  # ok | error
+    error_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+
+class SystemLog(Base):
+    """Operational event log (LOG-R1..R4, 4.B7). The incremental ``id`` doubles as the
+    polling cursor (LOG-R3). ``source`` is one of worker | scraper | notifier | alert |
+    summary; ``level`` info | warning | error. Messages never carry user operational
+    content (LOG-R4) — only ids and metrics. Retention by MNT-R2 (worker daily purge)."""
+
+    __tablename__ = "system_log"
+    __table_args__ = (Index("ix_system_log_created", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    level: Mapped[str] = mapped_column(String(16), nullable=False)  # info | warning | error
+    source: Mapped[str] = mapped_column(String(16), nullable=False)
+    message: Mapped[str] = mapped_column(String(2048), nullable=False)
+    context_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
+
+class ScrapeCache(Base):
+    """Scrape response cache (CTX-R9, 4.B8). One row per (plugin_id, cache_key); the key is
+    the sha256 of the normalised request (method + URL, sorted query) scoped to the plugin.
+    ``expires_at`` enforces the per-plugin half-life: expired rows are ignored on read and
+    purged at run start (4.B9). ``response_body`` is the raw bytes; ``response_meta_json``
+    keeps status + content-type so a hit reconstructs the response faithfully."""
+
+    __tablename__ = "scrape_cache"
+    __table_args__ = (
+        UniqueConstraint("plugin_id", "cache_key", name="uq_scrape_cache_identity"),
+        Index("ix_scrape_cache_expires", "expires_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    plugin_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    cache_key: Mapped[str] = mapped_column(String(64), nullable=False)  # sha256 hex
+    response_body: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    response_meta_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

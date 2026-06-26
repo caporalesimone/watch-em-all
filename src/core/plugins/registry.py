@@ -18,6 +18,7 @@ from types import ModuleType
 from typing import Any
 
 from fastapi import FastAPI
+from sqlalchemy import Engine, inspect
 
 from src.core.plugins.base import BasePlugin, NotifierPlugin, ScraperPlugin
 from src.core.plugins.context import PluginContext, build_context
@@ -142,7 +143,9 @@ def _load_one(
             f"plugin_id {plugin.plugin_id!r} does not match manifest name {manifest.name!r}"
         )
 
-    plugin.initialize(context_builder(manifest, plugin))
+    context = context_builder(manifest, plugin)
+    plugin.initialize(context)
+    _enforce_table_metadata(manifest, plugin, context.engine)
     _mount_router(app, manifest, plugin, router_dependencies)
     names.add(manifest.name)
     loaded.append(
@@ -154,6 +157,29 @@ def _load_one(
         )
     )
     log.info("plugin %s loaded (%s)", manifest.name, manifest.type)
+
+
+def _enforce_table_metadata(manifest: Manifest, plugin: BasePlugin, engine: Engine) -> None:
+    """DB-R7: a plugin that owns tables (``plugin_<id>_*``) must declare them in
+    ``table_metadata`` so the schema-drift guard (4.B0) can see them. Enforced at load
+    by the naming convention: any ``plugin_<id>_*`` table present in the DB but not
+    covered by ``table_metadata`` (including the case it is ``None``) rejects the
+    plugin — a real plugin that owns tables it doesn't declare must not load."""
+    prefix = f"plugin_{plugin.plugin_id}_"
+    try:
+        db_tables = set(inspect(engine).get_table_names())
+    except Exception as exc:  # an inspection error must not silently disable the guard
+        raise PluginLoadError(
+            f"{manifest.name}: cannot inspect the schema to verify table_metadata: {exc}"
+        ) from exc
+    owned = {name for name in db_tables if name.startswith(prefix)}
+    declared = set(plugin.table_metadata.tables) if plugin.table_metadata is not None else set()
+    undeclared = owned - declared
+    if undeclared:
+        raise PluginLoadError(
+            f"{manifest.name}: owns table(s) {sorted(undeclared)} not declared in "
+            "table_metadata (DB-R7) — set `table_metadata = _Base.metadata`"
+        )
 
 
 def _import_entry(plugin_name: str, entry_path: Path) -> ModuleType:

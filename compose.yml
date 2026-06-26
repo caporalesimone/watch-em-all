@@ -94,13 +94,10 @@ services:
     depends_on:
       db: { condition: service_healthy }
 
-  adminer:
-    image: adminer:4
-    ports: ["8081:8080"]
-    profiles: [dev]                      # browser DB inspection, dev only
-    depends_on:
-      db: { condition: service_healthy }
-    restart: unless-stopped
+# No DB browser here by design: the release kit is production-only. To inspect the
+# database in a pinch use `docker compose exec db psql -U $POSTGRES_USER $POSTGRES_DB`
+# or the `ops` container (backup/export/restore). The pgweb browser lives only in
+# compose-dev.yml (INF-3).
 
 volumes:
   pgdata:

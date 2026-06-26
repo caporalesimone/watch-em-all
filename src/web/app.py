@@ -17,13 +17,25 @@ from fastapi import Depends, FastAPI
 
 from src.core.bootstrap import ensure_initial_admin
 from src.core.config import get_settings
-from src.core.db import create_schema, init_engine, new_session
+from src.core.db import Base, create_schema, get_engine, init_engine, new_session
+from src.core.feature_flags import clear_flags, effective_flags
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.registry import load_plugins
+from src.core.schema_drift import SchemaDriftItem, check_schema_drift
 from src.core.scrape import implements_scraping
+from src.core.system_log import install_system_log_handler
 from src.web.deps import require_user
 from src.web.error_handlers import register_error_handlers
-from src.web.routers import admin_users, auth, catalog, health, me, plugins
+from src.web.routers import (
+    admin_scrapers,
+    admin_system,
+    admin_users,
+    auth,
+    catalog,
+    health,
+    me,
+    plugins,
+)
 from src.web.routers.scrape import make_scrape_now_router
 from src.web.spa import SpaStaticFiles
 
@@ -37,6 +49,8 @@ STATIC_DIR = Path(os.environ.get("WEA_STATIC_DIR", "/app/static"))
 def create_app() -> FastAPI:
     settings = get_settings()
     init_engine(settings.core.database_url)
+    # Scraper events that run in the web process (manual scrape-now) reach system_log too.
+    install_system_log_handler()
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -49,12 +63,40 @@ def create_app() -> FastAPI:
                 password=settings.admin_initial_password,
                 locale=settings.core.default_locale,
             )
+            # Dev feature flags are non-persistent: reset to defaults on each boot (4.B1a).
+            clear_flags(session)
+            log.info("feature flags: %s", effective_flags(session))
         finally:
             session.close()
         # Discover, load and mount the enabled plugins (REG-*). Isolated failures
         # are logged; the core stays up. Stored for the discovery endpoint. Every
         # plugin route sits behind authentication (#3).
         _app.state.loaded_plugins = load_plugins(_app, router_dependencies=[Depends(require_user)])
+        # Schema-drift guard (4.B0): now that the schema is ensured (create_schema +
+        # each plugin's initialize), compare the ORM model — core Base.metadata plus
+        # every plugin's declared table_metadata — against the live DB. It ALWAYS runs
+        # and logs warnings; WEA_SCHEMA_DRIFT_ALERT only gates the /api/health exposure
+        # (health.py). A check failure must never block startup.
+        metadatas = [Base.metadata] + [
+            lp.plugin.table_metadata
+            for lp in _app.state.loaded_plugins
+            if lp.plugin.table_metadata is not None
+        ]
+        drift: list[SchemaDriftItem] = []
+        try:
+            drift = check_schema_drift(get_engine(), metadatas)
+        except Exception:
+            log.exception("schema-drift check failed")
+        for item in drift:
+            if item.missing_table:
+                log.warning("schema drift: table %r is missing from the database", item.table)
+            else:
+                log.warning(
+                    "schema drift: table %r is missing column(s): %s",
+                    item.table,
+                    ", ".join(item.missing_columns),
+                )
+        _app.state.schema_drift = drift
         # Standard per-scraper scrape-now routes (SCR-R15): mounted here in the web
         # (they need the authenticated user + a request session, so they cannot
         # live in the web-free core base) for every scraper that actually implements
@@ -94,6 +136,8 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api/auth")
     app.include_router(me.router, prefix="/api")
     app.include_router(admin_users.router, prefix="/api")
+    app.include_router(admin_system.router, prefix="/api")
+    app.include_router(admin_scrapers.router, prefix="/api")
     app.include_router(catalog.router, prefix="/api")
     app.include_router(plugins.router, prefix="/api")
     # The SPA catch-all is mounted in the lifespan, after the plugins (see above).

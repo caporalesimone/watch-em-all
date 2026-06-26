@@ -23,6 +23,10 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # type-only: keeps this module free of runtime src.core imports
+    from src.core.scrape_cache import ScrapeCache
 
 DEFAULT_USER_AGENT = "watch-em-all/0.3 (+https://github.com/caporalesimone/watch-em-all)"
 DEFAULT_TIMEOUT_S = 15.0
@@ -66,6 +70,7 @@ class HttpClient:
         backoff_base_s: float = DEFAULT_BACKOFF_BASE_S,
         sleep: Callable[[float], None] = time.sleep,
         monotonic: Callable[[], float] = time.monotonic,
+        cache: ScrapeCache | None = None,
     ) -> None:
         self._user_agent = user_agent
         self._timeout_s = timeout_s
@@ -76,11 +81,18 @@ class HttpClient:
         self._monotonic = monotonic
         self._last_request_at: float | None = None
         self._request_count = 0
+        self._cache = cache  # scrape cache (CTX-R9); None = no caching
+        self._cache_hits = 0
 
     @property
     def request_count(self) -> int:
         """Total HTTP attempts made (retries included) — feeds monitoring (CTX-R3)."""
         return self._request_count
+
+    @property
+    def cache_hits(self) -> int:
+        """GET requests served from the scrape cache (CTX-R9) — feeds monitoring."""
+        return self._cache_hits
 
     def get(self, url: str, *, headers: dict[str, str] | None = None) -> HttpResponse:
         return self._request("GET", url, headers=headers)
@@ -104,6 +116,20 @@ class HttpClient:
         data: bytes | None = None,
         headers: dict[str, str] | None = None,
     ) -> HttpResponse:
+        # Scrape cache (CTX-R9): a GET within the half-life is served from cache — no HTTP,
+        # no politeness wait — and counted as a hit. POST is never cached.
+        if method == "GET" and self._cache is not None and self._cache.enabled:
+            cached = self._cache.get(method, url)
+            if cached is not None:
+                self._cache_hits += 1
+                hdrs_hit = {"content-type": cached.content_type} if cached.content_type else {}
+                return HttpResponse(
+                    status_code=cached.status_code,
+                    content=cached.content,
+                    url=url,
+                    headers=hdrs_hit,
+                )
+
         hdrs = {"User-Agent": self._user_agent}
         if headers:
             hdrs.update(headers)
@@ -119,11 +145,18 @@ class HttpClient:
                 with urllib.request.urlopen(req, timeout=self._timeout_s) as resp:
                     body = resp.read()
                     self._last_request_at = self._monotonic()
+                    resp_headers = {k.lower(): v for k, v in resp.headers.items()}
+                    # Cache the successful GET result (CTX-R9). Errors (4xx/5xx) take the
+                    # HTTPError path below and are never cached.
+                    if method == "GET" and self._cache is not None and self._cache.enabled:
+                        self._cache.put(
+                            method, url, int(resp.status), body, resp_headers.get("content-type")
+                        )
                     return HttpResponse(
                         status_code=int(resp.status),
                         content=body,
                         url=resp.geturl(),
-                        headers={k.lower(): v for k, v in resp.headers.items()},
+                        headers=resp_headers,
                     )
             except urllib.error.HTTPError as exc:
                 self._last_request_at = self._monotonic()

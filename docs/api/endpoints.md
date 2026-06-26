@@ -29,11 +29,35 @@ Role legend: 🌐 public · 👤 user · 🛡 admin
 | POST | `/api/admin/users` | 🛡 | `{username, first_name, last_name, role, temp_password}` | creates an account with a forced first-login password change; duplicate username → 409 (USR-R1/R2/R15) |
 | GET | `/api/admin/users` | 🛡 | — | lists all accounts (username, name, role, status, last login) |
 
+## Admin — system
+
+| Method | Path | Role | Response | Notes |
+|---|---|---|---|---|
+| GET | `/api/admin/errors` | 🛡 | `[{source, type, title, description}]` | **admin-only** feed of errors/warnings (admin diagnostics), kept off the public `/api/health` probe. First source: schema drift (4.B0), behind `WEA_SCHEMA_DRIFT_ALERT` |
+| GET | `/api/admin/logs` | 🛡 | `[{id, created_at, level, source, message, context}]` | **admin-only** system log **live tail** (4.B7/4.F3). Cursor by `id`: no `since` → latest `limit`; `since=<id>` → rows with `id > since` (ascending). Filters `level` (info/warning/error), `sources` (repeatable, multi), `q` (case-insensitive message search); `limit` 1–1000 (default 200) |
+| GET | `/api/admin/logs/page` | 🛡 | `{items, total, counts:{info,warning,error}, sources}` | **admin-only** system log **paged history** (4.F4): `page`+`size` (newest-first window) + `total` + per-level `counts` (over the source/search filters) + distinct `sources` (filter chips). Same `level`/`sources`/`q` filters |
+| GET | `/api/admin/feature-flags` | 🛡 | `{key: {…}}` | dev feature flags, effective values (defaults + overrides). Admin-only (4.B1a) |
+| PATCH | `/api/admin/feature-flags` | 🛡 | `{key: {…}}` | set one or more flags (known keys only); returns the effective map. Non-persistent — reset at web startup |
+| GET | `/api/admin/settings` | 🛡 | `{scraper_run_timeout_min, catchup_warning_min, log_retention_days, user_deletion_retention_days}` | system settings, effective (defaults + overrides). Admin only (4.F7) |
+| PATCH | `/api/admin/settings` | 🛡 | same shape (partial) | set one or more known settings (merged, ranges validated); **422** on unknown key / out-of-range. DB-first, no restart |
+
+Known flags (params shown with their defaults): `worker_tick` `{seconds: 60}` (worker dispatcher tick). _(The manual scrape-now cooldown is no longer a dev flag — it is the per-scraper reserved key `scrape_now_min_interval_s`, 4.B10.)_
+
+## Admin — scrapers — [scraper-scheduling-and-limits](../3-features/admin/scraper-scheduling-and-limits.md)
+
+| Method | Path | Role | Response | Notes |
+|---|---|---|---|---|
+| GET | `/api/admin/scrapers` | 🛡 | `[{scraper_id, display_name, times, enabled, last_slot}]` | schedulable scrapers (those that implement scraping) + their schedule (4.B2) |
+| PUT | `/api/admin/scrapers/{scraper_id}` | 🛡 | `{times, enabled}` → `{scraper_id, times, enabled, last_slot}` | set the slots (input `"HH:MM"` or `"HH:MM:SS"`, **returned canonical `"HH:MM:SS"`** (4.F1), de-duplicated/sorted; **422** on a bad time) and the enabled flag; unknown scraper → **404**. Edited from the **Scrapers → Schedule** page |
+| DELETE | `/api/admin/scrapers/{scraper_id}/cache` | 🛡 | `{deleted}` | clear the scraper's scrape cache (CTX-R9, 4.B9); returns how many entries were removed; unknown scraper → **404** |
+| GET | `/api/admin/scrapers/{scraper_id}/config` | 🛡 | `{politeness_delay_ms, http_timeout_s, cache_ttl_min, scrape_now_min_interval_s}` | the scraper's **core reserved config** — effective values (defaults + overrides, 4.B10); unknown scraper → **404** |
+| PATCH | `/api/admin/scrapers/{scraper_id}/config` | 🛡 | same shape | set one or more reserved keys (merged over the current values); **422** on an unknown key or out-of-range value, **404** unknown scraper |
+
 ## Plugin discovery — [plugin-registry](../4-capabilities/core/plugin-registry.md)
 
 | Method | Path | Role | Response | Notes |
 |---|---|---|---|---|
-| GET | `/api/plugins` | 👤🛡 | `[{name, type, route_base, icon, display_name}]` | only enabled + loaded plugins; no internal paths. `route_base`/`icon` are `null` for a plugin without a frontend (notifiers) |
+| GET | `/api/plugins` | 👤🛡 | `[{name, type, route_base, icon, display_name, version}]` | only enabled + loaded plugins; no internal paths. `route_base`/`icon` are `null` for a plugin without a frontend (notifiers); `version` is the plugin's own manifest version (4.B0a) |
 | GET | `/api/plugin-assets/{name}/icon` | 🌐 | image | the plugin's manifest `icon`, served as a static asset (path-traversal guarded); 404 if absent. Public like the SPA bundle — the browser loads it as an `<img>`, which cannot carry the bearer token |
 
 Plugin-specific routes are registered by each plugin under `/api{route_base}` (e.g. `/api/plugins/my-store/...`), **behind authentication** (the registry applies a user dependency to every plugin router), and documented in OpenAPI under the `Plugin: <name>` tag.
@@ -53,7 +77,7 @@ Registered under `/api/plugins/dragon-store` (the generic convention above); the
 | Method | Path | Role | Notes |
 |---|---|---|---|
 | POST | `/api/plugins/dragon-store/test` | 👤 | dry-run: returns `list[Product]`, writes nothing (SCR-R11) |
-| POST | `/api/plugins/dragon-store/scrape-now` | 👤 | immediate scrape for the requesting user only (writes the catalog); within the cooldown → **429** with the time remaining; otherwise **202** + a background job (SCR-R15) |
+| POST | `/api/plugins/dragon-store/scrape-now` | 👤 | immediate scrape for the requesting user only (writes the catalog); a run already in progress (scheduled or manual) → **409** (`scrape_in_progress`, SCHED-R4); within the cooldown → **429** with the time remaining; otherwise **202** + a background job (SCR-R15) |
 | GET | `/api/plugins/dragon-store/scrape-now` | 👤 | cooldown status: `{available, available_at, retry_after_seconds, interval_seconds}` (feeds the UI countdown) |
 | GET/POST/DELETE | `/api/plugins/dragon-store/watches` | 👤 | the user's watched product URLs; `POST` rejects a duplicate URL with **409** |
 
@@ -61,4 +85,4 @@ Registered under `/api/plugins/dragon-store` (the generic convention above); the
 
 | Method | Path | Role | Response | Notes |
 |---|---|---|---|---|
-| GET | `/api/health` | 🌐 | `200 {status, db, version, worker_heartbeat_age_s}` / `503` | app alive + DB reachable; `version` is the baked product version; `worker_heartbeat_age_s` is `null` until the worker persists its heartbeat (phase 4) |
+| GET | `/api/health` | 🌐 | `200 {status, db, version, server_time, worker_heartbeat_age_s}` / `503` | app alive + DB reachable; `version` is the baked product version; `server_time` is ISO8601 with the installation-TZ offset (the UI clock source, 4.F1); `worker_heartbeat_age_s` is `null` until the worker persists its heartbeat (phase 4) |

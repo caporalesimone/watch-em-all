@@ -14,7 +14,11 @@
 		"profile": "Profilo",
 		"logout": "Esci",
 		"scrapers": "Scraper",
-		"users": "Utenti"
+		"users": "Utenti",
+		"notifiers": "Notifier",
+		"featureFlags": "Feature flag",
+		"systemLogs": "Log di sistema",
+		"settings": "Impostazioni"
 	},
 	"catalog": {
 		"title": "Catalogo",
@@ -29,8 +33,6 @@
 		"colPriceOriginal": "Prezzo pieno",
 		"colPriceCurrent": "Prezzo",
 		"colAvailability": "Disponibilità",
-		"colOpen": "Apri",
-		"open": "Apri",
 		"available": "Disponibile",
 		"unavailable": "Esaurito",
 		"removed": "Delistato",
@@ -42,7 +44,6 @@
 	"admin": {
 		"users": {
 			"title": "Utenti",
-			"create": "Crea un utente",
 			"username": "Nome utente",
 			"firstName": "Nome",
 			"lastName": "Cognome",
@@ -63,13 +64,118 @@
 			"created": "Creato \"{username}\" — comunica la password temporanea; dovrà cambiarla al primo accesso.",
 			"errorTaken": "Questo nome utente è già in uso.",
 			"errorGeneric": "Impossibile creare l'utente."
+		},
+		"notifiers": {
+			"title": "Notifier",
+			"colName": "Notifier",
+			"colVersion": "Versione",
+			"empty": "Nessun notifier caricato.",
+			"loadError": "Impossibile caricare i notifier."
+		},
+		"logs": {
+			"title": "Log di sistema",
+			"subtitle": "Eventi runtime di scraper, worker, notifier, api e db.",
+			"live": "Live",
+			"refresh": "Aggiorna",
+			"search": "Cerca nei messaggi o nelle sorgenti…",
+			"all": "Tutti",
+			"sources": "Sorgenti",
+			"perPage": "{n} / pag.",
+			"colTime": "Ora",
+			"colSource": "Sorgente",
+			"colLevel": "Livello",
+			"colMessage": "Messaggio",
+			"context": "Contesto",
+			"empty": "Nessun log.",
+			"loadError": "Impossibile caricare i log.",
+			"showing": "Mostra {from}–{to} di {total}"
+		},
+		"settings": {
+			"title": "Impostazioni",
+			"hint": "Impostazioni di sistema a runtime, applicate senza riavvio.",
+			"loadError": "Impossibile caricare le impostazioni.",
+			"saveError": "Impossibile salvare le impostazioni.",
+			"fields": {
+				"scraper_run_timeout_min": "Timeout di run (minuti)",
+				"log_retention_days": "Retention log (giorni)",
+				"catchup_warning_min": "Soglia avviso recuperi (minuti)",
+				"user_deletion_retention_days": "Grazia cancellazione utenti (giorni)"
+			},
+			"fieldHints": {
+				"scraper_run_timeout_min": "Una run schedulata viene terminata se supera questo limite.",
+				"log_retention_days": "Log e record di run più vecchi vengono eliminati ogni giorno; 0 = mai. Lo storico prezzi non si tocca.",
+				"catchup_warning_min": "Avvisa quando uno slot recuperato è più vecchio di così (attivo quando arriva la feature).",
+				"user_deletion_retention_days": "Finestra di grazia prima della cancellazione definitiva di un utente (fase 10)."
+			}
+		},
+		"featureFlags": {
+			"title": "Feature flag",
+			"hint": "Interruttori di sviluppo a runtime. Le modifiche hanno effetto subito e non sono persistenti — tornano ai default al riavvio del web.",
+			"empty": "Nessun feature flag definito.",
+			"loadError": "Impossibile caricare i feature flag.",
+			"saveError": "Impossibile salvare i feature flag."
+		},
+		"scrapers": {
+			"title": "Scraper",
+			"hint": "Pianificazione e parametri operativi, uno scraper alla volta.",
+			"empty": "Nessuno scraper pianificabile caricato.",
+			"loadError": "Impossibile caricare gli scraper.",
+			"saveError": "Impossibile salvare la configurazione.",
+			"colName": "Scraper",
+			"colVersion": "Versione",
+			"colCache": "Cache",
+			"colSchedule": "Pianificazione",
+			"configure": "Configura",
+			"notSchedulable": "Non schedulabile",
+			"scheduleTitle": "Pianificazione",
+			"scheduleHint": "Imposta gli orari giornalieri per scraper. Gli orari sono nel fuso del server; due esecuzioni devono distare almeno 1 minuto.",
+			"colAdd": "Aggiungi",
+			"colActive": "Attivo",
+			"addAction": "Aggiungi",
+			"tooClose": "Troppo vicino a un orario esistente — minimo 1 minuto di distanza.",
+			"noTimes": "Nessun orario",
+			"removeConfirm": "Rimuovere l'esecuzione delle {time} per {name}?",
+			"removeAction": "Rimuovi",
+			"back": "← Scraper",
+			"configTitle": "{name} — configurazione",
+			"reserved": "Parametri operativi",
+			"reservedHint": "Impostazioni core applicate a ogni esecuzione e scrape manuale. Hanno effetto alla prossima esecuzione — senza riavvio.",
+			"cache": "Cache di scrape",
+			"cacheHint": "Rimuove le pagine in cache così la prossima esecuzione le riscarica dal sito.",
+			"clearCache": "Svuota cache",
+			"clearConfirm": "Rimuove tutte le pagine in cache di questo scraper. Continuare?",
+			"cacheCleared": "Rimosse {n} voci dalla cache.",
+			"clearError": "Impossibile svuotare la cache.",
+			"fields": {
+				"politeness_delay_ms": "Ritardo di politeness (millisecondi)",
+				"http_timeout_s": "Timeout HTTP (secondi)",
+				"cache_ttl_min": "Emivita cache (minuti, 0 = off)",
+				"scrape_now_min_interval_s": "Cooldown Scrape ora manuale (secondi)"
+			},
+			"fieldHints": {
+				"politeness_delay_ms": "Attesa minima tra due richieste verso lo stesso sito.",
+				"http_timeout_s": "Quanto attendere una risposta prima di rinunciare a una richiesta.",
+				"cache_ttl_min": "Per quanto una pagina scaricata viene riusata prima di riscaricarla; 0 disattiva la cache.",
+				"scrape_now_min_interval_s": "Tempo minimo prima che un utente possa rilanciare Scrape ora."
+			},
+			"viz": {
+				"title": "Pianificazione 24 ore",
+				"subtitle": "Sei fasce da 4 ore dalla mezzanotte. Clicca un marker per rimuovere quell'esecuzione.",
+				"runsPerDay": "{n} esecuzioni / giorno",
+				"perDay": "{n}×/giorno",
+				"noRuns": "nessuna esecuzione",
+				"empty": "Nessuna pianificazione ancora — aggiungi un orario a uno scraper qui sopra.",
+				"willStartIn": "{name} parte tra {when}",
+				"removeTitle": "{name} · {time} (clicca per rimuovere)"
+			}
 		}
-	},
-	"theme": {
-		"toggle": "Cambia tema"
 	},
 	"plugins": {
 		"notFound": "Questa pagina del plugin non è disponibile."
+	},
+	"adminErrors": {
+		"copy": "Copia messaggio",
+		"copied": "Messaggio copiato"
 	},
 	"login": {
 		"title": "Accedi",
@@ -80,13 +186,11 @@
 	"changePassword": {
 		"title": "Cambia la password",
 		"greeting": "Ciao {name}, scegli una nuova password per continuare.",
-		"hint": "Scegli una nuova password (almeno 8 caratteri).",
 		"current": "Password attuale",
 		"new": "Nuova password",
 		"confirm": "Conferma nuova password",
 		"submit": "Cambia password",
-		"mismatch": "Le due password non coincidono.",
-		"done": "Password cambiata. Accedi di nuovo."
+		"mismatch": "Le due password non coincidono."
 	},
 	"profile": {
 		"title": "Profilo",

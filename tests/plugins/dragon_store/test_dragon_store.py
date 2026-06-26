@@ -18,12 +18,14 @@ from typing import Any, cast
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from src.core.db import new_session
 from src.core.http import HttpClient
 from src.core.plugins.context import build_context
+from src.core.scraper_config import set_scraper_config
 
 DS = "/api/plugins/dragon-store"
 
-_FIX = Path(__file__).parent / "fixtures" / "dragon_store"
+_FIX = Path(__file__).parent / "fixtures"
 _FIXTURES = {
     "896": "gp_896_discounted.html",
     "36099": "gp_36099_preorder.html",
@@ -260,6 +262,26 @@ def test_scrape_now_status_available_before_first_run(client: TestClient) -> Non
     status = client.get(f"{DS}/scrape-now", headers=_bearer(token)).json()
     assert status["available"] is True
     assert status["available_at"] is None
+
+
+def test_scrape_now_cooldown_interval_follows_admin_config(client: TestClient) -> None:
+    # The per-scraper reserved config (scrape_now_min_interval_s, 4.B10) drives the cooldown
+    # the GET status reports (the UI countdown); a short interval reflects on the next read.
+    _uid, token = _user(client)
+    h = _bearer(token)
+    session = new_session()
+    try:
+        set_scraper_config(session, "dragon_store", {"scrape_now_min_interval_s": 30})
+    finally:
+        session.close()
+    with DragonServer() as base:
+        client.post(f"{DS}/watches", json={"url": gp_url(base, "896")}, headers=h)
+        assert client.post(f"{DS}/scrape-now", headers=h).status_code == 202
+        blocked = client.post(f"{DS}/scrape-now", headers=h)
+    assert blocked.status_code == 429
+    status = client.get(f"{DS}/scrape-now", headers=h).json()
+    assert status["interval_seconds"] == 30
+    assert 0 < status["retry_after_seconds"] <= 30
 
 
 # --- direct: run_for_user (idempotency, no-watch, identity dedup) ---

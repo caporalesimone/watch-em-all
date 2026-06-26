@@ -20,11 +20,14 @@ from datetime import datetime
 from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel
 
+from src.core.db import get_engine
 from src.core.errors import APIError
+from src.core.locks import ScraperLock, acquire_scraper_lock
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.context import build_context
 from src.core.plugins.registry import LoadedPlugin
 from src.core.scrape import CooldownStatus, claim_scrape, cooldown_status
+from src.core.scraper_config import get_scraper_config
 from src.web.deps import SessionDep, UserDep
 
 log = logging.getLogger(__name__)
@@ -72,7 +75,7 @@ def make_scrape_now_router(loaded: LoadedPlugin) -> APIRouter:
     assert isinstance(plugin, ScraperPlugin)  # the web mounts this only for scrapers
     manifest = loaded.manifest
 
-    def _run(user_id: int) -> None:
+    def _run(lock: ScraperLock, user_id: int) -> None:
         ctx = build_context(manifest, plugin)
         try:
             plugin.run_for_user(ctx, user_id)
@@ -80,6 +83,7 @@ def make_scrape_now_router(loaded: LoadedPlugin) -> APIRouter:
             log.exception("scrape-now failed for plugin %s user %s", plugin.plugin_id, user_id)
         finally:
             ctx.db.close()
+            lock.release()  # held since the request to keep the per-scraper lock (SCHED-R4)
 
     @router.post(
         "/scrape-now",
@@ -89,13 +93,22 @@ def make_scrape_now_router(loaded: LoadedPlugin) -> APIRouter:
         summary="Run this scraper now for the current user (cooldown-limited).",
     )
     def scrape_now(user: UserDep, db: SessionDep, background: BackgroundTasks) -> ScrapeNowStarted:
-        status = claim_scrape(db, plugin.plugin_id, user.sub)
+        # SCHED-R4: refuse if a run (scheduled or manual) is already in progress; the lock
+        # is held from here through the background task, which releases it when done.
+        lock = acquire_scraper_lock(get_engine(), plugin.plugin_id)
+        if lock is None:
+            raise APIError(
+                409, "scrape_in_progress", "A scrape for this source is already running."
+            )
+        interval = get_scraper_config(db, plugin.plugin_id).scrape_now_min_interval_s
+        status = claim_scrape(db, plugin.plugin_id, user.sub, interval)
         if not status.available:
+            lock.release()
             wait = _humanize(status.retry_after_seconds)
             raise APIError(
                 429, "scrape_cooldown", f"Scrape now is on cooldown; available again in ~{wait}."
             )
-        background.add_task(_run, user.sub)
+        background.add_task(_run, lock, user.sub)
         return ScrapeNowStarted(status="started", interval_seconds=status.interval_seconds)
 
     @router.get(
@@ -105,6 +118,7 @@ def make_scrape_now_router(loaded: LoadedPlugin) -> APIRouter:
         summary="Cooldown status for the current user (drives the UI countdown).",
     )
     def scrape_now_status(user: UserDep, db: SessionDep) -> ScrapeNowStatus:
-        return _to_model(cooldown_status(db, plugin.plugin_id, user.sub))
+        interval = get_scraper_config(db, plugin.plugin_id).scrape_now_min_interval_s
+        return _to_model(cooldown_status(db, plugin.plugin_id, user.sub, interval))
 
     return router

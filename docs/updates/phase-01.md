@@ -24,7 +24,7 @@
 
 ## Good to know
 
-- **First run**: `cp .env.example .env` (single config source), then start the dev stack. Default credentials from `.env.example`: `admin` / `change-me-please` → you are forced to set a new password, then sign in again with it. (Change them in `.env`: `ADMIN_INITIAL_USERNAME` / `ADMIN_INITIAL_PASSWORD`.)
+- **First run**: `cp .env.example .env` (single config source), then start the dev stack. Default credentials from `.env.example`: `admin` / `change-me-please` → you are forced to set a new password, then sign in again with it. (Change them in `.env`: `WEA_ADMIN_INITIAL_USERNAME` / `WEA_ADMIN_INITIAL_PASSWORD`.)
 - A password change is a **global logout** (by design): after changing it you are sent back to login.
 - The **worker is still a stub** in this phase, so `/api/health` shows `worker_heartbeat_age_s: null` — expected (the real worker arrives in phase 4).
 - After rebuilding the frontend, **hard-refresh** the browser (Ctrl+Shift+R): bundles are content-hashed and the old one may be cached.

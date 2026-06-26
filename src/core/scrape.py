@@ -107,6 +107,23 @@ def claim_scrape(
     return status
 
 
+def stamp_cooldown(session: Session, plugin_id: str, user_id: int) -> None:
+    """Write-only half of SCR-R15: stamp the anchor to *now* at the START of a scheduled
+    scrape for this ``(plugin, user)``, so the user's manual scrape-now is then on
+    cooldown. Never reads or blocks (a scheduled run is never itself rate-limited)."""
+    now = datetime.now(UTC)
+    row = session.scalar(
+        select(ScrapeCooldown).where(
+            ScrapeCooldown.plugin_id == plugin_id, ScrapeCooldown.user_id == user_id
+        )
+    )
+    if row is None:
+        session.add(ScrapeCooldown(plugin_id=plugin_id, user_id=user_id, last_scraped_at=now))
+    else:
+        row.last_scraped_at = now
+    session.commit()
+
+
 def implements_scraping(plugin: ScraperPlugin) -> bool:
     """True if the scraper actually implements ``run_for_user`` (overrides the
     base default). The web mounts the scrape-now route only for these, so a

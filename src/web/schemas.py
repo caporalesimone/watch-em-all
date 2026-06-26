@@ -55,6 +55,9 @@ class HealthResponse(BaseModel):
     status: str
     db: str
     version: str
+    # Current server time as ISO8601 with the installation-TZ offset (4.F1): the UI reads it
+    # once at render and ticks locally, so timelines use the server clock, not the client's.
+    server_time: datetime
     worker_heartbeat_age_s: float | None = None
 
 

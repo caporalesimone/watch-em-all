@@ -6,6 +6,27 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 Each entry is **short** and reads as a user-facing story: first a **bullet list of what changed for you** (additions, removals and changes together, light on jargon), then a brief **_under the hood_** paragraph on the architectural/technical changes. Older entries predate this style and are left as they are.
 
+## [0.4.0] - Unreleased
+
+**Phase 4 — automatic scheduled scraping (the worker), plus the dev/admin tooling around it.**
+
+### New
+
+- **Scheduled scraping.** Set per-scraper daily times; the worker runs each scraper automatically, **one at a time**, catching up the last missed slot after downtime.
+- **Schedule editor + 24-hour view.** A **Scrapers → Schedule** admin page sets each scraper's daily run times (HH:MM:SS chips, add/remove, suspend), with a **24-hour timeline** showing every run as a clickable plugin-icon marker and a live "now" marker on the server clock. Two runs must be at least 1 minute apart; removing a run asks for confirmation; a suspended scraper is grayed out everywhere.
+- **Scrape cache.** Repeated page reads within a half-life come from a cache instead of the shop — fewer visits; an admin can clear a scraper's cache.
+- **System log + page.** Worker/scraper events are recorded and read from a **System logs** admin page — a **Live** tail or paged **history**, with level tabs (counts), multi-source chips, message search and a context viewer; old logs and runs auto-prune after `log_retention_days` (price history never does).
+- **System settings page.** A **Settings** admin page edits the runtime `system_settings` (run timeout, log retention, catch-up threshold, user-deletion grace) **without a restart** (`GET`/`PATCH /api/admin/settings`, ranges validated). **Feature flags** now lives as a child under Settings (a self-building dev page: worker-tick knob, non-persistent).
+- **Scrapers & Notifiers admin.** Two admin areas list the loaded plugins by kind (icon + version): **Scrapers** also shows each scraper's schedule and opens its config page — politeness delay, HTTP timeout, cache half-life and the manual scrape-now cooldown — with a **Clear cache** button (changes apply on the next run, no restart); **Notifiers** lists the notifier plugins. (Replaces the earlier single Plugins list.)
+- **Schema-drift safety net** (dev): a missing table/column surfaces in an **admin-only** banner/feed (`GET /api/admin/errors`), never on the public `/api/health`.
+
+### Changed
+
+- **Dev DB browser: Adminer → pgweb** — opens straight on the DB (no login); the **release** kit now carries **no** DB browser at all.
+- **Heads-up — env vars renamed:** every variable is now **`WEA_`**-prefixed (e.g. `SECRET_KEY` → `WEA_SECRET_KEY`). Update your `.env`; see [`docs/env-variables.md`](docs/env-variables.md).
+
+_Under the hood:_ a real `worker` (`src/worker`) ticks (interval from the `worker_tick` feature flag, re-read each second) and dispatches due slots to a **serial runner** under a per-scraper advisory lock shared with scrape-now (409 on overlap), with a run timeout from `system_settings` and `scrape_run`/`scrape_user_log` records. The scrape cache (`scrape_cache`, CTX-R9) and the system log (`system_log`) each sit behind a small **swappable interface** (`scrape_cache.py`, `system_log.py`) — Postgres today, a Redis backend later would be a localized swap; the worker drops expired cache at run start and prunes logs/runs past `log_retention_days` daily (price history never). Feature flags live in a `feature_flags` table shared by web and worker and cleared at web startup. Per-scraper operational settings live in `scraper_admin_config` (the core reserved keys), read by `build_context` for every run and scrape-now and superseding the former hard-coded constants and the `scrape_now_cooldown` dev flag. Schema drift iterates `Base.metadata` plus each plugin's declared `table_metadata` (DB-R7, enforced at load); pgweb is dev-only (no Compose profile, INF-3); env vars carry the `WEA_` prefix and the product version is baked from the git tag. A dev/CI **i18n consistency gate** (`src/frontend/scripts/i18n-check.mjs`, `npm run i18n:check`) checks the English translation JSONs (core + plugins) against the code — failing on a used-but-missing or defined-but-dead key — and runs on PRs and release tags; it flagged and removed ten orphaned strings (English is the reference; per-locale parity lands in phase 12).
+
 ## [0.3.4] - 2026-06-25
 
 **Phase 3 — consolidation: close the open items and round off the documentation.**

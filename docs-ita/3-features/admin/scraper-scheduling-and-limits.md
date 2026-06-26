@@ -18,7 +18,7 @@ L'admin governa **quando** e **quanto** lavorano gli scraper: orari di esecuzion
 ### Esecuzione seriale e limiti di sistema
 - **SCHED-R6** — **Esecuzione strettamente seriale**: il runner esegue **un solo scraper alla volta**; i job dovuti nello stesso momento attendono in **coda FIFO**. Non esiste alcun parametro di parallelismo: la distribuzione del carico si governa **distanziando gli orari** degli scraper (con l'aiuto della vista calendario, SCHED-R10).
 - **SCHED-R7** — **`scraper_run_timeout`**: durata massima di una run (default 30 minuti); oltre, la run è terminata e marcata in errore. Uno scraper appeso non deve mai bloccare il sistema (con l'esecuzione seriale, bloccherebbe anche la coda).
-- **SCHED-R8** — **Politeness per-scraper**: ritardo minimo tra richieste HTTP consecutive dello stesso scraper (default 1–2 s, configurabile per scraper nella sua pagina admin). È imposto dal client HTTP fornito dal core, non lasciato alla buona volontà del plugin.
+- **SCHED-R8** — **Politeness per-scraper**: ritardo minimo tra richieste HTTP consecutive dello stesso scraper — chiave riservata **`politeness_delay_ms`** (millisecondi, default 1000–2000 ms), configurabile per scraper nella sua pagina admin (4.B10). È imposto dal client HTTP fornito dal core, non lasciato alla buona volontà del plugin.
 - **SCHED-R9** — Ogni scraper è **internamente mono-thread** (vincolo di contratto): una richiesta alla volta verso il sito. Con l'esecuzione seriale tra scraper, in ogni istante il sistema ha **al più una richiesta HTTP in volo** verso i siti osservati.
 
 ### Vista calendario
@@ -43,9 +43,9 @@ A e B sono dovuti alle 06:00: B attende in coda la fine di A. C ha il suo orario
 
 | Elemento | Contenuto |
 |---|---|
-| Riga per scraper | nome+icona, stato (attivo/sospeso/in coda/in esecuzione), slot configurati, esito e durata dell'ultima run, prossimo slot |
-| Azioni per riga | modifica slot (aggiungi/rimuovi orari), sospendi/riattiva, vai al monitoraggio |
-| Vista calendario | la giornata con i blocchi delle run pianificate di tutti gli scraper (SCHED-R10), read-only, click → pagina di configurazione dello scraper |
+| Riga per scraper | nome+icona, gli slot configurati come **chip `HH:MM:SS`** con **×** (chiede conferma), un **time-picker `HH:MM:SS` + Add** per aggiungerne, e un **toggle Attivo/Sospeso** (= flag `enabled`). Gli scraper non schedulabili compaiono come "Non schedulabile" |
+| Editor degli slot | pagina dedicata **`/admin/scrapers/schedule`** (4.F1, figlia di *Scrapers* nella sidebar): aggiungi/rimuovi orari (con conferma) e sospendi/riattiva persistono subito via `PUT /api/admin/scrapers/{id}`. **Regola solo-UI**: due run di *qualsiasi* scraper non possono distare meno di 1 minuto (distanza circolare a mezzanotte). |
+| Vista 24 ore | sotto la tabella, una timeline a **6 fasce da 4h** dalla mezzanotte: ogni run è un **marker = icona del plugin** cliccabile (rimuove, con conferma), con legenda, contatore `N runs/day` e un **now-marker** che legge l'ora del server da `/api/health` una volta e poi avanza in locale ogni secondo (hover → evidenzia il prossimo run). Uno scraper sospeso ha marker/chip/legenda **grigiati**. |
 | Impostazioni globali | `scraper_run_timeout`, soglia di ritardo per i recuperi, retention dei log |
 
 ```mermaid

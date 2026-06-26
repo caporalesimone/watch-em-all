@@ -54,6 +54,67 @@ class _Plugin(NotifierPlugin):
 plugin = _Plugin()
 """
 
+# A scraper that OWNS a table but does NOT declare table_metadata (DB-R7 violation).
+_SCRAPER_TABLE_NO_META = """
+from sqlalchemy import Integer
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from src.core.plugins.base import ScraperPlugin
+
+
+class _Base(DeclarativeBase):
+    pass
+
+
+class _Row(_Base):
+    __tablename__ = "plugin_leaky_rows"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+class _Plugin(ScraperPlugin):
+    plugin_id = "leaky"
+
+    def identity_seed(self, raw):
+        return None
+
+    def initialize(self, context):
+        _Base.metadata.create_all(context.engine)
+
+
+plugin = _Plugin()
+"""
+
+# Same, but correctly declaring its schema via table_metadata.
+_SCRAPER_TABLE_WITH_META = """
+from sqlalchemy import Integer
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from src.core.plugins.base import ScraperPlugin
+
+
+class _Base(DeclarativeBase):
+    pass
+
+
+class _Row(_Base):
+    __tablename__ = "plugin_tidy_rows"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+class _Plugin(ScraperPlugin):
+    plugin_id = "tidy"
+    table_metadata = _Base.metadata
+
+    def identity_seed(self, raw):
+        return None
+
+    def initialize(self, context):
+        _Base.metadata.create_all(context.engine)
+
+
+plugin = _Plugin()
+"""
+
 _engine = create_engine("sqlite+pysqlite:///:memory:")
 
 
@@ -203,3 +264,18 @@ def test_loads_notifier_without_router(tmp_path: Path) -> None:
     assert loaded[0].manifest.type == "notifier"
     paths = [getattr(route, "path", "") for route in app.routes]
     assert all(not path.startswith("/api/plugins") for path in paths)
+
+
+def test_scraper_owning_tables_without_table_metadata_rejected(tmp_path: Path) -> None:
+    # DB-R7: it creates plugin_leaky_rows but never declares table_metadata → rejected.
+    _make_scraper(tmp_path, "leaky", backend=_SCRAPER_TABLE_NO_META)
+    app = FastAPI()
+    loaded = load_plugins(app, context_builder=_ctx_builder, plugins_root=tmp_path)
+    assert loaded == []
+
+
+def test_scraper_declaring_table_metadata_loads(tmp_path: Path) -> None:
+    _make_scraper(tmp_path, "tidy", backend=_SCRAPER_TABLE_WITH_META)
+    app = FastAPI()
+    loaded = load_plugins(app, context_builder=_ctx_builder, plugins_root=tmp_path)
+    assert _names(loaded) == ["tidy"]

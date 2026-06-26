@@ -5,88 +5,63 @@ New items get appended over time.
 
 ## Open
 
-### Scrape-now: make the UI core-provided + rework the popup
-- **Reported:** rivedere graficamente il popup dello Scrape now. Se possibile lo Scrape now
-  (i **componenti grafici**, non solo il backend) va implementato nel **core**, non nel
-  singolo scraper, così ogni plugin non deve reimplementarlo. Il popup deve comparire
-  **in alto al centro** (non in basso) e **sopra tutti gli elementi**.
-- **Where:** the button + confirm popup currently live in the plugin
-  [`src/plugins/scrapers/dragon_store/frontend/PluginRoot.svelte`](src/plugins/scrapers/dragon_store/frontend/PluginRoot.svelte);
-  the backend mechanism (cooldown, route) is already core/base.
-- **Fix idea:** extract a shared **core frontend component** (a `ScrapeNow` widget the
-  plugin host injects — same spirit as the common dry-run results table, SCR-R12) so every
-  scraper gets the button + cooldown countdown + confirm popup for free. Render the popup
-  through a top-level portal/overlay anchored **top-center**, with a z-index above the app
-  shell.
+- **Catalog — extra space in the category breadcrumb.** In the Catalog the categories print as
+  `cat1 / cat2 / cat3` with an unwanted space around the `/`, because
+  [`catalog/+page.svelte`](src/frontend/src/routes/catalog/+page.svelte#L262-L278) lays each segment on
+  its own indented line and HTML collapses the newlines into a rendered space. The Dragon Store plugin
+  page renders the same breadcrumb but packs the markup with no inter-element whitespace
+  ([`PluginRoot.svelte`](src/plugins/scrapers/dragon_store/frontend/PluginRoot.svelte#L334-L340)) and
+  looks better — `Giochi di Ruolo/GDR Italiano/Il Richiamo di Cthulhu` beats
+  `Giochi di Ruolo/ GDR Italiano/ Il Richiamo di Cthulhu`. Fix: render the catalog breadcrumb tight,
+  the way Dragon Store does.
 
-### Swap Adminer → pgweb (dev DB browser), preconfigured & login-less
-- **Reported (Simone):** sostituire **Adminer** con **pgweb** come browser DB di sviluppo.
-  pgweb va **pre-configurato** (utente `admin` / pass `admin`), avviato **solo in debug**
-  (profilo `dev`) e **già connesso** al database `watchemall` senza compilare il form di
-  connessione. Sarebbe perfetto **evitare anche il login**.
-- **Where (touch points found in review):**
-  - [`compose.yml`](compose.yml#L97-L103) and [`compose-dev.yml`](compose-dev.yml#L89-L95):
-    the `adminer` service (`image: adminer:4`, `ports: ["8081:8080"]`, `profiles: [dev]`).
-  - [`compose-dev.yml:8`](compose-dev.yml#L8) header comment "# also adminer on :8081".
-  - [`.devcontainer/devcontainer.json:8`](.devcontainer/devcontainer.json#L8) —
-    `forwardPorts: [8080, 8081]` (8081 forwarded for the DB browser; can stay).
-  - Docs: [`README.md:98`](README.md#L98); [`docs/updates/phase-02.md:38`](docs/updates/phase-02.md#L38);
-    [`docs/updates/phase-03.md:33,37,47`](docs/updates/phase-03.md#L33-L47) (incl. the
-    "log in with…" step — pgweb shouldn't need it); deployment
-    ([`docs/infrastructure/deployment.md:44,110-112`](docs/infrastructure/deployment.md#L44)
-    + [`docs-ita`](docs-ita/infrastructure/deployment.md#L48) :48,119-121,137); dev-container
-    ([`docs/infrastructure/dev-container.md:44,55`](docs/infrastructure/dev-container.md#L44)
-    + [`docs-ita`](docs-ita/infrastructure/dev-container.md#L42) :42,54,70,86,101);
-    [`docs-ita/2-architecture/system-overview.md:18,38`](docs-ita/2-architecture/system-overview.md#L18);
-    [`docs-ita/4-capabilities/database/schema.md:86`](docs-ita/4-capabilities/database/schema.md#L86) (DB-R6);
-    [`docs-ita/developer-rules/infrastructure/rules.md:7,9`](docs-ita/developer-rules/infrastructure/rules.md#L7)
-    (INF-1 pins `adminer:4`; INF-3 "Adminer e simili");
-    [`docs-ita/plugin-development/checklist-and-testing.md:55`](docs-ita/plugin-development/checklist-and-testing.md#L55);
-    [`docs-ita/development-flow/phase-00-pipeline.md:31`](docs-ita/development-flow/phase-00-pipeline.md#L31),
-    [`phase-01-foundations.md:19`](docs-ita/development-flow/phase-01-foundations.md#L19).
-  - [`CHANGELOG.md:204`](CHANGELOG.md#L204) — historical released entry, **leave as-is**.
-- **.env / .env.example:** today **neither** references adminer (adminer needs no config —
-  you pick the DB in its UI). pgweb instead wants a connection: feed it a URL built from the
-  existing `POSTGRES_*` — `postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable`
-  (via `DATABASE_URL`/`--url`; confirm the exact env-var name + pgweb's listen port, likely
-  `8081:8081`, against the image at implementation time). Passing the URL makes pgweb open
-  straight on `watchemall` and **skip the connection form** → that already removes the
-  "login". Do **not** set pgweb's HTTP basic auth (`--auth-*`) since the request is to avoid
-  login — keep it locked down via the `dev` profile + never exposing 8081 in prod instead.
-  - **Credential note to confirm:** the request says "user admin / pass admin", but the dev
-    DB is `POSTGRES_USER=admin` / `POSTGRES_PASSWORD=change`. pgweb connects with the **DB**
-    creds, so it'd be `admin/change` unless we also set the dev DB password to `admin`. Decide.
-- **Fix idea:** replace the `adminer` service with `sosedoff/pgweb` (pin a tag, INF-1), keep
-  `profiles: [dev]` (INF-3) + `depends_on: db`, map `8081`, pass the connection URL. Then
-  sweep the doc touch points above (drop the Adminer "log in with…" step, rename to pgweb,
-  keep :8081) and update the INF-1 pin + INF-3 wording.
-- **Testing (once implemented):** `docker compose -f compose-dev.yml --profile dev up -d`
-  starts **pgweb** (not adminer) on :8081; opening **http://localhost:8081** lands **directly**
-  on the `watchemall` DB — **no connection form, no login** — and the tables are browsable.
-  **Without** the `dev` profile pgweb must **not** start (only db/web/worker). Confirm
-  `docker compose -f compose-dev.yml config` no longer lists an `adminer` service, and a repo
-  grep for "adminer" leaves only the historical CHANGELOG entry.
+- **Generalize the shared UI pieces into a core-provided "SDK".** The category breadcrumb, the image
+  element, and the **product cell** (the table-cell block with the linkable title + brand + category)
+  are re-implemented in both the Catalog and the Dragon Store page — and the spacing bug above is
+  exactly what that duplication causes. They should become ready-made components shipped by the core
+  (a small SDK) so every page/plugin gets the same look from a single implementation. This is a
+  concrete instance of the **shared plugin design-system** already gated for discussion before the
+  notifier work: list these three widgets (category breadcrumb, image, product cell) as candidates in
+  the [phase-7 "discuss before you start" gate](docs-ita/development-flow/phase-07-email-notifier.md)
+  plus rule [FE-18](docs-ita/developer-rules/frontend/rules.md).
 
-## Reminders / to discuss
+- **Admin — a live log page (frontend only now).** `4.B7` shipped in `0.4.0`: the `system_log`
+  table + the cursor API `GET /api/admin/logs` (no `since` → latest N; `since=<id>` → only newer rows;
+  `level`/`source` filters; `limit` 1–1000). So the **backend is done** — what's left is just the UI,
+  `4.F3`/`4.F4` (the polling page with filters, autoscroll). A *minimal* page is now a thin consumer of
+  that endpoint: load the latest N, then poll with `since=<maxId>`. Decisions already taken: **no
+  heartbeat log row** (the page's heartbeat/liveness cue must come from `/api/health` + the file
+  heartbeat, not from a log line); the worker/scraper are the only sources persisted. Still open for
+  `4.F3/F4`: polling cadence, sidebar placement, one page vs two (cursor page + filters page).
 
-### A standard set of core-frontend components reused by plugins
-- **Reminder (Simone):** ha senso ridiscutere un **set di elementi standard** forniti dal
-  **core frontend** e riutilizzati dai plugin? Discuterne su come potrebbe funzionare.
-- Candidate shared widgets: buttons (consistent hover/fill), popup/overlay (portal,
-  top-center, z above shell), the dry-run results table (already meant to be common,
-  SCR-R12), tag/badge chips, brand/category breadcrumb, the **Scrape now** control.
-- Possible shape: a small design-system exposed via `$lib`, with the plugin host injecting
-  the higher-level widgets (Scrape now, dry-run table) so plugins don't re-implement them
-  and the look stays consistent. Ties together the three button/popup items above.
+- **Worker container exposes `8080/tcp` but serves nothing (cosmetic).** `docker ps` on the dev
+  stack shows the `worker` container with `8080/tcp` exposed even though the worker serves no HTTP
+  (now the real dispatcher, 4.B1, shipped in 0.4.0 — still no HTTP) — the port is just `EXPOSE 8080`
+  metadata inherited from the shared `watch-em-all` image (one image, two roles `web`/`worker` by
+  command, by design). It is **not published** (no host mapping) so it's harmless, only noisy in
+  `docker ps`. Either accept/document it, or split the EXPOSE so only the `web` role advertises the
+  port. Observed:
+  ```
+  7ab0f417bb56  watch-em-all:dev  …  Up (healthy)  8080/tcp                       …-worker-1
+  26f3f3ce703f  watch-em-all:dev  …  Up (healthy)  0.0.0.0:8080->8080/tcp         …-web-1
+  0f7c989370fe  sosedoff/pgweb…   …  Up            0.0.0.0:8081->8081/tcp         …-pgweb-1
+  14eb07aee657  postgres:16       …  Up (healthy)  5432/tcp                       …-db-1
+  ```
 
-### compose-dev.yml: serve ancora il profilo `dev`?
-- **Reported (Simone):** in `compose-dev.yml` c'è il profilo `dev`; ma lancio già un compose diverso da
-  quello ufficiale — non ha senso toglierlo?
-- **Perché esiste (analisi):** il profilo è **ortogonale** alla scelta del file. `compose-dev.yml` vs
-  `compose.yml` sceglie *build-da-sorgenti vs immagini GHCR*. Il profilo `dev` invece fa il **gating** dei
-  servizi *opzionali / on-demand* DENTRO lo stack dev: i servizi senza profilo (`db`/`web`/`worker`) partono
-  sempre con un `up`; quelli con profilo partono **solo se lo attivi**. Oggi solo `adminer` ha `profiles:[dev]`
-  (browser DB); `ops` ha `profiles:[ops]`. Quindi `up` = solo db/web/worker; `--profile dev` aggiunge il browser DB.
-- **Conseguenza del toglierlo:** adminer (poi pgweb, vedi item Adminer→pgweb) partirebbe **a ogni `up`**, sempre acceso.
-- **Da decidere:** tenerlo (pattern standard Compose per servizi opzionali; consigliato), eventualmente
-  **rinominarlo** in qualcosa di più chiaro tipo `tools`/`debug` (il file è già "dev", così non confonde).
+## Off topic
+
+- **Two Claude Code skills: start-of-work and end-of-work.** Create a `/start-work` skill that opens a
+  phase/PR (branch, dated status header, empty CHANGELOG placeholder, version bookkeeping) and an
+  `/end-work` skill that closes it (finalize the CHANGELOG entry, tick the checklist, the tag +
+  GitHub-release steps, image/version sanity check). They'd encode the repeatable versioning/tagging
+  ritual — one tag per phase, no `v` prefix, `WEA_VERSION` in `.env`, version baked from `git describe`
+  — so it isn't re-derived by hand each time. See [`docs/env-variables.md`](docs/env-variables.md) and
+  the version notes in [ci](docs-ita/infrastructure/ci.md) for what the skills should automate.
+
+## Done / moved
+
+- The **shared plugin design-system** (Scrape-now-in-core + the common core-frontend widget set) is the
+  [phase-7 "discuss before you start" gate](docs-ita/development-flow/phase-07-email-notifier.md) plus
+  rule [FE-18](docs-ita/developer-rules/frontend/rules.md).
+- The **Adminer → pgweb** swap (and the `dev`-profile decision — resolved as "no profile, dev-only")
+  was done in 0.4.0 ([phase-4 `4.B0b`](docs-ita/development-flow/phase-04-worker-scheduling.md)).

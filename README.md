@@ -53,7 +53,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Fill `.env` before starting: set `WEA_VERSION` to the same release (`$VERSION`; never `latest`), pick strong `POSTGRES_*` values, and set `ADMIN_INITIAL_PASSWORD`. The repository and the GHCR packages are **public**, so both the file download and the image pull are anonymous — no auth. Once up, the app answers on `http://<host>:8080` (the login page; sign in with the admin from your `.env`, then set a new password at the forced first change).
+Fill `.env` before starting: set `WEA_VERSION` to the same release (`$VERSION`; never `latest`), pick strong `POSTGRES_*` values, and set `WEA_ADMIN_INITIAL_PASSWORD`. The repository and the GHCR packages are **public**, so both the file download and the image pull are anonymous — no auth. Once up, the app answers on `http://<host>:8080` (the login page; sign in with the admin from your `.env`, then set a new password at the forced first change).
 
 ### Updating
 
@@ -94,8 +94,7 @@ Development happens inside the [dev container](docs/infrastructure/dev-container
 
 ```bash
 cp .env.example .env                                    # single config source
-docker compose -f compose-dev.yml up -d --build         # db + web + worker
-docker compose -f compose-dev.yml --profile dev up -d   # also Adminer on :8081
+docker compose -f compose-dev.yml up -d --build         # db + web + worker + pgweb (DB browser on :8081)
 ```
 
 ## Releasing (maintainer)

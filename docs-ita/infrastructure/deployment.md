@@ -45,7 +45,8 @@ Repo e package GHCR sono **pubblici**: il `pull` è **anonimo**, nessun `docker 
 | `web` | FastAPI + bundle SPA; API, auth, scrape on-demand | `:8080` |
 | `worker` | Dispatcher + runner seriale scraper, alert, summary, manutenzione giornaliera | nessuna |
 | `ops` | Script di backup/export/restore, **effimero** (`run --rm`, profilo `ops`) | nessuna |
-| `adminer` | Ispezione DB dal browser | `:8081`, **solo profilo `dev`** |
+
+Il kit di release **non include alcun browser DB** (production-shaped): per ispezionare il database si usa `docker compose exec db psql -U $POSTGRES_USER $POSTGRES_DB` o il container `ops`. pgweb vive solo in `compose-dev.yml`.
 
 `web` e `worker` sono **due servizi dalla stessa immagine** `watch-em-all` (ruolo scelto dal `command`); comunicano **solo tramite il DB**, entrambi attendono `db` healthy e garantiscono lo schema all'avvio (idempotente: non serve ordinarli tra loro).
 
@@ -116,14 +117,6 @@ services:
     depends_on:
       db: { condition: service_healthy }
 
-  adminer:
-    image: adminer:4
-    ports: ["8081:8080"]
-    profiles: [dev]
-    depends_on:
-      db: { condition: service_healthy }
-    restart: unless-stopped
-
 volumes:
   pgdata:
 ```
@@ -134,10 +127,10 @@ Note: niente campo `version` (deprecato in Compose v2); immagini pinnate via `WE
 
 ```bash
 cp .env.example .env            # poi compilare i valori
-docker compose up -d            # produzione (senza adminer)
+docker compose up -d            # produzione (nessun browser DB; ispezione via `compose exec db psql` o `ops`)
 ```
 
-Primo avvio: lo schema viene creato, l'admin iniziale nasce con la password di `ADMIN_INITIAL_PASSWORD` e cambio forzato al primo login.
+Primo avvio: lo schema viene creato, l'admin iniziale nasce con la password di `WEA_ADMIN_INITIAL_PASSWORD` e cambio forzato al primo login.
 
 ## Salute e monitoraggio
 

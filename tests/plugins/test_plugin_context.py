@@ -39,6 +39,7 @@ class _Item(_Base):
 
 class _Plugin(ScraperPlugin):
     plugin_id = "tp_ctx"
+    table_metadata = _Base.metadata
 
     def identity_seed(self, raw):
         return None

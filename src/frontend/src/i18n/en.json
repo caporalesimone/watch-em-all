@@ -14,7 +14,11 @@
 		"profile": "Profile",
 		"logout": "Log out",
 		"scrapers": "Scrapers",
-		"users": "Users"
+		"users": "Users",
+		"notifiers": "Notifiers",
+		"featureFlags": "Feature flags",
+		"systemLogs": "System logs",
+		"settings": "Settings"
 	},
 	"catalog": {
 		"title": "Catalog",
@@ -29,8 +33,6 @@
 		"colPriceOriginal": "List price",
 		"colPriceCurrent": "Price",
 		"colAvailability": "Availability",
-		"colOpen": "Open",
-		"open": "Open",
 		"available": "Available",
 		"unavailable": "Out of stock",
 		"removed": "Delisted",
@@ -42,7 +44,6 @@
 	"admin": {
 		"users": {
 			"title": "Users",
-			"create": "Create a user",
 			"username": "Username",
 			"firstName": "First name",
 			"lastName": "Last name",
@@ -63,13 +64,118 @@
 			"created": "Created \"{username}\" — share the temporary password; they must change it at first login.",
 			"errorTaken": "That username is already in use.",
 			"errorGeneric": "Could not create the user."
+		},
+		"notifiers": {
+			"title": "Notifiers",
+			"colName": "Notifier",
+			"colVersion": "Version",
+			"empty": "No notifiers are loaded.",
+			"loadError": "Could not load the notifiers."
+		},
+		"logs": {
+			"title": "System logs",
+			"subtitle": "Runtime events from scraper, worker, notifier, api and db.",
+			"live": "Live",
+			"refresh": "Refresh",
+			"search": "Search messages or sources…",
+			"all": "All",
+			"sources": "Sources",
+			"perPage": "{n} / page",
+			"colTime": "Time",
+			"colSource": "Source",
+			"colLevel": "Level",
+			"colMessage": "Message",
+			"context": "Context",
+			"empty": "No log entries.",
+			"loadError": "Could not load the logs.",
+			"showing": "Showing {from}–{to} of {total}"
+		},
+		"settings": {
+			"title": "Settings",
+			"hint": "Runtime system settings, applied without a restart.",
+			"loadError": "Could not load the settings.",
+			"saveError": "Could not save the settings.",
+			"fields": {
+				"scraper_run_timeout_min": "Run timeout (minutes)",
+				"log_retention_days": "Log retention (days)",
+				"catchup_warning_min": "Catch-up warning threshold (minutes)",
+				"user_deletion_retention_days": "User deletion grace (days)"
+			},
+			"fieldHints": {
+				"scraper_run_timeout_min": "A scheduled run is stopped if it runs longer than this.",
+				"log_retention_days": "Logs and run records older than this are purged daily; 0 = never. Price history is never pruned.",
+				"catchup_warning_min": "Warn when a recovered slot is older than this (takes effect as the feature lands).",
+				"user_deletion_retention_days": "Grace window before a deleted user is removed for good (phase 10)."
+			}
+		},
+		"featureFlags": {
+			"title": "Feature flags",
+			"hint": "Dev runtime toggles. Changes apply immediately and are non-persistent — they reset to defaults when the web restarts.",
+			"empty": "No feature flags are defined.",
+			"loadError": "Could not load the feature flags.",
+			"saveError": "Could not save the feature flags."
+		},
+		"scrapers": {
+			"title": "Scrapers",
+			"hint": "Schedule and operational parameters, one scraper at a time.",
+			"empty": "No schedulable scrapers are loaded.",
+			"loadError": "Could not load the scrapers.",
+			"saveError": "Could not save the configuration.",
+			"colName": "Scraper",
+			"colVersion": "Version",
+			"colCache": "Cache",
+			"colSchedule": "Schedule",
+			"configure": "Configure",
+			"notSchedulable": "Not schedulable",
+			"scheduleTitle": "Schedule",
+			"scheduleHint": "Set the daily run times per scraper. Times are in the server timezone; two runs must be at least 1 minute apart.",
+			"colAdd": "Add",
+			"colActive": "Active",
+			"addAction": "Add",
+			"tooClose": "Too close to an existing time — runs must be ≥ 1 minute apart.",
+			"noTimes": "No times yet",
+			"removeConfirm": "Remove the run at {time} for {name}?",
+			"removeAction": "Remove",
+			"back": "← Scrapers",
+			"configTitle": "{name} — configuration",
+			"reserved": "Operational parameters",
+			"reservedHint": "Core settings applied on every run and manual scrape. They take effect on the next run — no restart.",
+			"cache": "Scrape cache",
+			"cacheHint": "Remove the cached pages so the next run fetches fresh from the site.",
+			"clearCache": "Clear cache",
+			"clearConfirm": "This removes all cached pages for this scraper. Continue?",
+			"cacheCleared": "Cleared {n} cached entries.",
+			"clearError": "Could not clear the cache.",
+			"fields": {
+				"politeness_delay_ms": "Politeness delay (milliseconds)",
+				"http_timeout_s": "HTTP timeout (seconds)",
+				"cache_ttl_min": "Cache half-life (minutes, 0 = off)",
+				"scrape_now_min_interval_s": "Manual scrape-now cooldown (seconds)"
+			},
+			"fieldHints": {
+				"politeness_delay_ms": "Minimum wait between two requests to the same site.",
+				"http_timeout_s": "How long to wait for a response before giving up on a request.",
+				"cache_ttl_min": "How long a fetched page is reused before fetching it again; 0 disables the cache.",
+				"scrape_now_min_interval_s": "Minimum time before a user can run Scrape now again."
+			},
+			"viz": {
+				"title": "24-hour schedule",
+				"subtitle": "Six 4-hour bands from midnight. Click a marker to remove that run.",
+				"runsPerDay": "{n} runs / day",
+				"perDay": "{n}×/day",
+				"noRuns": "no runs",
+				"empty": "No schedules configured yet — add a time to any scraper above.",
+				"willStartIn": "{name} will start in {when}",
+				"removeTitle": "{name} · {time} (click to remove)"
+			}
 		}
-	},
-	"theme": {
-		"toggle": "Toggle theme"
 	},
 	"plugins": {
 		"notFound": "This plugin page is not available."
+	},
+	"adminErrors": {
+		"copy": "Copy Message",
+		"copied": "Message copied"
 	},
 	"login": {
 		"title": "Sign in",
@@ -80,13 +186,11 @@
 	"changePassword": {
 		"title": "Change your password",
 		"greeting": "Hi {name}, choose a new password to continue.",
-		"hint": "Choose a new password (at least 8 characters).",
 		"current": "Current password",
 		"new": "New password",
 		"confirm": "Confirm new password",
 		"submit": "Change password",
-		"mismatch": "The two passwords do not match.",
-		"done": "Password changed. Please sign in again."
+		"mismatch": "The two passwords do not match."
 	},
 	"profile": {
 		"title": "Profile",

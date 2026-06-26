@@ -23,7 +23,7 @@ def ensure_initial_admin(
     if session.scalar(select(User.id).limit(1)) is not None:
         return
     if not password:
-        log.warning("no users yet and ADMIN_INITIAL_PASSWORD is unset; skipping admin bootstrap")
+        log.warning("no users yet and WEA_ADMIN_INITIAL_PASSWORD unset; skipping admin bootstrap")
         return
     session.add(
         User(

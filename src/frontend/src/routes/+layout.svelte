@@ -6,9 +6,11 @@
 	import { page } from '$app/stores';
 	import { _ } from 'svelte-i18n';
 
-	import { getHealth } from '$lib/api/client';
+	import { getAdminErrors, getHealth } from '$lib/api/client';
+	import AdminErrors from '$lib/components/AdminErrors.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import { setupI18n } from '$lib/i18n';
+	import { adminErrors } from '$lib/stores/adminErrors';
 	import { auth, bootstrap } from '$lib/stores/auth';
 	import { loadPlugins, resetPlugins } from '$lib/stores/plugins';
 	import { theme } from '$lib/stores/theme';
@@ -17,6 +19,7 @@
 	let { children } = $props();
 	let ready = $state(false);
 	let pluginsLoaded = $state(false);
+	let driftLoaded = $state(false);
 
 	onMount(async () => {
 		theme.init();
@@ -71,6 +74,27 @@
 		}
 	});
 
+	// Admin errors are an ADMIN-ONLY feed (served by an admin endpoint, not the public
+	// health probe): fetch once when an admin is in the shell, clear it otherwise so it
+	// never lingers for a normal user.
+	$effect(() => {
+		if (!ready) return;
+		const state = $auth;
+		const isAdmin =
+			state.status === 'authed' &&
+			state.user?.role === 'admin' &&
+			!state.user?.must_change_password;
+		if (isAdmin && !driftLoaded) {
+			driftLoaded = true;
+			void getAdminErrors()
+				.then((d) => adminErrors.set(d))
+				.catch(() => {});
+		} else if (!isAdmin && driftLoaded) {
+			driftLoaded = false;
+			adminErrors.set([]);
+		}
+	});
+
 	const showShell = $derived(
 		ready && $auth.status === 'authed' && !$auth.user?.must_change_password
 	);
@@ -88,3 +112,6 @@
 {:else}
 	<main class="flex h-full items-center justify-center p-6">{@render children()}</main>
 {/if}
+
+<!-- Admin-only; self-hides unless GET /api/admin/errors reports something (4.B0/4.F0). -->
+<AdminErrors />

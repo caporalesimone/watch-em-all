@@ -43,6 +43,9 @@ class Settings(BaseModel):
     version: str
     admin_username: str
     admin_initial_password: str | None
+    # 4.B0: gates only whether GET /api/health exposes schema drift (the check
+    # always runs and logs). Unset → off; .env/.env.example ship it true.
+    schema_drift_alert: bool = False
 
 
 def _interpolate(value: str) -> str:
@@ -67,6 +70,15 @@ def _resolve(node: Any) -> Any:
     if isinstance(node, list):
         return [_resolve(item) for item in node]
     return node
+
+
+def _env_flag(name: str, *, default: bool = False) -> bool:
+    """Read a boolean env flag: unset → ``default``; otherwise true for
+    ``1`` / ``true`` / ``yes`` / ``on`` (case-insensitive)."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _read_version() -> str:
@@ -98,8 +110,9 @@ def load_settings(config_path: str | os.PathLike[str] | None = None) -> Settings
     return Settings(
         core=core,
         version=_read_version(),
-        admin_username=os.environ.get("ADMIN_INITIAL_USERNAME", "admin"),
-        admin_initial_password=os.environ.get("ADMIN_INITIAL_PASSWORD") or None,
+        admin_username=os.environ.get("WEA_ADMIN_INITIAL_USERNAME", "admin"),
+        admin_initial_password=os.environ.get("WEA_ADMIN_INITIAL_PASSWORD") or None,
+        schema_drift_alert=_env_flag("WEA_SCHEMA_DRIFT_ALERT"),
     )
 
 

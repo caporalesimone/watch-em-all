@@ -109,7 +109,7 @@ Segui la [convenzione](../api/endpoints.md#rotte-plugin-specific): `config-schem
 def get_admin_config_schema(self):
     return [
         ConfigField(key="request_timeout_s", label_key="cfg.timeout", type="number", default=20),
-        ConfigField(key="politeness_delay_s", label_key="cfg.delay", type="number", default=1.5),
+        ConfigField(key="politeness_delay_ms", label_key="cfg.delay", type="number", default=1500),
         # + le regole economiche del sito se configurabili (es. soglie sconto)
     ]
 ```

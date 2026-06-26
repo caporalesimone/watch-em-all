@@ -25,6 +25,8 @@ from fastapi import APIRouter
 from src.core.contracts import CategoryRef
 
 if TYPE_CHECKING:
+    from sqlalchemy import MetaData
+
     from src.core.contracts import DeltaCounters, Product
     from src.core.plugins.context import PluginContext
 
@@ -76,6 +78,12 @@ class BasePlugin:
     """Common contract for every plugin, with default (no-op) implementations."""
 
     plugin_id: str  # must equal the manifest `name` (validated at load)
+
+    # A plugin that owns tables (named ``plugin_<plugin_id>_*``) MUST declare them by
+    # pointing this at its own MetaData (``table_metadata = _Base.metadata``); ``None``
+    # means "no tables" (e.g. a notifier without state). The registry enforces it at
+    # load (DB-R7) and the schema-drift guard (4.B0) iterates it next to the core.
+    table_metadata: MetaData | None = None
 
     def initialize(self, context: PluginContext) -> None:
         """Called once at load. The plugin creates its own tables here,
@@ -154,6 +162,13 @@ class ScraperPlugin(BasePlugin, ABC):
         WITHOUT writing anything (neither catalog nor inputs). Real scrapers
         override it."""
         raise NotImplementedError(f"{self.plugin_id}: run_test not implemented")
+
+    def configured_users(self, context: PluginContext) -> list[int]:
+        """User ids that have configured this scraper — the users a SCHEDULED run
+        iterates (SCR-R3 reframed: the scraper tells the core whom to scrape). Default:
+        none; a real scraper returns e.g. the users with at least one watch. Not used by
+        scrape-now, which targets only the requesting user."""
+        return []
 
 
 class NotifierPlugin(BasePlugin):

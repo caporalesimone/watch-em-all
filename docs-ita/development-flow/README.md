@@ -22,9 +22,9 @@
   *Risultato: l'app parte con Docker, si fa login, la shell c'è.*
 - [x] **Fase 2 — Plugin system** → [phase-02-plugin-system.md](phase-02-plugin-system.md) — rilasciata `0.2.0`
   *Risultato: un plugin demo appare da solo in sidebar con la sua pagina.*
-- [ ] **Fase 3 — Catalogo e primo scrape** → [phase-03-catalog-first-scrape.md](phase-03-catalog-first-scrape.md) — *in corso*
-  *Risultato: prodotti reali di Dragon Store nel Product Picker. **Primo MVP fatto** (`0.3.0`): **gestione utenti** (crea/elenca + shell sdoppiato per ruolo), anticipata dalla Fase 10 perché serve un account `user` per provare il resto — i ruoli non si sovrappongono (l'admin governa, non possiede carrelli). In Fase 10 restano reset/disabilita/cancellazione differita/filtri/notifiche.*
-- [ ] **Fase 4 — Worker e scheduling** → [phase-04-worker-scheduling.md](phase-04-worker-scheduling.md)
+- [x] **Fase 3 — Catalogo e primo scrape** → [phase-03-catalog-first-scrape.md](phase-03-catalog-first-scrape.md) — rilasciata `0.3.4`
+  *Risultato: prodotti reali di Dragon Store nel Product Picker, catalogo con delta e storico, scrape lanciato a mano. La **gestione utenti** (crea/elenca + shell sdoppiato per ruolo) è stata anticipata dalla Fase 10 perché serve un account `user` per provare il resto — i ruoli non si sovrappongono (l'admin governa, non possiede carrelli); in Fase 10 restano reset/disabilita/cancellazione differita/filtri/notifiche.*
+- [ ] **Fase 4 — Worker e scheduling** → [phase-04-worker-scheduling.md](phase-04-worker-scheduling.md) — *in corso (`0.4.x`)*
   *Risultato: lo scraping parte da solo agli orari decisi; l'admin lo osserva nei log.*
 - [ ] **Fase 5 — Carrelli** → [phase-05-carts.md](phase-05-carts.md)
   *Risultato: carrelli con totali, adjustments, soglia e provenienza.*
@@ -42,6 +42,8 @@
   *Risultato: report periodico, badge minimo storico e convenienza, export dei dati.*
 - [ ] **Fase 12 — Rifinitura e 1.0** → [phase-12-polish-v1.md](phase-12-polish-v1.md)
   *Risultato: secondo canale (Discord), audit i18n English-first, CI piena: release 1.0.*
+- 💡 **Fase 13 — Resilienza dello scraping** (post-1.0, idea da dettagliare) → [phase-13-scraping-resilience.md](phase-13-scraping-resilience.md)
+  *Risultato: le connessioni verso i siti usano user-agent (e opzioni di richiesta) decisi dal core, con eventuale preferenza per-scraper. Annotazione, oltre il perimetro 1.0.*
 
 ## La logica dell'ordine
 
@@ -50,9 +52,11 @@ flowchart LR
     F0[0 Pipeline] --> F1[1 Fondamenta] --> F2[2 Plugin system] --> F3[3 Primo scrape] --> F4[4 Worker]
     F4 --> F5[5 Carrelli] --> F6[6 Alert in-app] --> F7[7 Email 🎉 0.1]
     F7 --> F8[8 Grafici] --> F9[9 DragonStore full] --> F10[10 Admin] --> F11[11 Insight] --> F12[12 1.0]
+    F12 -.post-1.0.-> F13[13 Resilienza scraping 💡]
 ```
 
 - La fase 0 costruisce e **roda il processo** (CI, immagini dev sul branch, release sul tag, deploy kit) con container stub: **prima che esista il prodotto, esiste il suo flusso di rilascio** — ogni fase successiva ne beneficia dalla prima PR.
 - Le fasi 1-7 percorrono la **catena del valore minima** del prodotto (login → plugin → dati → automazione → carrelli → alert → consegna): alla fase 7 il sistema fa già, per intero, il suo mestiere su prodotti singoli.
 - Le fasi 8-11 **arricchiscono** (grafici, categorie, governo, insight) su un prodotto che già si usa tutti i giorni — ogni fase è valore visibile, non infrastruttura.
 - La fase 12 chiude il perimetro della [1.0](../1-business/product-overview.md).
+- Dalla **fase 13** in poi sono **enhancement post-1.0** (idee annotate, da dettagliare): non fanno parte del perimetro 1.0 e si promuovono quando diventano attuali — affini ai [future improvements](../future-improvements/README.md), ma tenute qui perché sono fasi di lavoro vere e proprie quando partiranno.

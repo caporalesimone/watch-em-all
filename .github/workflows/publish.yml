@@ -41,8 +41,18 @@ jobs:
           fi
           echo "Tag matches the top CHANGELOG entry."
 
+  i18n-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: i18n consistency (English reference, 4.B11)
+        run: node src/frontend/scripts/i18n-check.mjs   # zero runtime deps — no npm install needed
+
   images:
-    needs: version-guard
+    needs: [version-guard, i18n-guard]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

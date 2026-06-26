@@ -15,7 +15,7 @@ graph TB
         WEB[web<br/>FastAPI + bundle statico SPA<br/>API, auth, scrape on-demand]
         WORKER[worker<br/>dispatcher temporale +<br/>runner seriale degli scraper]
         DB[(db<br/>PostgreSQL 16)]
-        ADM[adminer<br/>solo profilo dev]
+        ADM[pgweb<br/>browser DB, solo dev]
     end
     EXT1[Siti e-commerce]
     EXT2[Canali di notifica<br/>SMTP, webhook…]
@@ -35,7 +35,7 @@ graph TB
 | `web` | API HTTP, autenticazione, serve la SPA buildata, esegue gli **scrape on-demand** (dry-run, scrape-now, test notifier) come task in background | Carica i plugin per esporre le loro route e i loro schemi di config |
 | `worker` | Dispatcher temporale (tick al minuto) + **runner seriale degli scraper** (uno alla volta, ciascuno al proprio orario); run di alert e summary; manutenzione giornaliera (purge utenti scaduti, retention); heartbeat | Carica i plugin per eseguirli |
 | `db` | PostgreSQL: unico stato condiviso del sistema | MVCC gestisce le scritture concorrenti di web e worker |
-| `adminer` | Ispezione del DB dal browser | Solo `--profile dev`, mai in produzione |
+| `pgweb` | Ispezione del DB dal browser | Solo nello stack di sviluppo (`compose-dev.yml`), assente dal release |
 
 **Perché PostgreSQL e non SQLite**: due processi scrivono concorrentemente (web e worker); SQLite con lock su file condiviso tra container è fragile, Postgres con MVCC no.
 

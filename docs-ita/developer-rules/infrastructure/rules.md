@@ -4,9 +4,9 @@
 
 ## Docker e compose
 
-- **INF-1** — Immagini **pinnate** (mai `latest`): `postgres:16`, `adminer:4`, base images con tag esplicito.
+- **INF-1** — Immagini **pinnate** (mai `latest`): `postgres:16`, `sosedoff/pgweb:0.16.2`, base images con tag esplicito.
 - **INF-2** — Log rotation su ogni servizio applicativo (`max-size`/`max-file`); healthcheck su `db`, `web` (endpoint health) e `worker` (file heartbeat).
-- **INF-3** — Strumenti di debug (Adminer e simili) **solo dietro profilo `dev`**: il compose di default deve essere production-shaped.
+- **INF-3** — Strumenti di debug (pgweb e simili) **vivono solo nello stack di sviluppo** (`compose-dev.yml`) e sono **assenti** dal `compose.yml` di default: la separazione tra i due file è il gate (non un profilo), e il compose di default resta production-shaped.
 - **INF-4** — Mount read-only dove possibile (`config.yaml:ro`); nessun bind-mount di codice in produzione.
 - **INF-5** — Dockerfile multi-stage: build del frontend e installazione Poetry separate dallo stage finale; immagini finali senza toolchain di build.
 

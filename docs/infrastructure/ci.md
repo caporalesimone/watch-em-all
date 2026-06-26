@@ -4,14 +4,38 @@
 >
 > English translation of the Italian reference [`docs-ita/infrastructure/ci.md`](../../docs-ita/infrastructure/ci.md), limited to what is implemented (DOC-12). The pipeline is born minimal in phase 0 and **grows with the flow**: linters and typecheck arrive with the first code (phase 1), contract and integration tests at scale (phase 12). Only the jobs that exist today are described here.
 
-## Jobs (phase 0)
+## Jobs
 
 | Job | What it does | Gate |
 |---|---|---|
+| Backend lint | `ruff check .` · `ruff format --check .` | blocking |
+| Backend typecheck | `mypy` (strict) | blocking |
+| Backend tests | `pytest` (unit + contract; integration on a Postgres service) | blocking |
+| Frontend lint | `prettier --check` · `svelte-check` | blocking |
+| i18n consistency | `i18n:check` — English keys **used vs defined** (core + plugins); 4.B11. Also runs **before the build** (`prebuild`) and **on tag** (job `i18n-guard`, a prerequisite of *Build images*) | blocking |
+| Frontend build | `npm run build` (runs `build:plugins` + `i18n:check`) | blocking |
 | Build images | builds `watch-em-all` (app) and `watch-em-all-ops`; **on PRs** pushes them as `dev-<branch>` (see *Dev images*) | blocking |
 | CHANGELOG guard | the PR must update `CHANGELOG.md` (one PR = one version, INF-19) | blocking |
 
 Policy: `main` is always green; PRs are not merged with red jobs. Process details in [developer-rules](../../docs-ita/developer-rules/README.md).
+
+### Backend tests — layout and commands
+
+`tests/` **mirrors `src/`**: one subpackage per subsystem, so a test for `src/<area>/foo.py` lives in `tests/<area>/`. `conftest.py` (shared fixtures, e.g. `client`) and the root `__init__.py` apply to every subfolder.
+
+| Folder | What it holds |
+|---|---|
+| `tests/core/` | domain/service logic (`src/core/*`): catalog, cache, settings, schedule, locks, system log, security, … |
+| `tests/web/` | endpoints/API via `TestClient` (`src/web/routers/*`) |
+| `tests/worker/` | dispatcher and serial runner (`src/worker/*`) |
+| `tests/plugins/` | plugin framework (manifest, registry, discovery, context, scraper identity) |
+| `tests/plugins/dragon_store/` | the Dragon Store plugin + its `fixtures/` (saved real pages) |
+
+```bash
+poetry run pytest                                                          # whole suite (recursive)
+poetry run pytest tests/web                                                # one group
+poetry run pytest tests/plugins/dragon_store/test_dragon_store_parser.py   # one file
+```
 
 ## Dev images (on PRs)
 
