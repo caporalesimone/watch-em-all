@@ -6,6 +6,7 @@
 	import { _ } from 'svelte-i18n';
 
 	import {
+		clearScraperCache,
 		getScraperConfig,
 		listScrapers,
 		patchScraperConfig,
@@ -19,6 +20,10 @@
 	let saving = $state(false);
 	let saved = $state(false);
 	let error = $state<string | null>(null);
+
+	let clearing = $state(false);
+	let clearConfirm = $state(false);
+	let clearedMsg = $state<string | null>(null);
 
 	// Reload when the route param changes (the component is reused across scrapers).
 	$effect(() => {
@@ -59,6 +64,23 @@
 			error = $_('admin.scrapers.saveError');
 		} finally {
 			saving = false;
+		}
+	}
+
+	async function clearCache(): Promise<void> {
+		const sid = $page.params.id;
+		if (!sid) return;
+		clearing = true;
+		clearedMsg = null;
+		error = null;
+		try {
+			const { deleted } = await clearScraperCache(sid);
+			clearedMsg = $_('admin.scrapers.cacheCleared', { values: { n: deleted } });
+		} catch {
+			error = $_('admin.scrapers.clearError');
+		} finally {
+			clearing = false;
+			clearConfirm = false;
 		}
 	}
 
@@ -122,6 +144,45 @@
 			{#if saved}<span class="text-sm text-green-600 dark:text-green-400">{$_('common.saved')}</span
 				>{/if}
 			{#if error}<span class="text-sm text-red-500">{error}</span>{/if}
+		</div>
+
+		<div class="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+			<h2 class="font-semibold">{$_('admin.scrapers.cache')}</h2>
+			<p class="mt-1 mb-3 text-sm text-slate-500">{$_('admin.scrapers.cacheHint')}</p>
+			{#if clearConfirm}
+				<div class="flex flex-wrap items-center gap-3">
+					<span class="text-sm">{$_('admin.scrapers.clearConfirm')}</span>
+					<button
+						class="rounded bg-red-700 px-3 py-1.5 text-sm text-white hover:bg-red-600 disabled:opacity-50"
+						onclick={clearCache}
+						disabled={clearing}
+					>
+						{$_('admin.scrapers.clearCache')}
+					</button>
+					<button
+						class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
+						onclick={() => (clearConfirm = false)}
+						disabled={clearing}
+					>
+						{$_('common.cancel')}
+					</button>
+				</div>
+			{:else}
+				<div class="flex items-center gap-3">
+					<button
+						class="rounded border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
+						onclick={() => {
+							clearConfirm = true;
+							clearedMsg = null;
+						}}
+					>
+						{$_('admin.scrapers.clearCache')}
+					</button>
+					{#if clearedMsg}<span class="text-sm text-green-600 dark:text-green-400"
+							>{clearedMsg}</span
+						>{/if}
+				</div>
+			{/if}
 		</div>
 	{/if}
 </section>

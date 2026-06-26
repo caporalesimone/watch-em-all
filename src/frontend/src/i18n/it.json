@@ -96,6 +96,12 @@
 			"configTitle": "{name} — configurazione",
 			"reserved": "Parametri operativi",
 			"reservedHint": "Impostazioni core applicate a ogni esecuzione e scrape manuale. Hanno effetto alla prossima esecuzione — senza riavvio.",
+			"cache": "Cache di scrape",
+			"cacheHint": "Rimuove le pagine in cache così la prossima esecuzione le riscarica dal sito.",
+			"clearCache": "Svuota cache",
+			"clearConfirm": "Rimuove tutte le pagine in cache di questo scraper. Continuare?",
+			"cacheCleared": "Rimosse {n} voci dalla cache.",
+			"clearError": "Impossibile svuotare la cache.",
 			"fields": {
 				"politeness_delay_s": "Ritardo di politeness (secondi)",
 				"http_timeout_s": "Timeout HTTP (secondi)",

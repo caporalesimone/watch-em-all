@@ -168,6 +168,12 @@ export async function patchScraperConfig(
 	return asJson<ScraperConfig>(res);
 }
 
+// Clear a scraper's scrape cache (4.B9/4.F5); returns how many entries were removed.
+export async function clearScraperCache(id: string): Promise<{ deleted: number }> {
+	const res = await apiFetch(`/api/admin/scrapers/${id}/cache`, { method: 'DELETE' });
+	return asJson<{ deleted: number }>(res);
+}
+
 // Catalog / Product Picker (CAT-*). Money fields are Decimal serialised as
 // strings (exact, no float drift) — rendered as-is, never parsed for maths.
 export interface BrandRef {

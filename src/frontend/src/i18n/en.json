@@ -96,6 +96,12 @@
 			"configTitle": "{name} — configuration",
 			"reserved": "Operational parameters",
 			"reservedHint": "Core settings applied on every run and manual scrape. They take effect on the next run — no restart.",
+			"cache": "Scrape cache",
+			"cacheHint": "Remove the cached pages so the next run fetches fresh from the site.",
+			"clearCache": "Clear cache",
+			"clearConfirm": "This removes all cached pages for this scraper. Continue?",
+			"cacheCleared": "Cleared {n} cached entries.",
+			"clearError": "Could not clear the cache.",
 			"fields": {
 				"politeness_delay_s": "Politeness delay (seconds)",
 				"http_timeout_s": "HTTP timeout (seconds)",
