@@ -12,15 +12,16 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel
 
 from src.core.errors import APIError
 from src.core.feature_flags import effective_flags, set_flags
+from src.core.models import SystemLog
 from src.core.schema_drift import SchemaDriftItem
-from src.core.system_log import list_logs
+from src.core.system_log import distinct_sources, level_counts, list_logs, page_logs
 from src.web.deps import AdminDep, SessionDep, SettingsDep
 
 router = APIRouter(prefix="/admin", tags=["Admin: system"])
@@ -77,31 +78,65 @@ class SystemLogEntry(BaseModel):
     context: dict[str, Any] | None = None
 
 
+class SystemLogPage(BaseModel):
+    """A page of history plus the stats that drive the filters (4.F3/F4)."""
+
+    items: list[SystemLogEntry]
+    total: int  # all rows matching the source/search/level filters
+    counts: dict[str, int]  # rows per level over the source/search filters
+    sources: list[str]  # distinct sources present, for the filter chips
+
+
+def _entry(r: SystemLog) -> SystemLogEntry:
+    return SystemLogEntry(
+        id=r.id,
+        created_at=r.created_at,
+        level=r.level,  # type: ignore[arg-type]
+        source=r.source,
+        message=r.message,
+        context=r.context_json,
+    )
+
+
 @router.get(
     "/logs",
     response_model=list[SystemLogEntry],
-    summary="System log (admin only): cursor by id. No 'since' = latest N; 'since' = newer rows.",
+    summary="System log live tail (admin): cursor by id (no 'since' = latest N).",
 )
 def admin_logs(
     _admin: AdminDep,
     db: SessionDep,
-    since: int | None = Query(None, description="return rows with id > since (else the latest N)"),
+    since: int | None = Query(None, description="rows with id > since (else the latest N)"),
     level: Literal["info", "warning", "error"] | None = Query(None),
-    source: str | None = Query(None),
+    sources: Annotated[list[str] | None, Query(description="filter by source(s)")] = None,
+    q: str | None = Query(None, description="case-insensitive substring on the message"),
     limit: int = Query(200, ge=1, le=1000),
 ) -> list[SystemLogEntry]:
-    rows = list_logs(db, since=since, level=level, source=source, limit=limit)
-    return [
-        SystemLogEntry(
-            id=r.id,
-            created_at=r.created_at,
-            level=r.level,  # type: ignore[arg-type]
-            source=r.source,
-            message=r.message,
-            context=r.context_json,
-        )
-        for r in rows
-    ]
+    rows = list_logs(db, since=since, level=level, sources=sources, q=q, limit=limit)
+    return [_entry(r) for r in rows]
+
+
+@router.get(
+    "/logs/page",
+    response_model=SystemLogPage,
+    summary="System log history, paged (admin): newest-first + total + counts + sources.",
+)
+def admin_logs_page(
+    _admin: AdminDep,
+    db: SessionDep,
+    page: int = Query(1, ge=1),
+    size: int = Query(50, ge=1, le=1000),
+    level: Literal["info", "warning", "error"] | None = Query(None),
+    sources: Annotated[list[str] | None, Query(description="filter by source(s)")] = None,
+    q: str | None = Query(None, description="case-insensitive substring on the message"),
+) -> SystemLogPage:
+    rows, total = page_logs(db, page=page, size=size, level=level, sources=sources, q=q)
+    return SystemLogPage(
+        items=[_entry(r) for r in rows],
+        total=total,
+        counts=level_counts(db, sources=sources, q=q),
+        sources=distinct_sources(db),
+    )
 
 
 @router.get(

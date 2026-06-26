@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import Session
 
 from src.core.db import new_session
@@ -85,22 +85,36 @@ def install_system_log_handler() -> None:
     logger.addHandler(handler)
 
 
+def _conditions(
+    level: str | None, sources: list[str] | None, q: str | None
+) -> list[ColumnElement[bool]]:
+    """Shared WHERE conditions for the log reads (level / multi-source / message search)."""
+    conds: list[ColumnElement[bool]] = []
+    if level is not None:
+        conds.append(SystemLog.level == level)
+    if sources:
+        conds.append(SystemLog.source.in_(sources))
+    if q:
+        conds.append(SystemLog.message.ilike(f"%{q}%"))
+    return conds
+
+
 def list_logs(
     session: Session,
     *,
     since: int | None = None,
     level: str | None = None,
-    source: str | None = None,
+    sources: list[str] | None = None,
+    q: str | None = None,
     limit: int = 200,
 ) -> list[SystemLog]:
-    """Cursor read (LOG-R3). ``since=None`` → the most recent ``limit`` rows (returned
-    ascending, for a first page); ``since=<id>`` → rows with ``id > since`` ascending (the
-    new ones). Optional ``level``/``source`` filters apply to both."""
+    """Cursor read (LOG-R3), for the live tail. ``since=None`` → the most recent ``limit``
+    rows (returned ascending, for a first page); ``since=<id>`` → rows with ``id > since``
+    ascending (the new ones). ``level``/``sources``/``q`` filters apply to both."""
     stmt = select(SystemLog)
-    if level is not None:
-        stmt = stmt.where(SystemLog.level == level)
-    if source is not None:
-        stmt = stmt.where(SystemLog.source == source)
+    conds = _conditions(level, sources, q)
+    if conds:
+        stmt = stmt.where(*conds)
     if since is not None:
         return list(
             session.scalars(stmt.where(SystemLog.id > since).order_by(SystemLog.id).limit(limit))
@@ -108,3 +122,52 @@ def list_logs(
     # No cursor: the most recent N, then ascending so the client appends forward.
     recent = list(session.scalars(stmt.order_by(SystemLog.id.desc()).limit(limit)))
     return list(reversed(recent))
+
+
+def page_logs(
+    session: Session,
+    *,
+    page: int = 1,
+    size: int = 50,
+    level: str | None = None,
+    sources: list[str] | None = None,
+    q: str | None = None,
+) -> tuple[list[SystemLog], int]:
+    """Paged history read (newest first): one window of ``size`` rows at 1-based ``page``,
+    plus the total count of all matching rows. Drives the page-number browser (Live off)."""
+    conds = _conditions(level, sources, q)
+    count_stmt = select(func.count()).select_from(SystemLog)
+    rows_stmt = select(SystemLog)
+    if conds:
+        count_stmt = count_stmt.where(*conds)
+        rows_stmt = rows_stmt.where(*conds)
+    total = int(session.scalar(count_stmt) or 0)
+    rows = list(
+        session.scalars(
+            rows_stmt.order_by(SystemLog.id.desc()).offset((page - 1) * size).limit(size)
+        )
+    )
+    return rows, total
+
+
+def level_counts(
+    session: Session, *, sources: list[str] | None = None, q: str | None = None
+) -> dict[str, int]:
+    """Row count per level over the current source/search filters (the level filter itself
+    is ignored, so the tabs can show how many of each level match)."""
+    conds = _conditions(None, sources, q)
+    stmt = select(SystemLog.level, func.count()).group_by(SystemLog.level)
+    if conds:
+        stmt = stmt.where(*conds)
+    out = {"info": 0, "warning": 0, "error": 0}
+    for row in session.execute(stmt).all():
+        lvl = str(row[0])
+        if lvl in out:
+            out[lvl] = int(row[1])
+    return out
+
+
+def distinct_sources(session: Session) -> list[str]:
+    """The distinct sources present in the log — drives the source filter chips (so they
+    reflect what actually exists, e.g. worker/scraper today, notifier from phase 7)."""
+    return sorted(s for s in session.scalars(select(SystemLog.source).distinct()) if s)

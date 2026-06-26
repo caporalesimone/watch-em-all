@@ -12,7 +12,7 @@ from sqlalchemy import select
 from src.core.db import new_session
 from src.core.maintenance import purge_expired
 from src.core.models import ScrapeRun, ScrapeUserLog, SystemLog
-from src.core.system_log import list_logs
+from src.core.system_log import distinct_sources, level_counts, list_logs, page_logs
 
 
 def _bearer(token: str) -> dict[str, str]:
@@ -91,7 +91,7 @@ def test_list_logs_cursor_and_filters(client: TestClient) -> None:
 
         errs = list_logs(session, level="error")
         assert errs and all(r.level == "error" for r in errs)
-        scr = list_logs(session, source="scraper")
+        scr = list_logs(session, sources=["scraper"])
         assert scr and all(r.source == "scraper" for r in scr)
 
         last2 = list_logs(session, limit=2)  # most recent N, returned ascending
@@ -170,3 +170,65 @@ def test_logs_endpoint_level_filter(client: TestClient) -> None:
     errs = client.get("/api/admin/logs?level=error", headers=h).json()
     assert any(e["message"] == "E1" for e in errs)
     assert all(e["level"] == "error" for e in errs)
+
+
+def test_list_logs_q_and_multi_source(client: TestClient) -> None:
+    session = new_session()
+    try:
+        session.add(SystemLog(level="info", source="worker", message="uqz alpha one"))
+        session.add(SystemLog(level="info", source="scraper", message="uqz beta two"))
+        session.add(SystemLog(level="warning", source="scraper", message="uqz alpha three"))
+        session.commit()
+        hits = list_logs(session, q="UQZ ALPHA")  # ILIKE, case-insensitive substring
+        assert {r.message for r in hits} == {"uqz alpha one", "uqz alpha three"}
+        scr = list_logs(session, sources=["scraper"], q="uqz")
+        assert {r.message for r in scr} == {"uqz beta two", "uqz alpha three"}
+        both = list_logs(session, sources=["worker", "scraper"], q="uqz")
+        assert len(both) == 3
+    finally:
+        session.close()
+
+
+def test_page_logs_counts_and_sources(client: TestClient) -> None:
+    session = new_session()
+    try:
+        for i in range(7):
+            session.add(SystemLog(level="info", source="worker", message=f"PGT w{i}"))
+        session.add(SystemLog(level="error", source="scraper", message="PGT boom"))
+        session.commit()
+
+        page1, total = page_logs(session, page=1, size=5, q="PGT")
+        assert total == 8 and len(page1) == 5
+        assert page1[0].id > page1[-1].id  # newest first
+        page2, total2 = page_logs(session, page=2, size=5, q="PGT")
+        assert total2 == 8 and len(page2) == 3
+        assert not ({r.id for r in page1} & {r.id for r in page2})  # no overlap
+
+        # counts respect the source/search filters but not the level filter
+        assert level_counts(session, q="PGT") == {"info": 7, "warning": 0, "error": 1}
+        assert level_counts(session, sources=["scraper"], q="PGT") == {
+            "info": 0,
+            "warning": 0,
+            "error": 1,
+        }
+        assert "scraper" in distinct_sources(session) and "worker" in distinct_sources(session)
+    finally:
+        session.close()
+
+
+def test_logs_page_endpoint(client: TestClient) -> None:
+    assert client.get("/api/admin/logs/page").status_code == 401
+    h = _bearer(_admin_token(client))
+    session = new_session()
+    try:
+        session.add(SystemLog(level="error", source="scraper", message="kaboom"))
+        session.add(SystemLog(level="info", source="worker", message="ok tick"))
+        session.commit()
+    finally:
+        session.close()
+    body = client.get("/api/admin/logs/page?size=10", headers=h).json()
+    assert set(body) == {"items", "total", "counts", "sources"}
+    assert body["total"] >= 2
+    assert "scraper" in body["sources"] and "worker" in body["sources"]
+    only = client.get("/api/admin/logs/page?q=kaboom", headers=h).json()
+    assert only["total"] == 1 and only["items"][0]["message"] == "kaboom"
