@@ -23,8 +23,10 @@
   products found / new / price-changes / removed, HTTP requests, **cache hits** — and a
   status (`ok` / `partial` / `error` / `timeout`); a run that overruns the configured
   timeout is stopped between users and marked.
-- Schedules are set from the **Scrapers → Schedule** page (daily-times chips + a 24-hour
-  timeline with clickable markers and a live "now" marker), or via the API.
+- Schedules are set from the **Scrapers → Schedule** page: per-scraper `HH:MM:SS` time
+  chips (add/remove with confirmation, an Active/suspend toggle, and a UI rule that two runs
+  must be ≥ 1 minute apart), plus a **24-hour timeline** with clickable plugin-icon markers
+  and a live "now" marker read once from `/api/health` then ticked locally. Or via the API.
 
 ### 2) Scrape cache — fewer visits to the shop
 

@@ -99,7 +99,7 @@ Il **purge definitivo non ha endpoint**: è il job giornaliero del worker a elim
 | Metodo | Path | Ruolo | Body / Query | Note |
 |---|---|---|---|---|
 | GET | `/api/admin/scrapers` | 🛡 | — | per scraper: schedule, stato (idle/queued/running/sospeso), ultima run |
-| PUT | `/api/admin/scrapers/{id}/schedule` | 🛡 | `{times: ["HH:MM",...], enabled}` | 1..N slot/giorno |
+| PUT | `/api/admin/scrapers/{id}` | 🛡 | `{times, enabled}` → `{scraper_id, times, enabled, last_slot}` | imposta gli slot (input `HH:MM` o `HH:MM:SS`, restituiti **canonici `HH:MM:SS`** — 4.F1, dedup/ordinati; **422** orario non valido) e il flag `enabled`; 1..N slot/giorno; editato dalla pagina **Scrapers → Schedule** |
 | GET | `/api/admin/scrapers/calendar` | 🛡 | `?date=YYYY-MM-DD` | **vista calendario del giorno** (SCHED-R10): tutte le run pianificate di tutti gli scraper (slot + durata media recente per dimensionare i blocchi); read-only |
 | GET | `/api/admin/scrapers/{id}/runs` | 🛡 | `?page=` | elenco run con contatori |
 | GET | `/api/admin/runs/{run_id}` | 🛡 | — | dettaglio per-utente (`scrape_user_log`) |

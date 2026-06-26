@@ -24,7 +24,8 @@ flowchart TB
 # Scrape — admin, per-scraper, 1..N slot al giorno
 class ScraperSchedule(BaseModel):
     scraper_id: str                    # = plugin_id dello scraper
-    times: list[time]                  # 1..N orari (slot); ordinati, unici
+    times: list[str]                   # 1..N orari (slot) canonici "HH:MM:SS" (4.F1); input
+                                       # accettato "HH:MM" o "HH:MM:SS"; ordinati, unici
     enabled: bool = True               # sospensione runtime senza toccare il manifest
     last_slot: datetime | None = None  # ultimo slot ESEGUITO (datetime, non date:
                                        # regge N slot/giorno e il recupero cross-midnight)

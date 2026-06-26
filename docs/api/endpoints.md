@@ -45,7 +45,7 @@ Known flags (params shown with their defaults): `worker_tick` `{seconds: 60}` (w
 | Method | Path | Role | Response | Notes |
 |---|---|---|---|---|
 | GET | `/api/admin/scrapers` | 🛡 | `[{scraper_id, display_name, times, enabled, last_slot}]` | schedulable scrapers (those that implement scraping) + their schedule (4.B2) |
-| PUT | `/api/admin/scrapers/{scraper_id}` | 🛡 | `{times, enabled}` → the updated schedule | set the slots (`"HH:MM"` or `"HH:MM:SS"`, de-duplicated/sorted; **422** on a bad time) and the enabled flag; unknown scraper → **404** |
+| PUT | `/api/admin/scrapers/{scraper_id}` | 🛡 | `{times, enabled}` → `{scraper_id, times, enabled, last_slot}` | set the slots (input `"HH:MM"` or `"HH:MM:SS"`, **returned canonical `"HH:MM:SS"`** (4.F1), de-duplicated/sorted; **422** on a bad time) and the enabled flag; unknown scraper → **404**. Edited from the **Scrapers → Schedule** page |
 | DELETE | `/api/admin/scrapers/{scraper_id}/cache` | 🛡 | `{deleted}` | clear the scraper's scrape cache (CTX-R9, 4.B9); returns how many entries were removed; unknown scraper → **404** |
 | GET | `/api/admin/scrapers/{scraper_id}/config` | 🛡 | `{politeness_delay_ms, http_timeout_s, cache_ttl_min, scrape_now_min_interval_s}` | the scraper's **core reserved config** — effective values (defaults + overrides, 4.B10); unknown scraper → **404** |
 | PATCH | `/api/admin/scrapers/{scraper_id}/config` | 🛡 | same shape | set one or more reserved keys (merged over the current values); **422** on an unknown key or out-of-range value, **404** unknown scraper |

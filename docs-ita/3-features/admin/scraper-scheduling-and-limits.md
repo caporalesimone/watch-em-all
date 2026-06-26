@@ -43,9 +43,9 @@ A e B sono dovuti alle 06:00: B attende in coda la fine di A. C ha il suo orario
 
 | Elemento | Contenuto |
 |---|---|
-| Riga per scraper | nome+icona, stato (attivo/sospeso/in coda/in esecuzione), slot configurati, esito e durata dell'ultima run, prossimo slot |
-| Azioni per riga | modifica slot (aggiungi/rimuovi orari), sospendi/riattiva, vai al monitoraggio |
-| Vista calendario | la giornata con i blocchi delle run pianificate di tutti gli scraper (SCHED-R10), read-only, click → pagina di configurazione dello scraper |
+| Riga per scraper | nome+icona, gli slot configurati come **chip `HH:MM:SS`** con **×** (chiede conferma), un **time-picker `HH:MM:SS` + Add** per aggiungerne, e un **toggle Attivo/Sospeso** (= flag `enabled`). Gli scraper non schedulabili compaiono come "Non schedulabile" |
+| Editor degli slot | pagina dedicata **`/admin/scrapers/schedule`** (4.F1, figlia di *Scrapers* nella sidebar): aggiungi/rimuovi orari (con conferma) e sospendi/riattiva persistono subito via `PUT /api/admin/scrapers/{id}`. **Regola solo-UI**: due run di *qualsiasi* scraper non possono distare meno di 1 minuto (distanza circolare a mezzanotte). |
+| Vista 24 ore | sotto la tabella, una timeline a **6 fasce da 4h** dalla mezzanotte: ogni run è un **marker = icona del plugin** cliccabile (rimuove, con conferma), con legenda, contatore `N runs/day` e un **now-marker** che legge l'ora del server da `/api/health` una volta e poi avanza in locale ogni secondo (hover → evidenzia il prossimo run). Uno scraper sospeso ha marker/chip/legenda **grigiati**. |
 | Impostazioni globali | `scraper_run_timeout`, soglia di ritardo per i recuperi, retention dei log |
 
 ```mermaid
