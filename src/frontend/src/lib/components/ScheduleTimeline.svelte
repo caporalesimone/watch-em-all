@@ -23,11 +23,7 @@
 		onRemove
 	}: { scrapers: Scraper[]; onRemove: (id: string, time: string) => void } = $props();
 
-	// TEMP(4.F1): prototype controls — decide a fixed value / whether to remove before the
-	// Phase 4 closure (tracked in development-flow/phase-04). Not production config.
-	let showSubTicks = $state(true); // 30-/10-minute sub-ticks (hours are always shown)
-	let markerSize = $state(24); // px, 8–72
-
+	const MARKER_PX = 30; // fixed marker diameter (chosen during 4.F1 prototyping)
 	const BANDS = [0, 1, 2, 3, 4, 5];
 	const SECONDS_PER_BAND = 4 * 3600;
 
@@ -52,7 +48,7 @@
 		return ((sec - band * SECONDS_PER_BAND) / SECONDS_PER_BAND) * 100;
 	}
 
-	// Reference ticks within a band: hour marks (always, labelled), 30-min and 10-min marks.
+	// Reference ticks within a band: hour marks (labelled), plus 30-min and 10-min marks.
 	type Tick = { posPct: number; kind: 'hour' | 'half' | 'ten'; label?: string };
 	function ticksFor(band: number): Tick[] {
 		const out: Tick[] = [];
@@ -181,12 +177,14 @@
 		return hovering && nextRun !== null && nextRun.id === m.id && nextRun.time === m.time;
 	}
 
-	// On hover of the now marker, the next run grows and gets a theme-contrasting ring.
+	// On hover of the now marker, the next run grows and gets a theme-contrasting ring. The
+	// drop shadow is a Tailwind class (not inline) so it composes with the ring instead of
+	// overriding it (both are box-shadows).
 	function markerClass(m: Marker): string {
 		const base =
-			'absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-transform hover:brightness-110';
+			'absolute -translate-x-1/2 -translate-y-1/2 rounded-full shadow-md transition-transform hover:brightness-110';
 		return isNext(m)
-			? `${base} z-20 scale-150 ring-2 ring-slate-900 dark:ring-white`
+			? `${base} z-20 scale-150 ring-[3px] ring-slate-900 dark:ring-white`
 			: `${base} z-10 ring-1 ring-white/25`;
 	}
 </script>
@@ -217,21 +215,6 @@
 		{/each}
 	</div>
 
-	<!-- TEMP(4.F1) prototype controls -->
-	<div class="mt-3 flex flex-wrap items-center gap-5 text-xs text-slate-500">
-		<label class="flex items-center gap-2">
-			<input type="checkbox" bind:checked={showSubTicks} />
-			{$_('admin.scrapers.viz.subTicks')}
-		</label>
-		<label class="group flex items-center gap-2">
-			{$_('admin.scrapers.viz.markerSize')}
-			<input type="range" min="8" max="72" bind:value={markerSize} title={`${markerSize}px`} />
-			<span class="font-mono opacity-0 transition-opacity group-hover:opacity-100"
-				>{markerSize}px</span
-			>
-		</label>
-	</div>
-
 	{#if totalRuns === 0}
 		<div
 			class="mt-6 rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 dark:border-slate-700"
@@ -252,7 +235,7 @@
 							style="top:26px;height:1px"
 						></div>
 
-						<!-- ticks: hours always (with labels); 30-/10-min only when enabled -->
+						<!-- ticks: hours (labelled) + 30-min + faint 10-min -->
 						{#each ticksFor(band) as tk (tk.posPct)}
 							{#if tk.kind === 'hour'}
 								<div
@@ -265,12 +248,12 @@
 								>
 									{tk.label}
 								</div>
-							{:else if showSubTicks && tk.kind === 'half'}
+							{:else if tk.kind === 'half'}
 								<div
 									class="absolute bg-slate-300 dark:bg-white/15"
 									style="left:{tk.posPct}%;top:21px;width:1px;height:10px"
 								></div>
-							{:else if showSubTicks && tk.kind === 'ten'}
+							{:else}
 								<div
 									class="absolute bg-slate-300/60 dark:bg-white/10"
 									style="left:{tk.posPct}%;top:23px;width:1px;height:6px"
@@ -283,9 +266,7 @@
 							<button
 								type="button"
 								class={markerClass(m)}
-								style="left:{posInBand(
-									m.sec
-								)}%;top:26px;width:{markerSize}px;height:{markerSize}px;box-shadow:0 2px 6px rgba(0,0,0,0.5)"
+								style="left:{posInBand(m.sec)}%;top:26px;width:{MARKER_PX}px;height:{MARKER_PX}px"
 								title={$_('admin.scrapers.viz.removeTitle', {
 									values: { name: m.name, time: m.time }
 								})}
@@ -321,14 +302,16 @@
 									class="absolute inset-y-0 -translate-x-1/2 bg-slate-400 dark:bg-slate-300"
 									style="width:2px"
 								></div>
+								<!-- Badge raised above the markers (icons reach 15px above the line). -->
 								<div
-									class="absolute top-1 -translate-x-1/2 rounded bg-white px-1.5 py-0.5 font-mono text-[11px] whitespace-nowrap text-slate-800 shadow"
+									class="absolute -translate-x-1/2 rounded bg-white px-1.5 py-0.5 font-mono text-[11px] whitespace-nowrap text-slate-800 shadow"
+									style="top:-1.25rem"
 								>
 									{nowLabel}
 								</div>
 								{#if hovering && nextRun}
 									<div
-										class="absolute -top-6 -translate-x-1/2 rounded bg-slate-900 px-2 py-1 text-xs whitespace-nowrap text-white shadow-lg"
+										class="absolute -top-12 -translate-x-1/2 rounded bg-slate-900 px-2 py-1 text-xs whitespace-nowrap text-white shadow-lg"
 									>
 										{$_('admin.scrapers.viz.willStartIn', {
 											values: { name: nextRun.name, when: humanize(nextRun.delta) }

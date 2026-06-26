@@ -100,6 +100,8 @@
 			"addAction": "Add",
 			"tooClose": "Too close to an existing time — runs must be ≥ 1 minute apart.",
 			"noTimes": "No times yet",
+			"removeConfirm": "Remove the run at {time} for {name}?",
+			"removeAction": "Remove",
 			"back": "← Scrapers",
 			"configTitle": "{name} — configuration",
 			"reserved": "Operational parameters",
@@ -130,9 +132,7 @@
 				"noRuns": "no runs",
 				"empty": "No schedules configured yet — add a time to any scraper above.",
 				"willStartIn": "{name} will start in {when}",
-				"removeTitle": "{name} · {time} (click to remove)",
-				"subTicks": "30-minute ticks",
-				"markerSize": "Marker size"
+				"removeTitle": "{name} · {time} (click to remove)"
 			}
 		}
 	},

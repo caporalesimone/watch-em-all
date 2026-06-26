@@ -100,6 +100,8 @@
 			"addAction": "Aggiungi",
 			"tooClose": "Troppo vicino a un orario esistente — minimo 1 minuto di distanza.",
 			"noTimes": "Nessun orario",
+			"removeConfirm": "Rimuovere l'esecuzione delle {time} per {name}?",
+			"removeAction": "Rimuovi",
 			"back": "← Scraper",
 			"configTitle": "{name} — configurazione",
 			"reserved": "Parametri operativi",
@@ -130,9 +132,7 @@
 				"noRuns": "nessuna esecuzione",
 				"empty": "Nessuna pianificazione ancora — aggiungi un orario a uno scraper qui sopra.",
 				"willStartIn": "{name} parte tra {when}",
-				"removeTitle": "{name} · {time} (clicca per rimuovere)",
-				"subTicks": "Tacche 30 minuti",
-				"markerSize": "Dimensione marker"
+				"removeTitle": "{name} · {time} (clicca per rimuovere)"
 			}
 		}
 	},

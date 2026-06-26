@@ -136,10 +136,26 @@
 		await persist(row, row.times, !row.enabled);
 	}
 
-	// Remove handler for the 24-hour timeline (click on a marker).
-	function onRemoveFromViz(id: string, time: string): void {
-		const r = rows.find((x) => x.id === id);
-		if (r) void removeTime(r, time);
+	// Removing a run (the table × or a timeline marker) asks for confirmation first.
+	let pendingRemoval = $state<{ id: string; time: string } | null>(null);
+
+	const pendingInfo = $derived.by(() => {
+		const p = pendingRemoval;
+		if (!p) return null;
+		const r = rows.find((x) => x.id === p.id);
+		return { time: p.time, name: r?.name ?? p.id };
+	});
+
+	function requestRemove(id: string, time: string): void {
+		if (!saving) pendingRemoval = { id, time };
+	}
+
+	async function confirmRemove(): Promise<void> {
+		const p = pendingRemoval;
+		pendingRemoval = null;
+		if (!p) return;
+		const r = rows.find((x) => x.id === p.id);
+		if (r) await removeTime(r, p.time);
 	}
 </script>
 
@@ -197,7 +213,7 @@
 												type="button"
 												class="text-slate-400 hover:text-red-600 disabled:opacity-40 dark:hover:text-red-400"
 												aria-label={`remove ${t}`}
-												onclick={() => removeTime(row, t)}
+												onclick={() => requestRemove(row.id, t)}
 												disabled={saving}>×</button
 											>
 										</span>
@@ -254,6 +270,39 @@
 
 		{#if error}<p class="text-sm text-red-500">{error}</p>{/if}
 
-		<ScheduleTimeline scrapers={rows} onRemove={onRemoveFromViz} />
+		<ScheduleTimeline scrapers={rows} onRemove={requestRemove} />
+	{/if}
+
+	{#if pendingInfo}
+		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+			<div
+				class="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+				role="dialog"
+				aria-modal="true"
+			>
+				<p class="text-sm">
+					{$_('admin.scrapers.removeConfirm', {
+						values: { time: pendingInfo.time, name: pendingInfo.name }
+					})}
+				</p>
+				<div class="mt-4 flex justify-end gap-3">
+					<button
+						type="button"
+						class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+						onclick={() => (pendingRemoval = null)}
+					>
+						{$_('common.cancel')}
+					</button>
+					<button
+						type="button"
+						class="rounded bg-red-700 px-3 py-1.5 text-sm text-white hover:bg-red-600 disabled:opacity-40"
+						onclick={confirmRemove}
+						disabled={saving}
+					>
+						{$_('admin.scrapers.removeAction')}
+					</button>
+				</div>
+			</div>
+		</div>
 	{/if}
 </section>
