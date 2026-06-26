@@ -190,6 +190,55 @@ export async function clearScraperCache(id: string): Promise<{ deleted: number }
 	return asJson<{ deleted: number }>(res);
 }
 
+// System log (4.B7/4.F3-F4). Admin-only. Two reads: paged history + a live cursor tail.
+export interface SystemLogEntry {
+	id: number;
+	created_at: string;
+	level: 'info' | 'warning' | 'error';
+	source: string;
+	message: string;
+	context: Record<string, unknown> | null;
+}
+
+export interface SystemLogPage {
+	items: SystemLogEntry[];
+	total: number;
+	counts: Record<string, number>; // rows per level over the source/search filters
+	sources: string[]; // distinct sources present (filter chips)
+}
+
+export interface LogQuery {
+	page?: number;
+	size?: number;
+	level?: 'info' | 'warning' | 'error' | null;
+	sources?: string[];
+	q?: string;
+	since?: number;
+	limit?: number;
+}
+
+function logParams(query: LogQuery): URLSearchParams {
+	const p = new URLSearchParams();
+	if (query.page) p.set('page', String(query.page));
+	if (query.size) p.set('size', String(query.size));
+	if (query.level) p.set('level', query.level);
+	if (query.q) p.set('q', query.q);
+	if (query.since !== undefined) p.set('since', String(query.since));
+	if (query.limit) p.set('limit', String(query.limit));
+	for (const s of query.sources ?? []) p.append('sources', s);
+	return p;
+}
+
+// Paged history (Live off): newest-first window + total + per-level counts + distinct sources.
+export function getLogsPage(query: LogQuery = {}): Promise<SystemLogPage> {
+	return apiFetch(`/api/admin/logs/page?${logParams(query)}`).then(asJson<SystemLogPage>);
+}
+
+// Live tail (cursor): no `since` → latest N (ascending); `since=<id>` → newer rows (ascending).
+export function tailLogs(query: LogQuery = {}): Promise<SystemLogEntry[]> {
+	return apiFetch(`/api/admin/logs?${logParams(query)}`).then(asJson<SystemLogEntry[]>);
+}
+
 // Catalog / Product Picker (CAT-*). Money fields are Decimal serialised as
 // strings (exact, no float drift) — rendered as-is, never parsed for maths.
 export interface BrandRef {

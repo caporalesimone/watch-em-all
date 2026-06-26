@@ -16,7 +16,8 @@
 		"scrapers": "Scrapers",
 		"users": "Users",
 		"notifiers": "Notifiers",
-		"featureFlags": "Feature flags"
+		"featureFlags": "Feature flags",
+		"systemLogs": "System logs"
 	},
 	"catalog": {
 		"title": "Catalog",
@@ -72,6 +73,24 @@
 			"colVersion": "Version",
 			"empty": "No notifiers are loaded.",
 			"loadError": "Could not load the notifiers."
+		},
+		"logs": {
+			"title": "System logs",
+			"subtitle": "Runtime events from scraper, worker, notifier, api and db.",
+			"live": "Live",
+			"refresh": "Refresh",
+			"search": "Search messages or sources…",
+			"all": "All",
+			"sources": "Sources",
+			"perPage": "{n} / page",
+			"colTime": "Time",
+			"colSource": "Source",
+			"colLevel": "Level",
+			"colMessage": "Message",
+			"context": "Context",
+			"empty": "No log entries.",
+			"loadError": "Could not load the logs.",
+			"showing": "Showing {from}–{to} of {total}"
 		},
 		"featureFlags": {
 			"title": "Feature flags",
