@@ -121,6 +121,18 @@
 				"http_timeout_s": "How long to wait for a response before giving up on a request.",
 				"cache_ttl_min": "How long a fetched page is reused before fetching it again; 0 disables the cache.",
 				"scrape_now_min_interval_s": "Minimum time before a user can run Scrape now again."
+			},
+			"viz": {
+				"title": "24-hour schedule",
+				"subtitle": "Six 4-hour bands from midnight. Click a marker to remove that run.",
+				"runsPerDay": "{n} runs / day",
+				"perDay": "{n}×/day",
+				"noRuns": "no runs",
+				"empty": "No schedules configured yet — add a time to any scraper above.",
+				"willStartIn": "{name} will start in {when}",
+				"removeTitle": "{name} · {time} (click to remove)",
+				"showTicks": "Hour ticks",
+				"markerSize": "Marker size"
 			}
 		}
 	},

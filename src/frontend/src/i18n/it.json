@@ -121,6 +121,18 @@
 				"http_timeout_s": "Quanto attendere una risposta prima di rinunciare a una richiesta.",
 				"cache_ttl_min": "Per quanto una pagina scaricata viene riusata prima di riscaricarla; 0 disattiva la cache.",
 				"scrape_now_min_interval_s": "Tempo minimo prima che un utente possa rilanciare Scrape ora."
+			},
+			"viz": {
+				"title": "Pianificazione 24 ore",
+				"subtitle": "Sei fasce da 4 ore dalla mezzanotte. Clicca un marker per rimuovere quell'esecuzione.",
+				"runsPerDay": "{n} esecuzioni / giorno",
+				"perDay": "{n}×/giorno",
+				"noRuns": "nessuna esecuzione",
+				"empty": "Nessuna pianificazione ancora — aggiungi un orario a uno scraper qui sopra.",
+				"willStartIn": "{name} parte tra {when}",
+				"removeTitle": "{name} · {time} (clicca per rimuovere)",
+				"showTicks": "Tacche orarie",
+				"markerSize": "Dimensione marker"
 			}
 		}
 	},

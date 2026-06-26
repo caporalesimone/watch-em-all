@@ -15,6 +15,7 @@
 		type ScraperListItem
 	} from '$lib/api/client';
 	import PageTitle from '$lib/components/PageTitle.svelte';
+	import ScheduleTimeline from '$lib/components/ScheduleTimeline.svelte';
 
 	type Row = {
 		id: string;
@@ -134,6 +135,12 @@
 	async function toggleActive(row: Row): Promise<void> {
 		await persist(row, row.times, !row.enabled);
 	}
+
+	// Remove handler for the 24-hour timeline (click on a marker).
+	function onRemoveFromViz(id: string, time: string): void {
+		const r = rows.find((x) => x.id === id);
+		if (r) void removeTime(r, time);
+	}
 </script>
 
 <section class="space-y-6">
@@ -246,5 +253,7 @@
 		</table>
 
 		{#if error}<p class="text-sm text-red-500">{error}</p>{/if}
+
+		<ScheduleTimeline scrapers={rows} onRemove={onRemoveFromViz} />
 	{/if}
 </section>
