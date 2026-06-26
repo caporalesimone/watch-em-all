@@ -131,6 +131,43 @@ export async function patchFeatureFlags(partial: FeatureFlags): Promise<FeatureF
 	return asJson<FeatureFlags>(res);
 }
 
+// Admin scraper management (4.B2/4.B10). Admin-only on the backend.
+export interface ScraperListItem {
+	scraper_id: string;
+	display_name: string;
+	times: string[]; // daily slots "HH:MM" (4.B2; edited by the slot editor, 4.F1)
+	enabled: boolean;
+	last_slot: string | null;
+}
+
+// Core reserved config a scraper's runs/scrape-now obey (4.B10).
+export interface ScraperConfig {
+	politeness_delay_s: number;
+	http_timeout_s: number;
+	cache_ttl_min: number; // 0 disables the scrape cache
+	scrape_now_min_interval_s: number;
+}
+
+export function listScrapers(): Promise<ScraperListItem[]> {
+	return apiFetch('/api/admin/scrapers').then(asJson<ScraperListItem[]>);
+}
+
+export function getScraperConfig(id: string): Promise<ScraperConfig> {
+	return apiFetch(`/api/admin/scrapers/${id}/config`).then(asJson<ScraperConfig>);
+}
+
+export async function patchScraperConfig(
+	id: string,
+	partial: Partial<ScraperConfig>
+): Promise<ScraperConfig> {
+	const res = await apiFetch(`/api/admin/scrapers/${id}/config`, {
+		method: 'PATCH',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(partial)
+	});
+	return asJson<ScraperConfig>(res);
+}
+
 // Catalog / Product Picker (CAT-*). Money fields are Decimal serialised as
 // strings (exact, no float drift) — rendered as-is, never parsed for maths.
 export interface BrandRef {

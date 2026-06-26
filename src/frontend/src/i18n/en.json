@@ -79,6 +79,29 @@
 			"empty": "No feature flags are defined.",
 			"loadError": "Could not load the feature flags.",
 			"saveError": "Could not save the feature flags."
+		},
+		"scrapers": {
+			"title": "Scrapers",
+			"hint": "Schedule and operational parameters, one scraper at a time.",
+			"empty": "No schedulable scrapers are loaded.",
+			"loadError": "Could not load the scrapers.",
+			"saveError": "Could not save the configuration.",
+			"colName": "Scraper",
+			"colVersion": "Version",
+			"colSchedule": "Schedule",
+			"configure": "Configure",
+			"suspended": "Suspended",
+			"noSchedule": "No schedule",
+			"back": "← Scrapers",
+			"configTitle": "{name} — configuration",
+			"reserved": "Operational parameters",
+			"reservedHint": "Core settings applied on every run and manual scrape. They take effect on the next run — no restart.",
+			"fields": {
+				"politeness_delay_s": "Politeness delay (seconds)",
+				"http_timeout_s": "HTTP timeout (seconds)",
+				"cache_ttl_min": "Cache half-life (minutes, 0 = off)",
+				"scrape_now_min_interval_s": "Manual scrape-now interval (seconds)"
+			}
 		}
 	},
 	"theme": {

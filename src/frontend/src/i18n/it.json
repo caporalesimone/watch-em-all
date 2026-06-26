@@ -79,6 +79,29 @@
 			"empty": "Nessun feature flag definito.",
 			"loadError": "Impossibile caricare i feature flag.",
 			"saveError": "Impossibile salvare i feature flag."
+		},
+		"scrapers": {
+			"title": "Scraper",
+			"hint": "Pianificazione e parametri operativi, uno scraper alla volta.",
+			"empty": "Nessuno scraper pianificabile caricato.",
+			"loadError": "Impossibile caricare gli scraper.",
+			"saveError": "Impossibile salvare la configurazione.",
+			"colName": "Scraper",
+			"colVersion": "Versione",
+			"colSchedule": "Pianificazione",
+			"configure": "Configura",
+			"suspended": "Sospeso",
+			"noSchedule": "Nessuna pianificazione",
+			"back": "← Scraper",
+			"configTitle": "{name} — configurazione",
+			"reserved": "Parametri operativi",
+			"reservedHint": "Impostazioni core applicate a ogni esecuzione e scrape manuale. Hanno effetto alla prossima esecuzione — senza riavvio.",
+			"fields": {
+				"politeness_delay_s": "Ritardo di politeness (secondi)",
+				"http_timeout_s": "Timeout HTTP (secondi)",
+				"cache_ttl_min": "Emivita cache (minuti, 0 = off)",
+				"scrape_now_min_interval_s": "Intervallo Scrape ora manuale (secondi)"
+			}
 		}
 	},
 	"theme": {
