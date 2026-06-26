@@ -107,6 +107,12 @@
 				"http_timeout_s": "Timeout HTTP (secondi)",
 				"cache_ttl_min": "Emivita cache (minuti, 0 = off)",
 				"scrape_now_min_interval_s": "Intervallo Scrape ora manuale (secondi)"
+			},
+			"fieldHints": {
+				"politeness_delay_s": "Attesa minima tra due richieste verso lo stesso sito.",
+				"http_timeout_s": "Quanto attendere una risposta prima di rinunciare a una richiesta.",
+				"cache_ttl_min": "Per quanto una pagina scaricata viene riusata prima di riscaricarla; 0 disattiva la cache.",
+				"scrape_now_min_interval_s": "Tempo minimo prima che un utente possa rilanciare Scrape ora."
 			}
 		}
 	},

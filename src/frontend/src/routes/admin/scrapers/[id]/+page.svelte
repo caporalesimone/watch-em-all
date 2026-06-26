@@ -113,8 +113,11 @@
 			<div class="space-y-2">
 				{#each fields as f (f.key)}
 					<label class="flex items-center justify-between gap-4 text-sm">
-						<span class="text-slate-600 dark:text-slate-300">
-							{$_(`admin.scrapers.fields.${f.key}`)}
+						<span class="flex flex-col pr-4">
+							<span class="text-slate-600 dark:text-slate-300"
+								>{$_(`admin.scrapers.fields.${f.key}`)}</span
+							>
+							<span class="text-xs text-slate-400">{$_(`admin.scrapers.fieldHints.${f.key}`)}</span>
 						</span>
 						<input
 							class="{inputClass} w-40 text-right"
