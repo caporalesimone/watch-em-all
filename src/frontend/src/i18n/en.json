@@ -106,7 +106,7 @@
 				"politeness_delay_ms": "Politeness delay (milliseconds)",
 				"http_timeout_s": "HTTP timeout (seconds)",
 				"cache_ttl_min": "Cache half-life (minutes, 0 = off)",
-				"scrape_now_min_interval_s": "Manual scrape-now interval (seconds)"
+				"scrape_now_min_interval_s": "Manual scrape-now cooldown (seconds)"
 			},
 			"fieldHints": {
 				"politeness_delay_ms": "Minimum wait between two requests to the same site.",
