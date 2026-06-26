@@ -36,6 +36,17 @@
 	const fromIdx = $derived(total === 0 ? 0 : (page - 1) * size + 1);
 	const toIdx = $derived(Math.min(page * size, total));
 
+	// A sliding window of at most 5 page numbers, centred on the current page.
+	function pageNumbers(): number[] {
+		const span = 2;
+		let start = Math.max(1, page - span);
+		const end = Math.min(pages, start + 2 * span);
+		start = Math.max(1, end - 2 * span);
+		const out: number[] = [];
+		for (let p = start; p <= end; p++) out.push(p);
+		return out;
+	}
+
 	function filters(): LogQuery {
 		return { level, sources: selectedSources, q: q.trim() || undefined };
 	}
@@ -255,6 +266,30 @@
 	{:else if entries.length === 0}
 		<p class="text-sm text-slate-500">{$_('admin.logs.empty')}</p>
 	{:else}
+		{#snippet pager()}
+			<div class="flex items-center gap-1">
+				<button
+					type="button"
+					class="rounded px-2 py-1 text-sm hover:bg-slate-100 disabled:opacity-40 dark:hover:bg-slate-800"
+					onclick={() => goTo(page - 1)}
+					disabled={page <= 1}>‹</button
+				>
+				{#each pageNumbers() as p (p)}
+					<button type="button" class={tabClass(p === page)} onclick={() => goTo(p)}>{p}</button>
+				{/each}
+				<button
+					type="button"
+					class="rounded px-2 py-1 text-sm hover:bg-slate-100 disabled:opacity-40 dark:hover:bg-slate-800"
+					onclick={() => goTo(page + 1)}
+					disabled={page >= pages}>›</button
+				>
+			</div>
+		{/snippet}
+
+		{#if !live}
+			<div class="flex justify-end">{@render pager()}</div>
+		{/if}
+
 		<!-- Fixed layout: column widths stay put regardless of content/filter (Message takes the rest). -->
 		<table class="w-full table-fixed text-left text-sm">
 			<colgroup>
@@ -310,21 +345,7 @@
 		{#if !live}
 			<div class="flex flex-wrap items-center justify-between gap-3 pt-1 text-sm text-slate-500">
 				<span>{$_('admin.logs.showing', { values: { from: fromIdx, to: toIdx, total } })}</span>
-				<div class="flex items-center gap-1">
-					<button
-						type="button"
-						class="rounded px-2 py-1 hover:bg-slate-100 disabled:opacity-40 dark:hover:bg-slate-800"
-						onclick={() => goTo(page - 1)}
-						disabled={page <= 1}>‹</button
-					>
-					<span class="px-2 font-mono">{page} / {pages}</span>
-					<button
-						type="button"
-						class="rounded px-2 py-1 hover:bg-slate-100 disabled:opacity-40 dark:hover:bg-slate-800"
-						onclick={() => goTo(page + 1)}
-						disabled={page >= pages}>›</button
-					>
-				</div>
+				{@render pager()}
 			</div>
 		{/if}
 	{/if}
