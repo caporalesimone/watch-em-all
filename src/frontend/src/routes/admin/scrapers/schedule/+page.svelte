@@ -149,19 +149,26 @@
 	{:else if error && rows.length === 0}
 		<p class="text-sm text-red-500">{error}</p>
 	{:else}
-		<table class="w-full max-w-3xl text-left text-sm">
+		<!-- Fixed layout: column widths are set, so adding a chip never resizes the table. -->
+		<table class="w-[58rem] max-w-full table-fixed text-left text-sm">
+			<colgroup>
+				<col style="width: 13rem" />
+				<col style="width: 24rem" />
+				<col style="width: 16rem" />
+				<col style="width: 5rem" />
+			</colgroup>
 			<thead class="border-b border-slate-200 text-xs text-slate-500 dark:border-slate-800">
 				<tr>
 					<th class="py-2 pr-4">{$_('admin.scrapers.colName')}</th>
 					<th class="py-2 pr-4">{$_('admin.scrapers.colSchedule')}</th>
 					<th class="py-2 pr-4">{$_('admin.scrapers.colAdd')}</th>
-					<th class="py-2 pr-4">{$_('admin.scrapers.colActive')}</th>
+					<th class="py-2 text-center">{$_('admin.scrapers.colActive')}</th>
 				</tr>
 			</thead>
 			<tbody>
 				{#each rows as row (row.id)}
 					<tr class="border-b border-slate-100 align-top dark:border-slate-800/60">
-						<td class="py-3 pr-4 font-medium">
+						<td class="py-3 pr-4 font-medium whitespace-nowrap">
 							{#if row.icon}
 								<img src={row.icon} alt="" class="mr-2 inline h-4 w-4 align-text-bottom" />
 							{/if}{row.name}
@@ -220,7 +227,7 @@
 							{/if}
 						</td>
 
-						<td class="py-3 pr-4">
+						<td class="py-3 text-center align-middle">
 							{#if row.schedulable}
 								<input
 									type="checkbox"

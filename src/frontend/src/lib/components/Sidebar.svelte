@@ -9,11 +9,17 @@
 	// Roles don't overlap (personas-and-roles.md): an admin governs (no personal
 	// catalog/carts), a user owns their data. The shell shows one or the other.
 	const isAdmin = $derived(($auth.user?.role ?? 'user') === 'admin');
-	const primary = $derived(
+
+	type NavItem = { href: string; key: string; children?: { href: string; key: string }[] };
+	const primary = $derived<NavItem[]>(
 		isAdmin
 			? [
 					{ href: '/admin/users', key: 'nav.users' },
-					{ href: '/admin/scrapers', key: 'nav.scrapers' },
+					{
+						href: '/admin/scrapers',
+						key: 'nav.scrapers',
+						children: [{ href: '/admin/scrapers/schedule', key: 'admin.scrapers.scheduleTitle' }]
+					},
 					{ href: '/admin/notifiers', key: 'nav.notifiers' },
 					{ href: '/admin/feature-flags', key: 'nav.featureFlags' }
 				]
@@ -37,6 +43,12 @@
 	<nav class="flex flex-1 flex-col gap-1">
 		{#each primary as link (link.href)}
 			<a href={link.href} class={itemClass(link.href)}>{$_(link.key)}</a>
+			{#if link.children}
+				{#each link.children as child (child.href)}
+					<!-- Child entry: clickable, indented (ml-4) to read as a sub-page. -->
+					<a href={child.href} class="{itemClass(child.href)} ml-4 text-[13px]">{$_(child.key)}</a>
+				{/each}
+			{/if}
 		{/each}
 		<a href="/profile" class={itemClass('/profile')}>{$_('nav.profile')}</a>
 
