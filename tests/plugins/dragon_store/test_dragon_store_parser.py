@@ -21,7 +21,7 @@ from src.plugins.scrapers.dragon_store.backend.sanitizer import (
     sanitize_title,
 )
 
-_FIX = Path(__file__).parent / "fixtures" / "dragon_store"
+_FIX = Path(__file__).parent / "fixtures"
 
 
 def _read(name: str) -> bytes:

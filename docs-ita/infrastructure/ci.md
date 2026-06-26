@@ -18,6 +18,28 @@ Pipeline minima (GitHub Actions) su ogni push/PR: esegue i tool già scelti dal 
 
 La pipeline nasce in **fase 0** del [development flow](../development-flow/phase-00-pipeline.md) (build immagini, guardia CHANGELOG, publish dev e su tag) e **cresce col flusso**: linter e typecheck con il primo codice (fase 1), test di contratto e integrazione a regime (fase 12).
 
+## Test backend — struttura e comandi
+
+La cartella `tests/` **rispecchia `src/`**: una sottocartella per sottosistema, così un test per `src/<area>/foo.py` sta in `tests/<area>/`. La `conftest.py` (fixtures condivise, es. `client`) e l'`__init__.py` stanno alla **radice** di `tests/` e valgono per tutte le sottocartelle.
+
+| Cartella | Cosa contiene |
+|---|---|
+| `tests/core/` | logica di dominio / servizi (`src/core/*`): catalogo, cache, settings, schedule, lock, system log, security, … |
+| `tests/web/` | endpoint/API via `TestClient` (`src/web/routers/*`): auth, admin users/scrapers/errors, catalog, rate-limit, scrape-lock |
+| `tests/worker/` | dispatcher e runner seriale (`src/worker/*`) |
+| `tests/plugins/` | framework dei plugin (manifest, registry, discovery, context, identità scraper) |
+| `tests/plugins/dragon_store/` | il plugin Dragon Store + le sue `fixtures/` (pagine reali salvate) |
+
+```bash
+poetry run pytest                                   # tutta la suite (testpaths = tests/, ricorsivo)
+poetry run pytest tests/web                          # solo un gruppo
+poetry run pytest tests/plugins/dragon_store         # solo un plugin (test + fixtures)
+poetry run pytest tests/plugins/dragon_store/test_dragon_store_parser.py   # un singolo file
+poetry run pytest -k "schedule and not worker"       # per espressione sul nome
+```
+
+Aggiungere un test = metterlo nella sottocartella del sottosistema che esercita; nessuna config da toccare (`testpaths`/`mypy.files` sono ricorsivi). Su Windows i comandi backend (`poetry run …`) girano nell'ambiente Linux del devcontainer/WSL, non in Git Bash.
+
 ## Immagini dev (su PR)
 
 Per **provare il container prima del merge**, un workflow costruisce le immagini a ogni **apertura/aggiornamento di PR** (anche draft) e le pubblica su GHCR con tag **`dev-<branch>`** (nome del branch sanificato), **sovrascritto** a ogni push: punta sempre all'ultima build di quel ramo. Più rami in volo → tag distinti, nessuna collisione.

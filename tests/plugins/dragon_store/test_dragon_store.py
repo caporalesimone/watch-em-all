@@ -25,7 +25,7 @@ from src.core.scraper_config import set_scraper_config
 
 DS = "/api/plugins/dragon-store"
 
-_FIX = Path(__file__).parent / "fixtures" / "dragon_store"
+_FIX = Path(__file__).parent / "fixtures"
 _FIXTURES = {
     "896": "gp_896_discounted.html",
     "36099": "gp_36099_preorder.html",
