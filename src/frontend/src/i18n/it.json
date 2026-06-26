@@ -107,6 +107,7 @@
 			"saveError": "Impossibile salvare la configurazione.",
 			"colName": "Scraper",
 			"colVersion": "Versione",
+			"colCache": "Cache",
 			"colSchedule": "Pianificazione",
 			"configure": "Configura",
 			"suspended": "Sospeso",

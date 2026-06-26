@@ -101,6 +101,15 @@ def test_clear_cache_admin_only_unknown_404_and_counts(client: TestClient) -> No
     assert client.delete("/api/admin/scrapers/dragon_store/cache", headers=h).json()["deleted"] == 0
 
 
+def test_list_reports_cache_entries(client: TestClient) -> None:
+    h = _bearer(_admin_token(client))
+    by_id = {s["scraper_id"]: s for s in client.get("/api/admin/scrapers", headers=h).json()}
+    assert by_id["dragon_store"]["cache_entries"] == 0
+    _seed_cache("dragon_store", ["a", "b", "c"])
+    by_id = {s["scraper_id"]: s for s in client.get("/api/admin/scrapers", headers=h).json()}
+    assert by_id["dragon_store"]["cache_entries"] == 3
+
+
 # --- reserved config (4.B10) ---
 
 CFG = "/api/admin/scrapers/dragon_store/config"

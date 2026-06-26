@@ -32,6 +32,7 @@ class ScraperScheduleOut(BaseModel):
     times: list[str]
     enabled: bool
     last_slot: datetime | None
+    cache_entries: int  # number of scrape_cache rows for this scraper (admin list)
 
 
 class ScraperScheduleUpdate(BaseModel):
@@ -53,23 +54,27 @@ def _schedulable(request: Request) -> dict[str, LoadedPlugin]:
     }
 
 
-def _out(lp: LoadedPlugin, sched: ScraperSchedule | None) -> ScraperScheduleOut:
+def _out(lp: LoadedPlugin, sched: ScraperSchedule | None, cache_entries: int) -> ScraperScheduleOut:
     return ScraperScheduleOut(
         scraper_id=lp.plugin.plugin_id,
         display_name=lp.manifest.display_name,
         times=sched.times if sched is not None else [],
         enabled=sched.enabled if sched is not None else True,
         last_slot=sched.last_slot if sched is not None else None,
+        cache_entries=cache_entries,
     )
 
 
 @router.get(
     "/scrapers",
     response_model=list[ScraperScheduleOut],
-    summary="List schedulable scrapers with their schedule (admin only).",
+    summary="List schedulable scrapers with their schedule + cache size (admin only).",
 )
 def list_scrapers(request: Request, _admin: AdminDep, db: SessionDep) -> list[ScraperScheduleOut]:
-    return [_out(lp, get_schedule(db, sid)) for sid, lp in _schedulable(request).items()]
+    return [
+        _out(lp, get_schedule(db, sid), scrape_cache.count(db, sid))
+        for sid, lp in _schedulable(request).items()
+    ]
 
 
 @router.put(
@@ -91,7 +96,7 @@ def set_scraper(
         sched = upsert_schedule(db, scraper_id, body.times, body.enabled)
     except ValueError as exc:
         raise APIError(422, "invalid_time", str(exc)) from exc
-    return _out(lp, sched)
+    return _out(lp, sched, scrape_cache.count(db, scraper_id))
 
 
 @router.delete(

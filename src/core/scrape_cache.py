@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from sqlalchemy import Engine, delete, select
+from sqlalchemy import Engine, delete, func, select
 from sqlalchemy.orm import Session
 
 from src.core.db import new_session
@@ -66,6 +66,16 @@ def clear(session: Session, plugin_id: str) -> int:
     res = session.execute(delete(ScrapeCacheRow).where(ScrapeCacheRow.plugin_id == plugin_id))
     session.commit()
     return int(getattr(res, "rowcount", 0) or 0)
+
+
+def count(session: Session, plugin_id: str) -> int:
+    """Number of cache entries currently stored for a plugin (shown in the admin list)."""
+    stmt = (
+        select(func.count())
+        .select_from(ScrapeCacheRow)
+        .where(ScrapeCacheRow.plugin_id == plugin_id)
+    )
+    return int(session.scalar(stmt) or 0)
 
 
 def _aware(dt: datetime) -> datetime:

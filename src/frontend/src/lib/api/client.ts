@@ -137,9 +137,10 @@ export async function patchFeatureFlags(partial: FeatureFlags): Promise<FeatureF
 export interface ScraperListItem {
 	scraper_id: string;
 	display_name: string;
-	times: string[]; // daily slots "HH:MM" (4.B2; edited by the slot editor, 4.F1)
+	times: string[]; // daily slots "HH:MM:SS" (4.B2/4.F1)
 	enabled: boolean;
 	last_slot: string | null;
+	cache_entries: number; // scrape-cache rows for this scraper
 }
 
 // Core reserved config a scraper's runs/scrape-now obey (4.B10).

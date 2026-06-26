@@ -237,25 +237,50 @@
 		</select>
 	</div>
 
-	<!-- source chips -->
-	{#if allSources.length > 0}
-		<div class="flex flex-wrap items-center gap-2">
-			<span class="text-xs font-semibold tracking-wide text-slate-400 uppercase">
-				{$_('admin.logs.sources')}
-			</span>
-			{#each allSources as s (s)}
-				<button
-					type="button"
-					class="flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs {selectedSources.includes(
-						s
-					)
-						? 'border-slate-400 bg-slate-100 dark:border-slate-500 dark:bg-slate-800'
-						: 'border-slate-200 text-slate-500 dark:border-slate-800'}"
-					onclick={() => toggleSource(s)}
-				>
-					<span class="h-2 w-2 rounded-full {sourceDot(s)}"></span>{s}
-				</button>
+	{#snippet pager()}
+		<div class="flex items-center gap-1">
+			<button
+				type="button"
+				class="rounded px-2 py-1 text-sm hover:bg-slate-100 disabled:opacity-40 dark:hover:bg-slate-800"
+				onclick={() => goTo(page - 1)}
+				disabled={page <= 1}>‹</button
+			>
+			{#each pageNumbers() as p (p)}
+				<button type="button" class={tabClass(p === page)} onclick={() => goTo(p)}>{p}</button>
 			{/each}
+			<button
+				type="button"
+				class="rounded px-2 py-1 text-sm hover:bg-slate-100 disabled:opacity-40 dark:hover:bg-slate-800"
+				onclick={() => goTo(page + 1)}
+				disabled={page >= pages}>›</button
+			>
+		</div>
+	{/snippet}
+
+	<!-- source chips (left) + pager (right) on one row, so the table sits right under it -->
+	{#if allSources.length > 0}
+		<div class="flex flex-wrap items-center justify-between gap-2">
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="text-xs font-semibold tracking-wide text-slate-400 uppercase">
+					{$_('admin.logs.sources')}
+				</span>
+				{#each allSources as s (s)}
+					<button
+						type="button"
+						class="flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs {selectedSources.includes(
+							s
+						)
+							? 'border-slate-400 bg-slate-100 dark:border-slate-500 dark:bg-slate-800'
+							: 'border-slate-200 text-slate-500 dark:border-slate-800'}"
+						onclick={() => toggleSource(s)}
+					>
+						<span class="h-2 w-2 rounded-full {sourceDot(s)}"></span>{s}
+					</button>
+				{/each}
+			</div>
+			{#if !live && total > 0}
+				{@render pager()}
+			{/if}
 		</div>
 	{/if}
 
@@ -266,30 +291,6 @@
 	{:else if entries.length === 0}
 		<p class="text-sm text-slate-500">{$_('admin.logs.empty')}</p>
 	{:else}
-		{#snippet pager()}
-			<div class="flex items-center gap-1">
-				<button
-					type="button"
-					class="rounded px-2 py-1 text-sm hover:bg-slate-100 disabled:opacity-40 dark:hover:bg-slate-800"
-					onclick={() => goTo(page - 1)}
-					disabled={page <= 1}>‹</button
-				>
-				{#each pageNumbers() as p (p)}
-					<button type="button" class={tabClass(p === page)} onclick={() => goTo(p)}>{p}</button>
-				{/each}
-				<button
-					type="button"
-					class="rounded px-2 py-1 text-sm hover:bg-slate-100 disabled:opacity-40 dark:hover:bg-slate-800"
-					onclick={() => goTo(page + 1)}
-					disabled={page >= pages}>›</button
-				>
-			</div>
-		{/snippet}
-
-		{#if !live}
-			<div class="flex justify-end">{@render pager()}</div>
-		{/if}
-
 		<!-- Fixed layout: column widths stay put regardless of content/filter (Message takes the rest). -->
 		<table class="w-full table-fixed text-left text-sm">
 			<colgroup>
