@@ -38,6 +38,12 @@
 <section class="space-y-6">
 	<PageTitle title={$_('admin.scrapers.title')} />
 	<p class="text-sm text-slate-500">{$_('admin.scrapers.hint')}</p>
+	<a
+		href="/admin/scrapers/schedule"
+		class="inline-block text-sm text-sky-600 hover:underline dark:text-sky-400"
+	>
+		{$_('admin.scrapers.scheduleTitle')} →
+	</a>
 
 	{#if loading}
 		<p class="text-sm text-slate-500">{$_('common.loading')}</p>

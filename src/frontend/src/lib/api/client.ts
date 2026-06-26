@@ -154,6 +154,20 @@ export function listScrapers(): Promise<ScraperListItem[]> {
 	return apiFetch('/api/admin/scrapers').then(asJson<ScraperListItem[]>);
 }
 
+// Set a scraper's daily times + enabled flag (4.B2/4.F1). The backend de-dupes, sorts and
+// returns canonical HH:MM:SS times. 404 if the scraper isn't schedulable.
+export async function updateScraperSchedule(
+	id: string,
+	body: { times: string[]; enabled: boolean }
+): Promise<ScraperListItem> {
+	const res = await apiFetch(`/api/admin/scrapers/${id}`, {
+		method: 'PUT',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+	return asJson<ScraperListItem>(res);
+}
+
 export function getScraperConfig(id: string): Promise<ScraperConfig> {
 	return apiFetch(`/api/admin/scrapers/${id}/config`).then(asJson<ScraperConfig>);
 }
