@@ -6,10 +6,14 @@
 
 Il registro degli eventi operativi del sistema, consultabile in near-real-time dalla pagina admin (polling incrementale con cursore, auto-scroll pausabile, filtri per livello e origine).
 
-- **LOG-R1** — Origini: `worker` (dispatcher: esecuzioni, recuperi, skip per overlap, heartbeat, manutenzione giornaliera — purge utenti scaduti e relativi errori), `scraper` (eventi emessi dai plugin scraper via logger del contesto), `alert`, `summary`. Livelli: `info`, `warning`, `error`.
-- **LOG-R2** — Eventi notevoli sempre registrati: run eseguita (con ritardo rispetto allo slot; oltre soglia → warning "recupero"), slot saltato per overlap (warning), errore/timeout di run (error), heartbeat (info, riga ricorrente).
+- **LOG-R1** — Origini **implementate**: `worker` (dispatcher: esecuzioni, recuperi, skip per overlap, manutenzione giornaliera — purge dei log/run oltre la retention) e `scraper` (eventi emessi dai plugin scraper via logger del contesto). Solo i record `wea.worker.*` e `wea.plugin.*` sono persistiti; il resto resta su stdout. Le origini `alert`/`summary` arriveranno con notifiche/summary (fasi 6+). Livelli: `info`, `warning`, `error`.
+- **LOG-R2** — Eventi notevoli sempre registrati: run eseguita (con ritardo rispetto allo slot; oltre soglia → warning "recupero"), slot saltato per overlap (warning), errore/timeout di run (error). **Niente riga di heartbeat** (decisione 2026-06-26): la liveness del worker resta su `/api/health` + file di heartbeat, non come log ricorrente.
 - **LOG-R3** — Il polling usa un cursore (id dell'ultima riga vista): il server restituisce solo le righe successive.
 - **LOG-R4** — I messaggi non contengono mai contenuti operativi degli utenti (titoli dei prodotti, contenuto delle notifiche): solo identificativi e metriche — coerente con il principio che l'admin non legge i dati degli utenti.
+
+## Pagina System logs (4.F3/4.F4)
+
+Voce admin top-level **`/admin/logs`**, modello **ibrido**: **Live ON** = tail a cursore (`GET /api/admin/logs?since=<maxId>`, auto-refresh ~5 s, paginazione nascosta); **Live OFF** = storico a **numeri di pagina** (`GET /api/admin/logs/page?page=&size=` → `{items, total, counts, sources}`). Filtri: **tab per livello con conteggi** (Tutti/INFO/WARN/ERR), **chip sorgente multipli** (dinamici dalle sorgenti presenti — oggi worker/scraper), **ricerca** `q` (ILIKE sul messaggio), **righe/pagina** 25/50/100. Tabella ora · sorgente · livello · messaggio + **`{ }`** che apre il `context_json` in una modale.
 
 ## Manutenzione e impostazioni globali
 
@@ -24,7 +28,7 @@ Il registro degli eventi operativi del sistema, consultabile in near-real-time d
 ```mermaid
 flowchart LR
     subgraph "Sorgenti"
-        W[Worker: run, recuperi,<br/>skip, heartbeat]
+        W[Worker: run, recuperi,<br/>skip, manutenzione]
         S[Plugin scraper: logger]
         AE[Alert/Summary engine]
     end

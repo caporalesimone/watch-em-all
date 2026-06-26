@@ -18,7 +18,7 @@ The admin governs **when** and **how much** the scrapers work: execution times (
 ### Serial execution and system limits
 - **SCHED-R6** — **Strictly serial execution**: the runner runs **only one scraper at a time**; jobs due at the same moment wait in a **FIFO queue**. There is no parallelism parameter: load distribution is governed by **spacing out the scrapers' times** (with the help of the calendar view, SCHED-R10).
 - **SCHED-R7** — **`scraper_run_timeout`**: maximum duration of a run (default 30 minutes); beyond that, the run is terminated and marked as an error. A hung scraper must never block the system (with serial execution it would also block the queue).
-- **SCHED-R8** — **Per-scraper politeness**: minimum delay between consecutive HTTP requests of the same scraper (default 1–2 s, configurable per scraper on its admin page). It is enforced by the HTTP client provided by the core, not left to the plugin's goodwill.
+- **SCHED-R8** — **Per-scraper politeness**: minimum delay between consecutive HTTP requests of the same scraper — reserved key **`politeness_delay_ms`** (milliseconds, default 1000–2000 ms), configurable per scraper on its admin page (4.B10). It is enforced by the HTTP client provided by the core, not left to the plugin's goodwill.
 - **SCHED-R9** — Each scraper is **internally single-threaded** (contract constraint): one request at a time toward the site. With serial execution across scrapers, at any instant the system has **at most one HTTP request in flight** toward the watched sites.
 
 ### Calendar view
@@ -56,7 +56,7 @@ flowchart LR
     S --> W[Worker: dispatcher]
     SET --> P[Serial runner]
     W --> P
-    P --> M[Monitoring and statistics<br/>see scraper-monitoring.md]
+    P --> M[Monitoring & statistics<br/>later phase]
 ```
 
 ## Rationale of the choices

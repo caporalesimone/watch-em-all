@@ -6,10 +6,14 @@
 
 The record of the system's operational events, viewable in near-real-time from the admin page (incremental polling with a cursor, pausable auto-scroll, filters by level and source).
 
-- **LOG-R1** — Sources: `worker` (dispatcher: runs, recoveries, skips due to overlap, heartbeat, daily maintenance — purge of expired users and related errors), `scraper` (events emitted by scraper plugins via the context logger), `alert`, `summary`. Levels: `info`, `warning`, `error`.
-- **LOG-R2** — Notable events that are always recorded: run executed (with its delay relative to the slot; beyond the threshold → "recovery" warning), slot skipped due to overlap (warning), run error/timeout (error), heartbeat (info, recurring line).
+- **LOG-R1** — **Implemented** sources: `worker` (dispatcher: runs, recoveries, skips due to overlap, daily maintenance — purge of logs/runs past retention) and `scraper` (events emitted by scraper plugins via the context logger). Only `wea.worker.*` and `wea.plugin.*` records are persisted; everything else stays on stdout. The `alert`/`summary` sources arrive with notifications/summary (phase 6+). Levels: `info`, `warning`, `error`.
+- **LOG-R2** — Notable events that are always recorded: run executed (with its delay relative to the slot; beyond the threshold → "recovery" warning), slot skipped due to overlap (warning), run error/timeout (error). **No heartbeat row** (2026-06-26 decision): worker liveness stays on `/api/health` + a heartbeat file, not a recurring log line.
 - **LOG-R3** — Polling uses a cursor (id of the last row seen): the server returns only the rows that follow it.
 - **LOG-R4** — Messages never contain users' operational content (product titles, notification content): only identifiers and metrics — consistent with the principle that the admin does not read users' data.
+
+## System logs page (4.F3/4.F4)
+
+A top-level admin entry **`/admin/logs`**, **hybrid** model: **Live ON** = cursor tail (`GET /api/admin/logs?since=<maxId>`, auto-refresh ~5 s, pagination hidden); **Live OFF** = paged **history** (`GET /api/admin/logs/page?page=&size=` → `{items, total, counts, sources}`). Filters: **level tabs with counts** (All/INFO/WARN/ERR), **multi-source chips** (dynamic from the sources present — today worker/scraper), message **search** `q` (ILIKE), **rows per page** 25/50/100. Table time · source · level · message + a **`{ }`** button that opens the row's `context_json` in a modal.
 
 ## Maintenance and global settings
 
@@ -24,7 +28,7 @@ The record of the system's operational events, viewable in near-real-time from t
 ```mermaid
 flowchart LR
     subgraph "Sources"
-        W[Worker: runs, recoveries,<br/>skips, heartbeat]
+        W[Worker: runs, recoveries,<br/>skips, maintenance]
         S[Scraper plugins: logger]
         AE[Alert/Summary engine]
     end

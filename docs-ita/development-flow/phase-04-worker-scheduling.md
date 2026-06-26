@@ -1,6 +1,6 @@
 # Fase 4 — Worker e scheduling
 
-> Stato: 🚧 in corso — avviata 2026-06-25, versione di lavoro `0.4.x` · Prerequisiti: Fase 3 ✅ · [Indice del flusso](README.md)
+> Stato: ✅ chiusa — 2026-06-25 → 2026-06-27, `0.4.0` · Prerequisiti: Fase 3 ✅ · [Indice del flusso](README.md)
 
 ## Obiettivo
 
@@ -53,11 +53,11 @@ Imposti "Dragon Store alle 14:30" e alle 14:30 lo scrape parte da solo; nella pa
 
 ## Definition of Done
 
-- [ ] Scraping quotidiano completamente automatico, **un solo scraper alla volta**, con scrape-now che convive (stessi lock).
-- [ ] Scenari di resilienza provati: worker giù sullo slot (recupera), run oltre timeout (terminata e marcata, la coda riparte), errore su un utente (run `partial`).
-- [ ] La cache lavora: stessa query tra due utenti o due run entro l'emivita → una sola visita al sito (visibile dai contatori `http_requests`/`cache_hits`); l'emivita si governa dalla UI admin.
-- [ ] L'admin risponde a "quando ha girato? com'è andata? quanto ha fatto?" senza guardare il DB.
-- [ ] [docs](../../docs/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
+- [x] Scraping quotidiano completamente automatico, **un solo scraper alla volta**, con scrape-now che convive (stessi lock).
+- [x] Scenari di resilienza provati: worker giù sullo slot (recupera), run oltre timeout (terminata e marcata, la coda riparte), errore su un utente (run `partial`).
+- [x] La cache lavora: stessa query tra due utenti o due run entro l'emivita → una sola visita al sito (visibile dai contatori `http_requests`/`cache_hits`); l'emivita si governa dalla UI admin.
+- [x] L'admin risponde a "quando ha girato? com'è andata? quanto ha fatto?" senza guardare il DB.
+- [x] [docs](../../docs/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti
 

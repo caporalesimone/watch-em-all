@@ -18,7 +18,7 @@ L'admin governa **quando** e **quanto** lavorano gli scraper: orari di esecuzion
 ### Esecuzione seriale e limiti di sistema
 - **SCHED-R6** — **Esecuzione strettamente seriale**: il runner esegue **un solo scraper alla volta**; i job dovuti nello stesso momento attendono in **coda FIFO**. Non esiste alcun parametro di parallelismo: la distribuzione del carico si governa **distanziando gli orari** degli scraper (con l'aiuto della vista calendario, SCHED-R10).
 - **SCHED-R7** — **`scraper_run_timeout`**: durata massima di una run (default 30 minuti); oltre, la run è terminata e marcata in errore. Uno scraper appeso non deve mai bloccare il sistema (con l'esecuzione seriale, bloccherebbe anche la coda).
-- **SCHED-R8** — **Politeness per-scraper**: ritardo minimo tra richieste HTTP consecutive dello stesso scraper (default 1–2 s, configurabile per scraper nella sua pagina admin). È imposto dal client HTTP fornito dal core, non lasciato alla buona volontà del plugin.
+- **SCHED-R8** — **Politeness per-scraper**: ritardo minimo tra richieste HTTP consecutive dello stesso scraper — chiave riservata **`politeness_delay_ms`** (millisecondi, default 1000–2000 ms), configurabile per scraper nella sua pagina admin (4.B10). È imposto dal client HTTP fornito dal core, non lasciato alla buona volontà del plugin.
 - **SCHED-R9** — Ogni scraper è **internamente mono-thread** (vincolo di contratto): una richiesta alla volta verso il sito. Con l'esecuzione seriale tra scraper, in ogni istante il sistema ha **al più una richiesta HTTP in volo** verso i siti osservati.
 
 ### Vista calendario

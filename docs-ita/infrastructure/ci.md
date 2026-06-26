@@ -11,8 +11,9 @@ Pipeline minima (GitHub Actions) su ogni push/PR: esegue i tool già scelti dal 
 | Lint backend | `ruff check .` · `ruff format --check .` | bloccante |
 | Typecheck backend | `mypy` (strict) | bloccante |
 | Test backend | `pytest` (unit + contratto; integrazione con Postgres service) | bloccante |
-| Lint frontend | `eslint` · `prettier --check` · `svelte-check` | bloccante |
-| Build frontend | `npm run build` (include `build:plugins`) | bloccante |
+| Lint frontend | `prettier --check` · `svelte-check` | bloccante |
+| Consistenza i18n | `i18n:check` — chiavi inglesi **usate vs definite** (core + plugin); 4.B11. Gira anche **prima della build** (`prebuild`) e **sul tag** (job `i18n-guard`, prerequisito di *Build immagini*) | bloccante |
+| Build frontend | `npm run build` (esegue `build:plugins` + `i18n:check`) | bloccante |
 | Build immagini | build di `watch-em-all` (app) e `watch-em-all-ops`; **su PR** push come `dev-<branch>` (vedi *Immagini dev*) | bloccante |
 | Guardia CHANGELOG | la PR deve aggiornare `CHANGELOG.md` (ogni PR = una versione, INF-19) | bloccante |
 

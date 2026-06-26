@@ -105,10 +105,15 @@ Il **purge definitivo non ha endpoint**: è il job giornaliero del worker a elim
 | GET | `/api/admin/runs/{run_id}` | 🛡 | — | dettaglio per-utente (`scrape_user_log`) |
 | GET | `/api/admin/scrapers/{id}/stats` | 🛡 | `?days=30` | serie per i trend (durate, richieste, variazioni) |
 | DELETE | `/api/admin/scrapers/{id}/cache` | 🛡 | — | **svuota la cache di scrape** del plugin (CTX-R9); pulsante nella pagina admin del plugin |
+| GET | `/api/admin/scrapers/{id}/config` | 🛡 | — | **chiavi riservate del core** per lo scraper (4.B10): `politeness_delay_ms`, `http_timeout_s`, `cache_ttl_min`, `scrape_now_min_interval_s` (effettive: default + override) |
+| PATCH | `/api/admin/scrapers/{id}/config` | 🛡 | `{politeness_delay_ms?, http_timeout_s?, cache_ttl_min?, scrape_now_min_interval_s?}` | imposta una o più chiavi riservate (merge, range validati → **422**); lette dal contesto a ogni run/scrape, senza riavvio (4.F2) |
 | GET | `/api/admin/settings` | 🛡 | — | `SystemSettings` (effettive: default + override); admin-only (4.F7) |
 | PATCH | `/api/admin/settings` | 🛡 | `{scraper_run_timeout_min?, catchup_warning_min?, log_retention_days?, user_deletion_retention_days?}` | imposta una o più chiavi note (merge, range validati → **422**); DB-first, effetto immediato senza riavvio |
 | GET | `/api/admin/logs` | 🛡 | `?since=<id>&level=&sources=&q=&limit=` | **tail live** (4.F3): righe con id > since (asc); senza `since` = ultime N. Filtri `level`, `sources` (multi), `q` (ILIKE sul messaggio) |
 | GET | `/api/admin/logs/page` | 🛡 | `?page=&size=&level=&sources=&q=` → `{items, total, counts, sources}` | **storico paginato** (4.F4): finestra newest-first + totale + conteggi per livello (sui filtri sorgente/ricerca) + sorgenti distinte (chip) |
+| GET | `/api/admin/feature-flags` | 🛡 | — | flag dev runtime effettivi (4.F6); **non persistenti** (reset al riavvio del web) |
+| PATCH | `/api/admin/feature-flags` | 🛡 | `{<flag>: {<param>: value}}` | imposta i flag (merge), poi restituisce gli effettivi; oggi `worker_tick.seconds` |
+| GET | `/api/admin/errors` | 🛡 | — | feed problemi **admin-only** (4.F0): oggi il disallineamento schema (DB-R7); mai sul `/api/health` pubblico |
 | DELETE | `/api/admin/alerts` | 🛡 | `?before=<date>` | purge globale storico alert per data |
 
 ## Admin — dashboard di sistema — [admin-dashboard](../3-features/admin/admin-dashboard.md)
