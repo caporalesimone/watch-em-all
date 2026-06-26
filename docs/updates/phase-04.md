@@ -5,7 +5,8 @@
 > tooling around it: a transparent scrape cache, a system log with retention, dev feature
 > flags and the admin pages, on top of the earlier groundwork (a friendlier dev database
 > browser, a schema-drift safety net, admin plugin versions, tidier environment variables).
-> The i18n consistency tool (dev/CI) is the last remaining MVP before the phase closes.
+> A dev/CI **i18n consistency gate** now keeps the translations honest. With that in, the
+> phase's MVP is complete — what remains is the live DoD verification and the release tag.
 
 ## What's implemented (so far, 0.4.0)
 
@@ -102,6 +103,18 @@
   on every run and manual scrape: **politeness delay**, **HTTP timeout**, **cache half-life**
   and the **manual scrape-now cooldown** (`GET`/`PATCH /api/admin/scrapers/{id}/config`). The
   **Clear cache** button lives here too. Changes take effect on the next run — no restart.
+
+### 10) i18n consistency gate (dev/CI)
+
+- A small Node gate (`src/frontend/scripts/i18n-check.mjs`, run with `npm run i18n:check`)
+  checks the **English** translation JSONs (the core dictionary plus each plugin's
+  namespace) against the code: it fails on a key **used in the UI but missing** from the
+  JSON, or **defined but never used** (dead). Runtime-assembled keys (e.g.
+  `errors.{code}`) are listed as prefixes in `i18n-check.config.json` and exempted.
+- It runs **before the build** (it's pure static analysis), and gates both **pull
+  requests** (`ci.yml`) and **release tags** (`publish.yml`). Its first run found and
+  removed ten orphaned strings. English is the reference here; verifying that every other
+  locale carries exactly the English key set is a phase-12 follow-up.
 
 _Under the hood:_ the `worker` container runs the real dispatcher (`src/worker`): it boots
 like the web (engine, schema, plugins) and ticks at an interval read from the
