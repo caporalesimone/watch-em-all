@@ -255,7 +255,15 @@
 	{:else if entries.length === 0}
 		<p class="text-sm text-slate-500">{$_('admin.logs.empty')}</p>
 	{:else}
-		<table class="w-full text-left text-sm">
+		<!-- Fixed layout: column widths stay put regardless of content/filter (Message takes the rest). -->
+		<table class="w-full table-fixed text-left text-sm">
+			<colgroup>
+				<col style="width: 7rem" />
+				<col style="width: 9rem" />
+				<col style="width: 5rem" />
+				<col />
+				<col style="width: 3rem" />
+			</colgroup>
 			<thead class="border-b border-slate-200 text-xs text-slate-500 dark:border-slate-800">
 				<tr>
 					<th class="py-2 pr-4">{$_('admin.logs.colTime')}</th>
@@ -282,7 +290,7 @@
 								{LEVEL_LABEL[e.level]}
 							</span>
 						</td>
-						<td class="py-1.5 pr-4 font-mono text-xs">{e.message}</td>
+						<td class="py-1.5 pr-4 font-mono text-xs break-words">{e.message}</td>
 						<td class="py-1.5 text-right">
 							{#if e.context}
 								<button
