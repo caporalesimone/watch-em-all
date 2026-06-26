@@ -95,7 +95,7 @@ services:
     # never exposed in production).
     environment:
       DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable"
-    ports: ["8081:8081"]                  # pgweb listens on 8081 (not 8080 like adminer)
+    ports: ["8081:8081"]                  # pgweb listens on 8081 (the web/app uses 8080)
     depends_on:
       db: { condition: service_healthy }
     restart: unless-stopped

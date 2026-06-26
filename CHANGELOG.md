@@ -10,7 +10,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 **Phase 4 — automatic scheduled scraping (the worker), plus the dev/admin tooling around it.**
 
-**New**
+### New
 
 - **Scheduled scraping.** Set per-scraper daily times; the worker runs each scraper automatically, **one at a time**, catching up the last missed slot after downtime. (Slot-editor UI is next.)
 - **Scrape cache.** Repeated page reads within a half-life come from a cache instead of the shop — fewer visits; an admin can clear a scraper's cache.
@@ -18,7 +18,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - **Feature flags + Plugins pages.** A self-building **Feature flags** page (dev knobs: worker tick, scrape-now cooldown — non-persistent) and a **Plugins** page (type + version).
 - **Schema-drift safety net** (dev): a missing table/column surfaces in an **admin-only** banner/feed (`GET /api/admin/errors`), never on the public `/api/health`.
 
-**Changed**
+### Changed
 
 - **Dev DB browser: Adminer → pgweb** — opens straight on the DB (no login); the **release** kit now carries **no** DB browser at all.
 - **Heads-up — env vars renamed:** every variable is now **`WEA_`**-prefixed (e.g. `SECRET_KEY` → `WEA_SECRET_KEY`). Update your `.env`; see [`docs/env-variables.md`](docs/env-variables.md).
