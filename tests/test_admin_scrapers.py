@@ -47,12 +47,12 @@ def test_lists_schedulable_scrapers_and_sets_slots(client: TestClient) -> None:
         headers=h,
     )
     assert put.status_code == 200
-    # De-duplicated and sorted.
-    assert put.json()["times"] == ["06:00", "22:00"]
+    # De-duplicated, sorted, canonical HH:MM:SS (4.F1).
+    assert put.json()["times"] == ["06:00:00", "22:00:00"]
     assert put.json()["enabled"] is False
 
     again = {s["scraper_id"]: s for s in client.get("/api/admin/scrapers", headers=h).json()}
-    assert again["dragon_store"]["times"] == ["06:00", "22:00"]
+    assert again["dragon_store"]["times"] == ["06:00:00", "22:00:00"]
 
 
 def test_rejects_unknown_scraper_and_bad_time(client: TestClient) -> None:

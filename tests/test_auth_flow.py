@@ -26,6 +26,7 @@ def test_health_reports_version_and_db(client: TestClient) -> None:
     assert body["status"] == "ok"
     assert body["db"] == "ok"
     assert body["version"] == "9.9.9-test"
+    assert "server_time" in body  # ISO8601 server clock (4.F1)
 
 
 def test_full_auth_flow(client: TestClient) -> None:

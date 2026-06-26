@@ -140,7 +140,7 @@ Il **purge definitivo non ha endpoint**: è il job giornaliero del worker a elim
 
 | Metodo | Path | Ruolo | Risposta | Note |
 |---|---|---|---|---|
-| GET | `/api/health` | 🌐 | `200 {status, db, worker_heartbeat_age_s}` / `503` | app viva + DB raggiungibile; età heartbeat worker informativa |
+| GET | `/api/health` | 🌐 | `200 {status, db, version, server_time, worker_heartbeat_age_s}` / `503` | app viva + DB raggiungibile; `server_time` = ISO8601 con offset del fuso d'installazione (clock per la timeline UI, 4.F1); età heartbeat worker informativa |
 
 ## Rotte plugin-specific (convenzione)
 

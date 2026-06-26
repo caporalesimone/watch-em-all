@@ -82,4 +82,4 @@ Registered under `/api/plugins/dragon-store` (the generic convention above); the
 
 | Method | Path | Role | Response | Notes |
 |---|---|---|---|---|
-| GET | `/api/health` | 🌐 | `200 {status, db, version, worker_heartbeat_age_s}` / `503` | app alive + DB reachable; `version` is the baked product version; `worker_heartbeat_age_s` is `null` until the worker persists its heartbeat (phase 4) |
+| GET | `/api/health` | 🌐 | `200 {status, db, version, server_time, worker_heartbeat_age_s}` / `503` | app alive + DB reachable; `version` is the baked product version; `server_time` is ISO8601 with the installation-TZ offset (the UI clock source, 4.F1); `worker_heartbeat_age_s` is `null` until the worker persists its heartbeat (phase 4) |

@@ -1,7 +1,8 @@
 """Scraper schedules (4.B2): per-scraper daily slots, stored and validated.
 
-``times`` are wall-clock ``"HH:MM"`` entries in the installation timezone, kept sorted
-and de-duplicated. The "due slot" logic (4.B3) builds on this.
+``times`` are wall-clock entries in the installation timezone, accepted as ``HH:MM`` or
+``HH:MM:SS`` and stored **canonically as ``HH:MM:SS``** (4.F1), kept sorted and
+de-duplicated. The "due slot" logic (4.B3) builds on this.
 """
 
 from __future__ import annotations
@@ -30,15 +31,13 @@ def _to_time(value: str) -> time:
 
 
 def _fmt_time(t: time) -> str:
-    """Canonical string: ``HH:MM`` on a whole minute, else ``HH:MM:SS``."""
-    if t.second:
-        return f"{t.hour:02d}:{t.minute:02d}:{t.second:02d}"
-    return f"{t.hour:02d}:{t.minute:02d}"
+    """Canonical string, always ``HH:MM:SS`` (4.F1: seconds always shown, even ``00``)."""
+    return f"{t.hour:02d}:{t.minute:02d}:{t.second:02d}"
 
 
 def parse_times(values: list[str]) -> list[str]:
-    """Validate ``"HH:MM"`` / ``"HH:MM:SS"`` entries; return them de-duplicated and
-    sorted (seconds kept only when non-zero). Raises ``ValueError`` on a bad entry."""
+    """Validate ``"HH:MM"`` / ``"HH:MM:SS"`` entries; return them canonical ``HH:MM:SS``,
+    de-duplicated and sorted. Raises ``ValueError`` on a bad entry."""
     seen: set[time] = set()
     parsed: list[time] = []
     for value in values:

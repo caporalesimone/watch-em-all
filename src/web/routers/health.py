@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, Response
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from src.core.schedule import install_tz
 from src.web.deps import SessionDep, SettingsDep
 from src.web.schemas import HealthResponse
 
@@ -32,5 +35,7 @@ def health(response: Response, settings: SettingsDep, db: SessionDep) -> HealthR
         status="ok" if db_status == "ok" else "degraded",
         db=db_status,
         version=settings.version,
+        # Wall-clock in the installation TZ (serialised ISO8601 with offset) — the UI clock source.
+        server_time=datetime.now(install_tz()),
         worker_heartbeat_age_s=None,
     )

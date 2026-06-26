@@ -12,12 +12,13 @@ ROME = ZoneInfo("Europe/Rome")  # June → CEST (UTC+2)
 
 
 def test_parse_times_dedupes_and_sorts() -> None:
-    assert parse_times(["22:00", "06:00", "06:00"]) == ["06:00", "22:00"]
+    # Canonical HH:MM:SS (seconds always shown, 4.F1).
+    assert parse_times(["22:00", "06:00", "06:00"]) == ["06:00:00", "22:00:00"]
 
 
 def test_parse_times_accepts_seconds() -> None:
-    # HH:MM:SS accepted; seconds kept only when non-zero; sorted with second precision.
-    assert parse_times(["23:10:30", "23:10", "23:10:00"]) == ["23:10", "23:10:30"]
+    # HH:MM / HH:MM:SS accepted; all normalised to canonical HH:MM:SS, sorted with second precision.
+    assert parse_times(["23:10:30", "23:10", "23:10:00"]) == ["23:10:00", "23:10:30"]
 
 
 def test_latest_due_slot_with_seconds() -> None:

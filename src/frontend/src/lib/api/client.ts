@@ -31,6 +31,8 @@ export interface Health {
 	status: string;
 	db: string;
 	version: string;
+	// ISO8601 with the server's TZ offset (4.F1): the schedule timeline's clock source.
+	server_time: string;
 	worker_heartbeat_age_s: number | null;
 }
 
