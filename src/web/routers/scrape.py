@@ -22,12 +22,12 @@ from pydantic import BaseModel
 
 from src.core.db import get_engine
 from src.core.errors import APIError
-from src.core.feature_flags import scrape_now_cooldown_seconds
 from src.core.locks import ScraperLock, acquire_scraper_lock
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.context import build_context
 from src.core.plugins.registry import LoadedPlugin
 from src.core.scrape import CooldownStatus, claim_scrape, cooldown_status
+from src.core.scraper_config import get_scraper_config
 from src.web.deps import SessionDep, UserDep
 
 log = logging.getLogger(__name__)
@@ -100,7 +100,8 @@ def make_scrape_now_router(loaded: LoadedPlugin) -> APIRouter:
             raise APIError(
                 409, "scrape_in_progress", "A scrape for this source is already running."
             )
-        status = claim_scrape(db, plugin.plugin_id, user.sub, scrape_now_cooldown_seconds(db))
+        interval = get_scraper_config(db, plugin.plugin_id).scrape_now_min_interval_s
+        status = claim_scrape(db, plugin.plugin_id, user.sub, interval)
         if not status.available:
             lock.release()
             wait = _humanize(status.retry_after_seconds)
@@ -117,7 +118,7 @@ def make_scrape_now_router(loaded: LoadedPlugin) -> APIRouter:
         summary="Cooldown status for the current user (drives the UI countdown).",
     )
     def scrape_now_status(user: UserDep, db: SessionDep) -> ScrapeNowStatus:
-        interval = scrape_now_cooldown_seconds(db)
+        interval = get_scraper_config(db, plugin.plugin_id).scrape_now_min_interval_s
         return _to_model(cooldown_status(db, plugin.plugin_id, user.sub, interval))
 
     return router

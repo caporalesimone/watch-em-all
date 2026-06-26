@@ -19,9 +19,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.core.db import new_session
-from src.core.feature_flags import set_flags
 from src.core.http import HttpClient
 from src.core.plugins.context import build_context
+from src.core.scraper_config import set_scraper_config
 
 DS = "/api/plugins/dragon-store"
 
@@ -264,14 +264,14 @@ def test_scrape_now_status_available_before_first_run(client: TestClient) -> Non
     assert status["available_at"] is None
 
 
-def test_scrape_now_cooldown_interval_follows_feature_flag(client: TestClient) -> None:
-    # The dev feature flag overrides the cooldown the GET status reports (the UI countdown);
-    # a near-zero interval also clears an existing cooldown straight away.
+def test_scrape_now_cooldown_interval_follows_admin_config(client: TestClient) -> None:
+    # The per-scraper reserved config (scrape_now_min_interval_s, 4.B10) drives the cooldown
+    # the GET status reports (the UI countdown); a short interval reflects on the next read.
     _uid, token = _user(client)
     h = _bearer(token)
     session = new_session()
     try:
-        set_flags(session, {"scrape_now_cooldown": {"seconds": 30}})
+        set_scraper_config(session, "dragon_store", {"scrape_now_min_interval_s": 30})
     finally:
         session.close()
     with DragonServer() as base:

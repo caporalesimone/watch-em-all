@@ -179,6 +179,24 @@ class ScraperSchedule(Base):
     last_slot: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class ScraperAdminConfig(Base):
+    """Per-scraper admin config (PCFG-R2, 4.B10): one row per scraper (= plugin_id),
+    ``config_json`` holding the **core reserved keys** (``politeness_delay_s``,
+    ``http_timeout_s``, ``cache_ttl_min``, ``scrape_now_min_interval_s``) the core reads on
+    the plugin's behalf (HTTP client, cache, scrape-now cooldown) and, from phase 7+, the
+    fields the plugin itself declares (site rules). Typed access via
+    :func:`src.core.scraper_config.get_scraper_config`; unknown keys are ignored. No
+    ``enabled`` flag — suspension lives in ``scraper_schedule``."""
+
+    __tablename__ = "scraper_admin_config"
+
+    plugin_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    config_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
 class SystemSetting(Base):
     """Global system settings (MNT-R3), key → JSON value, editable at runtime and
     **persistent** (unlike feature_flags). Typed access via

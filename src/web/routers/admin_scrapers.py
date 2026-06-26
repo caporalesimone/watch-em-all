@@ -8,9 +8,10 @@ dispatcher (4.B3+) reads these schedules to decide what is due.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from src.core import scrape_cache
 from src.core.errors import APIError
@@ -19,6 +20,7 @@ from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.registry import LoadedPlugin
 from src.core.schedule import get_schedule, upsert_schedule
 from src.core.scrape import implements_scraping
+from src.core.scraper_config import ScraperReservedConfig, get_scraper_config, set_scraper_config
 from src.web.deps import AdminDep, SessionDep
 
 router = APIRouter(prefix="/admin", tags=["Admin: scrapers"])
@@ -106,3 +108,39 @@ def clear_scraper_cache(
     if scraper_id not in _schedulable(request):
         raise APIError(404, "not_found", f"no schedulable scraper {scraper_id!r}")
     return CacheCleared(deleted=scrape_cache.clear(db, scraper_id))
+
+
+@router.get(
+    "/scrapers/{scraper_id}/config",
+    response_model=ScraperReservedConfig,
+    summary="A scraper's core reserved config — effective values (admin only).",
+)
+def get_scraper_admin_config(
+    scraper_id: str,
+    request: Request,
+    _admin: AdminDep,
+    db: SessionDep,
+) -> ScraperReservedConfig:
+    if scraper_id not in _schedulable(request):
+        raise APIError(404, "not_found", f"no schedulable scraper {scraper_id!r}")
+    return get_scraper_config(db, scraper_id)
+
+
+@router.patch(
+    "/scrapers/{scraper_id}/config",
+    response_model=ScraperReservedConfig,
+    summary="Set one or more reserved config keys (admin only); returns the effective values.",
+)
+def set_scraper_admin_config(
+    scraper_id: str,
+    body: dict[str, Any],
+    request: Request,
+    _admin: AdminDep,
+    db: SessionDep,
+) -> ScraperReservedConfig:
+    if scraper_id not in _schedulable(request):
+        raise APIError(404, "not_found", f"no schedulable scraper {scraper_id!r}")
+    try:
+        return set_scraper_config(db, scraper_id, body)
+    except (ValidationError, ValueError) as exc:
+        raise APIError(422, "invalid_config", str(exc)) from exc

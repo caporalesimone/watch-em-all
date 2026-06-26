@@ -5,13 +5,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from src.core.db import new_session
-from src.core.feature_flags import (
-    clear_flags,
-    scrape_now_cooldown_seconds,
-    set_flags,
-    worker_tick_seconds,
-)
-from src.core.scrape import SCRAPE_NOW_COOLDOWN_SECONDS
+from src.core.feature_flags import clear_flags, set_flags, worker_tick_seconds
 
 
 def _bearer(token: str) -> dict[str, str]:
@@ -89,18 +83,5 @@ def test_worker_tick_seconds_override_then_clear(client: TestClient) -> None:
         assert worker_tick_seconds(session) == 7
         clear_flags(session)
         assert worker_tick_seconds(session) == 60
-    finally:
-        session.close()
-
-
-def test_scrape_now_cooldown_seconds_override_then_clear(client: TestClient) -> None:
-    # Service level: default (production constant) → override → clear → default.
-    session = new_session()
-    try:
-        assert scrape_now_cooldown_seconds(session) == SCRAPE_NOW_COOLDOWN_SECONDS
-        set_flags(session, {"scrape_now_cooldown": {"seconds": 30}})
-        assert scrape_now_cooldown_seconds(session) == 30
-        clear_flags(session)
-        assert scrape_now_cooldown_seconds(session) == SCRAPE_NOW_COOLDOWN_SECONDS
     finally:
         session.close()

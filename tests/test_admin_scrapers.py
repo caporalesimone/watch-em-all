@@ -99,3 +99,51 @@ def test_clear_cache_admin_only_unknown_404_and_counts(client: TestClient) -> No
     assert resp.json()["deleted"] == 2
     # A second clear removes nothing.
     assert client.delete("/api/admin/scrapers/dragon_store/cache", headers=h).json()["deleted"] == 0
+
+
+# --- reserved config (4.B10) ---
+
+CFG = "/api/admin/scrapers/dragon_store/config"
+
+
+def test_config_requires_admin(client: TestClient) -> None:
+    assert client.get(CFG).status_code == 401
+    assert client.patch(CFG, json={"http_timeout_s": 20}).status_code == 401
+
+
+def test_config_get_defaults_then_patch_subset(client: TestClient) -> None:
+    h = _bearer(_admin_token(client))
+    # Defaults mirror the superseded constants.
+    assert client.get(CFG, headers=h).json() == {
+        "politeness_delay_s": 1.5,
+        "http_timeout_s": 15.0,
+        "cache_ttl_min": 60,
+        "scrape_now_min_interval_s": 3600,
+    }
+    patched = client.patch(CFG, json={"cache_ttl_min": 0, "http_timeout_s": 20}, headers=h)
+    assert patched.status_code == 200
+    body = patched.json()
+    assert body["cache_ttl_min"] == 0  # 0 disables the cache
+    assert body["http_timeout_s"] == 20.0
+    # Untouched keys keep their defaults.
+    assert body["politeness_delay_s"] == 1.5
+    assert body["scrape_now_min_interval_s"] == 3600
+    # Persisted across reads.
+    assert client.get(CFG, headers=h).json()["cache_ttl_min"] == 0
+
+
+def test_config_unknown_scraper_404(client: TestClient) -> None:
+    h = _bearer(_admin_token(client))
+    assert client.get("/api/admin/scrapers/nope/config", headers=h).status_code == 404
+    assert (
+        client.patch("/api/admin/scrapers/nope/config", json={"cache_ttl_min": 5}, headers=h)
+    ).status_code == 404
+
+
+def test_config_rejects_unknown_key_and_out_of_range(client: TestClient) -> None:
+    h = _bearer(_admin_token(client))
+    # Unknown key (extra=forbid) → 422 at the schema boundary.
+    assert client.patch(CFG, json={"nope": 1}, headers=h).status_code == 422
+    # Out-of-range → 422 from the service validation.
+    assert client.patch(CFG, json={"http_timeout_s": 999}, headers=h).status_code == 422
+    assert client.patch(CFG, json={"cache_ttl_min": -1}, headers=h).status_code == 422

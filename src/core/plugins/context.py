@@ -10,14 +10,15 @@ and the calling plugin's ``plugin_id``, so a scraper delivers its products with
 ``context.update_catalog(user_id, products)`` and never writes the catalog
 directly (the Catalog Update Service does, and commits — catalog-update-service.md).
 
-Phase-3 PR3 adds ``http``: the polite, counted, retrying HTTP client every
-scraper must use (SCR-R6, plugin-context.md CTX-R1..R4). v0 with constant
-politeness/timeout (admin-configurable values arrive in phase 4); no scrape
-cache yet (CTX-R9, phase 9).
+``http`` is the polite, counted, retrying HTTP client every scraper must use
+(SCR-R6, plugin-context.md CTX-R1..R4), backed by the per-plugin scrape cache
+(CTX-R9, 4.B8). Phase 4 (4.B10) governs its politeness/timeout and the cache
+half-life from the per-scraper admin **reserved config** (``scraper_config``).
 
-Still simplified (declared, flow rule #7): ``logger`` writes to stdout until the
-``system_log`` table exists (~phase 10); ``config`` is empty until the
-ConfigField admin-config infrastructure exists (phase 4 for the reserved keys);
+Still simplified (declared, flow rule #7): ``logger`` writes to stdout (the
+``system_log`` handler is attached at the process level, 4.B7); ``config`` (the
+plugin's *own* declared fields) stays empty until the ConfigField infrastructure
+lands (phase 7+) — the core reserved keys live in ``scraper_config``, not here;
 no ``markdown`` yet.
 """
 
@@ -36,6 +37,7 @@ from src.core.catalog import update_catalog as _update_catalog_service
 from src.core.db import get_engine, new_session
 from src.core.http import HttpClient
 from src.core.scrape_cache import ScrapeCache
+from src.core.scraper_config import get_scraper_config
 
 if TYPE_CHECKING:
     from src.core.contracts import DeltaCounters, Product
@@ -72,12 +74,22 @@ def build_context(manifest: Manifest, plugin: BasePlugin) -> PluginContext:
     def _update_catalog(user_id: int, products: list[Product]) -> DeltaCounters:
         return _update_catalog_service(session, user_id, plugin_id, products)
 
+    # Core reserved config for this scraper (4.B10): admin-set politeness/timeout/cache
+    # half-life, read here for both scheduled runs and the manual scrape-now. Defaults
+    # mirror the former constants when no admin override exists.
+    cfg = get_scraper_config(session, plugin_id)
+
     return PluginContext(
         engine=get_engine(),
         db=session,
         logger=logging.getLogger(f"wea.plugin.{manifest.name}"),
         config={},
         update_catalog=_update_catalog,
-        # Scrape cache (CTX-R9): per-plugin, default half-life; transparent to the plugin.
-        http=HttpClient(cache=ScrapeCache(get_engine(), plugin_id)),
+        # Polite/counted/retrying client (SCR-R6) + per-plugin scrape cache (CTX-R9),
+        # both governed by the admin reserved config; transparent to the plugin.
+        http=HttpClient(
+            timeout_s=cfg.http_timeout_s,
+            min_interval_s=cfg.politeness_delay_s,
+            cache=ScrapeCache(get_engine(), plugin_id, ttl_min=cfg.cache_ttl_min),
+        ),
     )
