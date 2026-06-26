@@ -89,7 +89,7 @@ def build_context(manifest: Manifest, plugin: BasePlugin) -> PluginContext:
         # both governed by the admin reserved config; transparent to the plugin.
         http=HttpClient(
             timeout_s=cfg.http_timeout_s,
-            min_interval_s=cfg.politeness_delay_s,
+            min_interval_s=cfg.politeness_delay_ms / 1000,
             cache=ScrapeCache(get_engine(), plugin_id, ttl_min=cfg.cache_ttl_min),
         ),
     )

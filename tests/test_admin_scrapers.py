@@ -115,7 +115,7 @@ def test_config_get_defaults_then_patch_subset(client: TestClient) -> None:
     h = _bearer(_admin_token(client))
     # Defaults mirror the superseded constants.
     assert client.get(CFG, headers=h).json() == {
-        "politeness_delay_s": 1.5,
+        "politeness_delay_ms": 1500,
         "http_timeout_s": 15.0,
         "cache_ttl_min": 60,
         "scrape_now_min_interval_s": 3600,
@@ -126,7 +126,7 @@ def test_config_get_defaults_then_patch_subset(client: TestClient) -> None:
     assert body["cache_ttl_min"] == 0  # 0 disables the cache
     assert body["http_timeout_s"] == 20.0
     # Untouched keys keep their defaults.
-    assert body["politeness_delay_s"] == 1.5
+    assert body["politeness_delay_ms"] == 1500
     assert body["scrape_now_min_interval_s"] == 3600
     # Persisted across reads.
     assert client.get(CFG, headers=h).json()["cache_ttl_min"] == 0

@@ -17,7 +17,7 @@ Due run successive (o due scraper) verso lo stesso sito partono con user-agent d
 ## Stato attuale (da cui si parte)
 
 - `src/core/http.py` usa un **`DEFAULT_USER_AGENT` costante** (CTX-R2): unico, fisso, uguale per tutti.
-- La config riservata per-scraper esiste già (`scraper_admin_config`, 4.B10: `politeness_delay_s`/`http_timeout_s`/`cache_ttl_min`/`scrape_now_min_interval_s`) ed è il punto naturale dove agganciare eventuali chiavi nuove.
+- La config riservata per-scraper esiste già (`scraper_admin_config`, 4.B10: `politeness_delay_ms`/`http_timeout_s`/`cache_ttl_min`/`scrape_now_min_interval_s`) ed è il punto naturale dove agganciare eventuali chiavi nuove.
 - `build_context` costruisce l'`HttpClient` per ogni run/scrape: è il seam dove il core può iniettare lo UA scelto.
 
 ## MVP (abbozzati — da dettagliare)

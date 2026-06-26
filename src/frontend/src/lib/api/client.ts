@@ -142,7 +142,7 @@ export interface ScraperListItem {
 
 // Core reserved config a scraper's runs/scrape-now obey (4.B10).
 export interface ScraperConfig {
-	politeness_delay_s: number;
+	politeness_delay_ms: number;
 	http_timeout_s: number;
 	cache_ttl_min: number; // 0 disables the scrape cache
 	scrape_now_min_interval_s: number;

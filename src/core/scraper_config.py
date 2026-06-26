@@ -6,7 +6,7 @@ ignored (so a future plugin-declared field sitting in the same ``config_json`` n
 the typed read). The defaults mirror the constants the values supersede — kept as a single
 source so the two never drift:
 
-- ``politeness_delay_s``       ← ``http.DEFAULT_MIN_INTERVAL_S``
+- ``politeness_delay_ms``      ← ``http.DEFAULT_MIN_INTERVAL_S`` × 1000 (ms for finer granularity)
 - ``http_timeout_s``           ← ``http.DEFAULT_TIMEOUT_S``
 - ``cache_ttl_min``            ← ``scrape_cache.DEFAULT_CACHE_TTL_MIN`` (0 disables the cache)
 - ``scrape_now_min_interval_s``← ``scrape.SCRAPE_NOW_COOLDOWN_SECONDS`` (retires the dev
@@ -34,7 +34,7 @@ class ScraperReservedConfig(BaseModel):
     """Effective core reserved config for one scraper (defaults from the superseded
     constants; ranges keep an admin typo from breaking a run)."""
 
-    politeness_delay_s: float = Field(default=DEFAULT_MIN_INTERVAL_S, ge=0, le=60)
+    politeness_delay_ms: int = Field(default=round(DEFAULT_MIN_INTERVAL_S * 1000), ge=0, le=60_000)
     http_timeout_s: float = Field(default=DEFAULT_TIMEOUT_S, ge=1, le=120)
     cache_ttl_min: int = Field(default=DEFAULT_CACHE_TTL_MIN, ge=0, le=10_080)
     scrape_now_min_interval_s: int = Field(default=SCRAPE_NOW_COOLDOWN_SECONDS, ge=0, le=86_400)

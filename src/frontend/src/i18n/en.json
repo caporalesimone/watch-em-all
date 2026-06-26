@@ -103,13 +103,13 @@
 			"cacheCleared": "Cleared {n} cached entries.",
 			"clearError": "Could not clear the cache.",
 			"fields": {
-				"politeness_delay_s": "Politeness delay (seconds)",
+				"politeness_delay_ms": "Politeness delay (milliseconds)",
 				"http_timeout_s": "HTTP timeout (seconds)",
 				"cache_ttl_min": "Cache half-life (minutes, 0 = off)",
 				"scrape_now_min_interval_s": "Manual scrape-now interval (seconds)"
 			},
 			"fieldHints": {
-				"politeness_delay_s": "Minimum wait between two requests to the same site.",
+				"politeness_delay_ms": "Minimum wait between two requests to the same site.",
 				"http_timeout_s": "How long to wait for a response before giving up on a request.",
 				"cache_ttl_min": "How long a fetched page is reused before fetching it again; 0 disables the cache.",
 				"scrape_now_min_interval_s": "Minimum time before a user can run Scrape now again."

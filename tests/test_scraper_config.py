@@ -18,7 +18,7 @@ def test_defaults_mirror_constants_when_no_row(client: TestClient) -> None:
     session = new_session()
     try:
         cfg = get_scraper_config(session, "dragon_store")
-        assert cfg.politeness_delay_s == DEFAULT_MIN_INTERVAL_S
+        assert cfg.politeness_delay_ms == round(DEFAULT_MIN_INTERVAL_S * 1000)
         assert cfg.http_timeout_s == DEFAULT_TIMEOUT_S
         assert cfg.cache_ttl_min == DEFAULT_CACHE_TTL_MIN
         assert cfg.scrape_now_min_interval_s == SCRAPE_NOW_COOLDOWN_SECONDS

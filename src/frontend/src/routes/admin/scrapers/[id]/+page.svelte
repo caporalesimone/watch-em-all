@@ -85,7 +85,7 @@
 	}
 
 	const fields: { key: keyof ScraperConfig; step: number }[] = [
-		{ key: 'politeness_delay_s', step: 0.1 },
+		{ key: 'politeness_delay_ms', step: 50 },
 		{ key: 'http_timeout_s', step: 1 },
 		{ key: 'cache_ttl_min', step: 1 },
 		{ key: 'scrape_now_min_interval_s', step: 1 }

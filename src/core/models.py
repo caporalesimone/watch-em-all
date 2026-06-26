@@ -181,7 +181,7 @@ class ScraperSchedule(Base):
 
 class ScraperAdminConfig(Base):
     """Per-scraper admin config (PCFG-R2, 4.B10): one row per scraper (= plugin_id),
-    ``config_json`` holding the **core reserved keys** (``politeness_delay_s``,
+    ``config_json`` holding the **core reserved keys** (``politeness_delay_ms``,
     ``http_timeout_s``, ``cache_ttl_min``, ``scrape_now_min_interval_s``) the core reads on
     the plugin's behalf (HTTP client, cache, scrape-now cooldown) and, from phase 7+, the
     fields the plugin itself declares (site rules). Typed access via
