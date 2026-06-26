@@ -14,7 +14,7 @@
 			? [
 					{ href: '/admin/users', key: 'nav.users' },
 					{ href: '/admin/scrapers', key: 'nav.scrapers' },
-					{ href: '/admin/plugins', key: 'nav.plugins' },
+					{ href: '/admin/notifiers', key: 'nav.notifiers' },
 					{ href: '/admin/feature-flags', key: 'nav.featureFlags' }
 				]
 			: [

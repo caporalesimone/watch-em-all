@@ -53,10 +53,13 @@
 - An **Admin → Feature flags** page renders itself from the API — each flag's input is
   inferred from its value's type — so a new flag shows up with **no frontend change**.
 
-### 5) Admin can see plugin versions
+### 5) Admin sees plugins by kind — Scrapers & Notifiers
 
-- An **Admin → Plugins** page lists each loaded plugin with its **type and version**
-  (e.g. Dragon Store `0.2.0`) — the first slice of admin plugin visibility.
+- The admin has a **Scrapers** area and a **Notifiers** area, each listing the loaded
+  plugins of that kind with their **icon and version** (e.g. Dragon Store `0.2.0`).
+  **Scrapers** also shows the schedule and links to each scraper's config page; **Notifiers**
+  is informational for now (notifier admin config arrives in phase 7+). This replaces the
+  earlier single *Plugins* list.
 
 ### 6) Dev database browser: Adminer → pgweb
 
@@ -88,7 +91,7 @@
 - An **Admin → Scrapers** area lists the schedulable scrapers (version + schedule summary)
   and opens, per scraper, a config page for the **operational parameters** the core applies
   on every run and manual scrape: **politeness delay**, **HTTP timeout**, **cache half-life**
-  and the **manual scrape-now interval** (`GET`/`PATCH /api/admin/scrapers/{id}/config`). The
+  and the **manual scrape-now cooldown** (`GET`/`PATCH /api/admin/scrapers/{id}/config`). The
   **Clear cache** button lives here too. Changes take effect on the next run — no restart.
 
 _Under the hood:_ the `worker` container runs the real dispatcher (`src/worker`): it boots
@@ -117,7 +120,7 @@ load); the product version is still baked from the git tag.
   a *daily-times* scheduler, not an "every N minutes" interval.
 - The **system log is API-only** for now; the near-real-time **log page** (filters,
   autoscroll) is the next frontend MVP and consumes the same cursor endpoint.
-- The cache half-life and the manual scrape-now interval are now **per-scraper admin
+- The cache half-life and the manual scrape-now cooldown are now **per-scraper admin
   settings** (Admin → Scrapers), editable without a restart; their defaults match the
   former built-in constants.
 - Feature flags are **dev-only and non-persistent** — they reset to defaults on web restart.

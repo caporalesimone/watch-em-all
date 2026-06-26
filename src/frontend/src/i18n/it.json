@@ -15,7 +15,7 @@
 		"logout": "Esci",
 		"scrapers": "Scraper",
 		"users": "Utenti",
-		"plugins": "Plugin",
+		"notifiers": "Notifier",
 		"featureFlags": "Feature flag"
 	},
 	"catalog": {
@@ -66,12 +66,12 @@
 			"errorTaken": "Questo nome utente è già in uso.",
 			"errorGeneric": "Impossibile creare l'utente."
 		},
-		"plugins": {
-			"title": "Plugin",
-			"colName": "Plugin",
-			"colType": "Tipo",
+		"notifiers": {
+			"title": "Notifier",
+			"colName": "Notifier",
 			"colVersion": "Versione",
-			"empty": "Nessun plugin caricato."
+			"empty": "Nessun notifier caricato.",
+			"loadError": "Impossibile caricare i notifier."
 		},
 		"featureFlags": {
 			"title": "Feature flag",
@@ -92,6 +92,7 @@
 			"configure": "Configura",
 			"suspended": "Sospeso",
 			"noSchedule": "Nessuna pianificazione",
+			"notSchedulable": "Non schedulabile",
 			"back": "← Scraper",
 			"configTitle": "{name} — configurazione",
 			"reserved": "Parametri operativi",

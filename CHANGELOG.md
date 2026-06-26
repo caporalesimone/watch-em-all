@@ -15,8 +15,8 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - **Scheduled scraping.** Set per-scraper daily times; the worker runs each scraper automatically, **one at a time**, catching up the last missed slot after downtime. (Slot-editor UI is next.)
 - **Scrape cache.** Repeated page reads within a half-life come from a cache instead of the shop — fewer visits; an admin can clear a scraper's cache.
 - **System log.** Worker/scraper events are recorded and readable by the admin (`GET /api/admin/logs`); old logs and runs auto-prune after `log_retention_days` (price history never does).
-- **Feature flags + Plugins pages.** A self-building **Feature flags** page (dev knob: worker tick — non-persistent) and a **Plugins** page (type + version).
-- **Per-scraper settings (admin).** A new **Scrapers** area shows each scraper's version and schedule and opens a config page for its operational parameters — politeness delay, HTTP timeout, cache half-life and the manual scrape-now interval — plus a **Clear cache** button. Changes take effect on the next run, no restart.
+- **Feature flags page.** A self-building **Feature flags** page (dev knob: worker tick — non-persistent).
+- **Scrapers & Notifiers admin.** Two admin areas list the loaded plugins by kind (icon + version): **Scrapers** also shows each scraper's schedule and opens its config page — politeness delay, HTTP timeout, cache half-life and the manual scrape-now cooldown — with a **Clear cache** button (changes apply on the next run, no restart); **Notifiers** lists the notifier plugins. (Replaces the earlier single Plugins list.)
 - **Schema-drift safety net** (dev): a missing table/column surfaces in an **admin-only** banner/feed (`GET /api/admin/errors`), never on the public `/api/health`.
 
 ### Changed

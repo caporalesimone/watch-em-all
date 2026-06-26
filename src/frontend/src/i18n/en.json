@@ -15,7 +15,7 @@
 		"logout": "Log out",
 		"scrapers": "Scrapers",
 		"users": "Users",
-		"plugins": "Plugins",
+		"notifiers": "Notifiers",
 		"featureFlags": "Feature flags"
 	},
 	"catalog": {
@@ -66,12 +66,12 @@
 			"errorTaken": "That username is already in use.",
 			"errorGeneric": "Could not create the user."
 		},
-		"plugins": {
-			"title": "Plugins",
-			"colName": "Plugin",
-			"colType": "Type",
+		"notifiers": {
+			"title": "Notifiers",
+			"colName": "Notifier",
 			"colVersion": "Version",
-			"empty": "No plugins are loaded."
+			"empty": "No notifiers are loaded.",
+			"loadError": "Could not load the notifiers."
 		},
 		"featureFlags": {
 			"title": "Feature flags",
@@ -92,6 +92,7 @@
 			"configure": "Configure",
 			"suspended": "Suspended",
 			"noSchedule": "No schedule",
+			"notSchedulable": "Not schedulable",
 			"back": "← Scrapers",
 			"configTitle": "{name} — configuration",
 			"reserved": "Operational parameters",
