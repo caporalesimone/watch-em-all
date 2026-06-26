@@ -160,10 +160,7 @@
 </script>
 
 <section class="space-y-6">
-	<a href="/admin/scrapers" class="text-sm text-sky-600 hover:underline dark:text-sky-400">
-		{$_('admin.scrapers.back')}
-	</a>
-
+	<!-- No back-link: this page is a child of Scrapers in the sidebar (redundant). -->
 	<PageTitle title={$_('admin.scrapers.scheduleTitle')} />
 	<p class="text-sm text-slate-500">{$_('admin.scrapers.scheduleHint')}</p>
 
