@@ -131,7 +131,7 @@
 				"empty": "Nessuna pianificazione ancora — aggiungi un orario a uno scraper qui sopra.",
 				"willStartIn": "{name} parte tra {when}",
 				"removeTitle": "{name} · {time} (clicca per rimuovere)",
-				"showTicks": "Tacche orarie",
+				"subTicks": "Tacche 30 minuti",
 				"markerSize": "Dimensione marker"
 			}
 		}

@@ -131,7 +131,7 @@
 				"empty": "No schedules configured yet — add a time to any scraper above.",
 				"willStartIn": "{name} will start in {when}",
 				"removeTitle": "{name} · {time} (click to remove)",
-				"showTicks": "Hour ticks",
+				"subTicks": "30-minute ticks",
 				"markerSize": "Marker size"
 			}
 		}

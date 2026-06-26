@@ -25,8 +25,8 @@
 
 	// TEMP(4.F1): prototype controls — decide a fixed value / whether to remove before the
 	// Phase 4 closure (tracked in development-flow/phase-04). Not production config.
-	let showTicks = $state(true);
-	let markerSize = $state(16); // px, 8–24
+	let showSubTicks = $state(true); // 30-/10-minute sub-ticks (hours are always shown)
+	let markerSize = $state(24); // px, 8–72
 
 	const BANDS = [0, 1, 2, 3, 4, 5];
 	const SECONDS_PER_BAND = 4 * 3600;
@@ -52,6 +52,19 @@
 		return ((sec - band * SECONDS_PER_BAND) / SECONDS_PER_BAND) * 100;
 	}
 
+	// Reference ticks within a band: hour marks (always, labelled), 30-min and 10-min marks.
+	type Tick = { posPct: number; kind: 'hour' | 'half' | 'ten'; label?: string };
+	function ticksFor(band: number): Tick[] {
+		const out: Tick[] = [];
+		for (let mm = 0; mm <= 240; mm += 10) {
+			const posPct = (mm / 240) * 100;
+			if (mm % 60 === 0) out.push({ posPct, kind: 'hour', label: pad(band * 4 + mm / 60) });
+			else if (mm % 30 === 0) out.push({ posPct, kind: 'half' });
+			else out.push({ posPct, kind: 'ten' });
+		}
+		return out;
+	}
+
 	function humanize(s: number): string {
 		if (s >= 3600) {
 			const h = Math.floor(s / 3600);
@@ -67,6 +80,8 @@
 	}
 
 	type Marker = { id: string; name: string; icon: string | null; time: string; sec: number };
+
+	const legendScrapers = $derived(scrapers.filter((s) => s.schedulable));
 
 	const markersByBand = $derived.by(() => {
 		const out: Marker[][] = [[], [], [], [], [], []];
@@ -93,7 +108,7 @@
 	);
 
 	function freqLabel(s: Scraper): string {
-		const n = s.schedulable ? s.times.length : 0;
+		const n = s.times.length;
 		return n > 0
 			? $_('admin.scrapers.viz.perDay', { values: { n } })
 			: $_('admin.scrapers.viz.noRuns');
@@ -165,6 +180,15 @@
 	function isNext(m: Marker): boolean {
 		return hovering && nextRun !== null && nextRun.id === m.id && nextRun.time === m.time;
 	}
+
+	// On hover of the now marker, the next run grows and gets a theme-contrasting ring.
+	function markerClass(m: Marker): string {
+		const base =
+			'absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-transform hover:brightness-110';
+		return isNext(m)
+			? `${base} z-20 scale-150 ring-2 ring-slate-900 dark:ring-white`
+			: `${base} z-10 ring-1 ring-white/25`;
+	}
 </script>
 
 <section class="rounded-xl border border-slate-200 p-6 dark:border-slate-800/80">
@@ -178,9 +202,9 @@
 		</span>
 	</div>
 
-	<!-- legend -->
+	<!-- legend (schedulable scrapers only) -->
 	<div class="mt-4 flex flex-wrap gap-x-5 gap-y-2">
-		{#each scrapers as s (s.id)}
+		{#each legendScrapers as s (s.id)}
 			<span class="flex items-center gap-2 text-sm">
 				{#if s.icon}
 					<img src={s.icon} alt="" class="h-3.5 w-3.5" />
@@ -196,12 +220,15 @@
 	<!-- TEMP(4.F1) prototype controls -->
 	<div class="mt-3 flex flex-wrap items-center gap-5 text-xs text-slate-500">
 		<label class="flex items-center gap-2">
-			<input type="checkbox" bind:checked={showTicks} />
-			{$_('admin.scrapers.viz.showTicks')}
+			<input type="checkbox" bind:checked={showSubTicks} />
+			{$_('admin.scrapers.viz.subTicks')}
 		</label>
-		<label class="flex items-center gap-2">
+		<label class="group flex items-center gap-2">
 			{$_('admin.scrapers.viz.markerSize')}
-			<input type="range" min="8" max="24" bind:value={markerSize} />
+			<input type="range" min="8" max="72" bind:value={markerSize} title={`${markerSize}px`} />
+			<span class="font-mono opacity-0 transition-opacity group-hover:opacity-100"
+				>{markerSize}px</span
+			>
 		</label>
 	</div>
 
@@ -225,31 +252,37 @@
 							style="top:26px;height:1px"
 						></div>
 
-						<!-- hour ticks -->
-						{#if showTicks}
-							{#each [0, 1, 2, 3, 4] as i (i)}
+						<!-- ticks: hours always (with labels); 30-/10-min only when enabled -->
+						{#each ticksFor(band) as tk (tk.posPct)}
+							{#if tk.kind === 'hour'}
 								<div
-									class="absolute bg-slate-300 dark:bg-white/10"
-									style="left:{i * 25}%;top:19px;width:1px;height:14px"
+									class="absolute bg-slate-400 dark:bg-white/25"
+									style="left:{tk.posPct}%;top:19px;width:1px;height:14px"
 								></div>
 								<div
 									class="absolute -translate-x-1/2 font-mono text-[10px] text-slate-400"
-									style="left:{i * 25}%;top:36px"
+									style="left:{tk.posPct}%;top:36px"
 								>
-									{pad(band * 4 + i)}
+									{tk.label}
 								</div>
-							{/each}
-						{/if}
+							{:else if showSubTicks && tk.kind === 'half'}
+								<div
+									class="absolute bg-slate-300 dark:bg-white/15"
+									style="left:{tk.posPct}%;top:21px;width:1px;height:10px"
+								></div>
+							{:else if showSubTicks && tk.kind === 'ten'}
+								<div
+									class="absolute bg-slate-300/60 dark:bg-white/10"
+									style="left:{tk.posPct}%;top:23px;width:1px;height:6px"
+								></div>
+							{/if}
+						{/each}
 
 						<!-- markers (plugin icons) -->
 						{#each markersByBand[band] as m (m.id + m.time)}
 							<button
 								type="button"
-								class="absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-full ring-1 ring-white/25 transition-transform hover:brightness-110"
-								class:scale-125={isNext(m)}
-								class:ring-2={isNext(m)}
-								class:ring-amber-400={isNext(m)}
-								class:z-20={isNext(m)}
+								class={markerClass(m)}
 								style="left:{posInBand(
 									m.sec
 								)}%;top:26px;width:{markerSize}px;height:{markerSize}px;box-shadow:0 2px 6px rgba(0,0,0,0.5)"
