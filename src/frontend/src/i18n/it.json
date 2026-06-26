@@ -33,8 +33,6 @@
 		"colPriceOriginal": "Prezzo pieno",
 		"colPriceCurrent": "Prezzo",
 		"colAvailability": "Disponibilità",
-		"colOpen": "Apri",
-		"open": "Apri",
 		"available": "Disponibile",
 		"unavailable": "Esaurito",
 		"removed": "Delistato",
@@ -46,7 +44,6 @@
 	"admin": {
 		"users": {
 			"title": "Utenti",
-			"create": "Crea un utente",
 			"username": "Nome utente",
 			"firstName": "Nome",
 			"lastName": "Cognome",
@@ -129,8 +126,6 @@
 			"colCache": "Cache",
 			"colSchedule": "Pianificazione",
 			"configure": "Configura",
-			"suspended": "Sospeso",
-			"noSchedule": "Nessuna pianificazione",
 			"notSchedulable": "Non schedulabile",
 			"scheduleTitle": "Pianificazione",
 			"scheduleHint": "Imposta gli orari giornalieri per scraper. Gli orari sono nel fuso del server; due esecuzioni devono distare almeno 1 minuto.",
@@ -175,9 +170,6 @@
 			}
 		}
 	},
-	"theme": {
-		"toggle": "Cambia tema"
-	},
 	"plugins": {
 		"notFound": "Questa pagina del plugin non è disponibile."
 	},
@@ -194,13 +186,11 @@
 	"changePassword": {
 		"title": "Cambia la password",
 		"greeting": "Ciao {name}, scegli una nuova password per continuare.",
-		"hint": "Scegli una nuova password (almeno 8 caratteri).",
 		"current": "Password attuale",
 		"new": "Nuova password",
 		"confirm": "Conferma nuova password",
 		"submit": "Cambia password",
-		"mismatch": "Le due password non coincidono.",
-		"done": "Password cambiata. Accedi di nuovo."
+		"mismatch": "Le due password non coincidono."
 	},
 	"profile": {
 		"title": "Profilo",

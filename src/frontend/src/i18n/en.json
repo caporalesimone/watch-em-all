@@ -33,8 +33,6 @@
 		"colPriceOriginal": "List price",
 		"colPriceCurrent": "Price",
 		"colAvailability": "Availability",
-		"colOpen": "Open",
-		"open": "Open",
 		"available": "Available",
 		"unavailable": "Out of stock",
 		"removed": "Delisted",
@@ -46,7 +44,6 @@
 	"admin": {
 		"users": {
 			"title": "Users",
-			"create": "Create a user",
 			"username": "Username",
 			"firstName": "First name",
 			"lastName": "Last name",
@@ -129,8 +126,6 @@
 			"colCache": "Cache",
 			"colSchedule": "Schedule",
 			"configure": "Configure",
-			"suspended": "Suspended",
-			"noSchedule": "No schedule",
 			"notSchedulable": "Not schedulable",
 			"scheduleTitle": "Schedule",
 			"scheduleHint": "Set the daily run times per scraper. Times are in the server timezone; two runs must be at least 1 minute apart.",
@@ -175,9 +170,6 @@
 			}
 		}
 	},
-	"theme": {
-		"toggle": "Toggle theme"
-	},
 	"plugins": {
 		"notFound": "This plugin page is not available."
 	},
@@ -194,13 +186,11 @@
 	"changePassword": {
 		"title": "Change your password",
 		"greeting": "Hi {name}, choose a new password to continue.",
-		"hint": "Choose a new password (at least 8 characters).",
 		"current": "Current password",
 		"new": "New password",
 		"confirm": "Confirm new password",
 		"submit": "Change password",
-		"mismatch": "The two passwords do not match.",
-		"done": "Password changed. Please sign in again."
+		"mismatch": "The two passwords do not match."
 	},
 	"profile": {
 		"title": "Profile",
