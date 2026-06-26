@@ -15,12 +15,13 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from src.core.errors import APIError
 from src.core.feature_flags import effective_flags, set_flags
 from src.core.models import SystemLog
 from src.core.schema_drift import SchemaDriftItem
+from src.core.settings import SystemSettings, get_system_settings, set_system_settings
 from src.core.system_log import distinct_sources, level_counts, list_logs, page_logs
 from src.web.deps import AdminDep, SessionDep, SettingsDep
 
@@ -162,3 +163,24 @@ def patch_feature_flags(
         raise APIError(422, "unknown_flag", str(exc)) from exc
     log.info("feature flags changed: %s", result)
     return result
+
+
+@router.get(
+    "/settings",
+    response_model=SystemSettings,
+    summary="System settings: effective values (defaults + overrides). Admin only.",
+)
+def get_settings(_admin: AdminDep, db: SessionDep) -> SystemSettings:
+    return get_system_settings(db)
+
+
+@router.patch(
+    "/settings",
+    response_model=SystemSettings,
+    summary="Set one or more system settings (known keys only); returns the effective values.",
+)
+def patch_settings(body: dict[str, Any], _admin: AdminDep, db: SessionDep) -> SystemSettings:
+    try:
+        return set_system_settings(db, body)
+    except (ValidationError, ValueError) as exc:
+        raise APIError(422, "invalid_setting", str(exc)) from exc
