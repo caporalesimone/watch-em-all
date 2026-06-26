@@ -46,7 +46,9 @@
   data, only ids and metrics.
 - The worker prunes the log **and** old run records past `log_retention_days` (default 90)
   once a day; the **price history is never pruned** — it is the system's value.
-- This is API-only today; the live log **page** is a coming MVP.
+- A **System logs** admin page (`/admin/logs`) reads it: a **Live** tail (cursor, auto-refresh)
+  or paged **history** (page numbers + total + per-level counts), with level tabs, multi-source
+  chips, message search, and a `{ }` viewer for a row's context JSON.
 
 ### 4) Dev feature flags + an admin page that builds itself
 
