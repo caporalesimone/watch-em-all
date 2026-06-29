@@ -365,7 +365,9 @@
 			<table class="w-full text-left text-sm">
 				<thead class="border-b border-slate-200 text-xs text-slate-500 dark:border-slate-800">
 					<tr>
-						<th class={th}>{$_('catalog.colSource')}</th>
+						{#if cart.mode === 'cross'}
+							<th class={th}>{$_('catalog.colSource')}</th>
+						{/if}
 						<th class={th}>{$_('catalog.colImage')}</th>
 						<th class={th}>{$_('catalog.colName')}</th>
 						<th class={th}>{$_('catalog.colTags')}</th>
@@ -381,7 +383,9 @@
 							class="border-b border-slate-100 dark:border-slate-800/60"
 							class:opacity-50={!m.active}
 						>
-							<td class="py-2 pr-4"><SourceTag pluginId={m.plugin_id} /></td>
+							{#if cart.mode === 'cross'}
+								<td class="py-2 pr-4"><SourceTag pluginId={m.plugin_id} /></td>
+							{/if}
 							<td class="py-2 pr-4"><ProductThumb src={m.image_url} /></td>
 							<td class="py-2 pr-4">
 								<ProductCell name={m.name} url={m.url} brand={m.brand} category={m.category} />
