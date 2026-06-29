@@ -26,6 +26,7 @@ Chiudere il perimetro della 1.0: il secondo canale di notifica (che dimostra la 
 - [ ] **12.F1 — Stati vuoti** (~1h): stati vuoti curati su tutte le pagine (FE-12). *Verifica: giro da utente nuovo senza momenti "e adesso?".*
 - [ ] **12.F2 — Conferme distruttive + responsive** (~1h): conferme con conseguenze esplicite (FE-11), responsive di base. *Verifica: ogni azione distruttiva dichiara cosa cancella.*
 - [ ] **12.F3 — Revisione dark/light** (~1h): passata su tutte le pagine nei due temi. *Verifica: nessun elemento illeggibile nei due temi.*
+- [ ] **12.F4 — Widget condivisi nel core (mini-SDK)** (~1h): estrarre i widget oggi ri-implementati sia nel Catalog sia nelle pagine plugin — **breadcrumb di categoria**, **immagine prodotto** (con hover-zoom) e **product cell** (la cella con titolo linkabile + brand + categoria) — in componenti `$lib/components` self-contained/props-driven, così ogni pagina/plugin ha lo stesso look da un'unica implementazione (elimina la duplicazione, FE-8/FE-18). Applica il modello deciso al [gate design system di fase 7](phase-07-email-notifier.md). *Verifica: Catalog e pagina Dragon Store rendono breadcrumb/immagine/cella dallo stesso componente, nessuna regressione visiva nei due temi.*
 
 ### Trasversali
 

@@ -5,15 +5,7 @@ New items get appended over time.
 
 ## Open
 
-- **Generalize the shared UI pieces into a core-provided "SDK".** The category breadcrumb, the image
-  element, and the **product cell** (the table-cell block with the linkable title + brand + category)
-  are re-implemented in both the Catalog and the Dragon Store page. They should become ready-made
-  components shipped by the core (a small SDK) so every page/plugin gets the same look from a single
-  implementation. This is a concrete instance of the **shared plugin design-system** already gated for
-  discussion before the notifier work: list these three widgets (category breadcrumb, image, product
-  cell) as candidates in the
-  [phase-7 "discuss before you start" gate](docs-ita/development-flow/phase-07-email-notifier.md) plus
-  rule [FE-18](docs-ita/developer-rules/frontend/rules.md).
+_(nothing open right now)_
 
 ## Off topic
 
