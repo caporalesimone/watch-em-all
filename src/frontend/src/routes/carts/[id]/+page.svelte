@@ -465,12 +465,19 @@
 									</div>
 								{/if}
 							</td>
-							<td
-								class="py-2 pr-4 text-slate-400"
-								class:line-through={m.price_current !== m.price_original}
+							<td class="py-2 pr-4 text-slate-400" class:line-through={Number(m.discount_pct) > 0}
 								>{money(m.price_original, m.currency)}</td
 							>
-							<td class="py-2 pr-4">{money(m.price_current, m.currency)}</td>
+							<td class="py-2 pr-4 font-medium">
+								<div>{money(m.price_current, m.currency)}</div>
+								{#if Number(m.discount_pct) > 0}
+									<span
+										class="mt-0.5 inline-block rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700 dark:bg-green-900/40 dark:text-green-300"
+									>
+										-{Math.round(Number(m.discount_pct))}%
+									</span>
+								{/if}
+							</td>
 							<td class="py-2 pr-4">
 								{#if m.removed}
 									<span class="text-red-600">{$_('carts.statusDelisted')}</span>
