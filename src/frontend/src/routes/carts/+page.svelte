@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { afterNavigate } from '$app/navigation';
 	import { _ } from 'svelte-i18n';
 
 	import { createCart, listCarts, type CartCard, type CartMode } from '$lib/api/client';
@@ -30,7 +30,10 @@
 		}
 	}
 
-	onMount(load);
+	// Reload on entry and whenever we return here (e.g. after editing/deleting on a detail page).
+	afterNavigate(() => {
+		void load();
+	});
 
 	// Default the store to the first scraper when switching to single-store mode.
 	$effect(() => {
@@ -61,14 +64,6 @@
 		} finally {
 			creating = false;
 		}
-	}
-
-	function onChanged(updated: CartCard): void {
-		carts = carts.map((c) => (c.id === updated.id ? updated : c));
-	}
-
-	function onDeleted(id: number): void {
-		carts = carts.filter((c) => c.id !== id);
 	}
 </script>
 
@@ -155,7 +150,7 @@
 	{:else}
 		<div class="grid gap-4 md:grid-cols-2">
 			{#each carts as cart (cart.id)}
-				<CartCardView {cart} {onChanged} {onDeleted} />
+				<CartCardView {cart} />
 			{/each}
 		</div>
 	{/if}

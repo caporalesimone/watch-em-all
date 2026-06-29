@@ -44,6 +44,7 @@
 	},
 	"carts": {
 		"title": "Carts",
+		"back": "Back to carts",
 		"empty": "No carts yet. Create one to group products and track a savings threshold.",
 		"error": "Could not load your carts.",
 		"new": "New cart",
@@ -62,8 +63,6 @@
 		"products": "{count} products",
 		"noProducts": "This cart has no products yet.",
 		"final": "Final estimate",
-		"showProducts": "Show products",
-		"hideProducts": "Hide products",
 		"removeItem": "Remove",
 		"unhealthy": "Contains delisted products",
 		"removeDelisted": "Remove delisted",

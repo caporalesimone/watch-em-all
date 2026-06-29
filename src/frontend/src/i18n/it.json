@@ -44,6 +44,7 @@
 	},
 	"carts": {
 		"title": "Carrelli",
+		"back": "Torna ai carrelli",
 		"empty": "Nessun carrello. Creane uno per raggruppare prodotti e tracciare una soglia di risparmio.",
 		"error": "Impossibile caricare i carrelli.",
 		"new": "Nuovo carrello",
@@ -62,8 +63,6 @@
 		"products": "{count} prodotti",
 		"noProducts": "Questo carrello non ha ancora prodotti.",
 		"final": "Stima finale",
-		"showProducts": "Mostra prodotti",
-		"hideProducts": "Nascondi prodotti",
 		"removeItem": "Rimuovi",
 		"unhealthy": "Contiene prodotti delistati",
 		"removeDelisted": "Rimuovi delistati",

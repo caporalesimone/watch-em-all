@@ -12,7 +12,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 ### New
 
-- **Carts.** Group catalog products into **carts** and see what they'd really cost. Two kinds: **cross-store** (any shop — the same product can appear once per shop, each row showing its store) and **single-store** (one shop, with that shop's discounts applied). A cart shows the full total, the discounted total, the shop's adjustments and a **final estimate**; you can set a **savings threshold** (in €, or type a % and the page converts it) with a progress bar, and the cart flags itself when it holds a **delisted** product. Fill a cart straight from the **Catalog** by selecting products and choosing a cart.
+- **Carts.** Group catalog products into **carts** and see what they'd really cost. Two kinds: **cross-store** (any shop — the same product can appear once per shop, each row showing its store) and **single-store** (one shop, with that shop's discounts applied). A cart shows the full total, the discounted total, the shop's adjustments and a **final estimate**; you can set a **savings threshold** (in €, or type a % and the page converts it) with a progress bar, and the cart flags itself when it holds a **delisted** product. Fill a cart straight from the **Catalog** by selecting products and choosing a cart. Click a cart to open its **detail page** — a full product table with preview images, provenance per row and per-row remove.
 
 ### Changed
 
