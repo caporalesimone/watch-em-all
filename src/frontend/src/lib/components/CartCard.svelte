@@ -111,6 +111,65 @@
 			busy = false;
 		}
 	}
+
+	// --- threshold (5.F3): stored in €, with a % input aid that converts on the current full total ---
+	let editingThreshold = $state(false);
+	let thrAmount = $state('');
+	let thrPct = $state('');
+
+	function openThreshold(): void {
+		thrAmount = cart.threshold_amount ?? '';
+		thrPct = '';
+		editingThreshold = true;
+	}
+
+	// %-off → € on the current full total (display aid; also fills the € field on input).
+	const pctEquiv = $derived.by(() => {
+		const pct = Number(thrPct);
+		const full = Number(cart.total_full);
+		if (!thrPct || Number.isNaN(pct) || pct <= 0 || pct > 100 || full <= 0) return null;
+		return (full * (1 - pct / 100)).toFixed(2);
+	});
+
+	function applyPct(): void {
+		if (pctEquiv !== null) thrAmount = pctEquiv;
+	}
+
+	async function saveThreshold(): Promise<void> {
+		const amt = thrAmount.trim();
+		if (!amt || Number(amt) <= 0) return;
+		busy = true;
+		try {
+			applyUpdate(await patchCart(cart.id, { threshold_amount: amt }));
+			editingThreshold = false;
+			thrPct = '';
+		} finally {
+			busy = false;
+		}
+	}
+
+	async function clearThreshold(): Promise<void> {
+		busy = true;
+		try {
+			applyUpdate(await patchCart(cart.id, { threshold_amount: null }));
+			editingThreshold = false;
+		} finally {
+			busy = false;
+		}
+	}
+
+	// Progress toward the target: 0% at the full price, 100% when reached.
+	const thrProgress = $derived.by(() => {
+		const t = cart.threshold;
+		if (!t) return null;
+		const full = Number(cart.total_full);
+		const target = Number(t.amount);
+		const current = Number(t.current);
+		const span = full - target;
+		const pct =
+			span > 0 ? Math.max(0, Math.min(1, (full - current) / span)) * 100 : t.reached ? 100 : 0;
+		return { pct, remaining: Math.max(current - target, 0).toFixed(2), reached: t.reached };
+	});
 </script>
 
 <div class="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
@@ -211,6 +270,79 @@
 			{/each}
 		</dl>
 	{/if}
+
+	<!-- Savings threshold (5.F3) -->
+	<div class="mt-3 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
+		{#if editingThreshold}
+			<div class="space-y-2">
+				<div class="flex flex-wrap items-end gap-3">
+					<label class="text-slate-500">
+						{$_('carts.thresholdTarget')}
+						<input
+							bind:value={thrAmount}
+							inputmode="decimal"
+							class="ml-1 w-24 rounded border border-slate-300 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-900"
+						/>
+					</label>
+					<label class="text-slate-500">
+						{$_('carts.thresholdPct')}
+						<input
+							bind:value={thrPct}
+							oninput={applyPct}
+							inputmode="decimal"
+							class="ml-1 w-16 rounded border border-slate-300 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-900"
+						/>
+					</label>
+				</div>
+				{#if pctEquiv}
+					<p class="text-slate-400">
+						{$_('carts.thresholdEquiv', { values: { pct: thrPct, amount: pctEquiv } })}
+					</p>
+				{/if}
+				<div class="flex gap-3">
+					<button
+						class="hover:underline"
+						onclick={saveThreshold}
+						disabled={busy || !thrAmount.trim()}>{$_('common.save')}</button
+					>
+					{#if cart.threshold_amount}
+						<button class="text-red-600 hover:underline" onclick={clearThreshold} disabled={busy}
+							>{$_('carts.thresholdClear')}</button
+						>
+					{/if}
+					<button class="text-slate-500 hover:underline" onclick={() => (editingThreshold = false)}
+						>{$_('common.cancel')}</button
+					>
+				</div>
+			</div>
+		{:else}
+			<div class="flex items-center justify-between gap-2">
+				{#if cart.threshold_amount}
+					<span class="text-slate-500"
+						>{$_('carts.thresholdTitle')}:
+						<strong>{money(cart.threshold_amount, cart.currency)}</strong></span
+					>
+				{:else}
+					<span class="text-slate-400">{$_('carts.thresholdNone')}</span>
+				{/if}
+				<button class="shrink-0 text-slate-500 hover:underline" onclick={openThreshold}
+					>{$_('carts.thresholdSet')}</button
+				>
+			</div>
+			{#if thrProgress}
+				<div class="mt-2">
+					<div class="h-2 w-full overflow-hidden rounded bg-slate-100 dark:bg-slate-800">
+						<div class="h-full bg-emerald-500" style="width: {thrProgress.pct}%"></div>
+					</div>
+					<p class="mt-1 text-slate-400">
+						{thrProgress.reached
+							? $_('carts.thresholdReachedMsg')
+							: $_('carts.thresholdRemaining', { values: { remaining: thrProgress.remaining } })}
+					</p>
+				</div>
+			{/if}
+		{/if}
+	</div>
 
 	<div class="mt-3 flex items-center gap-3 text-xs">
 		<button class="text-slate-500 hover:underline" onclick={toggle}>

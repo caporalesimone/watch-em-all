@@ -124,6 +124,7 @@ def _card_kwargs(cart: Cart, state: CartState, n_members: int) -> dict[str, obje
         "total_discounted": state.total_discounted,
         "adjustments": [_to_adjustment(a) for a in state.adjustments],
         "final_price": state.final_price,
+        "threshold_amount": cart.threshold_amount,
         "threshold": _to_threshold(state),
         "created_at": cart.created_at,
     }

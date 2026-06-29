@@ -186,7 +186,8 @@ class CartCard(BaseModel):
     total_discounted: Decimal
     adjustments: list[CartAdjustment] = Field(default_factory=list)
     final_price: Decimal
-    threshold: CartThreshold | None = None
+    threshold_amount: Decimal | None = None  # the stored target (the editor's value)
+    threshold: CartThreshold | None = None  # computed status (null without active members)
     created_at: datetime
 
 

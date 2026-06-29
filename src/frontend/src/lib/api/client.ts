@@ -441,6 +441,7 @@ export interface CartCard {
 	total_discounted: string;
 	adjustments: CartAdjustment[];
 	final_price: string;
+	threshold_amount: string | null;
 	threshold: CartThreshold | null;
 	created_at: string;
 }
