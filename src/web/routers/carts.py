@@ -1,50 +1,42 @@
 """Carts API (carts.md, cart-engine.md). Phase 5.
 
-5.B1 — the CRUD skeleton: create/list/get/rename/delete a cart, scoped to the
-token's user (DB-R1). ``mode`` is fixed at creation (CART-R2): a ``scraper_specific``
-cart names a loaded scraper, a ``cross`` cart names none. Membership (items) is
-5.B2; the computed state (totals, adjustments, threshold) is layered on by the
-Cart Engine in 5.B3 — for now ``CartOut`` reports only identity + member count.
+CRUD + membership (5.B1/5.B2) plus the computed state from the Cart Engine (5.B3):
+the list returns cards (totals, adjustments, health flag), the detail adds the
+member rows. ``mode`` is fixed at creation (CART-R2), per-user (DB-R1). For a
+scraper_specific cart the engine's adjustments come from the cart's scraper, which
+the router resolves from ``app.state.loaded_plugins`` and binds — the core engine
+never imports the web.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Request
-from sqlalchemy import func, select
+from sqlalchemy import select
 
+from src.core.cart_engine import AdjustmentFn, CartState, evaluate_cart
+from src.core.contracts import Adjustment, BrandRef, CategoryRef
 from src.core.errors import APIError
 from src.core.models import Cart, CartMember, CatalogProduct
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.registry import LoadedPlugin
 from src.web.deps import SessionDep, UserDep
-from src.web.schemas import CartCreate, CartItemsBody, CartOut, CartPatch
+from src.web.schemas import (
+    CartAdjustment,
+    CartCard,
+    CartCreate,
+    CartDetail,
+    CartItemsBody,
+    CartMemberOut,
+    CartPatch,
+)
 
 router = APIRouter(prefix="/carts", tags=["Carts"])
 
 
-def _loaded_scraper_ids(request: Request) -> set[str]:
-    """plugin_id of every loaded scraper — the valid targets for a scraper_specific cart."""
+def _loaded_scrapers(request: Request) -> dict[str, ScraperPlugin]:
+    """Loaded scraper instances keyed by plugin_id (targets for scraper_specific)."""
     loaded: list[LoadedPlugin] = list(getattr(request.app.state, "loaded_plugins", []))
-    return {lp.plugin.plugin_id for lp in loaded if isinstance(lp.plugin, ScraperPlugin)}
-
-
-def _member_count(db: SessionDep, cart_id: int) -> int:
-    return (
-        db.scalar(select(func.count()).select_from(CartMember).where(CartMember.cart_id == cart_id))
-        or 0
-    )
-
-
-def _out(db: SessionDep, cart: Cart) -> CartOut:
-    return CartOut(
-        id=cart.id,
-        name=cart.name,
-        mode=cart.mode,
-        scraper_id=cart.scraper_id,
-        threshold_pct=cart.threshold_pct,
-        member_count=_member_count(db, cart.id),
-        created_at=cart.created_at,
-    )
+    return {lp.plugin.plugin_id: lp.plugin for lp in loaded if isinstance(lp.plugin, ScraperPlugin)}
 
 
 def _get_owned(db: SessionDep, user: UserDep, cart_id: int) -> Cart:
@@ -55,24 +47,106 @@ def _get_owned(db: SessionDep, user: UserDep, cart_id: int) -> Cart:
     return cart
 
 
-@router.get("", response_model=list[CartOut], summary="List the current user's carts.")
-def list_carts(user: UserDep, db: SessionDep) -> list[CartOut]:
+def _cart_products(db: SessionDep, cart_id: int) -> list[CatalogProduct]:
+    """The catalog products that are members of the cart (CART-R1)."""
+    return list(
+        db.scalars(
+            select(CatalogProduct)
+            .join(CartMember, CartMember.product_id == CatalogProduct.id)
+            .where(CartMember.cart_id == cart_id)
+            .order_by(CatalogProduct.name.asc(), CatalogProduct.id.asc())
+        ).all()
+    )
+
+
+def _adjuster(request: Request, cart: Cart) -> AdjustmentFn | None:
+    """Bind the cart's scraper ``get_adjustments`` for a scraper_specific cart, or
+    None (cross carts, or scraper not loaded → no adjustments)."""
+    if cart.mode != "scraper_specific" or cart.scraper_id is None:
+        return None
+    plugin = _loaded_scrapers(request).get(cart.scraper_id)
+    return plugin.get_adjustments if plugin is not None else None
+
+
+def _to_adjustment(a: Adjustment) -> CartAdjustment:
+    return CartAdjustment(id=a.id, description=a.description, amount=a.amount, params=a.params)
+
+
+def _member_out(p: CatalogProduct, active: bool) -> CartMemberOut:
+    return CartMemberOut(
+        product_id=p.id,
+        plugin_id=p.plugin_id,
+        external_id=p.external_id,
+        url=p.url,
+        name=p.name,
+        image_url=p.image_url,
+        brand=BrandRef(text=p.brand_text, link=p.brand_link) if p.brand_text else None,
+        tags=p.tags,
+        category=[CategoryRef(**c) for c in p.category],
+        currency=p.currency,
+        price_current=p.price_current,
+        price_original=p.price_original,
+        discount_pct=p.discount_pct,
+        is_available=p.is_available,
+        removed=p.removed,
+        active=p.is_available and not p.removed,
+    )
+
+
+def _state(db: SessionDep, request: Request, cart: Cart) -> tuple[CartState, list[CatalogProduct]]:
+    products = _cart_products(db, cart.id)
+    state = evaluate_cart(cart.mode, products, _adjuster(request, cart))
+    return state, products
+
+
+def _card_kwargs(cart: Cart, state: CartState, n_members: int) -> dict[str, object]:
+    return {
+        "id": cart.id,
+        "name": cart.name,
+        "mode": cart.mode,
+        "scraper_id": cart.scraper_id,
+        "currency": state.currency,
+        "member_count": n_members,
+        "active_count": state.active_count,
+        "excluded_count": state.excluded_count,
+        "has_delisted": state.has_delisted,
+        "total_full": state.total_full,
+        "total_discounted": state.total_discounted,
+        "adjustments": [_to_adjustment(a) for a in state.adjustments],
+        "final_price": state.final_price,
+        "created_at": cart.created_at,
+    }
+
+
+def _card(db: SessionDep, request: Request, cart: Cart) -> CartCard:
+    state, products = _state(db, request, cart)
+    return CartCard(**_card_kwargs(cart, state, len(products)))  # type: ignore[arg-type]
+
+
+def _detail(db: SessionDep, request: Request, cart: Cart) -> CartDetail:
+    state, products = _state(db, request, cart)
+    members = [_member_out(p, p.is_available and not p.removed) for p in products]
+    return CartDetail(**_card_kwargs(cart, state, len(products)), members=members)  # type: ignore[arg-type]
+
+
+@router.get("", response_model=list[CartCard], summary="List the current user's carts (cards).")
+def list_carts(user: UserDep, db: SessionDep, request: Request) -> list[CartCard]:
     carts = db.scalars(
         select(Cart)
         .where(Cart.user_id == user.sub)
         .order_by(Cart.created_at.desc(), Cart.id.desc())
     ).all()
-    return [_out(db, c) for c in carts]
+    return [_card(db, request, c) for c in carts]
 
 
-@router.post("", response_model=CartOut, status_code=201, summary="Create a cart (mode is fixed).")
-def create_cart(body: CartCreate, user: UserDep, db: SessionDep, request: Request) -> CartOut:
+@router.post("", response_model=CartDetail, status_code=201, summary="Create a cart (mode fixed).")
+def create_cart(body: CartCreate, user: UserDep, db: SessionDep, request: Request) -> CartDetail:
     if body.mode == "scraper_specific":
         if not body.scraper_id:
             raise APIError(
                 422, "scraper_id_required", "scraper_specific carts require a scraper_id"
             )
-        if body.scraper_id not in _loaded_scraper_ids(request):
+        if body.scraper_id not in _loaded_scrapers(request):
             raise APIError(422, "unknown_scraper", f"no loaded scraper {body.scraper_id!r}")
         scraper_id = body.scraper_id
     else:  # cross
@@ -84,22 +158,24 @@ def create_cart(body: CartCreate, user: UserDep, db: SessionDep, request: Reques
     db.add(cart)
     db.commit()
     db.refresh(cart)
-    return _out(db, cart)
+    return _detail(db, request, cart)
 
 
-@router.get("/{cart_id}", response_model=CartOut, summary="Get one cart.")
-def get_cart(cart_id: int, user: UserDep, db: SessionDep) -> CartOut:
-    return _out(db, _get_owned(db, user, cart_id))
+@router.get("/{cart_id}", response_model=CartDetail, summary="Get one cart with its members.")
+def get_cart(cart_id: int, user: UserDep, db: SessionDep, request: Request) -> CartDetail:
+    return _detail(db, request, _get_owned(db, user, cart_id))
 
 
-@router.patch("/{cart_id}", response_model=CartOut, summary="Rename a cart (mode is immutable).")
-def patch_cart(cart_id: int, body: CartPatch, user: UserDep, db: SessionDep) -> CartOut:
+@router.patch("/{cart_id}", response_model=CartDetail, summary="Rename a cart (mode immutable).")
+def patch_cart(
+    cart_id: int, body: CartPatch, user: UserDep, db: SessionDep, request: Request
+) -> CartDetail:
     cart = _get_owned(db, user, cart_id)
     if body.name is not None:
         cart.name = body.name
     db.commit()
     db.refresh(cart)
-    return _out(db, cart)
+    return _detail(db, request, cart)
 
 
 @router.delete("/{cart_id}", status_code=204, summary="Delete a cart (only the cart, CART-R3).")
@@ -109,25 +185,15 @@ def delete_cart(cart_id: int, user: UserDep, db: SessionDep) -> None:
     db.commit()
 
 
-def _cart_currencies(db: SessionDep, cart_id: int) -> set[str]:
-    """Distinct currencies of the cart's current members (CART single-currency)."""
-    return set(
-        db.scalars(
-            select(CatalogProduct.currency)
-            .join(CartMember, CartMember.product_id == CatalogProduct.id)
-            .where(CartMember.cart_id == cart_id)
-        ).all()
-    )
-
-
 @router.post(
-    "/{cart_id}/items", response_model=CartOut, summary="Add catalog products to a cart (5.B2)."
+    "/{cart_id}/items", response_model=CartDetail, summary="Add products to a cart (5.B2)."
 )
-def add_items(cart_id: int, body: CartItemsBody, user: UserDep, db: SessionDep) -> CartOut:
+def add_items(
+    cart_id: int, body: CartItemsBody, user: UserDep, db: SessionDep, request: Request
+) -> CartDetail:
     cart = _get_owned(db, user, cart_id)
     ids = list(dict.fromkeys(body.product_ids))  # dedupe, preserve order
 
-    # All ids must be the user's catalog products (CART-R1).
     products = db.scalars(
         select(CatalogProduct).where(CatalogProduct.user_id == user.sub, CatalogProduct.id.in_(ids))
     ).all()
@@ -138,24 +204,20 @@ def add_items(cart_id: int, body: CartItemsBody, user: UserDep, db: SessionDep) 
 
     ordered = [by_id[i] for i in ids]
 
-    # Delisted products are not currently offered → cannot be added (out-of-stock can).
     delisted = [p.id for p in ordered if p.removed]
     if delisted:
         raise APIError(422, "product_delisted", f"delisted products cannot be added: {delisted}")
 
-    # scraper_specific accepts only products of its own scraper (CART-R4).
     if cart.mode == "scraper_specific":
         wrong = [p.id for p in ordered if p.plugin_id != cart.scraper_id]
         if wrong:
             raise APIError(422, "product_scraper_mismatch", f"not from {cart.scraper_id}: {wrong}")
 
-    # A cart holds a single currency (decision 2026-06-29): the existing members plus
-    # the new products must share exactly one currency.
-    currencies = _cart_currencies(db, cart.id) | {p.currency for p in ordered}
+    existing_currencies = {p.currency for p in _cart_products(db, cart.id)}
+    currencies = existing_currencies | {p.currency for p in ordered}
     if len(currencies) > 1:
         raise APIError(422, "currency_mismatch", f"a cart holds one currency: {sorted(currencies)}")
 
-    # Idempotent: skip ids already members; add the rest.
     existing = set(
         db.scalars(
             select(CartMember.product_id).where(
@@ -167,13 +229,15 @@ def add_items(cart_id: int, body: CartItemsBody, user: UserDep, db: SessionDep) 
         if pid not in existing:
             db.add(CartMember(cart_id=cart.id, product_id=pid))
     db.commit()
-    return _out(db, cart)
+    return _detail(db, request, cart)
 
 
 @router.delete(
-    "/{cart_id}/items", response_model=CartOut, summary="Remove cart members (no-op if absent)."
+    "/{cart_id}/items", response_model=CartDetail, summary="Remove cart members (no-op if absent)."
 )
-def remove_items(cart_id: int, body: CartItemsBody, user: UserDep, db: SessionDep) -> CartOut:
+def remove_items(
+    cart_id: int, body: CartItemsBody, user: UserDep, db: SessionDep, request: Request
+) -> CartDetail:
     cart = _get_owned(db, user, cart_id)
     members = db.scalars(
         select(CartMember).where(
@@ -183,4 +247,4 @@ def remove_items(cart_id: int, body: CartItemsBody, user: UserDep, db: SessionDe
     for m in members:  # absent ids are a no-op
         db.delete(m)
     db.commit()
-    return _out(db, cart)
+    return _detail(db, request, cart)

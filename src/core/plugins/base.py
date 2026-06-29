@@ -25,9 +25,12 @@ from fastapi import APIRouter
 from src.core.contracts import CategoryRef
 
 if TYPE_CHECKING:
+    from decimal import Decimal
+
     from sqlalchemy import MetaData
 
-    from src.core.contracts import DeltaCounters, Product
+    from src.core.contracts import Adjustment, DeltaCounters, Product
+    from src.core.models import CatalogProduct
     from src.core.plugins.context import PluginContext
 
 
@@ -168,6 +171,16 @@ class ScraperPlugin(BasePlugin, ABC):
         iterates (SCR-R3 reframed: the scraper tells the core whom to scrape). Default:
         none; a real scraper returns e.g. the users with at least one watch. Not used by
         scrape-now, which targets only the requesting user."""
+        return []
+
+    def get_adjustments(
+        self, products: list[CatalogProduct], cart_total: Decimal
+    ) -> list[Adjustment]:
+        """Adjustments for a scraper_specific cart (adjustment.md, 5.B5): the plugin's
+        site rules (threshold discounts, shipping, …) applied to the cart's **active**
+        products and their discounted ``cart_total``. Returns signed ``Adjustment``
+        items the core sums into the final estimate. Default: none — a scraper without
+        site-specific cart logic returns ``[]``."""
         return []
 
 

@@ -127,16 +127,56 @@ class CartPatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=128)
 
 
-class CartOut(BaseModel):
-    # Phase 5.B1 view: cart identity + member count. The computed state (totals,
-    # adjustments, threshold) is layered on by the Cart Engine in 5.B3.
+class CartAdjustment(BaseModel):
+    # An adjustment line as the cart card shows it (5.B3/5.B5). `id` is the i18n key
+    # the FE localizes; `params` feed its interpolation; `description` is debug-only.
+    id: str
+    description: str
+    amount: Decimal
+    params: dict[str, str] = Field(default_factory=dict)
+
+
+class CartMemberOut(BaseModel):
+    # A cart member = a catalog product row + whether it counts in the totals (active).
+    product_id: int
+    plugin_id: str
+    external_id: str
+    url: str
+    name: str
+    image_url: str | None
+    brand: BrandRef | None = None
+    tags: list[str] = Field(default_factory=list)
+    category: list[CategoryRef] = Field(default_factory=list)
+    currency: str
+    price_current: Decimal
+    price_original: Decimal
+    discount_pct: Decimal
+    is_available: bool
+    removed: bool
+    active: bool
+
+
+class CartCard(BaseModel):
+    # A cart with its computed state (5.B3). The threshold is added in 5.B4. `members`
+    # is only filled in the detail view (CartDetail).
     id: int
     name: str
     mode: str
     scraper_id: str | None
-    threshold_pct: Decimal | None
+    currency: str | None
     member_count: int
+    active_count: int
+    excluded_count: int
+    has_delisted: bool
+    total_full: Decimal
+    total_discounted: Decimal
+    adjustments: list[CartAdjustment] = Field(default_factory=list)
+    final_price: Decimal
     created_at: datetime
+
+
+class CartDetail(CartCard):
+    members: list[CartMemberOut] = Field(default_factory=list)
 
 
 class CartItemsBody(BaseModel):
