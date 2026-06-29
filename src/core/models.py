@@ -133,9 +133,11 @@ class Cart(Base):
 
     ``mode`` is **immutable** after creation (CART-R2): no endpoint changes it.
     ``scraper_id`` is the scraper's ``plugin_id`` for ``scraper_specific`` carts and
-    NULL for ``cross`` (CART-R4/R5). ``threshold_pct`` is the savings threshold, stored
-    **always as a percent** (CART-R9), NULL = no threshold. Alert types + the per-cart
-    baseline are phase 6 (alerts), not here. Per-user (DB-R1)."""
+    NULL for ``cross`` (CART-R4/R5). ``threshold_amount`` is the savings threshold,
+    stored as an **absolute € value** (decision 2026-06-29, inverts CART-R9/R10 — the
+    percentage is a UI input aid only); NULL = no threshold; the engine fires when the
+    final estimate ≤ this amount (CART-R11). Alert types + the per-cart baseline are
+    phase 6 (alerts), not here. Per-user (DB-R1)."""
 
     __tablename__ = "carts"
 
@@ -146,7 +148,7 @@ class Cart(Base):
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     mode: Mapped[str] = mapped_column(String(16), nullable=False)  # cross | scraper_specific
     scraper_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    threshold_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    threshold_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -159,9 +161,7 @@ class CartMember(Base):
     product removes the membership (CART-R3/R8, the products cascade realises CAT-R8)."""
 
     __tablename__ = "cart_members"
-    __table_args__ = (
-        UniqueConstraint("cart_id", "product_id", name="uq_cart_members_identity"),
-    )
+    __table_args__ = (UniqueConstraint("cart_id", "product_id", name="uq_cart_members_identity"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     cart_id: Mapped[int] = mapped_column(

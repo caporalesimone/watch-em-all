@@ -27,7 +27,7 @@ flowchart TD
 - **Prodotto attivo** = membro del carrello con `is_available = true` e `removed = false`. Solo gli attivi entrano nei totali.
 - **Totale pieno** = Σ `price_original` degli attivi · **Totale scontato** = Σ `price_current` degli attivi.
 - **Stima finale** = totale scontato − Σ `adjustments.amount` (solo carrelli scraper-specific; per i cross, stima finale = totale scontato).
-- **Soglia** = percentuale di sconto richiesta, salvata sempre come `threshold_pct`; il valore assoluto eventualmente inserito dall'utente è convertito alla creazione/modifica usando il totale pieno corrente.
+- **Soglia** = importo assoluto in € richiesto, salvato come `threshold_amount` (CART-R9: la % è solo un aiuto di input UI, convertita a € una volta sola); il confronto è sulla **stima finale** (CART-R11). Importo **fisso**, non ricalcolato al variare del perimetro.
 
 ## Pseudocodice di valutazione
 
@@ -46,13 +46,11 @@ def evaluate(cart) -> CartState:
     final_price = total_discounted - sum(a.amount for a in adjustments)
 
     threshold = None
-    if cart.threshold_pct is not None and active:                 # CART-R12: niente soglia senza attivi
-        target = total_full * (1 - cart.threshold_pct / 100)      # soglia in € sul pieno corrente
+    if cart.threshold_amount is not None and active:              # CART-R12: niente soglia senza attivi
         threshold = ThresholdState(
-            pct     = cart.threshold_pct,
-            target  = target,
+            amount  = cart.threshold_amount,                      # importo € fisso (CART-R9)
             current = final_price,                                # CART-R11: confronto sulla stima finale
-            reached = final_price <= target,
+            reached = final_price <= cart.threshold_amount,
             partial = bool(excluded),                             # raggiunta con esclusi → "parziale"
         )
     return CartState(active, excluded, total_full, total_discounted,
@@ -61,14 +59,14 @@ def evaluate(cart) -> CartState:
 
 Note normative:
 
-- La soglia in € (`target`) **segue il perimetro degli attivi**: percentuale fissa, valore assoluto ricalcolato (esempio normativo in [carts.md](../../3-features/user/carts.md)).
+- La soglia è un **importo € fisso** (`threshold_amount`): non si ricalcola al variare del perimetro; la % è solo input UI convertito una volta (CART-R9/R10, esempio normativo in [carts.md](../../3-features/user/carts.md)).
 - Il confronto avviene sulla **stima finale** (adjustments inclusi): è il prezzo reale dell'acquisto in blocco (UC-1).
 - `get_adjustments` è invocato con il totale scontato corrente; il core non interpreta le voci, le somma. Voci positive = risparmi, negative = costi.
 - Carrello senza attivi: nessuna valutazione di soglia, totali a zero, stato "tutti esclusi" reso dalla UI.
 
 ## Persistenza
 
-Tabelle `carts` (con `mode` e `scraper_id` nullable per i cross, `threshold_pct` nullable), `cart_members`, `cart_alert_types` — schema in [database/schema.md](../database/schema.md). La soglia è una colonna di `carts` (relazione 1:1, niente tabella separata); i tipi di alert sono righe presenti = tipo abilitato (niente flag).
+Tabelle `carts` (con `mode` e `scraper_id` nullable per i cross, `threshold_amount` nullable), `cart_members`, `cart_alert_types` — schema in [database/schema.md](../database/schema.md). La soglia è una colonna di `carts` (relazione 1:1, niente tabella separata); i tipi di alert sono righe presenti = tipo abilitato (niente flag).
 
 ## Interazioni
 

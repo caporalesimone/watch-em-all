@@ -197,3 +197,33 @@ def test_add_rejects_foreign_catalog_id(client: TestClient) -> None:
     resp = _add(client, token, cart, [999999])
     assert resp.status_code == 422
     assert resp.json()["code"] == "product_not_found"
+
+
+def test_threshold_set_clear_and_validation(client: TestClient) -> None:
+    uid, token = _make_user(client, _admin_token(client), "alice")
+    _seed(uid, "dragon_store", {"external_id": "a"})  # price 10.00, active
+    ids = _ids_by_external(client, token)
+    cart = _cross_cart(client, token)
+    _add(client, token, cart, [ids["a"]])
+
+    reached = client.patch(
+        f"/api/carts/{cart}", json={"threshold_amount": "10.00"}, headers=_bearer(token)
+    ).json()
+    assert reached["threshold"]["reached"] is True
+    assert reached["threshold"]["partial"] is False
+
+    tighter = client.patch(
+        f"/api/carts/{cart}", json={"threshold_amount": "5.00"}, headers=_bearer(token)
+    ).json()
+    assert tighter["threshold"]["reached"] is False
+
+    cleared = client.patch(
+        f"/api/carts/{cart}", json={"threshold_amount": None}, headers=_bearer(token)
+    ).json()
+    assert cleared["threshold"] is None
+
+    bad = client.patch(
+        f"/api/carts/{cart}", json={"threshold_amount": "-1"}, headers=_bearer(token)
+    )
+    assert bad.status_code == 422
+    assert bad.json()["code"] == "threshold_must_be_positive"

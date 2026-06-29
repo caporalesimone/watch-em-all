@@ -122,9 +122,12 @@ class CartCreate(BaseModel):
 
 
 class CartPatch(BaseModel):
-    # Phase 5.B1: rename only. The threshold (threshold_pct / threshold_amount with
-    # conversion) is added in 5.B4; mode is never editable (CART-R2).
+    # Rename and/or set the threshold. The threshold is an absolute € value (5.B4); the
+    # percentage is a UI input aid only. `threshold_amount: null` (explicitly present)
+    # clears the threshold — the endpoint uses model_fields_set to tell "omitted" from
+    # "set to null". mode is never editable (CART-R2).
     name: str | None = Field(default=None, min_length=1, max_length=128)
+    threshold_amount: Decimal | None = None
 
 
 class CartAdjustment(BaseModel):
@@ -156,9 +159,18 @@ class CartMemberOut(BaseModel):
     active: bool
 
 
+class CartThreshold(BaseModel):
+    # Savings-threshold status (5.B4). `amount` is the absolute € target; `current` is
+    # the final estimate it compares against; `partial` = reached with excluded members.
+    amount: Decimal
+    current: Decimal
+    reached: bool
+    partial: bool
+
+
 class CartCard(BaseModel):
-    # A cart with its computed state (5.B3). The threshold is added in 5.B4. `members`
-    # is only filled in the detail view (CartDetail).
+    # A cart with its computed state (5.B3/5.B4). `members` is only filled in the detail
+    # view (CartDetail). `threshold` is null when unset or no active members (CART-R12).
     id: int
     name: str
     mode: str
@@ -172,6 +184,7 @@ class CartCard(BaseModel):
     total_discounted: Decimal
     adjustments: list[CartAdjustment] = Field(default_factory=list)
     final_price: Decimal
+    threshold: CartThreshold | None = None
     created_at: datetime
 
 

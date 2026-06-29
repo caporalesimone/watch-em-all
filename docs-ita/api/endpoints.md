@@ -49,7 +49,7 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 | GET | `/api/carts` | 👤 | — | elenco card (con stato calcolato) |
 | POST | `/api/carts` | 👤 | `{name, mode, scraper_id?}` | mode immutabile dopo |
 | GET | `/api/carts/{id}` | 👤 | — | dettaglio + stato (totali, adjustments, soglia) |
-| PATCH | `/api/carts/{id}` | 👤 | `{name?, threshold_pct?, threshold_amount?}` | amount → convertito a pct sul pieno corrente |
+| PATCH | `/api/carts/{id}` | 👤 | `{name?, threshold_amount?}` | soglia = importo € (`>0`); `threshold_amount: null` la rimuove; la % è solo aiuto di input UI (CART-R9) |
 | DELETE | `/api/carts/{id}` | 👤 | — | solo il carrello |
 | POST | `/api/carts/{id}/items` | 👤 | `{product_ids}` | aggiunta membri |
 | DELETE | `/api/carts/{id}/items` | 👤 | `{product_ids}` | rimozione membri |

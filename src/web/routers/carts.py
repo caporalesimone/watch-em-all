@@ -28,6 +28,7 @@ from src.web.schemas import (
     CartItemsBody,
     CartMemberOut,
     CartPatch,
+    CartThreshold,
 )
 
 router = APIRouter(prefix="/carts", tags=["Carts"])
@@ -72,6 +73,13 @@ def _to_adjustment(a: Adjustment) -> CartAdjustment:
     return CartAdjustment(id=a.id, description=a.description, amount=a.amount, params=a.params)
 
 
+def _to_threshold(state: CartState) -> CartThreshold | None:
+    t = state.threshold
+    if t is None:
+        return None
+    return CartThreshold(amount=t.amount, current=t.current, reached=t.reached, partial=t.partial)
+
+
 def _member_out(p: CatalogProduct, active: bool) -> CartMemberOut:
     return CartMemberOut(
         product_id=p.id,
@@ -95,7 +103,7 @@ def _member_out(p: CatalogProduct, active: bool) -> CartMemberOut:
 
 def _state(db: SessionDep, request: Request, cart: Cart) -> tuple[CartState, list[CatalogProduct]]:
     products = _cart_products(db, cart.id)
-    state = evaluate_cart(cart.mode, products, _adjuster(request, cart))
+    state = evaluate_cart(cart.mode, products, _adjuster(request, cart), cart.threshold_amount)
     return state, products
 
 
@@ -114,6 +122,7 @@ def _card_kwargs(cart: Cart, state: CartState, n_members: int) -> dict[str, obje
         "total_discounted": state.total_discounted,
         "adjustments": [_to_adjustment(a) for a in state.adjustments],
         "final_price": state.final_price,
+        "threshold": _to_threshold(state),
         "created_at": cart.created_at,
     }
 
@@ -171,8 +180,16 @@ def patch_cart(
     cart_id: int, body: CartPatch, user: UserDep, db: SessionDep, request: Request
 ) -> CartDetail:
     cart = _get_owned(db, user, cart_id)
+    fields = body.model_fields_set
     if body.name is not None:
         cart.name = body.name
+    if "threshold_amount" in fields:  # present (even as null) → set or clear
+        if body.threshold_amount is None:
+            cart.threshold_amount = None
+        elif body.threshold_amount <= 0:
+            raise APIError(422, "threshold_must_be_positive", "threshold_amount must be > 0")
+        else:
+            cart.threshold_amount = body.threshold_amount
     db.commit()
     db.refresh(cart)
     return _detail(db, request, cart)

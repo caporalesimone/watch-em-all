@@ -91,3 +91,30 @@ def test_cross_ignores_adjuster() -> None:
     s = evaluate_cart("cross", [_p("10.00", "10.00")], adj)
     assert s.adjustments == []
     assert s.final_price == Decimal("10.00")
+
+
+def test_threshold_reached_and_not_reached() -> None:
+    products = [_p("10.00", "12.00"), _p("20.00", "20.00")]  # discounted total 30
+    reached = evaluate_cart("cross", products, threshold_amount=Decimal("30.00"))
+    assert reached.threshold is not None
+    assert reached.threshold.current == Decimal("30.00")
+    assert reached.threshold.reached is True
+    assert reached.threshold.partial is False
+
+    not_reached = evaluate_cart("cross", products, threshold_amount=Decimal("25.00"))
+    assert not_reached.threshold is not None
+    assert not_reached.threshold.reached is False
+
+
+def test_threshold_partial_when_members_excluded() -> None:
+    products = [_p("10.00", "10.00"), _p("99.00", "99.00", removed=True)]
+    s = evaluate_cart("cross", products, threshold_amount=Decimal("10.00"))
+    assert s.threshold is not None
+    assert s.threshold.reached is True
+    assert s.threshold.partial is True  # reached, but a delisted member is excluded
+
+
+def test_no_threshold_without_active_members() -> None:
+    products = [_p("10.00", "10.00", available=False)]  # only member excluded
+    s = evaluate_cart("cross", products, threshold_amount=Decimal("5.00"))
+    assert s.threshold is None  # CART-R12

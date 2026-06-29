@@ -42,7 +42,7 @@ erDiagram
 
 | Tabella | Colonne | Note |
 |---|---|---|
-| `carts` | id, user_id FK, name, mode (`cross`\|`scraper_specific`), scraper_id (null se cross), threshold_pct (null = nessuna soglia), created_at | mode immutabile; soglia come colonna (1:1) |
+| `carts` | id, user_id FK, name, mode (`cross`\|`scraper_specific`), scraper_id (null se cross), threshold_amount (€, null = nessuna soglia), created_at | mode immutabile; soglia = importo € fisso, colonna 1:1 (CART-R9, la % è solo input UI) |
 | `cart_members` | cart_id FK **CASCADE**, product_id FK **CASCADE** | **UNIQUE (cart_id, product_id)**; la cascata da products realizza CAT-R8 |
 | `cart_alert_types` | cart_id FK **CASCADE**, alert_type | **Presenza riga = tipo abilitato** (niente colonna enabled); UNIQUE (cart_id, alert_type) |
 
