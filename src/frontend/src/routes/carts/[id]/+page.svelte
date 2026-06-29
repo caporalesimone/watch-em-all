@@ -10,7 +10,13 @@
 		removeCartItems,
 		type CartDetail
 	} from '$lib/api/client';
+	import DiscountBadge from '$lib/components/DiscountBadge.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
+	import ProductCell from '$lib/components/ProductCell.svelte';
+	import ProductTags from '$lib/components/ProductTags.svelte';
+	import ProductThumb from '$lib/components/ProductThumb.svelte';
+	import SourceTag from '$lib/components/SourceTag.svelte';
+	import { money } from '$lib/format';
 	import { mountedPlugins } from '$lib/stores/plugins';
 
 	const cartId = $derived(Number($page.params.id));
@@ -22,11 +28,6 @@
 
 	let renaming = $state(false);
 	let draftName = $state('');
-
-	// Image hover-zoom (same intent delay as the Catalog).
-	const HOVER_DELAY_MS = 500;
-	let hoveredId = $state<number | null>(null);
-	let hoverTimer: ReturnType<typeof setTimeout> | null = null;
 
 	async function loadDetail(id: number): Promise<void> {
 		loading = true;
@@ -44,13 +45,8 @@
 		void loadDetail(cartId);
 	});
 
-	function money(value: string, currency: string | null): string {
-		return !currency || currency === 'EUR' ? `€${value}` : `${value} ${currency}`;
-	}
-
-	function source(pluginId: string): { name: string; icon: string | null } {
-		const p = $mountedPlugins.find((m) => m.name === pluginId);
-		return { name: p?.display_name ?? pluginId, icon: p?.icon ?? null };
+	function sourceName(pluginId: string): string {
+		return $mountedPlugins.find((m) => m.name === pluginId)?.display_name ?? pluginId;
 	}
 
 	function adjDisplay(amount: string, currency: string | null): string {
@@ -62,21 +58,6 @@
 	function adjClass(amount: string): string {
 		const n = Number(amount);
 		return n > 0 ? 'text-emerald-600' : n < 0 ? 'text-red-600' : 'text-slate-400';
-	}
-
-	function previewEnter(id: number): void {
-		if (hoverTimer) clearTimeout(hoverTimer);
-		hoverTimer = setTimeout(() => {
-			hoveredId = id;
-			hoverTimer = null;
-		}, HOVER_DELAY_MS);
-	}
-	function previewLeave(): void {
-		if (hoverTimer) {
-			clearTimeout(hoverTimer);
-			hoverTimer = null;
-		}
-		hoveredId = null;
 	}
 
 	async function rename(): Promise<void> {
@@ -235,7 +216,7 @@
 				{cart.mode === 'cross'
 					? $_('carts.modeCross')
 					: $_('carts.modeSingle')}{#if cart.scraper_id}
-					· {source(cart.scraper_id).name}{/if}
+					· {sourceName(cart.scraper_id)}{/if}
 			</span>
 			<span>{$_('carts.products', { values: { count: cart.member_count } })}</span>
 			{#if cart.excluded_count > 0}
@@ -396,87 +377,22 @@
 				</thead>
 				<tbody>
 					{#each cart.members as m (m.product_id)}
-						{@const src = source(m.plugin_id)}
 						<tr
 							class="border-b border-slate-100 dark:border-slate-800/60"
 							class:opacity-50={!m.active}
 						>
+							<td class="py-2 pr-4"><ProductThumb src={m.image_url} /></td>
+							<td class="py-2 pr-4"><SourceTag pluginId={m.plugin_id} /></td>
 							<td class="py-2 pr-4">
-								<div
-									class="relative inline-block"
-									role="presentation"
-									onmouseenter={() => previewEnter(m.product_id)}
-									onmouseleave={previewLeave}
-								>
-									{#if m.image_url}
-										<img
-											src={m.image_url}
-											alt=""
-											class="h-10 w-10 rounded border border-slate-200 object-cover dark:border-slate-700"
-											loading="lazy"
-										/>
-										<div
-											class="pointer-events-none absolute left-12 top-0 z-20"
-											class:hidden={hoveredId !== m.product_id}
-										>
-											<img
-												src={m.image_url}
-												alt=""
-												class="max-h-80 max-w-xs rounded-lg border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900"
-											/>
-										</div>
-									{:else}
-										<div
-											class="h-10 w-10 rounded border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800"
-										></div>
-									{/if}
-								</div>
+								<ProductCell name={m.name} url={m.url} brand={m.brand} category={m.category} />
 							</td>
-							<td class="py-2 pr-4">
-								<span class="flex items-center gap-1 text-xs text-slate-500" title={src.name}>
-									{#if src.icon}<img src={src.icon} alt="" class="h-4 w-4" />{/if}<span
-										>{src.name}</span
-									>
-								</span>
-							</td>
-							<td class="py-2 pr-4">
-								<a href={m.url} target="_blank" rel="noopener noreferrer" class="hover:underline"
-									>{m.name}</a
-								>
-								{#if m.brand}
-									<div class="text-xs text-slate-400">{m.brand.text}</div>
-								{/if}
-								{#if m.category.length > 0}
-									<div class="mt-0.5 text-xs text-slate-400">
-										{#each m.category as cat, i (cat.text + i)}{#if i > 0}<span class="px-1">/</span
-												>{/if}{cat.text}{/each}
-									</div>
-								{/if}
-							</td>
-							<td class="py-2 pr-4">
-								{#if m.tags.length > 0}
-									<div class="flex flex-wrap gap-1">
-										{#each m.tags as tag (tag)}
-											<span
-												class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-												>{tag}</span
-											>
-										{/each}
-									</div>
-								{/if}
-							</td>
+							<td class="py-2 pr-4"><ProductTags tags={m.tags} /></td>
 							<td class="py-2 pr-4 text-slate-400" class:line-through={Number(m.discount_pct) > 0}
 								>{money(m.price_original, m.currency)}</td
 							>
 							<td class="py-2 pr-4 font-medium">
 								<div>{money(m.price_current, m.currency)}</div>
-								{#if Number(m.discount_pct) > 0}
-									<span
-										class="mt-0.5 inline-block rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700 dark:bg-green-900/40 dark:text-green-300"
-									>
-										-{Math.round(Number(m.discount_pct))}%
-									</span>
-								{/if}
+								<DiscountBadge discountPct={m.discount_pct} />
 							</td>
 							<td class="py-2 pr-4">
 								{#if m.removed}
