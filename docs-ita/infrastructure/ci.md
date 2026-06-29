@@ -57,7 +57,7 @@ Workflow separato, attivato dai **tag `x.y.z`** (SemVer puro, senza prefisso `v`
 
 | Step | Cosa fa |
 |---|---|
-| Build & push | `watch-em-all` (app: ruoli web+worker) e `watch-em-all-ops` → `ghcr.io/<owner>/…:<tag>` (es. `1.2.0`; mai `latest`, INF-1) |
+| Build & push | `watch-em-all` (app: ruoli web+worker) e `watch-em-all-ops` → `ghcr.io/<owner>/…:<tag>` (es. `1.2.0`) **più il tag mobile `latest`** che punta alla release più recente (5.T1). INF-1 (mai `latest`) riguarda le immagini *upstream*, non i nostri artefatti |
 
 Il tag è l'unico trigger di pubblicazione delle immagini: `main` verde non pubblica nulla — e il tag lo crea **l'owner a mano**, quando vuole una release (vedi *Tag e release* sotto). I **package GHCR sono pubblici** (come il repo): il pull lato utente è anonimo, nessuna autenticazione.
 

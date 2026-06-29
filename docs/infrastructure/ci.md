@@ -53,7 +53,7 @@ A separate workflow, triggered by **`x.y.z` tags** (plain SemVer, no `v` prefix;
 
 | Step | What it does |
 |---|---|
-| Build & push | `watch-em-all` (app: web+worker roles) and `watch-em-all-ops` → `ghcr.io/<owner>/…:<tag>` (e.g. `1.2.0`; never `latest`, INF-1) |
+| Build & push | `watch-em-all` (app: web+worker roles) and `watch-em-all-ops` → `ghcr.io/<owner>/…:<tag>` (e.g. `1.2.0`) **plus a moving `latest` tag** pointing at the newest release (5.T1). INF-1 (never `latest`) is about *upstream* images, not our own artifacts |
 
 The tag is the only publish trigger: a green `main` publishes nothing — and the tag is created **by the owner by hand**, when a release is wanted (see *Tags and releases* below). The GHCR **packages are public** (like the repo): the user-side pull is anonymous, no authentication.
 

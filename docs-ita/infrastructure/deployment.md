@@ -26,7 +26,7 @@ cp .env.example .env                  # poi compilare i valori (WEA_VERSION=$VER
 docker compose pull && docker compose up -d
 ```
 
-Repo e package GHCR sono **pubblici**: il `pull` è **anonimo**, nessun `docker login` necessario (scelta di distribuzione, Q6). Le immagini pubblicate (pinnate per versione, mai `latest` — INF-1):
+Repo e package GHCR sono **pubblici**: il `pull` è **anonimo**, nessun `docker login` necessario (scelta di distribuzione, Q6). Le immagini pubblicate (pinnate per versione; al release si pubblica anche il tag mobile `latest` come comodità — 5.T1 — ma **pinnare `WEA_VERSION` resta il default consigliato**; INF-1 "mai `latest`" riguarda le immagini *upstream*, non i nostri artefatti):
 
 | Immagine | Contenuto |
 |---|---|

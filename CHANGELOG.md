@@ -10,6 +10,10 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 **Phase 5 — carts (the functional heart): the two cart modes, computed totals, adjustments and the savings threshold. Opening with some catalog polish; the cart work lands below as it ships.**
 
+### Changed
+
+- **Release images also get a `latest` tag.** Each release now publishes both `watch-em-all` and `watch-em-all-ops` as `:x.y.z` **and** `:latest` on GHCR, so a `docker compose pull` can track the newest release without editing `WEA_VERSION` — pinning a version stays the recommended default, `latest` is the quick-try convenience.
+
 ### Fixed
 
 - **Catalog — tighter category breadcrumb.** The category path no longer carries an unwanted gap around each `/` separator (`Giochi di Ruolo / GDR Italiano` → `Giochi di Ruolo/GDR Italiano`), matching the compact look the Dragon Store page already had.
