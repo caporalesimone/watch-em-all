@@ -180,6 +180,8 @@ class CartCard(BaseModel):
     active_count: int
     excluded_count: int
     has_delisted: bool
+    any_on_sale: bool = False
+    all_on_sale: bool = False
     total_full: Decimal
     total_discounted: Decimal
     adjustments: list[CartAdjustment] = Field(default_factory=list)

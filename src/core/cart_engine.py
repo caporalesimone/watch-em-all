@@ -50,6 +50,8 @@ class CartState:
     active_count: int
     excluded_count: int
     has_delisted: bool  # any member delisted → the cart is "unhealthy"
+    any_on_sale: bool  # at least one active member is discounted
+    all_on_sale: bool  # every active member is discounted (and there is at least one)
     threshold: ThresholdState | None  # None when unset or no active members (CART-R12)
 
 
@@ -70,6 +72,7 @@ def evaluate_cart(
     carts with at least one active member (CART-R7). ``threshold_amount`` (absolute €)
     is evaluated only when set AND there is at least one active member (CART-R12)."""
     active = [p for p in products if _is_active(p)]
+    on_sale = [p for p in active if (p.discount_pct or 0) > 0]
 
     total_full = sum((p.price_original for p in active), Decimal(0))
     total_discounted = sum((p.price_current for p in active), Decimal(0))
@@ -99,5 +102,7 @@ def evaluate_cart(
         active_count=len(active),
         excluded_count=len(products) - len(active),
         has_delisted=any(p.removed for p in products),
+        any_on_sale=len(on_sale) > 0,
+        all_on_sale=bool(active) and len(on_sale) == len(active),
         threshold=threshold,
     )

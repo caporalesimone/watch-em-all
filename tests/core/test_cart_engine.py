@@ -17,10 +17,12 @@ def _p(
     available: bool = True,
     removed: bool = False,
     currency: str = "EUR",
+    discount: str = "0",
 ) -> CatalogProduct:
     return CatalogProduct(
         price_current=Decimal(current),
         price_original=Decimal(original),
+        discount_pct=Decimal(discount),
         is_available=available,
         removed=removed,
         currency=currency,
@@ -118,3 +120,19 @@ def test_no_threshold_without_active_members() -> None:
     products = [_p("10.00", "10.00", available=False)]  # only member excluded
     s = evaluate_cart("cross", products, threshold_amount=Decimal("5.00"))
     assert s.threshold is None  # CART-R12
+
+
+def test_on_sale_flags() -> None:
+    none_on_sale = evaluate_cart("cross", [_p("10.00", "10.00"), _p("5.00", "5.00")])
+    assert none_on_sale.any_on_sale is False
+    assert none_on_sale.all_on_sale is False
+
+    some = evaluate_cart("cross", [_p("8.00", "10.00", discount="20"), _p("5.00", "5.00")])
+    assert some.any_on_sale is True
+    assert some.all_on_sale is False
+
+    every = evaluate_cart(
+        "cross", [_p("8.00", "10.00", discount="20"), _p("4.00", "5.00", discount="20")]
+    )
+    assert every.any_on_sale is True
+    assert every.all_on_sale is True

@@ -435,6 +435,8 @@ export interface CartCard {
 	active_count: number;
 	excluded_count: number;
 	has_delisted: boolean;
+	any_on_sale: boolean;
+	all_on_sale: boolean;
 	total_full: string;
 	total_discounted: string;
 	adjustments: CartAdjustment[];
