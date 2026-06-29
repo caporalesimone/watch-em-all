@@ -12,6 +12,10 @@ Attivi gli alert su un carrello, un prezzo cambia, e all'orario scelto trovi nel
 
 ## MVP
 
+### Da gestire per prima (rinviato dalla Fase 5)
+
+- [ ] **6.F0 — Product Picker → carrello: compatibilità multi-scraper** (~1h): nella tendina "aggiungi a carrello" della selezione multipla, un carrello **scraper-specific** è selezionabile solo se il suo scraper coincide con il plugin di **tutti** i prodotti selezionati (i **cross** sempre); selezione che copre più scraper → gli scraper-specific incompatibili appaiono disabilitati con una nota. Rinviato dalla Fase 5 (5.F4) per provare prima la UX di base con un solo scraper; il vincolo lato server (uno scraper-specific rifiuta prodotti di altri scraper) è già attivo dalla 5.B2. *Verifica: con prodotti di due scraper selezionati, solo i cart cross e i cart dello scraper coerente sono selezionabili.*
+
 ### Backend
 
 - [ ] **6.B1 — Tipi di alert per carrello** (~1h): `cart_alert_types` (presenza=abilitato), `PUT /api/carts/{id}/alert-types`. *Verifica: selezione persistita via Swagger.*
