@@ -13,11 +13,11 @@ from fastapi import APIRouter, Request
 from sqlalchemy import func, select
 
 from src.core.errors import APIError
-from src.core.models import Cart, CartMember
+from src.core.models import Cart, CartMember, CatalogProduct
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.registry import LoadedPlugin
 from src.web.deps import SessionDep, UserDep
-from src.web.schemas import CartCreate, CartOut, CartPatch
+from src.web.schemas import CartCreate, CartItemsBody, CartOut, CartPatch
 
 router = APIRouter(prefix="/carts", tags=["Carts"])
 
@@ -107,3 +107,80 @@ def delete_cart(cart_id: int, user: UserDep, db: SessionDep) -> None:
     cart = _get_owned(db, user, cart_id)
     db.delete(cart)  # cart_members cascade; catalog products are untouched
     db.commit()
+
+
+def _cart_currencies(db: SessionDep, cart_id: int) -> set[str]:
+    """Distinct currencies of the cart's current members (CART single-currency)."""
+    return set(
+        db.scalars(
+            select(CatalogProduct.currency)
+            .join(CartMember, CartMember.product_id == CatalogProduct.id)
+            .where(CartMember.cart_id == cart_id)
+        ).all()
+    )
+
+
+@router.post(
+    "/{cart_id}/items", response_model=CartOut, summary="Add catalog products to a cart (5.B2)."
+)
+def add_items(cart_id: int, body: CartItemsBody, user: UserDep, db: SessionDep) -> CartOut:
+    cart = _get_owned(db, user, cart_id)
+    ids = list(dict.fromkeys(body.product_ids))  # dedupe, preserve order
+
+    # All ids must be the user's catalog products (CART-R1).
+    products = db.scalars(
+        select(CatalogProduct).where(CatalogProduct.user_id == user.sub, CatalogProduct.id.in_(ids))
+    ).all()
+    by_id = {p.id: p for p in products}
+    missing = [i for i in ids if i not in by_id]
+    if missing:
+        raise APIError(422, "product_not_found", f"not in your catalog: {missing}")
+
+    ordered = [by_id[i] for i in ids]
+
+    # Delisted products are not currently offered → cannot be added (out-of-stock can).
+    delisted = [p.id for p in ordered if p.removed]
+    if delisted:
+        raise APIError(422, "product_delisted", f"delisted products cannot be added: {delisted}")
+
+    # scraper_specific accepts only products of its own scraper (CART-R4).
+    if cart.mode == "scraper_specific":
+        wrong = [p.id for p in ordered if p.plugin_id != cart.scraper_id]
+        if wrong:
+            raise APIError(422, "product_scraper_mismatch", f"not from {cart.scraper_id}: {wrong}")
+
+    # A cart holds a single currency (decision 2026-06-29): the existing members plus
+    # the new products must share exactly one currency.
+    currencies = _cart_currencies(db, cart.id) | {p.currency for p in ordered}
+    if len(currencies) > 1:
+        raise APIError(422, "currency_mismatch", f"a cart holds one currency: {sorted(currencies)}")
+
+    # Idempotent: skip ids already members; add the rest.
+    existing = set(
+        db.scalars(
+            select(CartMember.product_id).where(
+                CartMember.cart_id == cart.id, CartMember.product_id.in_(ids)
+            )
+        ).all()
+    )
+    for pid in ids:
+        if pid not in existing:
+            db.add(CartMember(cart_id=cart.id, product_id=pid))
+    db.commit()
+    return _out(db, cart)
+
+
+@router.delete(
+    "/{cart_id}/items", response_model=CartOut, summary="Remove cart members (no-op if absent)."
+)
+def remove_items(cart_id: int, body: CartItemsBody, user: UserDep, db: SessionDep) -> CartOut:
+    cart = _get_owned(db, user, cart_id)
+    members = db.scalars(
+        select(CartMember).where(
+            CartMember.cart_id == cart.id, CartMember.product_id.in_(body.product_ids)
+        )
+    ).all()
+    for m in members:  # absent ids are a no-op
+        db.delete(m)
+    db.commit()
+    return _out(db, cart)

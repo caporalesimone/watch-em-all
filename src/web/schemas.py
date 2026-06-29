@@ -137,3 +137,10 @@ class CartOut(BaseModel):
     threshold_pct: Decimal | None
     member_count: int
     created_at: datetime
+
+
+class CartItemsBody(BaseModel):
+    # Add/remove cart members by catalog product id (5.B2). The add is validated as
+    # a batch: all ids must be the user's, listed (not delisted), of the cart's scraper
+    # (scraper_specific) and one currency — else the whole batch is rejected.
+    product_ids: list[int] = Field(min_length=1)
