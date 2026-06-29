@@ -387,3 +387,118 @@ export async function updateLocale(locale: string): Promise<Me> {
 	});
 	return asJson<Me>(res);
 }
+
+// Carts (phase 5). Money fields are exact strings (Decimal). The cards carry the
+// engine's computed state; the detail adds the member rows.
+export type CartMode = 'cross' | 'scraper_specific';
+
+export interface CartAdjustment {
+	id: string; // full i18n key the UI localizes
+	description: string; // debug-only
+	amount: string; // signed: + saving, − cost
+	params: Record<string, string>;
+}
+
+export interface CartThreshold {
+	amount: string;
+	current: string;
+	reached: boolean;
+	partial: boolean;
+}
+
+export interface CartMember {
+	product_id: number;
+	plugin_id: string;
+	external_id: string;
+	url: string;
+	name: string;
+	image_url: string | null;
+	brand: BrandRef | null;
+	tags: string[];
+	category: CategoryRef[];
+	currency: string;
+	price_current: string;
+	price_original: string;
+	discount_pct: string;
+	is_available: boolean;
+	removed: boolean;
+	active: boolean;
+}
+
+export interface CartCard {
+	id: number;
+	name: string;
+	mode: CartMode;
+	scraper_id: string | null;
+	currency: string | null;
+	member_count: number;
+	active_count: number;
+	excluded_count: number;
+	has_delisted: boolean;
+	total_full: string;
+	total_discounted: string;
+	adjustments: CartAdjustment[];
+	final_price: string;
+	threshold: CartThreshold | null;
+	created_at: string;
+}
+
+export interface CartDetail extends CartCard {
+	members: CartMember[];
+}
+
+export function listCarts(): Promise<CartCard[]> {
+	return apiFetch('/api/carts').then(asJson<CartCard[]>);
+}
+
+export function getCart(id: number): Promise<CartDetail> {
+	return apiFetch(`/api/carts/${id}`).then(asJson<CartDetail>);
+}
+
+export async function createCart(payload: {
+	name: string;
+	mode: CartMode;
+	scraper_id?: string | null;
+}): Promise<CartDetail> {
+	const res = await apiFetch('/api/carts', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(payload)
+	});
+	return asJson<CartDetail>(res);
+}
+
+// PATCH: omit a field to leave it unchanged; send threshold_amount: null to clear it.
+export async function patchCart(
+	id: number,
+	payload: { name?: string; threshold_amount?: string | null }
+): Promise<CartDetail> {
+	const res = await apiFetch(`/api/carts/${id}`, {
+		method: 'PATCH',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(payload)
+	});
+	return asJson<CartDetail>(res);
+}
+
+export async function deleteCart(id: number): Promise<void> {
+	await asEmpty(await apiFetch(`/api/carts/${id}`, { method: 'DELETE' }));
+}
+
+export async function addCartItems(id: number, productIds: number[]): Promise<CartDetail> {
+	const res = await apiFetch(`/api/carts/${id}/items`, {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ product_ids: productIds })
+	});
+	return asJson<CartDetail>(res);
+}
+
+export async function removeCartItems(id: number, productIds: number[]): Promise<CartDetail> {
+	const res = await apiFetch(`/api/carts/${id}/items`, {
+		method: 'DELETE',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ product_ids: productIds })
+	});
+	return asJson<CartDetail>(res);
+}

@@ -10,6 +10,10 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 **Phase 5 — carts (the functional heart): the two cart modes, computed totals, adjustments and the savings threshold. Opening with some catalog polish; the cart work lands below as it ships.**
 
+### New
+
+- **Carts.** Group catalog products into **carts** and see what they'd really cost. Two kinds: **cross-store** (any shop — the same product can appear once per shop, each row showing its store) and **single-store** (one shop, with that shop's discounts applied). A cart shows the full total, the discounted total, the shop's adjustments and a **final estimate**; you can set a **savings threshold** (in €, or type a % and the page converts it) with a progress bar, and the cart flags itself when it holds a **delisted** product. Fill a cart straight from the **Catalog** by selecting products and choosing a cart.
+
 ### Changed
 
 - **Release images also get a `latest` tag.** Each release now publishes both `watch-em-all` and `watch-em-all-ops` as `:x.y.z` **and** `:latest` on GHCR, so a `docker compose pull` can track the newest release without editing `WEA_VERSION` — pinning a version stays the recommended default, `latest` is the quick-try convenience.

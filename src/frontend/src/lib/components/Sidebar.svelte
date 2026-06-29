@@ -30,7 +30,8 @@
 				]
 			: [
 					{ href: '/', key: 'nav.dashboard' },
-					{ href: '/catalog', key: 'nav.catalog' }
+					{ href: '/catalog', key: 'nav.catalog' },
+					{ href: '/carts', key: 'nav.carts' }
 				]
 	);
 
