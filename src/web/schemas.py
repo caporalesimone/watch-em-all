@@ -111,3 +111,29 @@ class CatalogPage(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class CartCreate(BaseModel):
+    # name + mode (immutable after, CART-R2); scraper_id required for scraper_specific,
+    # must be absent/null for cross (validated in the router for a clean error envelope).
+    name: str = Field(min_length=1, max_length=128)
+    mode: Literal["cross", "scraper_specific"]
+    scraper_id: str | None = None
+
+
+class CartPatch(BaseModel):
+    # Phase 5.B1: rename only. The threshold (threshold_pct / threshold_amount with
+    # conversion) is added in 5.B4; mode is never editable (CART-R2).
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+
+
+class CartOut(BaseModel):
+    # Phase 5.B1 view: cart identity + member count. The computed state (totals,
+    # adjustments, threshold) is layered on by the Cart Engine in 5.B3.
+    id: int
+    name: str
+    mode: str
+    scraper_id: str | None
+    threshold_pct: Decimal | None
+    member_count: int
+    created_at: datetime

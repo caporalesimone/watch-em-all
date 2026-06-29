@@ -18,7 +18,7 @@ Crei "Wishlist giochi" (scraper-specific): la card mostra totale pieno barrato, 
 
 ### Backend
 
-- [ ] **5.B1 — Tabelle + CRUD carrelli** (~1h): `carts`/`cart_members` (UNIQUE, cascate), API CRUD ([endpoints](../api/endpoints.md#carrelli--cart-engine)). *Verifica: ciclo completo via Swagger.*
+- [x] **5.B1 — Tabelle + CRUD carrelli** (~1h): `carts`/`cart_members` (UNIQUE, cascate), API CRUD ([endpoints](../api/endpoints.md#carrelli--cart-engine)). *Verifica: ciclo completo via Swagger.* — modelli core `Cart`/`CartMember`, router `/api/carts` (create con `mode` fisso + validazione scraper, list, get, rename, delete; per-utente DB-R1); membri 5.B2, stato calcolato 5.B3.
 - [ ] **5.B2 — Regole di modalità + membri** (~1h): modalità immutabile; scraper-specific accetta solo prodotti del suo scraper; API membri. *Verifica: vincoli rifiutati con errori chiari via Swagger.*
 - [ ] **5.B3 — Cart Engine: attivi/esclusi e totali** (~1h): stato calcolato, totale pieno/scontato, esclusione indisponibili ([cart-engine](../4-capabilities/core/cart-engine.md)). *Verifica: unit test tabellari sui casi normativi di [carts.md](../3-features/user/carts.md).*
 - [ ] **5.B4 — Cart Engine: soglia** (~1h): soglia % (conversione da assoluto), confronto sulla stima finale, niente soglia senza attivi, ricalcolo su indisponibilità. *Verifica: unit test incluso il ricalcolo su indisponibilità.*
