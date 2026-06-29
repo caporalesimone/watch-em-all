@@ -1,6 +1,6 @@
 # Fase 5 — Carrelli
 
-> Stato: ☐ da iniziare · Prerequisiti: Fase 3 (la 4 può procedere in parallelo) · [Indice del flusso](README.md)
+> Stato: 🚧 in corso (avviata 2026-06-29) · Prerequisiti: Fase 3 (la 4 può procedere in parallelo) · [Indice del flusso](README.md)
 
 ## Obiettivo
 

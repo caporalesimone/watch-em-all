@@ -24,9 +24,9 @@
   *Risultato: un plugin demo appare da solo in sidebar con la sua pagina.*
 - [x] **Fase 3 — Catalogo e primo scrape** → [phase-03-catalog-first-scrape.md](phase-03-catalog-first-scrape.md) — rilasciata `0.3.4`
   *Risultato: prodotti reali di Dragon Store nel Product Picker, catalogo con delta e storico, scrape lanciato a mano. La **gestione utenti** (crea/elenca + shell sdoppiato per ruolo) è stata anticipata dalla Fase 10 perché serve un account `user` per provare il resto — i ruoli non si sovrappongono (l'admin governa, non possiede carrelli); in Fase 10 restano reset/disabilita/cancellazione differita/filtri/notifiche.*
-- [ ] **Fase 4 — Worker e scheduling** → [phase-04-worker-scheduling.md](phase-04-worker-scheduling.md) — *in corso (`0.4.x`)*
+- [x] **Fase 4 — Worker e scheduling** → [phase-04-worker-scheduling.md](phase-04-worker-scheduling.md) — rilasciata `0.4.0`
   *Risultato: lo scraping parte da solo agli orari decisi; l'admin lo osserva nei log.*
-- [ ] **Fase 5 — Carrelli** → [phase-05-carts.md](phase-05-carts.md)
+- [ ] **Fase 5 — Carrelli** → [phase-05-carts.md](phase-05-carts.md) — *in corso (`0.5.x`)*
   *Risultato: carrelli con totali, adjustments, soglia e provenienza.*
 - [ ] **Fase 6 — Alert in-app** → [phase-06-alerts-in-app.md](phase-06-alerts-in-app.md)
   *Risultato: cambio prezzo → notifica nello Storico alert alla cadenza scelta.*
