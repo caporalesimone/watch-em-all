@@ -10,7 +10,7 @@
 - **DRG-R4** — Prodotti **"ammaccati"**: ogni **categoria** osservata ha un **selettore "includi ammaccati"**, di default **disattivato** (gli ammaccati sono esclusi e conteggiati in `products_excluded`). L'utente che li vuole può attivarlo **categoria per categoria**. Gli out-of-stock sono sempre inclusi con `is_available=false`.
 - **DRG-R7** — Un prodotto ammaccato inserito come **prodotto singolo** è **sempre incluso**: averlo aggiunto esplicitamente è una scelta voluta. La UI lo segnala con un **piccolo avviso in rosso** ("Prodotto in stato AMMACCATO") nell'anteprima dry-run e nella lista degli input.
 - **DRG-R8** — In caso di sovrapposizione tra fonti con scelte diverse (es. ammaccato escluso dalla categoria A ma incluso dalla categoria B o aggiunto come singolo), **l'inclusione vince**: il prodotto è consegnato.
-- **DRG-R5** — Adjustments: applica al totale del carrello la **soglia di sconto massima raggiunta** tra quelle configurate (voce positiva); eventuali spese di spedizione come voce negativa — *se previste: da definire, vedi capabilities*.
+- **DRG-R5** — Adjustments (5.B5): sul **totale scontato** del carrello applica **una sola** fascia di sconto (la più alta raggiunta, **non cumulabile**) — default fase-5: `≥100 €→5%`, `≥200 €→10%`, `≥300 €→15%` (voce positiva) — più la **spedizione**: `+5,00 €` (voce negativa), **gratis** se il totale ≥ 100 €. I valori vivono nel plugin (`adjustments.py`); diventeranno editabili dall'admin coi ConfigField (fase 7+/9). Ogni voce porta una chiave i18n (`dragon_store.adjustments.*`) che il frontend localizza.
 - **DRG-R6** — Il concetto di categoria resta interno: il core e il Product Picker non lo vedono mai.
 
 ## UI utente (pagina del plugin)
@@ -41,11 +41,12 @@ flowchart LR
 
 ## Esempio di adjustments
 
-Carrello scraper-specific da 120 € (totale scontato), soglie configurate `{50 → 10%, 100 → 15%}`:
+Carrello scraper-specific con totale scontato **250 €** (fascia ≥200 → 10%):
 
-| Voce | Importo |
-|---|---|
-| Sconto soglia 100 € (15%) | **+18.00** (risparmio) |
-| Stima finale | 120 − 18 = **102.00** |
+| Voce | Chiave i18n | Importo |
+|---|---|---|
+| Sconto soglia 10% | `dragon_store.adjustments.threshold_discount` | **+25.00** (risparmio) |
+| Spedizione gratuita | `dragon_store.adjustments.free_shipping` | **0.00** |
+| **Stima finale** | | 250 − 25 = **225.00** |
 
-La soglia del carrello dell'utente si confronta con la stima finale (CART-R11): è il prezzo che pagherebbe davvero al checkout di Dragon Store.
+Sotto i 100 € nessuno sconto e spedizione **−5,00 €** (voce negativa). Lo sconto **non è cumulabile**: si applica solo la fascia più alta raggiunta. La soglia del carrello si confronta con la stima finale (CART-R11): è il prezzo che pagherebbe davvero al checkout di Dragon Store.

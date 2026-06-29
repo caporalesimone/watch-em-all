@@ -23,6 +23,11 @@
 			"started": "Scrape started — your catalog will update shortly.",
 			"cooldown_caption": "Next scrape available in {time}"
 		},
+		"adjustments": {
+			"threshold_discount": "Threshold discount {pct}%",
+			"shipping": "Shipping",
+			"free_shipping": "Free shipping"
+		},
 		"available": "Available",
 		"unavailable": "Out of stock",
 		"error": "Request failed."

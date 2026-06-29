@@ -199,6 +199,40 @@ def test_add_rejects_foreign_catalog_id(client: TestClient) -> None:
     assert resp.json()["code"] == "product_not_found"
 
 
+def test_scraper_specific_cart_shows_dragon_adjustments(client: TestClient) -> None:
+    uid, token = _make_user(client, _admin_token(client), "alice")
+    _seed(
+        uid,
+        "dragon_store",
+        {
+            "external_id": "p1",
+            "price_current": Decimal("150.00"),
+            "price_original": Decimal("150.00"),
+        },
+        {
+            "external_id": "p2",
+            "price_current": Decimal("100.00"),
+            "price_original": Decimal("100.00"),
+        },
+    )
+    ids = _ids_by_external(client, token)
+    cart = int(
+        client.post(
+            "/api/carts",
+            json={"name": "Wishlist", "mode": "scraper_specific", "scraper_id": "dragon_store"},
+            headers=_bearer(token),
+        ).json()["id"]
+    )
+    detail = _add(client, token, cart, [ids["p1"], ids["p2"]]).json()  # discounted total 250
+
+    assert Decimal(detail["total_discounted"]) == Decimal("250.00")
+    by_id = {a["id"]: Decimal(a["amount"]) for a in detail["adjustments"]}
+    assert by_id["dragon_store.adjustments.threshold_discount"] == Decimal("25.00")  # 10%
+    assert by_id["dragon_store.adjustments.free_shipping"] == Decimal("0.00")
+    # final = 250 − (25 + 0) = 225
+    assert Decimal(detail["final_price"]) == Decimal("225.00")
+
+
 def test_threshold_set_clear_and_validation(client: TestClient) -> None:
     uid, token = _make_user(client, _admin_token(client), "alice")
     _seed(uid, "dragon_store", {"external_id": "a"})  # price 10.00, active
