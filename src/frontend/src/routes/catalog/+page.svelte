@@ -3,7 +3,11 @@
 	import { _ } from 'svelte-i18n';
 
 	import {
+		addCartItems,
+		ApiErr,
+		listCarts,
 		listCatalog,
+		type CartCard,
 		type CatalogItem,
 		type CatalogPage,
 		type CatalogSort
@@ -30,6 +34,46 @@
 
 	const pages = $derived(data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1);
 
+	// Selection → "add to cart" (5.F4). Delisted rows can't be added (the backend rejects
+	// them); the multi-scraper compatibility UX is deferred to phase 6 (6.F0).
+	let selectedIds = $state<number[]>([]);
+	let carts = $state<CartCard[]>([]);
+	let targetCartId = $state<number | ''>('');
+	let adding = $state(false);
+	let addMsg = $state<string | null>(null);
+	let addErr = $state<string | null>(null);
+
+	function toggleSelect(id: number): void {
+		selectedIds = selectedIds.includes(id)
+			? selectedIds.filter((x) => x !== id)
+			: [...selectedIds, id];
+	}
+
+	async function loadCarts(): Promise<void> {
+		try {
+			carts = await listCarts();
+		} catch {
+			/* the add bar simply offers no carts */
+		}
+	}
+
+	async function addToCart(): Promise<void> {
+		if (targetCartId === '' || selectedIds.length === 0) return;
+		adding = true;
+		addMsg = null;
+		addErr = null;
+		try {
+			const cart = await addCartItems(Number(targetCartId), selectedIds);
+			addMsg = $_('carts.added', { values: { name: cart.name } });
+			selectedIds = [];
+			carts = carts.map((c) => (c.id === cart.id ? cart : c));
+		} catch (e) {
+			addErr = e instanceof ApiErr ? e.detail : $_('carts.addError');
+		} finally {
+			adding = false;
+		}
+	}
+
 	async function load(silent = false): Promise<void> {
 		if (!silent) loading = true;
 		error = null;
@@ -50,6 +94,7 @@
 
 	onMount(() => {
 		void load();
+		void loadCarts();
 		// scrape-now writes the catalog asynchronously; if the page is opened while a
 		// scrape is still running it would show empty. Retry briefly so the products
 		// appear on their own, without a manual search.
@@ -149,6 +194,34 @@
 		</button>
 	</form>
 
+	{#if addMsg}
+		<p class="text-sm text-emerald-600">{addMsg}</p>
+	{/if}
+	{#if selectedIds.length > 0}
+		<div
+			class="flex flex-wrap items-center gap-2 rounded border border-slate-200 bg-slate-50 p-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+		>
+			<span>{$_('carts.selected', { values: { count: selectedIds.length } })}</span>
+			<select
+				bind:value={targetCartId}
+				class="rounded border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-950"
+			>
+				<option value="">{$_('carts.chooseCart')}</option>
+				{#each carts as c (c.id)}
+					<option value={c.id}>{c.name}</option>
+				{/each}
+			</select>
+			<button
+				onclick={addToCart}
+				disabled={adding || targetCartId === ''}
+				class="rounded bg-slate-800 px-3 py-1 text-sm text-white hover:bg-slate-700 disabled:opacity-50 dark:bg-slate-200 dark:text-slate-900"
+			>
+				{$_('carts.addToCart')}
+			</button>
+			{#if addErr}<span class="text-red-500">{addErr}</span>{/if}
+		</div>
+	{/if}
+
 	{#if loading}
 		<p class="text-sm text-slate-500">{$_('common.loading')}</p>
 	{:else if error}
@@ -159,6 +232,7 @@
 		<table class="w-full text-left text-sm">
 			<thead class="border-b border-slate-200 text-xs text-slate-500 dark:border-slate-800">
 				<tr>
+					<th class={th}></th>
 					<th class="{th} {sortable}" onclick={() => sortBy('plugin_id')}
 						>{$_('catalog.colSource')}{arrow('plugin_id')}</th
 					>
@@ -185,6 +259,15 @@
 						class="border-b border-slate-100 dark:border-slate-800/60"
 						class:opacity-50={item.removed}
 					>
+						<td class="py-2 pr-2">
+							<input
+								type="checkbox"
+								checked={selectedIds.includes(item.id)}
+								disabled={item.removed}
+								onchange={() => toggleSelect(item.id)}
+								aria-label={$_('carts.addToCart')}
+							/>
+						</td>
 						<td class="py-2 pr-4">
 							{#if src.route}
 								<a
