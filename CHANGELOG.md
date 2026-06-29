@@ -10,6 +10,12 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 **Phase 5 — carts (the functional heart): the two cart modes, computed totals, adjustments and the savings threshold. Opening with some catalog polish; the cart work lands below as it ships.**
 
+### Fixed
+
+- **Catalog — tighter category breadcrumb.** The category path no longer carries an unwanted gap around each `/` separator (`Giochi di Ruolo / GDR Italiano` → `Giochi di Ruolo/GDR Italiano`), matching the compact look the Dragon Store page already had.
+
+_Under the hood:_ the catalog breadcrumb markup is now packed with no whitespace between the inline elements — the SvelteKit template used to lay each segment on its own indented line and HTML collapsed those newlines into a rendered space; same approach the Dragon Store plugin page already used.
+
 ## [0.4.0] - 2026-06-27
 
 **Phase 4 — automatic scheduled scraping (the worker), plus the dev/admin tooling around it.**

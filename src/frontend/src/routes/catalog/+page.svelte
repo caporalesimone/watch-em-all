@@ -261,19 +261,14 @@
 							{/if}
 							{#if item.category.length > 0}
 								<div class="mt-1 text-xs text-slate-400">
-									{#each item.category as cat, i (cat.text + i)}
-										{#if i > 0}<span class="px-1">/</span>{/if}
-										{#if cat.link}
-											<a
+									{#each item.category as cat, i (cat.text + i)}{#if i > 0}<span class="px-1"
+												>/</span
+											>{/if}{#if cat.link}<a
 												href={cat.link}
 												target="_blank"
 												rel="noopener noreferrer"
 												class="hover:underline">{cat.text}</a
-											>
-										{:else}
-											{cat.text}
-										{/if}
-									{/each}
+											>{:else}{cat.text}{/if}{/each}
 								</div>
 							{/if}
 						</td>
