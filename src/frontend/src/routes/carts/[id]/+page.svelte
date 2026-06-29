@@ -365,8 +365,8 @@
 			<table class="w-full text-left text-sm">
 				<thead class="border-b border-slate-200 text-xs text-slate-500 dark:border-slate-800">
 					<tr>
-						<th class={th}>{$_('catalog.colImage')}</th>
 						<th class={th}>{$_('catalog.colSource')}</th>
+						<th class={th}>{$_('catalog.colImage')}</th>
 						<th class={th}>{$_('catalog.colName')}</th>
 						<th class={th}>{$_('catalog.colTags')}</th>
 						<th class={th}>{$_('catalog.colPriceOriginal')}</th>
@@ -381,8 +381,8 @@
 							class="border-b border-slate-100 dark:border-slate-800/60"
 							class:opacity-50={!m.active}
 						>
-							<td class="py-2 pr-4"><ProductThumb src={m.image_url} /></td>
 							<td class="py-2 pr-4"><SourceTag pluginId={m.plugin_id} /></td>
+							<td class="py-2 pr-4"><ProductThumb src={m.image_url} /></td>
 							<td class="py-2 pr-4">
 								<ProductCell name={m.name} url={m.url} brand={m.brand} category={m.category} />
 							</td>
