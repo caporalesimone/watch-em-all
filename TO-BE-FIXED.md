@@ -5,16 +5,6 @@ New items get appended over time.
 
 ## Open
 
-- **Catalog — extra space in the category breadcrumb.** In the Catalog the categories print as
-  `cat1 / cat2 / cat3` with an unwanted space around the `/`, because
-  [`catalog/+page.svelte`](src/frontend/src/routes/catalog/+page.svelte#L262-L278) lays each segment on
-  its own indented line and HTML collapses the newlines into a rendered space. The Dragon Store plugin
-  page renders the same breadcrumb but packs the markup with no inter-element whitespace
-  ([`PluginRoot.svelte`](src/plugins/scrapers/dragon_store/frontend/PluginRoot.svelte#L334-L340)) and
-  looks better — `Giochi di Ruolo/GDR Italiano/Il Richiamo di Cthulhu` beats
-  `Giochi di Ruolo/ GDR Italiano/ Il Richiamo di Cthulhu`. Fix: render the catalog breadcrumb tight,
-  the way Dragon Store does.
-
 - **Generalize the shared UI pieces into a core-provided "SDK".** The category breadcrumb, the image
   element, and the **product cell** (the table-cell block with the linkable title + brand + category)
   are re-implemented in both the Catalog and the Dragon Store page — and the spacing bug above is
@@ -34,20 +24,6 @@ New items get appended over time.
   heartbeat, not from a log line); the worker/scraper are the only sources persisted. Still open for
   `4.F3/F4`: polling cadence, sidebar placement, one page vs two (cursor page + filters page).
 
-- **Worker container exposes `8080/tcp` but serves nothing (cosmetic).** `docker ps` on the dev
-  stack shows the `worker` container with `8080/tcp` exposed even though the worker serves no HTTP
-  (now the real dispatcher, 4.B1, shipped in 0.4.0 — still no HTTP) — the port is just `EXPOSE 8080`
-  metadata inherited from the shared `watch-em-all` image (one image, two roles `web`/`worker` by
-  command, by design). It is **not published** (no host mapping) so it's harmless, only noisy in
-  `docker ps`. Either accept/document it, or split the EXPOSE so only the `web` role advertises the
-  port. Observed:
-  ```
-  7ab0f417bb56  watch-em-all:dev  …  Up (healthy)  8080/tcp                       …-worker-1
-  26f3f3ce703f  watch-em-all:dev  …  Up (healthy)  0.0.0.0:8080->8080/tcp         …-web-1
-  0f7c989370fe  sosedoff/pgweb…   …  Up            0.0.0.0:8081->8081/tcp         …-pgweb-1
-  14eb07aee657  postgres:16       …  Up (healthy)  5432/tcp                       …-db-1
-  ```
-
 ## Off topic
 
 - **Two Claude Code skills: start-of-work and end-of-work.** Create a `/start-work` skill that opens a
@@ -65,3 +41,14 @@ New items get appended over time.
   rule [FE-18](docs-ita/developer-rules/frontend/rules.md).
 - The **Adminer → pgweb** swap (and the `dev`-profile decision — resolved as "no profile, dev-only")
   was done in 0.4.0 ([phase-4 `4.B0b`](docs-ita/development-flow/phase-04-worker-scheduling.md)).
+- **Catalog — extra space in the category breadcrumb** — fixed in `0.5.0` (branch `feat/phase-5`,
+  commit `341ab22`): the catalog breadcrumb markup is now packed tight with no inter-element
+  whitespace, the way the Dragon Store page already rendered it.
+- **Worker `8080/tcp` in `docker ps` — accepted, not fixed** (decided 2026-06-29). It is harmless
+  image metadata: `EXPOSE 8080` is documentation only (it publishes nothing); the `worker` service has
+  no `ports:` mapping and its healthcheck stats the heartbeat file, never touching 8080. The proposed
+  "split the EXPOSE so only `web` advertises the port" is impossible by design — one shared image, the
+  `web`/`worker` role is chosen at runtime by `command`, so a `EXPOSE` baked into that single image
+  can't be made role-specific without re-forking into two images (reverting `0.0.8`). The only clean
+  alternative (drop `EXPOSE 8080`, optionally re-declare `expose:` on the `web` compose service) is a
+  lateral trade — it loses the web image's port self-documentation — so the cosmetic noise is accepted.
