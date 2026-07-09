@@ -23,7 +23,7 @@ Il carrello è l'unità di monitoraggio con notifica: un gruppo di prodotti del 
 - **CART-R8** — I prodotti **non disponibili** o **delistati** restano nel carrello ma sono **esclusi da tutti i totali** finché non tornano attivi.
 
 ### Soglia
-- **CART-R9** — La soglia si imposta e si memorizza come **valore assoluto in €** (`threshold_amount`); `null` = nessuna soglia, valore `> 0`. *(Decisione 2026-06-29 — inverte la versione precedente "salvata come %".)* La **percentuale è solo un aiuto di input nella UI**: l'utente può digitarla e la UI la converte in € **una volta sola**, sul totale pieno corrente dei prodotti attivi, prima di salvare — mostrando l'equivalenza ("20% ≈ €64 sul totale attuale").
+- **CART-R9** — La soglia si imposta e si memorizza come **valore assoluto in €** (`threshold_amount`); `null` = nessuna soglia, valore `> 0`. *(Decisione 2026-06-29 — inverte la versione precedente "salvata come %".)* La **percentuale è solo un aiuto di input nella UI**: i campi **€ e %** si **specchiano a vicenda** (modificando uno, l'altro si aggiorna sul totale pieno corrente dei prodotti attivi, con `soglia€ = totale · (1 − %/100)`); al backend si invia **solo il valore in €**.
 - **CART-R10** — La soglia in € è **fissa**: una volta impostata non si ricalcola al variare del perimetro (è il numero scelto dall'utente). Il backend non conosce la percentuale; ragiona solo sull'importo.
 - **CART-R11** — La soglia si confronta con la **stima finale** (adjustments inclusi, quando presenti): è il prezzo reale che l'utente pagherebbe — coerente con UC-1.
 - **CART-R12** — Nessun evento di soglia se il carrello non ha **alcun prodotto attivo** (un confronto su totale 0 sarebbe sempre vero e privo di significato).

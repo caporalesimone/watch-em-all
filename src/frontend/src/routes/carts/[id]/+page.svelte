@@ -114,20 +114,38 @@
 	let thrAmount = $state('');
 	let thrPct = $state('');
 
+	function fullTotal(): number {
+		return Number(cart?.total_full ?? 0);
+	}
+	// € ↔ % mirror on the current full total: threshold_amount = full · (1 − pct/100).
+	// Each returns '' when the input can't be expressed as the other (empty cart,
+	// amount at/above the full price, out-of-range %).
+	function amountToPct(amount: string): string {
+		const amt = Number(amount);
+		const full = fullTotal();
+		if (!amount || Number.isNaN(amt) || full <= 0 || amt <= 0 || amt >= full) return '';
+		return String(Math.round(((full - amt) / full) * 10000) / 100);
+	}
+	function pctToAmount(pct: string): string {
+		const p = Number(pct);
+		const full = fullTotal();
+		if (!pct || Number.isNaN(p) || full <= 0 || p <= 0 || p > 100) return '';
+		return (full * (1 - p / 100)).toFixed(2);
+	}
+
 	function openThreshold(): void {
 		thrAmount = cart?.threshold_amount ?? '';
-		thrPct = '';
+		thrPct = amountToPct(thrAmount);
 		editingThreshold = true;
 	}
 
-	const pctEquiv = $derived.by(() => {
-		const pct = Number(thrPct);
-		const full = Number(cart?.total_full ?? 0);
-		if (!thrPct || Number.isNaN(pct) || pct <= 0 || pct > 100 || full <= 0) return null;
-		return (full * (1 - pct / 100)).toFixed(2);
-	});
-	function applyPct(): void {
-		if (pctEquiv !== null) thrAmount = pctEquiv;
+	// Typing in one field fills the other (reads the fresh DOM value; setting the
+	// mirror programmatically does not re-fire the opposite field's handler).
+	function onAmountInput(e: Event): void {
+		thrPct = amountToPct((e.target as HTMLInputElement).value);
+	}
+	function onPctInput(e: Event): void {
+		thrAmount = pctToAmount((e.target as HTMLInputElement).value);
 	}
 
 	async function saveThreshold(): Promise<void> {
@@ -282,6 +300,7 @@
 								>{$_('carts.thresholdTarget')}
 								<input
 									bind:value={thrAmount}
+									oninput={onAmountInput}
 									inputmode="decimal"
 									class="ml-1 w-24 rounded border border-slate-300 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-900"
 								/></label
@@ -290,17 +309,12 @@
 								>{$_('carts.thresholdPct')}
 								<input
 									bind:value={thrPct}
-									oninput={applyPct}
+									oninput={onPctInput}
 									inputmode="decimal"
 									class="ml-1 w-16 rounded border border-slate-300 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-900"
 								/></label
 							>
 						</div>
-						{#if pctEquiv}
-							<p class="text-slate-400">
-								{$_('carts.thresholdEquiv', { values: { pct: thrPct, amount: pctEquiv } })}
-							</p>
-						{/if}
 						<div class="flex gap-3">
 							<button
 								class="hover:underline"

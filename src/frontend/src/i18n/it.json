@@ -76,7 +76,6 @@
 		"thresholdNone": "Nessuna soglia — impostane una per essere avvisato quando la stima finale ci arriva.",
 		"thresholdTarget": "Obiettivo (€)",
 		"thresholdPct": "oppure % di sconto",
-		"thresholdEquiv": "{pct}% ≈ €{amount} sul totale pieno attuale",
 		"thresholdSet": "Imposta soglia",
 		"thresholdClear": "Rimuovi soglia",
 		"thresholdRemaining": "Mancano €{remaining}",

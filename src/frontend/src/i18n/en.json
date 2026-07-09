@@ -76,7 +76,6 @@
 		"thresholdNone": "No threshold — set one to be alerted when the final estimate drops to it.",
 		"thresholdTarget": "Target (€)",
 		"thresholdPct": "or % off",
-		"thresholdEquiv": "{pct}% ≈ €{amount} on the current full total",
 		"thresholdSet": "Set threshold",
 		"thresholdClear": "Remove threshold",
 		"thresholdRemaining": "€{remaining} to go",

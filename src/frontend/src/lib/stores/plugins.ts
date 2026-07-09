@@ -5,6 +5,7 @@
 import { writable } from 'svelte/store';
 
 import * as api from '$lib/api/client';
+import { registerPluginMessages, type PluginMessages } from '$lib/i18n';
 
 import { plugins as generated } from '../../generated/plugin-registry';
 
@@ -65,6 +66,23 @@ export async function loadPlugins(): Promise<void> {
 			);
 		}
 	}
+	// Eagerly register every mounted plugin's i18n so plugin namespaces consumed by
+	// CORE routes (e.g. cart adjustment labels like `dragon_store.adjustments.*`) are
+	// available without first visiting the plugin's own page — which is the only other
+	// place that registers them. Idempotent (addMessages merges); a broken bundle for
+	// one plugin must not break discovery.
+	await Promise.all(
+		mounted.map(async (plugin) => {
+			if (!plugin.i18n) return;
+			try {
+				const messages = (await plugin.i18n()) as { default: PluginMessages };
+				registerPluginMessages(messages.default);
+			} catch {
+				// A missing/broken plugin i18n bundle is non-fatal.
+			}
+		})
+	);
+
 	mountedPlugins.set(mounted);
 	pluginsReady.set(true);
 }
