@@ -2,7 +2,7 @@
 
 > **Layer 4 — Capability** · Audience: developer.
 >
-> English translation of the Italian reference [`docs-ita/4-capabilities/database/schema.md`](../../../docs-ita/4-capabilities/database/schema.md), limited to what is implemented (DOC-12). Phase 1 ships the `users` table; phase 3 adds the per-user catalog (`products`), its append-only price history (`price_history`) and the manual-scrape cooldown anchor (`scrape_cooldown`); phase 4 adds the scheduling, worker-run, log and scrape-cache tables; carts and alerts arrive in later phases.
+> English translation of the Italian reference [`docs-ita/4-capabilities/database/schema.md`](../../../docs-ita/4-capabilities/database/schema.md), limited to what is implemented (DOC-12). Phase 1 ships the `users` table; phase 3 adds the per-user catalog (`products`), its append-only price history (`price_history`) and the manual-scrape cooldown anchor (`scrape_cooldown`); phase 4 adds the scheduling, worker-run, log and scrape-cache tables; phase 5 adds the `carts` and `cart_members` tables. The per-cart alert-type rows and their baseline arrive in later phases.
 
 Engine **PostgreSQL 16**, accessed via SQLAlchemy, I/O validated with Pydantic v2. The schema is created idempotently at startup by web and worker (`create_all`).
 
@@ -24,6 +24,13 @@ Engine **PostgreSQL 16**, accessed via SQLAlchemy, I/O validated with Pydantic v
 | Table | Columns | Notes |
 |---|---|---|
 | `scrape_cooldown` | id, plugin_id, user_id FK **CASCADE**, last_scraped_at — **UNIQUE (plugin_id, user_id)** | the "last scrape" anchor per *(scraper, user)* for the manual **scrape-now** cooldown (SCR-R15): written at the **start** of **every** scrape (manual now; scheduled from phase 4), but **read** — and therefore binding — **only** by the manual scrape-now; upserted, one row per pair (not a run log) |
+
+## Carts (phase 5)
+
+| Table | Columns | Notes |
+|---|---|---|
+| `carts` | id, user_id FK **CASCADE**, name, mode (`cross`\|`scraper_specific`), scraper_id (String, null), threshold_amount (Numeric(12,2), null), created_at | per-user (DB-R1). `mode` fixed at creation (CART-R2); `scraper_id` = the scraper's `plugin_id` for `scraper_specific`, **NULL** for `cross` (CART-R4/R5). `threshold_amount` = the savings threshold, an **absolute €** value (`> 0`) or **NULL** = none (CART-R9); the percentage is only a UI input aid, never stored |
+| `cart_members` | id, cart_id FK **CASCADE**, product_id FK **CASCADE** — **UNIQUE (cart_id, product_id)** | a product's membership in a cart (CART-R1). Both FKs cascade: deleting the cart drops its members; deleting the catalog product removes it from every cart (CAT-R8). The UNIQUE constraint makes adds idempotent. No membership state is stored — active/excluded is derived from the product's `is_available`/`removed` by the Cart Engine |
 
 ## Scheduling & monitoring (phase 4)
 

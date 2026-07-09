@@ -46,6 +46,14 @@ This is the project's **English documentation**, the destined canonical wiki. It
 - [4-capabilities/core/plugin-context.md](4-capabilities/core/plugin-context.md) gained `update_catalog` + a v0 `http` client (politeness, timeout, retries)
 - the catalog read endpoint + scraper plugin routes in [api/endpoints.md](api/endpoints.md), and the `products` / `price_history` tables in [4-capabilities/database/schema.md](4-capabilities/database/schema.md)
 
+**Phase 5 — Carts** — group catalog products, compute what they'd really cost (0.5.0):
+
+- [3-features/user/carts.md](3-features/user/carts.md) — the two cart modes (cross / scraper-specific), membership rules, the € savings threshold (with the € ↔ % mirror)
+- [4-capabilities/core/cart-engine.md](4-capabilities/core/cart-engine.md) — the read-only engine: totals, adjustments, final estimate, threshold state, health flag
+- [4-capabilities/contracts/adjustment.md](4-capabilities/contracts/adjustment.md) — the `Adjustment` contract a scraper plugin returns for a single-store cart
+- the `/api/carts` CRUD + membership endpoints in [api/endpoints.md](api/endpoints.md), and the `carts` / `cart_members` tables in [4-capabilities/database/schema.md](4-capabilities/database/schema.md)
+- [3-features/user/catalog-and-product-picker.md](3-features/user/catalog-and-product-picker.md) gained the picker's "add selected to a cart" selection role (5.F4)
+
 The remaining business/architecture/feature layers arrive as the corresponding features land in later phases.
 
 ---

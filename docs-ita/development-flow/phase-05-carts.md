@@ -1,6 +1,6 @@
 # Fase 5 — Carrelli
 
-> Stato: 🚧 in corso (avviata 2026-06-29) · Prerequisiti: Fase 3 (la 4 può procedere in parallelo) · [Indice del flusso](README.md)
+> Stato: ✅ chiusa (rilasciata `0.5.0`, 2026-07-09) · Prerequisiti: Fase 3 (la 4 può procedere in parallelo) · [Indice del flusso](README.md)
 
 ## Obiettivo
 
@@ -36,10 +36,10 @@ Crei "Wishlist giochi" (scraper-specific): la card mostra totale pieno barrato, 
 
 ## Definition of Done
 
-- [ ] UC-1 visibile: carrello con adjustments e barra della soglia che riflette i prezzi reali.
-- [ ] UC-2 visibile: carrello cross con lo stesso prodotto da fonti diverse, provenienza inequivocabile.
-- [ ] Prodotto indisponibile → grigiato, escluso dai totali, soglia in € ricalcolata (esempio normativo CART).
-- [ ] [docs](../../docs/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
+- [x] UC-1 visibile: carrello con adjustments e barra della soglia che riflette i prezzi reali.
+- [x] UC-2 visibile: carrello cross con lo stesso prodotto da fonti diverse, provenienza inequivocabile.
+- [x] Prodotto indisponibile → grigiato, escluso dai totali, soglia in € ricalcolata (esempio normativo CART).
+- [x] [docs](../../docs/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti
 
