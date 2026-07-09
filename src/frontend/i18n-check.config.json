@@ -5,7 +5,8 @@
 		"admin.settings.fields.",
 		"admin.settings.fieldHints.",
 		"admin.scrapers.fields.",
-		"admin.scrapers.fieldHints."
+		"admin.scrapers.fieldHints.",
+		"dragon_store.adjustments."
 	],
 	"ignoreKeys": []
 }

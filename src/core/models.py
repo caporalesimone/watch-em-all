@@ -128,6 +128,50 @@ class PriceHistory(Base):
     )
 
 
+class Cart(Base):
+    """A user's cart (carts.md, cart-engine.md). Phase 5.
+
+    ``mode`` is **immutable** after creation (CART-R2): no endpoint changes it.
+    ``scraper_id`` is the scraper's ``plugin_id`` for ``scraper_specific`` carts and
+    NULL for ``cross`` (CART-R4/R5). ``threshold_amount`` is the savings threshold,
+    stored as an **absolute € value** (decision 2026-06-29, inverts CART-R9/R10 — the
+    percentage is a UI input aid only); NULL = no threshold; the engine fires when the
+    final estimate ≤ this amount (CART-R11). Alert types + the per-cart baseline are
+    phase 6 (alerts), not here. Per-user (DB-R1)."""
+
+    __tablename__ = "carts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    mode: Mapped[str] = mapped_column(String(16), nullable=False)  # cross | scraper_specific
+    scraper_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    threshold_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class CartMember(Base):
+    """Membership of a catalog product in a cart (CART-R1). Phase 5.
+
+    UNIQUE ``(cart_id, product_id)``; both FKs CASCADE — deleting the cart or the
+    product removes the membership (CART-R3/R8, the products cascade realises CAT-R8)."""
+
+    __tablename__ = "cart_members"
+    __table_args__ = (UniqueConstraint("cart_id", "product_id", name="uq_cart_members_identity"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    cart_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("carts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    product_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+
 class ScrapeCooldown(Base):
     """Anchor for the manual scrape-now cooldown (SCR-R15).
 

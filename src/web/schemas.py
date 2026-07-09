@@ -111,3 +111,92 @@ class CatalogPage(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class CartCreate(BaseModel):
+    # name + mode (immutable after, CART-R2); scraper_id required for scraper_specific,
+    # must be absent/null for cross (validated in the router for a clean error envelope).
+    name: str = Field(min_length=1, max_length=128)
+    mode: Literal["cross", "scraper_specific"]
+    scraper_id: str | None = None
+
+
+class CartPatch(BaseModel):
+    # Rename and/or set the threshold. The threshold is an absolute € value (5.B4); the
+    # percentage is a UI input aid only. `threshold_amount: null` (explicitly present)
+    # clears the threshold — the endpoint uses model_fields_set to tell "omitted" from
+    # "set to null". mode is never editable (CART-R2).
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    threshold_amount: Decimal | None = None
+
+
+class CartAdjustment(BaseModel):
+    # An adjustment line as the cart card shows it (5.B3/5.B5). `id` is the i18n key
+    # the FE localizes; `params` feed its interpolation; `description` is debug-only.
+    id: str
+    description: str
+    amount: Decimal
+    params: dict[str, str] = Field(default_factory=dict)
+
+
+class CartMemberOut(BaseModel):
+    # A cart member = a catalog product row + whether it counts in the totals (active).
+    product_id: int
+    plugin_id: str
+    external_id: str
+    url: str
+    name: str
+    image_url: str | None
+    brand: BrandRef | None = None
+    tags: list[str] = Field(default_factory=list)
+    category: list[CategoryRef] = Field(default_factory=list)
+    currency: str
+    price_current: Decimal
+    price_original: Decimal
+    discount_pct: Decimal
+    is_available: bool
+    removed: bool
+    active: bool
+
+
+class CartThreshold(BaseModel):
+    # Savings-threshold status (5.B4). `amount` is the absolute € target; `current` is
+    # the final estimate it compares against; `partial` = reached with excluded members.
+    amount: Decimal
+    current: Decimal
+    reached: bool
+    partial: bool
+
+
+class CartCard(BaseModel):
+    # A cart with its computed state (5.B3/5.B4). `members` is only filled in the detail
+    # view (CartDetail). `threshold` is null when unset or no active members (CART-R12).
+    id: int
+    name: str
+    mode: str
+    scraper_id: str | None
+    currency: str | None
+    member_count: int
+    active_count: int
+    excluded_count: int
+    has_delisted: bool
+    any_on_sale: bool = False
+    all_on_sale: bool = False
+    total_full: Decimal
+    total_discounted: Decimal
+    adjustments: list[CartAdjustment] = Field(default_factory=list)
+    final_price: Decimal
+    threshold_amount: Decimal | None = None  # the stored target (the editor's value)
+    threshold: CartThreshold | None = None  # computed status (null without active members)
+    created_at: datetime
+
+
+class CartDetail(CartCard):
+    members: list[CartMemberOut] = Field(default_factory=list)
+
+
+class CartItemsBody(BaseModel):
+    # Add/remove cart members by catalog product id (5.B2). The add is validated as
+    # a batch: all ids must be the user's, listed (not delisted), of the cart's scraper
+    # (scraper_specific) and one currency — else the whole batch is rejected.
+    product_ids: list[int] = Field(min_length=1)

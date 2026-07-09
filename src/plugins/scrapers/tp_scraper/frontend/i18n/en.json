@@ -1,8 +1,15 @@
 {
 	"tp_scraper": {
 		"title": "TP Scraper",
-		"blurb": "A throwaway test plugin that proves dynamic discovery, routing, the sidebar entry and its own backend route. It does not scrape anything.",
-		"ping": "Ping the backend route",
-		"error": "Request failed."
+		"blurb": "A test plugin that generates fake TP products into your catalog — use it to exercise multi-store carts, delisting and currency rules. Each product is named \"TP - …\".",
+		"error": "Request failed.",
+		"currency": "Currency",
+		"add": "Add TP product",
+		"clearAll": "Clear all",
+		"generated": "Generated products",
+		"empty": "No TP products yet — add one.",
+		"remove": "Remove",
+		"available": "Available",
+		"unavailable": "Out of stock"
 	}
 }

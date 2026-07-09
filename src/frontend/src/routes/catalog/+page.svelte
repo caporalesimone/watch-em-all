@@ -3,13 +3,22 @@
 	import { _ } from 'svelte-i18n';
 
 	import {
+		addCartItems,
+		ApiErr,
+		listCarts,
 		listCatalog,
+		type CartCard,
 		type CatalogItem,
 		type CatalogPage,
 		type CatalogSort
 	} from '$lib/api/client';
+	import DiscountBadge from '$lib/components/DiscountBadge.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
-	import { mountedPlugins } from '$lib/stores/plugins';
+	import ProductCell from '$lib/components/ProductCell.svelte';
+	import ProductTags from '$lib/components/ProductTags.svelte';
+	import ProductThumb from '$lib/components/ProductThumb.svelte';
+	import SourceTag from '$lib/components/SourceTag.svelte';
+	import { money } from '$lib/format';
 
 	const PAGE_SIZE = 20;
 
@@ -22,13 +31,47 @@
 	let order = $state<'asc' | 'desc'>('desc');
 	let pageNum = $state(1);
 
-	// Image hover-zoom: only reveal the enlarged preview after the cursor rests on a
-	// thumbnail for HOVER_DELAY_MS, so it doesn't flash while scrolling past rows.
-	const HOVER_DELAY_MS = 500;
-	let hoveredId = $state<number | null>(null);
-	let hoverTimer: ReturnType<typeof setTimeout> | null = null;
-
 	const pages = $derived(data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1);
+
+	// Selection → "add to cart" (5.F4). Delisted rows can't be added (the backend rejects
+	// them); the multi-scraper compatibility UX is deferred to phase 6 (6.F0).
+	let selectedIds = $state<number[]>([]);
+	let carts = $state<CartCard[]>([]);
+	let targetCartId = $state<number | ''>('');
+	let adding = $state(false);
+	let addMsg = $state<string | null>(null);
+	let addErr = $state<string | null>(null);
+
+	function toggleSelect(id: number): void {
+		selectedIds = selectedIds.includes(id)
+			? selectedIds.filter((x) => x !== id)
+			: [...selectedIds, id];
+	}
+
+	async function loadCarts(): Promise<void> {
+		try {
+			carts = await listCarts();
+		} catch {
+			/* the add bar simply offers no carts */
+		}
+	}
+
+	async function addToCart(): Promise<void> {
+		if (targetCartId === '' || selectedIds.length === 0) return;
+		adding = true;
+		addMsg = null;
+		addErr = null;
+		try {
+			const cart = await addCartItems(Number(targetCartId), selectedIds);
+			addMsg = $_('carts.added', { values: { name: cart.name } });
+			selectedIds = [];
+			carts = carts.map((c) => (c.id === cart.id ? cart : c));
+		} catch (e) {
+			addErr = e instanceof ApiErr ? e.detail : $_('carts.addError');
+		} finally {
+			adding = false;
+		}
+	}
 
 	async function load(silent = false): Promise<void> {
 		if (!silent) loading = true;
@@ -50,6 +93,7 @@
 
 	onMount(() => {
 		void load();
+		void loadCarts();
 		// scrape-now writes the catalog asynchronously; if the page is opened while a
 		// scrape is still running it would show empty. Retry briefly so the products
 		// appear on their own, without a manual search.
@@ -94,38 +138,9 @@
 		}
 	}
 
-	function source(pluginId: string): { name: string; icon: string | null; route: string | null } {
-		const p = $mountedPlugins.find((m) => m.name === pluginId);
-		return {
-			name: p?.display_name ?? pluginId,
-			icon: p?.icon ?? null,
-			route: p?.route_base ?? null
-		};
-	}
-
-	function money(value: string, currency: string): string {
-		return currency === 'EUR' ? `€${value}` : `${value} ${currency}`;
-	}
-
 	function availability(item: CatalogItem): string {
 		if (item.removed) return $_('catalog.removed');
 		return item.is_available ? $_('catalog.available') : $_('catalog.unavailable');
-	}
-
-	function previewEnter(id: number): void {
-		if (hoverTimer) clearTimeout(hoverTimer);
-		hoverTimer = setTimeout(() => {
-			hoveredId = id;
-			hoverTimer = null;
-		}, HOVER_DELAY_MS);
-	}
-
-	function previewLeave(): void {
-		if (hoverTimer) {
-			clearTimeout(hoverTimer);
-			hoverTimer = null;
-		}
-		hoveredId = null;
 	}
 
 	const th = 'py-2 pr-4 font-normal';
@@ -149,6 +164,34 @@
 		</button>
 	</form>
 
+	{#if addMsg}
+		<p class="text-sm text-emerald-600">{addMsg}</p>
+	{/if}
+	{#if selectedIds.length > 0}
+		<div
+			class="flex flex-wrap items-center gap-2 rounded border border-slate-200 bg-slate-50 p-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+		>
+			<span>{$_('carts.selected', { values: { count: selectedIds.length } })}</span>
+			<select
+				bind:value={targetCartId}
+				class="rounded border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-950"
+			>
+				<option value="">{$_('carts.chooseCart')}</option>
+				{#each carts as c (c.id)}
+					<option value={c.id}>{c.name}</option>
+				{/each}
+			</select>
+			<button
+				onclick={addToCart}
+				disabled={adding || targetCartId === ''}
+				class="rounded bg-slate-800 px-3 py-1 text-sm text-white hover:bg-slate-700 disabled:opacity-50 dark:bg-slate-200 dark:text-slate-900"
+			>
+				{$_('carts.addToCart')}
+			</button>
+			{#if addErr}<span class="text-red-500">{addErr}</span>{/if}
+		</div>
+	{/if}
+
 	{#if loading}
 		<p class="text-sm text-slate-500">{$_('common.loading')}</p>
 	{:else if error}
@@ -159,6 +202,7 @@
 		<table class="w-full text-left text-sm">
 			<thead class="border-b border-slate-200 text-xs text-slate-500 dark:border-slate-800">
 				<tr>
+					<th class={th}></th>
 					<th class="{th} {sortable}" onclick={() => sortBy('plugin_id')}
 						>{$_('catalog.colSource')}{arrow('plugin_id')}</th
 					>
@@ -180,127 +224,36 @@
 			</thead>
 			<tbody>
 				{#each data.items as item (item.id)}
-					{@const src = source(item.plugin_id)}
 					<tr
 						class="border-b border-slate-100 dark:border-slate-800/60"
 						class:opacity-50={item.removed}
 					>
-						<td class="py-2 pr-4">
-							{#if src.route}
-								<a
-									href={src.route}
-									class="flex items-center gap-2 text-slate-500 hover:text-slate-800 hover:underline dark:hover:text-slate-200"
-									title={src.name}
-								>
-									{#if src.icon}
-										<img src={src.icon} alt="" class="h-4 w-4" />
-									{/if}
-									<span>{src.name}</span>
-								</a>
-							{:else}
-								<span class="flex items-center gap-2 text-slate-500" title={src.name}>
-									{#if src.icon}
-										<img src={src.icon} alt="" class="h-4 w-4" />
-									{/if}
-									<span>{src.name}</span>
-								</span>
-							{/if}
+						<td class="py-2 pr-2">
+							<input
+								type="checkbox"
+								checked={selectedIds.includes(item.id)}
+								disabled={item.removed}
+								onchange={() => toggleSelect(item.id)}
+								aria-label={$_('carts.addToCart')}
+							/>
 						</td>
+						<td class="py-2 pr-4"><SourceTag pluginId={item.plugin_id} link /></td>
+						<td class="py-2 pr-4"><ProductThumb src={item.image_url} /></td>
 						<td class="py-2 pr-4">
-							<div
-								class="relative inline-block"
-								role="presentation"
-								onmouseenter={() => previewEnter(item.id)}
-								onmouseleave={previewLeave}
-							>
-								{#if item.image_url}
-									<img
-										src={item.image_url}
-										alt=""
-										class="h-10 w-10 rounded border border-slate-200 object-cover dark:border-slate-700"
-										loading="lazy"
-									/>
-									<!-- hover (after a ~500ms intent delay): full image (no crop), capped so it never fills the screen -->
-									<div
-										class="pointer-events-none absolute left-12 top-0 z-20"
-										class:hidden={hoveredId !== item.id}
-									>
-										<img
-											src={item.image_url}
-											alt=""
-											class="max-h-80 max-w-xs rounded-lg border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900"
-										/>
-									</div>
-								{:else}
-									<div
-										class="h-10 w-10 rounded border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800"
-									></div>
-								{/if}
-							</div>
+							<ProductCell
+								name={item.name}
+								url={item.url}
+								brand={item.brand}
+								category={item.category}
+							/>
 						</td>
-						<td class="py-2 pr-4">
-							<a
-								href={item.url}
-								target="_blank"
-								rel="noopener noreferrer"
-								class="font-medium text-sky-700 hover:underline dark:text-sky-400">{item.name}</a
-							>
-							{#if item.brand}
-								<div class="text-xs text-slate-500">
-									{#if item.brand.link}
-										<a
-											href={item.brand.link}
-											target="_blank"
-											rel="noopener noreferrer"
-											class="hover:underline">{item.brand.text}</a
-										>
-									{:else}
-										{item.brand.text}
-									{/if}
-								</div>
-							{/if}
-							{#if item.category.length > 0}
-								<div class="mt-1 text-xs text-slate-400">
-									{#each item.category as cat, i (cat.text + i)}
-										{#if i > 0}<span class="px-1">/</span>{/if}
-										{#if cat.link}
-											<a
-												href={cat.link}
-												target="_blank"
-												rel="noopener noreferrer"
-												class="hover:underline">{cat.text}</a
-											>
-										{:else}
-											{cat.text}
-										{/if}
-									{/each}
-								</div>
-							{/if}
-						</td>
-						<td class="py-2 pr-4">
-							{#if item.tags.length > 0}
-								<div class="flex flex-wrap gap-1">
-									{#each item.tags as tag (tag)}
-										<span
-											class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-											>{tag}</span
-										>
-									{/each}
-								</div>
-							{/if}
-						</td>
+						<td class="py-2 pr-4"><ProductTags tags={item.tags} /></td>
 						<td class="py-2 pr-4 text-slate-400" class:line-through={Number(item.discount_pct) > 0}>
 							{money(item.price_original, item.currency)}
 						</td>
 						<td class="py-2 pr-4 font-medium">
 							<div>{money(item.price_current, item.currency)}</div>
-							{#if Number(item.discount_pct) > 0}
-								<span
-									class="mt-0.5 inline-block rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700 dark:bg-green-900/40 dark:text-green-300"
-								>
-									-{Math.round(Number(item.discount_pct))}%
-								</span>
-							{/if}
+							<DiscountBadge discountPct={item.discount_pct} />
 						</td>
 						<td class="py-2 pr-4 text-slate-500">{availability(item)}</td>
 					</tr>

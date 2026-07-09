@@ -2,7 +2,7 @@
 
 > The single, canonical reference of the core HTTP endpoints. Conventions and Swagger: [README.md](README.md).
 >
-> English translation of the Italian reference [`docs-ita/api/endpoints.md`](../../docs-ita/api/endpoints.md), limited to what is implemented (DOC-12). Phase 1 ships Auth, Me and Health; phase 3 adds admin user management, plugin discovery, the read-only **catalog** and the scraper plugin's own routes; carts, history, alerts, notifiers and scheduling arrive in later phases.
+> English translation of the Italian reference [`docs-ita/api/endpoints.md`](../../docs-ita/api/endpoints.md), limited to what is implemented (DOC-12). Phase 1 ships Auth, Me and Health; phase 3 adds admin user management, plugin discovery, the read-only **catalog** and the scraper plugin's own routes; phase 4 adds the scraper scheduling/worker admin, the system log and the runtime settings/feature-flags; phase 5 adds **carts** (CRUD, membership and the computed state). Cart/product **history**, **alerts**, **notifiers** and the per-cart **alert types** arrive in later phases.
 
 Role legend: 🌐 public · 👤 user · 🛡 admin
 
@@ -69,6 +69,20 @@ Plugin-specific routes are registered by each plugin under `/api{route_base}` (e
 | GET | `/api/catalog` | 👤 | `?page=&page_size=&sort=&order=&q=&available=&removed=` | the current user's catalog as the Product Picker table: paginated server-side, returns `{items, total, page, page_size}`. `sort` ∈ {`name`, `plugin_id`, `price_current`, `price_original`, `is_available`, `last_seen_at`} (default `last_seen_at`); `order` `asc`\|`desc`; `q` = case-insensitive name search; `available`/`removed` = optional boolean filters |
 
 The catalog is **read-only** here: it is written only through the Catalog Update Service (a scrape). The cleanup/mutation endpoints (remove delisted, selective/empty) arrive in a later phase, with the cart/Product Picker selection role.
+
+## Carts — [cart-engine](../4-capabilities/core/cart-engine.md)
+
+| Method | Path | Role | Body | Notes |
+|---|---|---|---|---|
+| GET | `/api/carts` | 👤 | — | the user's carts as **cards** (each with its computed state: totals, adjustments, final estimate, threshold, health flag), newest first |
+| POST | `/api/carts` | 👤 | `{name, mode, scraper_id?}` | create; `mode` ∈ {`cross`, `scraper_specific`} and is **immutable** afterwards (CART-R2). `scraper_specific` **requires** a loaded `scraper_id` (else **422** `scraper_id_required` / `unknown_scraper`); `cross` must **not** name one (**422** `scraper_id_not_allowed`). Returns the cart **detail** with **201** |
+| GET | `/api/carts/{id}` | 👤 | — | the cart **detail**: the card fields + the member rows (each with provenance, prices, availability, `active`). Another user's cart → **404** |
+| PATCH | `/api/carts/{id}` | 👤 | `{name?, threshold_amount?}` | rename and/or set the savings threshold. `threshold_amount` is an **absolute €** value (`> 0`, else **422** `threshold_must_be_positive`); `threshold_amount: null` clears it. The % is only a UI input aid (CART-R9); the mode cannot be changed |
+| DELETE | `/api/carts/{id}` | 👤 | — | **204**; deletes only the cart (members cascade; catalog products untouched, CART-R3) |
+| POST | `/api/carts/{id}/items` | 👤 | `{product_ids}` | add members (idempotent). Batch-validated: your catalog only (**422** `product_not_found`), no delisted (**422** `product_delisted`), single currency (**422** `currency_mismatch`), and for `scraper_specific` only that scraper's products (**422** `product_scraper_mismatch`). Returns the updated detail |
+| DELETE | `/api/carts/{id}/items` | 👤 | `{product_ids}` | remove members; absent ids are a no-op. Returns the updated detail |
+
+The cart state (totals over the **active** members, adjustments for scraper-specific carts, the final estimate, the threshold state and the `has_delisted` health flag) is computed on demand by the [Cart Engine](../4-capabilities/core/cart-engine.md) — nothing is persisted beyond the cart definition and its members. The per-cart **alert types** (and their baseline) and the cart **price history** arrive in later phases.
 
 ## Scraper plugin routes — Dragon Store (implemented)
 

@@ -14,3 +14,4 @@ companion changelog-in-prose, not part of the canonical wiki tree.
 - [phase-02.md](phase-02.md) — Plugin system
 - [phase-03.md](phase-03.md) — Catalog & first scrape
 - [phase-04.md](phase-04.md) — Worker & scheduling (in progress; dev/admin tooling first)
+- [phase-05.md](phase-05.md) — Carts (two modes, Cart Engine, € threshold, adjustments)

@@ -17,21 +17,27 @@ from __future__ import annotations
 import logging
 import re
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from sqlalchemy import JSON, DateTime, Integer, String, delete, func, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
-from src.core.contracts import BrandRef, CategoryRef, DeltaCounters, Product
+from src.core.contracts import Adjustment, BrandRef, CategoryRef, DeltaCounters, Product
 from src.core.errors import APIError
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.context import PluginContext
 from src.web.deps import SessionDep, UserDep
 
+from .adjustments import ADJUSTMENTS
 from .parser import DragonStoreParseError, ParsedProduct, parse_product
 from .sanitizer import load_title_labels, sanitize_title
+
+if TYPE_CHECKING:
+    from decimal import Decimal
+
+    from src.core.models import CatalogProduct
 
 PLUGIN_ID = "dragon_store"
 # Native product id in a Dragon Store product URL, e.g. ".../...gp.35880.uw".
@@ -151,6 +157,13 @@ class DragonStorePlugin(ScraperPlugin):
     def configured_users(self, context: PluginContext) -> list[int]:
         # Users a scheduled run scrapes: everyone with at least one watch (SCR-R3).
         return list(context.db.scalars(select(Watch.user_id).distinct().order_by(Watch.user_id)))
+
+    def get_adjustments(
+        self, products: list[CatalogProduct], cart_total: Decimal
+    ) -> list[Adjustment]:
+        # DRG-R5: a non-cumulative threshold discount + shipping (free above a threshold),
+        # applied to the cart's discounted total. Rules live in adjustments.py.
+        return ADJUSTMENTS.compute(cart_total)
 
     # --- scraping (SCR-R4/R5/R6): one HTTP request per watch, via context.http ---
     def _scrape_products(self, context: PluginContext, urls: list[str]) -> list[Product]:

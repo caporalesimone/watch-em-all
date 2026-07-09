@@ -2,6 +2,10 @@
 	import { onDestroy, onMount } from 'svelte';
 
 	import { apiFetch } from '$lib/auth/manager';
+	import ProductCell from '$lib/components/ProductCell.svelte';
+	import ProductTags from '$lib/components/ProductTags.svelte';
+	import ProductThumb from '$lib/components/ProductThumb.svelte';
+	import { money } from '$lib/format';
 	import { _ } from '$lib/i18n';
 
 	const BASE = '/api/plugins/dragon-store';
@@ -229,53 +233,12 @@
 				<tbody>
 					{#each preview as p (p.external_id)}
 						<tr class="border-b border-slate-100 dark:border-slate-800/60">
+							<td class="py-1 pr-4"><ProductThumb src={p.image_url} /></td>
 							<td class="py-1 pr-4">
-								<a href={p.url} target="_blank" rel="noopener noreferrer" title={p.name}>
-									{#if p.image_url}
-										<img
-											src={p.image_url}
-											alt=""
-											class="h-10 w-10 rounded object-cover"
-											loading="lazy"
-										/>
-									{:else}
-										<div class="h-10 w-10 rounded bg-slate-100 dark:bg-slate-800"></div>
-									{/if}
-								</a>
+								<ProductCell name={p.name} url={p.url} brand={p.brand} />
+								<ProductTags tags={p.tags} />
 							</td>
-							<td class="py-1 pr-4">
-								<a
-									href={p.url}
-									target="_blank"
-									rel="noopener noreferrer"
-									class="text-sky-700 hover:underline dark:text-sky-400">{p.name}</a
-								>
-								{#if p.brand}
-									<div class="text-xs text-slate-500">
-										{#if p.brand.link}
-											<a
-												href={p.brand.link}
-												target="_blank"
-												rel="noopener noreferrer"
-												class="hover:underline">{p.brand.text}</a
-											>
-										{:else}
-											{p.brand.text}
-										{/if}
-									</div>
-								{/if}
-								{#if p.tags.length > 0}
-									<div class="mt-1 flex flex-wrap gap-1">
-										{#each p.tags as prop (prop)}
-											<span
-												class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-												>{prop}</span
-											>
-										{/each}
-									</div>
-								{/if}
-							</td>
-							<td class="py-1 pr-4 font-medium">€{p.price_current}</td>
+							<td class="py-1 pr-4 font-medium">{money(p.price_current, p.currency)}</td>
 							<td class="py-1 pr-4 text-slate-500">
 								{p.is_available ? $_('dragon_store.available') : $_('dragon_store.unavailable')}
 							</td>
@@ -296,63 +259,16 @@
 				<tbody>
 					{#each watches as w (w.id)}
 						<tr class="border-b border-slate-100 align-top dark:border-slate-800/60">
+							<td class="py-2 pr-4"><ProductThumb src={w.image_url} /></td>
 							<td class="py-2 pr-4">
-								<a href={w.url} target="_blank" rel="noopener noreferrer" title={w.name ?? w.url}>
-									{#if w.image_url}
-										<img
-											src={w.image_url}
-											alt=""
-											class="h-10 w-10 rounded border border-slate-200 object-cover dark:border-slate-700"
-											loading="lazy"
-										/>
-									{:else}
-										<div
-											class="h-10 w-10 rounded border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800"
-										></div>
-									{/if}
-								</a>
+								<ProductCell
+									name={w.name ?? w.url}
+									url={w.url}
+									brand={w.brand}
+									category={w.category}
+								/>
 							</td>
-							<td class="py-2 pr-4">
-								<a
-									href={w.url}
-									target="_blank"
-									rel="noopener noreferrer"
-									class="font-medium text-sky-700 hover:underline dark:text-sky-400">{w.name ?? w.url}</a
-								>
-								{#if w.brand}
-									<div class="text-xs text-slate-500">
-										{#if w.brand.link}<a
-												href={w.brand.link}
-												target="_blank"
-												rel="noopener noreferrer"
-												class="hover:underline">{w.brand.text}</a
-											>{:else}{w.brand.text}{/if}
-									</div>
-								{/if}
-								{#if w.category.length > 0}
-									<div class="mt-1 text-xs text-slate-400">
-										{#each w.category as cat, i (cat.text + i)}{#if i > 0}<span class="px-1">/</span
-											>{/if}{#if cat.link}<a
-													href={cat.link}
-													target="_blank"
-													rel="noopener noreferrer"
-													class="hover:underline">{cat.text}</a
-												>{:else}{cat.text}{/if}{/each}
-									</div>
-								{/if}
-							</td>
-							<td class="py-2 pr-4">
-								{#if w.tags.length > 0}
-									<div class="flex flex-wrap gap-1">
-										{#each w.tags as prop (prop)}
-											<span
-												class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-												>{prop}</span
-											>
-										{/each}
-									</div>
-								{/if}
-							</td>
+							<td class="py-2 pr-4"><ProductTags tags={w.tags} /></td>
 							<td class="py-2 text-right whitespace-nowrap">
 								<button
 									class="rounded border border-red-300 px-3 py-1 text-sm text-red-600 transition-colors hover:bg-red-100 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/40"

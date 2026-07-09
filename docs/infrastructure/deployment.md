@@ -26,7 +26,7 @@ cp .env.example .env                  # then fill in the values (WEA_VERSION=$VE
 docker compose pull && docker compose up -d
 ```
 
-The repo and the GHCR packages are **public**: the `pull` is **anonymous**, no `docker login` needed. The published images (pinned by version, never `latest` — INF-1):
+The repo and the GHCR packages are **public**: the `pull` is **anonymous**, no `docker login` needed. The published images (pinned by version; a release also publishes a moving `latest` tag as a convenience — 5.T1 — but **pinning `WEA_VERSION` stays the recommended default**; INF-1 "never `latest`" is about *upstream* images, not our own artifacts):
 
 | Image | Content |
 |---|---|

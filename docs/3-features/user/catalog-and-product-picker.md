@@ -2,7 +2,7 @@
 
 > **Layer 3 — User feature** · Audience: architects, developers.
 >
-> English translation of the Italian reference [`docs-ita/3-features/user/catalog-and-product-picker.md`](../../../docs-ita/3-features/user/catalog-and-product-picker.md), limited to what is implemented (DOC-12). Phase 3 ships the read-only catalog view (the per-user, searchable, sortable, paginated table); the cart/Product Picker selection role arrives in a later phase.
+> English translation of the Italian reference [`docs-ita/3-features/user/catalog-and-product-picker.md`](../../../docs-ita/3-features/user/catalog-and-product-picker.md), limited to what is implemented (DOC-12). Phase 3 ships the read-only catalog view (the per-user, searchable, sortable, paginated table); phase 5 adds the selection role — picking rows and **adding them to an existing cart** (5.F4). The cleanup/mutation actions (remove delisted, selective removal, empty) still arrive in a later phase.
 
 ## Purpose
 
@@ -79,3 +79,9 @@ sequenceDiagram
 ```
 
 When the catalog is empty the Product Picker invites the user to configure a scraper and start its first scrape **from its own page**: "Scrape now" is **per-scraper** and lives there ([scraper-plugin](../plugins/scraper-plugin.md), SCR-R15). It exists so the first population doesn't take hours to wait for, but it stays available at any time within the individual scraper's cooldown. Otherwise the catalog refreshes at the normal scheduled scrapes.
+
+## Adding selected products to a cart (5.F4)
+
+The Product Picker's selection role is now live: tick one or more rows, pick a **target cart** from the picker's add bar and add the selection to it (or add a single row from its own control). The membership rules of the target cart apply on the server ([carts](carts.md)): the batch is rejected if it would add a **delisted** product, mix **currencies**, or — for a **scraper-specific** cart — include a product from another scraper. **Delisted** rows are not offered for adding (their per-row control is disabled).
+
+The catalog does **not** yet steer the selection by cart compatibility: it does not grey out or pre-filter the products that a given cart cannot accept. That **multi-scraper compatibility UX** — surfacing, before the request, which carts a selection fits — is deferred to **phase 6 (6.F0)**; for now the **server constraint** is what holds, and an incompatible add comes back as a clear `422`.

@@ -74,11 +74,17 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push ${{ matrix.image }} ${{ github.ref_name }}
+      - name: Build and push ${{ matrix.image }} ${{ github.ref_name }} (+ latest)
         uses: docker/build-push-action@v7
         with:
           context: .
           file: ${{ matrix.dockerfile }}
           push: true
           provenance: false   # no attestation manifest -> no "unknown/unknown" entry in GHCR
-          tags: ghcr.io/${{ steps.meta.outputs.owner }}/${{ matrix.image }}:${{ github.ref_name }}
+          # The versioned tag is the source of truth; `latest` is a convenience pointer
+          # to the newest release (5.T1). Only release tags trigger this workflow, so
+          # `latest` is never moved by a dev branch; release tags are monotonic, so it
+          # always tracks the newest. Pinning WEA_VERSION stays the recommended default.
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/${{ matrix.image }}:${{ github.ref_name }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/${{ matrix.image }}:latest

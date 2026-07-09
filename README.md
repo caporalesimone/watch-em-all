@@ -53,7 +53,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Fill `.env` before starting: set `WEA_VERSION` to the same release (`$VERSION`; never `latest`), pick strong `POSTGRES_*` values, and set `WEA_ADMIN_INITIAL_PASSWORD`. The repository and the GHCR packages are **public**, so both the file download and the image pull are anonymous — no auth. Once up, the app answers on `http://<host>:8080` (the login page; sign in with the admin from your `.env`, then set a new password at the forced first change).
+Fill `.env` before starting: set `WEA_VERSION` to the same release (`$VERSION` — a pinned version is recommended; `latest` also exists for a quick try), pick strong `POSTGRES_*` values, and set `WEA_ADMIN_INITIAL_PASSWORD`. The repository and the GHCR packages are **public**, so both the file download and the image pull are anonymous — no auth. Once up, the app answers on `http://<host>:8080` (the login page; sign in with the admin from your `.env`, then set a new password at the forced first change).
 
 ### Updating
 

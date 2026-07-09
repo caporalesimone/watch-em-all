@@ -10,7 +10,21 @@ Il motore delle notifiche, consegnate per ora solo **in-app**: baseline, diff, d
 
 Attivi gli alert su un carrello, un prezzo cambia, e all'orario scelto trovi nello Storico alert un digest leggibile: cosa è cambiato, prezzi prima/dopo, provenienza, stato soglia. Badge "non letto" in dashboard.
 
+## ⚠️ Da riconciliare PRIMA di partire (docs-ita ↔ codice)
+
+> Discrepanze tra la documentazione **italiana** (source of truth) e il **codice implementato**, emerse alla chiusura della Fase 5 durante il mirror inglese (DOC-12). Da discutere e sistemare con Simone **prima** di iniziare gli MVP di questa fase. I docs **inglesi** in `docs/` sono già allineati al codice; questi punti riguardano il riallineamento della source-of-truth italiana (e la conferma dei contratti spec-ahead).
+
+1. **`Adjustment` — modello a 4 campi.** [`adjustment.md`](../4-capabilities/contracts/adjustment.md) mostra solo `description` + `amount`; il codice ([`src/core/contracts.py`](../../src/core/contracts.py)) ha **4 campi**: `id` (chiave i18n completa, resa dal frontend), `description` (**solo-debug**), `amount` (con segno), `params` (interpolazione i18n). L'esempio IT (`description="Sconto soglia 100"` come se fosse user-facing) è fuorviante → allineare al modello deciso in 5.B3/5.B5.
+2. **`get_adjustments` — firma a 2 argomenti.** Lo pseudocodice IT (in `adjustment.md` e [`cart-engine.md`](../4-capabilities/core/cart-engine.md)) usa `get_adjustments(cart_total)`; il codice reale (base + Dragon + call-site dell'engine) è `get_adjustments(products, cart_total)` → allineare.
+3. **`endpoints.md` IT — rotte non ancora implementate.** Elenca `PUT /api/carts/{id}/alert-types` e `GET /api/carts/{id}/history`, assenti in Fase 5 (giustamente esclusi dal mirror EN). Sono **contratto spec-ahead** (regola di flusso #8): la *alert-types* la implementa **6.B1**, la *history* è Fase 8 → nessuna correzione doc, solo **verificare** che il contratto documentato è quello giusto quando li implementiamo.
+4. **`CartState` — flag non documentati in IT.** L'engine implementato espone anche `has_delisted`, `any_on_sale`, `all_on_sale` e `currency`, che le "Definizioni" IT di `cart-engine.md` non citano → arricchire `cart-engine.md`.
+5. **Adjustments Dragon — valori dell'esempio.** L'esempio IT usa spedizione generica **−€7**; le regole reali ([`adjustments.py`](../../src/plugins/scrapers/dragon_store/backend/adjustments.py)) sono spedizione **−€5, gratis ≥€100** e sconti **5/10/15% a €100/200/300**. L'esempio IT è illustrativo, ma conviene usare i valori reali per coerenza.
+
 ## MVP
+
+### Da gestire per prima (rinviato dalla Fase 5)
+
+- [ ] **6.F0 — Product Picker → carrello: compatibilità multi-scraper** (~1h): nella tendina "aggiungi a carrello" della selezione multipla, un carrello **scraper-specific** è selezionabile solo se il suo scraper coincide con il plugin di **tutti** i prodotti selezionati (i **cross** sempre); selezione che copre più scraper → gli scraper-specific incompatibili appaiono disabilitati con una nota. Rinviato dalla Fase 5 (5.F4) per provare prima la UX di base con un solo scraper; il vincolo lato server (uno scraper-specific rifiuta prodotti di altri scraper) è già attivo dalla 5.B2. *Verifica: con prodotti di due scraper selezionati, solo i cart cross e i cart dello scraper coerente sono selezionabili.*
 
 ### Backend
 

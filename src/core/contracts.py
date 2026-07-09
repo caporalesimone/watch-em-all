@@ -70,6 +70,24 @@ class Product(BaseModel):
     extra: dict[str, Any] = Field(default_factory=dict)  # plugin-specific, persisted in extra_json
 
 
+class Adjustment(BaseModel):
+    """A correction on a **scraper_specific** cart total (adjustment.md), computed by
+    the plugin's own rules. The core sums them without interpreting them.
+
+    - ``id`` — the full i18n key the **frontend** renders into a localized label
+      (e.g. ``"dragon_store.adjustments.threshold_discount"``).
+    - ``params`` — values for that string's interpolation (e.g. ``{"pct": "10"}``).
+    - ``description`` — human-readable, **debug only** (never shown to users).
+    - ``amount`` — **signed**: POSITIVE = a saving (lowers the final estimate),
+      NEGATIVE = an extra cost (raises it). ``final = discounted − Σ amount`` (ADJ-R2).
+    """
+
+    id: str
+    description: str
+    amount: Decimal
+    params: dict[str, str] = Field(default_factory=dict)
+
+
 class DeltaCounters(BaseModel):
     """What ``update_catalog`` returns for one delivery (CATSVC-R6).
 

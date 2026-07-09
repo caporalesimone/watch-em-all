@@ -26,6 +26,7 @@ Chiudere il perimetro della 1.0: il secondo canale di notifica (che dimostra la 
 - [ ] **12.F1 — Stati vuoti** (~1h): stati vuoti curati su tutte le pagine (FE-12). *Verifica: giro da utente nuovo senza momenti "e adesso?".*
 - [ ] **12.F2 — Conferme distruttive + responsive** (~1h): conferme con conseguenze esplicite (FE-11), responsive di base. *Verifica: ogni azione distruttiva dichiara cosa cancella.*
 - [ ] **12.F3 — Revisione dark/light** (~1h): passata su tutte le pagine nei due temi. *Verifica: nessun elemento illeggibile nei due temi.*
+- [x] **12.F4 — Widget condivisi nel core (mini-SDK)** — **anticipato in Fase 5 (`5.F6`)**: estratti in `$lib/components` `ProductThumb` (immagine + hover-zoom), `CategoryBreadcrumb`, `ProductCell` (titolo+brand+categoria), `ProductTags`, `DiscountBadge`, `SourceTag` + `$lib/format.money`, consumati da Catalog, pagina carrello e pagina Dragon Store (FE-8/FE-18). Il gate design-system "grande" (modello di condivisione, overlay, token) resta a [fase 7](phase-07-email-notifier.md).
 
 ### Trasversali
 

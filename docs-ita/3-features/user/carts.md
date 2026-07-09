@@ -23,8 +23,8 @@ Il carrello è l'unità di monitoraggio con notifica: un gruppo di prodotti del 
 - **CART-R8** — I prodotti **non disponibili** o **delistati** restano nel carrello ma sono **esclusi da tutti i totali** finché non tornano attivi.
 
 ### Soglia
-- **CART-R9** — La soglia si imposta come **valore assoluto** (€) o **percentuale di sconto**; internamente è salvata sempre come percentuale, con la conversione mostrata in UI.
-- **CART-R10** — La soglia percentuale si applica al **totale pieno corrente dei soli prodotti attivi**: se un prodotto diventa indisponibile o il listino cambia, la soglia in € si ricalcola di conseguenza. La UI lo dichiara ("20% ≈ €64 sul totale attuale").
+- **CART-R9** — La soglia si imposta e si memorizza come **valore assoluto in €** (`threshold_amount`); `null` = nessuna soglia, valore `> 0`. *(Decisione 2026-06-29 — inverte la versione precedente "salvata come %".)* La **percentuale è solo un aiuto di input nella UI**: i campi **€ e %** si **specchiano a vicenda** (modificando uno, l'altro si aggiorna sul totale pieno corrente dei prodotti attivi, con `soglia€ = totale · (1 − %/100)`); al backend si invia **solo il valore in €**.
+- **CART-R10** — La soglia in € è **fissa**: una volta impostata non si ricalcola al variare del perimetro (è il numero scelto dall'utente). Il backend non conosce la percentuale; ragiona solo sull'importo.
 - **CART-R11** — La soglia si confronta con la **stima finale** (adjustments inclusi, quando presenti): è il prezzo reale che l'utente pagherebbe — coerente con UC-1.
 - **CART-R12** — Nessun evento di soglia se il carrello non ha **alcun prodotto attivo** (un confronto su totale 0 sarebbe sempre vero e privo di significato).
 
@@ -63,11 +63,11 @@ graph LR
     end
 ```
 
-## Ricalcolo soglia su indisponibilità (esempio normativo)
+## Soglia e prodotti esclusi (esempio normativo)
 
-| Scenario | Totale pieno attivo | Soglia % | Soglia € effettiva |
+La soglia è un importo in € **fisso**; il confronto è sulla **stima finale** dei soli prodotti attivi (CART-R11). Quando un prodotto diventa indisponibile o delistato esce dai totali (CART-R8): la stima finale cambia e la soglia può scattare con un perimetro ridotto. Se scatta **con prodotti esclusi**, lo stato della soglia è marcato **`partial`** (e la notifica, in fase 6, lo dichiara con l'elenco degli esclusi).
+
+| Scenario | Stima finale attiva | Soglia € | Raggiunta? |
 |---|---|---|---|
-| 5 prodotti disponibili | €100 | 20% | €80 |
-| Uno (da €20) diventa indisponibile | €80 | 20% | €64 |
-
-La percentuale resta fissa; il valore in € segue il perimetro dei prodotti attivi. Se la soglia scatta con prodotti esclusi, la notifica lo dichiara (evento "soglia raggiunta parziale" con l'elenco degli esclusi).
+| 5 prodotti disponibili | €90 | €80 | no |
+| Uno (da €20) diventa indisponibile | €72 | €80 | sì (`partial`, 1 escluso) |
