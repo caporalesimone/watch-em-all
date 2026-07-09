@@ -1,6 +1,6 @@
 # Fase 6 — Alert in-app
 
-> Stato: ☐ da iniziare · Prerequisiti: Fasi 4 e 5 · [Indice del flusso](README.md)
+> Stato: 🚧 in corso (avviata 2026-07-09) · Prerequisiti: Fasi 4 e 5 · [Indice del flusso](README.md)
 
 ## Obiettivo
 
