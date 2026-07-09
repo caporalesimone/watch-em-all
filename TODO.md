@@ -1,4 +1,4 @@
-# TO BE FIXED
+# TODO
 
 Running list of issues / polish noted by Simone, to address in a future pass.
 New items get appended over time.

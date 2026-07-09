@@ -1,12 +1,21 @@
+# Normalise every text file to LF in the repository and check it out with the
+# platform's native line endings. Git auto-detects text vs binary; the explicit
+# rules below override it where the ending must be pinned or conversion banned.
+* text=auto
+
 # Shell scripts run inside Linux containers: CRLF would break them,
 # no matter the OS of the machine that commits.
 *.sh text eol=lf
 
-# Compose files are consumed by Docker and carry embedded shell (healthchecks):
-# keep them LF so a Windows checkout never feeds CRLF into a Linux container.
-docker-compose.yml text eol=lf
+# Compose / YAML files are consumed by Docker and carry embedded shell
+# (healthchecks): keep them LF so a Windows checkout never feeds CRLF into a
+# Linux container. Covers compose.yml / compose-dev.yml.
 *.yml text eol=lf
 *.yaml text eol=lf
+
+# Dockerfiles and the entrypoint always target Linux.
+Dockerfile text eol=lf
+*.Dockerfile text eol=lf
 
 # The env template is copied to .env and read on a Linux host: CRLF would leave a
 # trailing \r in every value (e.g. passwords). Keep it LF.
@@ -14,7 +23,14 @@ docker-compose.yml text eol=lf
 
 # Real scraper fixtures are byte-exact (windows-1252, embedded HTML entities):
 # never let git rewrite line endings or normalise them, or the parser tests drift.
-tests/fixtures/** binary
+tests/plugins/**/fixtures/** binary
 
-# Icon assets are binary; never apply EOL conversion.
+# Binary assets: never apply EOL conversion. (SVG is XML/text — left as text.)
 *.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.woff binary
+*.woff2 binary
