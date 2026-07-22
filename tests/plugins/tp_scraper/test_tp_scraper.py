@@ -44,6 +44,23 @@ def _catalog_tp_rows() -> list[tuple[str, bool]]:
         session.close()
 
 
+def _catalog_tp_first() -> tuple[str, bool]:
+    """(price_current, is_available) as strings/bools for the single tp catalog row."""
+    from sqlalchemy import select
+
+    from src.core.db import new_session
+    from src.core.models import CatalogProduct
+
+    session = new_session()
+    try:
+        row = session.scalars(
+            select(CatalogProduct).where(CatalogProduct.plugin_id == "tp_scraper")
+        ).one()
+        return (str(row.price_current), row.is_available)
+    finally:
+        session.close()
+
+
 def test_add_generates_named_tp_product_in_catalog(client: TestClient) -> None:
     token = _admin_token(client)
     resp = client.post(TP, json={"currency": "EUR"}, headers=_bearer(token))
@@ -110,6 +127,52 @@ def test_invalid_currency_rejected(client: TestClient) -> None:
     resp = client.post(TP, json={"currency": "XYZ"}, headers=_bearer(token))
     assert resp.status_code == 422
     assert resp.json()["code"] == "invalid_currency"
+
+
+def test_edit_stages_until_scrape(client: TestClient) -> None:
+    token = _admin_token(client)
+    created = client.post(TP, json={}, headers=_bearer(token)).json()
+    pid = created["id"]
+    initial_price, _ = _catalog_tp_first()
+
+    # Edit the price: the plugin table reflects it immediately...
+    edited = client.patch(f"{TP}/{pid}", json={"price_current": "1.23"}, headers=_bearer(token))
+    assert edited.status_code == 200
+    assert edited.json()["price_current"] == "1.23"
+    # ...but the catalog is NOT touched until a scrape.
+    assert _catalog_tp_first()[0] == initial_price
+
+    # Simulate a scrape → the catalog now reflects the edit and reports the change.
+    scraped = client.post("/api/plugins/tp-scraper/scrape", headers=_bearer(token))
+    assert scraped.status_code == 200
+    assert scraped.json()["price_changes"] >= 1
+    assert _catalog_tp_first()[0] == "1.23"
+
+
+def test_edit_availability_reaches_catalog_on_scrape(client: TestClient) -> None:
+    token = _admin_token(client)
+    created = client.post(TP, json={}, headers=_bearer(token)).json()
+    pid = created["id"]
+
+    client.patch(f"{TP}/{pid}", json={"is_available": False}, headers=_bearer(token))
+    client.post("/api/plugins/tp-scraper/scrape", headers=_bearer(token))
+    assert _catalog_tp_first()[1] is False
+
+
+def test_edit_rejects_non_positive_price(client: TestClient) -> None:
+    token = _admin_token(client)
+    created = client.post(TP, json={}, headers=_bearer(token)).json()
+    resp = client.patch(
+        f"{TP}/{created['id']}", json={"price_current": "0"}, headers=_bearer(token)
+    )
+    assert resp.status_code == 422
+    assert resp.json()["code"] == "invalid_price"
+
+
+def test_edit_unknown_product_404(client: TestClient) -> None:
+    token = _admin_token(client)
+    resp = client.patch(f"{TP}/99999", json={"is_available": False}, headers=_bearer(token))
+    assert resp.status_code == 404
 
 
 def test_tp_scraper_is_not_schedulable(client: TestClient) -> None:

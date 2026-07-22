@@ -16,6 +16,10 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 - **The catalog's "add to cart" picker now guides your choice.** When you select products and pick a target cart, **single-store carts that don't match your selection are greyed out** — a single-store cart only accepts products from its own store, and if your selection spans more than one store all single-store carts are disabled (cross-store carts always stay available). A short note explains why, so an incompatible add is prevented up front instead of failing on submit.
 
+### Changed
+
+- **TP Scraper (dev tool) can now stage changes and "simulate a scrape".** On the TP Scraper page you can **edit a product's price or availability** inline and then press **Simulate scrape** to push every product's current values into the catalog at once — the same way a real scrape would. It makes the new alerts easy to try end to end: build a cart, enable alerts, drop a price, simulate a scrape, and watch the digest appear at your next cadence run.
+
 ### Fixed
 
 - **Carts no longer vanish on a full page reload.** Reloading the browser on the **Carts** page left it empty; you had to click **Carts** in the sidebar again for the list to appear. It now loads its contents on reload like every other page.

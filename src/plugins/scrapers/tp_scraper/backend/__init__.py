@@ -11,8 +11,11 @@ does not implement ``run_for_user``, so ``implements_scraping`` stays ``False``
 Each "add" inserts one random product into its own table and re-delivers the
 FULL set through ``update_catalog`` (the sanctioned write path — a scraper never
 writes the catalog directly); "remove"/"clear" delete rows and re-deliver, so
-the core delists what is gone. Throwaway: delete this folder once real
-multi-store scrapers exist.
+the core delists what is gone. "edit" (PATCH) changes a product's price/availability
+in the plugin's OWN table only; "simulate scrape" (POST /scrape) then delivers the
+current values to the catalog — recording the price/availability changes so the alert
+engine has something to diff. Throwaway: delete this folder once real multi-store
+scrapers exist.
 """
 
 from __future__ import annotations
@@ -192,6 +195,23 @@ class GenerateBody(BaseModel):
     currency: str = "EUR"
 
 
+class EditBody(BaseModel):
+    """Edit a product's price and/or availability (dev QA). Fields left unset are kept;
+    the change stays in the plugin's own table until a "simulate scrape" delivers it."""
+
+    price_current: Decimal | None = None
+    is_available: bool | None = None
+
+
+class ScrapeResult(BaseModel):
+    """What a simulated scrape changed in the catalog (from the Catalog Update Service)."""
+
+    found: int
+    new: int
+    price_changes: int
+    removed: int
+
+
 class GenProductOut(BaseModel):
     id: int
     name: str
@@ -256,11 +276,12 @@ class TpScraperPlugin(ScraperPlugin):
             extra={},
         )
 
-    def _deliver(self, db: Session, user_id: int) -> None:
+    def _deliver(self, db: Session, user_id: int) -> DeltaCounters:
         """Re-deliver this user's full generated set; the core inserts the new
-        ones and delists any that are gone. Commits the session (adds/deletes)."""
+        ones, records price/availability changes and delists any that are gone.
+        Commits the session (adds/deletes). Returns the delta the service computed."""
         products = [self._to_product(r) for r in _user_rows(db, user_id)]
-        _write_context(db).update_catalog(user_id, products)
+        return _write_context(db).update_catalog(user_id, products)
 
     def router(self) -> APIRouter:
         router = APIRouter()
@@ -284,6 +305,46 @@ class TpScraperPlugin(ScraperPlugin):
             out = _out(row)
             self._deliver(db, user.sub)
             return out
+
+        @router.patch("/products/{product_id}", response_model=GenProductOut)
+        def edit_product(
+            product_id: int, body: EditBody, user: UserDep, db: SessionDep
+        ) -> GenProductOut:
+            """Edit a product's price and/or availability in the plugin's own table.
+            Does NOT touch the catalog — the change lands there only on a simulated
+            scrape (POST /scrape), so a developer can stage a change and then 'scrape'
+            it to exercise the alert diff."""
+            row = db.scalar(
+                select(GeneratedProduct).where(
+                    GeneratedProduct.id == product_id, GeneratedProduct.user_id == user.sub
+                )
+            )
+            if row is None:
+                raise APIError(404, "not_found", "product not found")
+            fields = body.model_fields_set
+            if "price_current" in fields and body.price_current is not None:
+                if body.price_current <= 0:
+                    raise APIError(422, "invalid_price", "price_current must be > 0")
+                row.price_current = body.price_current
+            if "is_available" in fields and body.is_available is not None:
+                row.is_available = body.is_available
+            db.commit()
+            db.refresh(row)
+            return _out(row)
+
+        @router.post("/scrape", response_model=ScrapeResult)
+        def scrape(user: UserDep, db: SessionDep) -> ScrapeResult:
+            """Simulate a scrape: deliver every product's CURRENT values (including any
+            edits) to the catalog through the sanctioned Catalog Update Service, which
+            records price/availability changes into the history — so the alert engine
+            has something to diff on the next cadence run."""
+            delta = self._deliver(db, user.sub)
+            return ScrapeResult(
+                found=delta.found,
+                new=delta.new,
+                price_changes=delta.price_changes,
+                removed=delta.removed,
+            )
 
         @router.delete("/products/{product_id}", status_code=204)
         def remove_product(product_id: int, user: UserDep, db: SessionDep) -> None:
