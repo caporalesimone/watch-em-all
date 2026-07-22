@@ -13,20 +13,35 @@ Delivery to external channels is phase 7; here the digest only lands in the hist
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
+from pydantic import BaseModel
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.core.contracts import AlertType
-from src.core.models import AlertSnapshot
+from src.core.cart_engine import AdjustmentFn, evaluate_cart
+from src.core.contracts import AlertType, NotificationKind
+from src.core.models import (
+    AlertLog,
+    AlertSnapshot,
+    Cart,
+    CartAlertType,
+    CartMember,
+    CatalogProduct,
+)
 
 if TYPE_CHECKING:
     from src.core.cart_engine import CartState
-    from src.core.models import CatalogProduct
+
+# Resolves the bound ``get_adjustments`` for a scraper_specific cart (or None). Supplied by
+# the caller (worker/web) so the engine never imports the plugins — same pattern as the
+# carts API. Cross carts and unloaded scrapers get None.
+AdjusterProvider = Callable[[Cart], "AdjustmentFn | None"]
 
 
 def snapshot_payload(products: list[CatalogProduct], state: CartState) -> dict[str, Any]:
@@ -178,3 +193,179 @@ def delete_all_snapshots(db: Session, user_id: int) -> int:
     )
     db.execute(sa_delete(AlertSnapshot).where(AlertSnapshot.user_id == user_id))
     return count
+
+
+# ---------------------------------------------------------------------------
+# Digest payload (alert-event.md) — the self-sufficient AlertEvent written to the
+# history and (from phase 7) handed to the notifiers. Decimal serialises to a string
+# and datetime to ISO-8601 via model_dump(mode="json") (DB-R3 / AEV-R4).
+# ---------------------------------------------------------------------------
+
+
+class ThresholdInfo(BaseModel):
+    target: Decimal  # the € threshold (fixed amount; CART-R9)
+    current: Decimal  # current final estimate
+    reached: bool
+    partial: bool  # reached while some members are excluded
+    excluded: list[str] = []  # names of the excluded products (the PARTIAL case)
+
+
+class CartTotals(BaseModel):
+    full: Decimal
+    discounted: Decimal
+    final: Decimal
+
+
+class ProductAlertPayload(BaseModel):
+    product_id: int
+    name: str
+    url: str
+    plugin_id: str  # PROVENANCE: always present (cross carts!)
+    tags: list[AlertType]
+    price_previous: Decimal | None
+    price_current: Decimal
+    discount_pct: Decimal
+    currency: str = "EUR"
+
+
+class CartAlertPayload(BaseModel):
+    cart_id: int
+    cart_name: str
+    mode: str  # "cross" | "scraper_specific"
+    cart_events: list[AlertType] = []
+    products: list[ProductAlertPayload] = []
+    totals: CartTotals
+    threshold: ThresholdInfo | None = None
+
+
+class AlertEvent(BaseModel):
+    kind: NotificationKind = NotificationKind.ALERT_DIGEST
+    user_id: int
+    generated_at: datetime
+    cart_alerts: list[CartAlertPayload]  # only carts with at least one event (AEV-R1)
+
+
+def _is_active(p: CatalogProduct) -> bool:
+    return p.is_available and not p.removed
+
+
+def _carts_with_alert_types(db: Session, user_id: int) -> list[Cart]:
+    """The user's carts that have at least one alert type enabled (only these are run)."""
+    return list(
+        db.scalars(
+            select(Cart)
+            .join(CartAlertType, CartAlertType.cart_id == Cart.id)
+            .where(Cart.user_id == user_id)
+            .distinct()
+            .order_by(Cart.id.asc())
+        ).all()
+    )
+
+
+def _enabled_types(db: Session, cart_id: int) -> set[str]:
+    return set(
+        db.scalars(select(CartAlertType.alert_type).where(CartAlertType.cart_id == cart_id)).all()
+    )
+
+
+def _member_products(db: Session, cart_id: int) -> list[CatalogProduct]:
+    return list(
+        db.scalars(
+            select(CatalogProduct)
+            .join(CartMember, CartMember.product_id == CatalogProduct.id)
+            .where(CartMember.cart_id == cart_id)
+        ).all()
+    )
+
+
+def _build_cart_alert(
+    cart: Cart,
+    state: CartState,
+    products: list[CatalogProduct],
+    pdiffs: list[ProductDiff],
+    cevents: list[AlertType],
+) -> CartAlertPayload:
+    """Assemble one cart's contribution to the digest — its product tags (with prices and
+    provenance) and cart events, plus totals and threshold state (AEV-R2)."""
+    product_payloads = [
+        ProductAlertPayload(
+            product_id=d.product.id,
+            name=d.product.name,
+            url=d.product.url,
+            plugin_id=d.product.plugin_id,
+            tags=d.tags,
+            price_previous=d.price_previous,
+            price_current=d.price_current,
+            discount_pct=d.product.discount_pct or Decimal(0),
+            currency=d.product.currency,
+        )
+        for d in pdiffs
+    ]
+    threshold = None
+    if state.threshold is not None:
+        excluded = [p.name for p in products if not _is_active(p)]
+        threshold = ThresholdInfo(
+            target=state.threshold.amount,
+            current=state.threshold.current,
+            reached=state.threshold.reached,
+            partial=state.threshold.partial,
+            excluded=excluded,
+        )
+    return CartAlertPayload(
+        cart_id=cart.id,
+        cart_name=cart.name,
+        mode=cart.mode,
+        cart_events=cevents,
+        products=product_payloads,
+        totals=CartTotals(
+            full=state.total_full, discounted=state.total_discounted, final=state.final_price
+        ),
+        threshold=threshold,
+    )
+
+
+def run_for_user(
+    db: Session,
+    user_id: int,
+    adjuster_provider: AdjusterProvider,
+    now: datetime | None = None,
+) -> AlertLog | None:
+    """Run the alert engine for one user (6.B6): diff every cart with active alert types
+    against its baseline, aggregate the events into a single ``AlertEvent`` per user, write
+    it to ``alert_log`` (always, before any delivery) and advance every baseline. Returns
+    the written log row, or ``None`` when nothing changed. Delivery to channels is phase 7.
+
+    ``adjuster_provider`` binds each scraper_specific cart's ``get_adjustments`` so the core
+    never imports the plugins. The caller commits nothing extra — this function commits."""
+    when = now or datetime.now(UTC)
+    digest: list[CartAlertPayload] = []
+    for cart in _carts_with_alert_types(db, user_id):
+        enabled = _enabled_types(db, cart.id)
+        products = _member_products(db, cart.id)
+        state = evaluate_cart(cart.mode, products, adjuster_provider(cart), cart.threshold_amount)
+
+        snap = get_snapshot(db, user_id, cart.id)
+        if snap is None:  # safety net: never seeded → seed silently, no event this run
+            upsert_snapshot(db, user_id, cart.id, snapshot_payload(products, state))
+            continue
+
+        pdiffs = diff_products(products, snap.snapshot_json, enabled)
+        cevents = diff_cart_events(state, snap.snapshot_json, enabled)
+        if pdiffs or cevents:
+            digest.append(_build_cart_alert(cart, state, products, pdiffs, cevents))
+        upsert_snapshot(db, user_id, cart.id, snapshot_payload(products, state))  # advance ALWAYS
+
+    if not digest:
+        db.commit()  # baselines advanced even with nothing to notify
+        return None
+
+    event = AlertEvent(user_id=user_id, generated_at=when, cart_alerts=digest)
+    log = AlertLog(
+        user_id=user_id,
+        kind=NotificationKind.ALERT_DIGEST.value,
+        payload_json=event.model_dump(mode="json"),
+        created_at=when,
+    )
+    db.add(log)  # written ALWAYS, before any channel delivery (phase 7)
+    db.commit()
+    return log

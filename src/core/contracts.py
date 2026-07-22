@@ -39,6 +39,17 @@ class AlertType(StrEnum):
     CART_THRESHOLD_REACHED_PARTIAL = "CART_THRESHOLD_REACHED_PARTIAL"
 
 
+class NotificationKind(StrEnum):
+    """The kind of a notification, which also gives its category (alert-event.md). Phase 6
+    writes only ``ALERT_DIGEST``; the summary (phase 11) and the admin/system text messages
+    (phase 10) reuse the same ``alert_log`` and channel with a different payload."""
+
+    ALERT_DIGEST = "alert_digest"  # diff vs baseline (category: system)
+    SUMMARY = "summary"  # periodic snapshot (category: system)
+    SYSTEM_MESSAGE = "system_message"  # core-generated text message (category: system)
+    ADMIN_MESSAGE = "admin_message"  # admin-written text message (category: admin)
+
+
 class BrandRef(BaseModel):
     """A product's brand: a label plus an optional link (product.md PROD-R6).
 

@@ -217,6 +217,32 @@ class AlertSnapshot(Base):
     )
 
 
+class AlertLog(Base):
+    """One notification in a user's in-app history (schema.md, alerts). Phase 6 (6.B6).
+
+    Written **always**, before any channel delivery (delivery is phase 7). ``kind`` is a
+    :class:`~src.core.contracts.NotificationKind` and gives the category; phase 6 writes
+    only ``alert_digest``. ``payload_json`` is the full self-sufficient digest (AEV-R2) —
+    ``Decimal`` as string, ``datetime`` ISO-8601 (DB-R3). ``read_at`` null = unread (the
+    dashboard badge, 6.F4). ``admin_message_id`` stays null until the admin-message table
+    arrives in phase 10 (kept as a plain nullable column; the FK lands with that table)."""
+
+    __tablename__ = "alert_log"
+    __table_args__ = (Index("ix_alert_log_user_created", "user_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    admin_message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    payload_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class ScrapeCooldown(Base):
     """Anchor for the manual scrape-now cooldown (SCR-R15).
 
