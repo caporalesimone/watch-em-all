@@ -443,6 +443,7 @@ export interface CartCard {
 	final_price: string;
 	threshold_amount: string | null;
 	threshold: CartThreshold | null;
+	alert_types: string[];
 	created_at: string;
 }
 
@@ -502,6 +503,17 @@ export async function removeCartItems(id: number, productIds: number[]): Promise
 		method: 'DELETE',
 		headers: { 'content-type': 'application/json' },
 		body: JSON.stringify({ product_ids: productIds })
+	});
+	return asJson<CartDetail>(res);
+}
+
+// Replace the cart's enabled alert types with the full set (6.B1). Presence = enabled;
+// pass [] to disable all.
+export async function setCartAlertTypes(id: number, alertTypes: string[]): Promise<CartDetail> {
+	const res = await apiFetch(`/api/carts/${id}/alert-types`, {
+		method: 'PUT',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ alert_types: alertTypes })
 	});
 	return asJson<CartDetail>(res);
 }

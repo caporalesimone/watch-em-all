@@ -172,6 +172,27 @@ class CartMember(Base):
     )
 
 
+class CartAlertType(Base):
+    """An alert type enabled on a cart (schema.md, alerts). Phase 6 (6.B1).
+
+    **Presence of a row = that type is enabled** — there is no ``enabled`` column
+    (schema.md). UNIQUE ``(cart_id, alert_type)``; the FK CASCADEs so deleting the cart
+    drops its alert types. ``alert_type`` holds an :class:`~src.core.contracts.AlertType`
+    value. Enabling the first type seeds the per-cart baseline; clearing them all deletes
+    it (6.B2/6.B3)."""
+
+    __tablename__ = "cart_alert_types"
+    __table_args__ = (
+        UniqueConstraint("cart_id", "alert_type", name="uq_cart_alert_types_identity"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    cart_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("carts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    alert_type: Mapped[str] = mapped_column(String(48), nullable=False)
+
+
 class ScrapeCooldown(Base):
     """Anchor for the manual scrape-now cooldown (SCR-R15).
 
