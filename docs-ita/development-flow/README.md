@@ -28,9 +28,9 @@
   *Risultato: lo scraping parte da solo agli orari decisi; l'admin lo osserva nei log.*
 - [x] **Fase 5 — Carrelli** → [phase-05-carts.md](phase-05-carts.md) — rilasciata `0.5.0`
   *Risultato: carrelli con totali, adjustments, soglia e provenienza.*
-- [ ] **Fase 6 — Alert in-app** → [phase-06-alerts-in-app.md](phase-06-alerts-in-app.md) — *implementata, in attesa di release (`0.6.0`)*
-  *Risultato: cambio prezzo → notifica nello Storico alert alla cadenza scelta.*
-- [ ] **Fase 7 — Notifiche Email** 🎉 → [phase-07-email-notifier.md](phase-07-email-notifier.md)
+- [x] **Fase 6 — Alert in-app** → [phase-06-alerts-in-app.md](phase-06-alerts-in-app.md) — rilasciata `0.6.0`
+  *Risultato: cambio prezzo → notifica nello Storico alert appena lo scrape aggiorna i prezzi (event-driven).*
+- [ ] **Fase 7 — Notifiche Email** 🎉 → [phase-07-email-notifier.md](phase-07-email-notifier.md) — *in corso (`0.7.x`)*
   *Risultato: **la mail col digest arriva in casella — il prodotto fa il suo mestiere (0.1)**.*
 - [ ] **Fase 8 — Grafici dello storico** → [phase-08-price-charts.md](phase-08-price-charts.md)
   *Risultato: grafici interattivi per prodotto e carrello.*

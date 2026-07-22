@@ -6,6 +6,10 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 Each entry is **short** and reads as a user-facing story: first a **bullet list of what changed for you** (additions, removals and changes together, light on jargon), then a brief **_under the hood_** paragraph on the architectural/technical changes. Older entries predate this style and are left as they are.
 
+## [0.7.0] - Unreleased
+
+**Phase 7 — email notifications: your alert digests stop living only inside the app and start arriving in your inbox. Entries land below as they ship.**
+
 ## [0.6.0] - 2026-07-23
 
 **Phase 6 — in-app alerts: on each cart you pick which changes matter, and right after every scrape the system drops a single readable digest into the Alert History — event-driven, with nothing to schedule.**

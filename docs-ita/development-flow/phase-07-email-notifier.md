@@ -1,6 +1,6 @@
 # Fase 7 — Notifiche Email 🎉
 
-> Stato: ☐ da iniziare · Prerequisiti: Fase 6 · [Indice del flusso](README.md)
+> Stato: 🚧 in corso (avviata 2026-07-23) · Prerequisiti: Fase 6 · [Indice del flusso](README.md)
 
 ## Obiettivo
 
