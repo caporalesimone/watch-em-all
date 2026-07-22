@@ -2,36 +2,25 @@
 
 > **Layer 4 — Capability** · Audience: developer · Riferimenti tecnici ammessi. Architettura: [data-and-multitenancy](../../2-architecture/data-and-multitenancy.md).
 >
-> Le tabelle **già rilasciate** (`users`, `products`, `price_history`, `carts`, `cart_members`, `scrape_cooldown`, `scraper_schedule`, `scraper_admin_config`, `feature_flags`, `scrape_run`, `scrape_user_log`, `scrape_cache`, `system_settings`, `system_log`) sono documentate in inglese in [`docs/4-capabilities/database/schema.md`](../../../docs/4-capabilities/database/schema.md). Restano qui solo le tabelle ancora **spec-ahead** delle fasi 6+ (alert e notifiche) più le regole trasversali dello schema.
+> Le tabelle **già rilasciate** (`users`, `products`, `price_history`, `carts`, `cart_members`, `scrape_cooldown`, `scraper_schedule`, `scraper_admin_config`, `feature_flags`, `scrape_run`, `scrape_user_log`, `scrape_cache`, `system_settings`, `system_log`, e — da fase 6 — `cart_alert_types`, `alert_snapshot`, `alert_log`) sono documentate in inglese in [`docs/4-capabilities/database/schema.md`](../../../docs/4-capabilities/database/schema.md). Restano qui solo le tabelle ancora **spec-ahead** (consegna sui canali, summary, messaggi admin — fasi 7/10/11) più le regole trasversali dello schema.
 
 Motore **PostgreSQL 16**, accesso via SQLAlchemy, validazione I/O Pydantic v2. Schema creato idempotentemente all'avvio da web e worker; tabelle dei plugin create dai plugin stessi.
 
-Le nuove relazioni pendono dalle tabelle già rilasciate (`users`, `carts` — mostrate per contesto):
+Le relazioni spec-ahead pendono da `users` e da `alert_log` (già rilasciato, mostrato per contesto):
 
 ```mermaid
 erDiagram
-    users ||--o{ alert_log : riceve
     users ||--o| summary_config : ha
     users ||--o{ notifier_user_config : configura
-    carts ||--o{ cart_alert_types : "tipi abilitati (CASCADE)"
-    carts ||--o| alert_snapshot : "baseline per-carrello"
     alert_log ||--o{ alert_delivery : "esiti per canale (CASCADE)"
     admin_message ||--o{ alert_log : "una riga per destinatario"
 ```
 
-## Carrelli — tipi di alert
-
-| Tabella | Colonne | Note |
-|---|---|---|
-| `cart_alert_types` | cart_id FK **CASCADE**, alert_type | **Presenza riga = tipo abilitato** (niente colonna enabled); UNIQUE (cart_id, alert_type). La tabella `carts` è già rilasciata (schema inglese) |
-
-## Notifiche
+## Notifiche (spec-ahead)
 
 | Tabella | Colonne | Note |
 |---|---|---|
 | `summary_config` | user_id PK/FK, enabled, frequency (`weekly`\|`monthly`), weekday, scheduled_time, last_run_date | opt-in; monthly = giorno 1 |
-| `alert_snapshot` | user_id FK, cart_id FK **CASCADE**, snapshot_json, taken_at — **PK (user_id, cart_id)** | baseline **per-carrello**: seed all'abilitazione, avanza a ogni run, delete alla disabilitazione |
-| `alert_log` | id, user_id FK, kind (`alert_digest`\|`summary`\|`system_message`\|`admin_message`), admin_message_id FK (null se non admin), payload_json, created_at, read_at (null = non letto) | sempre scritto; INDEX (user_id, created_at); purge admin per data; kind determina la categoria (sistema/admin); per i messaggi testuali il body nel payload è Markdown (AEV-R7) |
 | `admin_message` | id, target_user_id FK (null = broadcast a tutti), title, body, created_at | il messaggio master; una riga `alert_log` per destinatario; gli esiti si leggono via `alert_delivery` |
 | `system_message_template` | key PK (es. `user.disabled`), title, body, updated_at | **solo override** dei messaggi di sistema: assenza di riga = default del core; ripristino = DELETE (ADMSG-R9) |
 | `alert_delivery` | id, alert_id FK **CASCADE**, plugin_id (null = nessun canale), status (`delivered`\|`failed`\|`skipped_no_notifier`), error_message, delivered_at | **un esito per canale** |

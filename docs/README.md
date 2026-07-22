@@ -1,13 +1,13 @@
 # Watch 'Em All — documentation (English, canonical)
 
 This is the project's **English documentation** — the **canonical wiki**. It describes the
-system **as it actually exists** (phases 0–5, implemented and released), organized by the
-same four layers as the source spec plus the cross-cutting sections.
+system **as it actually exists** (phases 0–6, implemented; 0–5 released, phase 6 in the open
+PR), organized by the same four layers as the source spec plus the cross-cutting sections.
 
 It **grows phase by phase**: at the close of each phase the newly-implemented slices are
 translated/adapted here from the Italian reference [`../docs-ita/`](../docs-ita/README.md).
 The Italian `docs-ita/` is no longer the full source of truth — it now holds only the
-**spec-ahead** slices (phase 6+, not yet built), the [`development-flow/`](../docs-ita/development-flow/README.md)
+**spec-ahead** slices (phase 7+, not yet built), the [`development-flow/`](../docs-ita/development-flow/README.md)
 roadmap and [`future-improvements/`](../docs-ita/future-improvements/README.md). It shrinks
 each phase as content migrates here, and is retired at v1 (close of Phase 12 — Polish/v1).
 
@@ -38,6 +38,7 @@ System- and feature-level architecture; text + Mermaid, no code.
 - [security-posture.md](2-architecture/security-posture.md) — the deliberate simplifications and their rationale
 - [plugin-architecture.md](2-architecture/plugin-architecture.md) — plugin-first, dynamic integration, soft-sandbox isolation
 - [scheduling-and-execution.md](2-architecture/scheduling-and-execution.md) — the scraper dispatcher, catch-up, serial runner, run observability
+- [notification-architecture.md](2-architecture/notification-architecture.md) — the in-app alerts model: diff vs baseline, event-driven, one aggregated digest to the history
 
 ### Layer 3 — Features (`3-features/`)
 Detailed feature views (user / admin / plugin); text + Mermaid, no code.
@@ -55,6 +56,7 @@ Detailed feature views (user / admin / plugin); text + Mermaid, no code.
   - [catalog-and-product-picker.md](3-features/user/catalog-and-product-picker.md) — the read-only catalog table (search, sort, paginate) and the "add selected to a cart" picker
   - [price-history.md](3-features/user/price-history.md) — recorded price/availability history
   - [profile-and-notifiers.md](3-features/user/profile-and-notifiers.md) — user profile and notifier settings
+  - [alerts-and-notifications.md](3-features/user/alerts-and-notifications.md) — in-app alerts: per-cart types, event-driven digests, the history and unread badge
 
 ### Layer 4 — Capabilities (`4-capabilities/`)
 Technical capabilities, contracts and data schema; the only layer with pseudocode and code references.
@@ -63,11 +65,13 @@ Technical capabilities, contracts and data schema; the only layer with pseudocod
   - [adjustment.md](4-capabilities/contracts/adjustment.md) — the `Adjustment` a scraper returns for a single-store cart
   - [product.md](4-capabilities/contracts/product.md) — the `Product` contract every scraper produces
   - [scheduling-models.md](4-capabilities/contracts/scheduling-models.md) — the scheduling data models
+  - [alert-event.md](4-capabilities/contracts/alert-event.md) — the `AlertEvent` digest payload the alert engine writes to the history
 - **core/**
   - [auth.md](4-capabilities/core/auth.md) — JWT auth, refresh rotation, forced/normal password change, bootstrap
   - [cart-engine.md](4-capabilities/core/cart-engine.md) — the read-only engine: totals, adjustments, final estimate, threshold state, health flag
   - [catalog-update-service.md](4-capabilities/core/catalog-update-service.md) — the single write path: delta, history, delisting
   - [cron-worker.md](4-capabilities/core/cron-worker.md) — the worker that runs due scrapes
+  - [alert-engine.md](4-capabilities/core/alert-engine.md) — the alert engine: baseline, diff, one aggregated digest, event-driven after each scrape
   - [plugin-context.md](4-capabilities/core/plugin-context.md) — the minimal context handed to a plugin (`engine`, `db`, `logger`, `config`, `update_catalog`, `http`)
   - [plugin-registry.md](4-capabilities/core/plugin-registry.md) — discovery, validation, isolated loading
   - [price-history.md](4-capabilities/core/price-history.md) — how price/availability history is recorded and read
@@ -104,6 +108,7 @@ Technical capabilities, contracts and data schema; the only layer with pseudocod
 ### Spec-ahead (not yet implemented)
 
 The parts of the product not yet built live, in Italian, under [`../docs-ita/`](../docs-ita/README.md):
-the full [development-flow](../docs-ita/development-flow/README.md) roadmap, the
-[notification-architecture](../docs-ita/2-architecture/notification-architecture.md), and the
-alert/summary/notifier slices across every layer. They migrate here as each phase lands.
+the full [development-flow](../docs-ita/development-flow/README.md) roadmap, and the **not-yet-built
+slices** across every layer — channel **delivery** of the digests (notifiers, phase 7), the periodic
+**summary** report, **admin notifications**, price **analytics** (all-time-low). They migrate here as
+each phase lands.

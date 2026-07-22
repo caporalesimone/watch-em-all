@@ -2,7 +2,7 @@
 
 > **Layer 4 — Capability** · Audience: developer.
 >
-> English translation of the Italian reference [`docs-ita/4-capabilities/database/schema.md`](../../../docs-ita/4-capabilities/database/schema.md), limited to what is implemented (DOC-12). Phase 1 ships the `users` table; phase 3 adds the per-user catalog (`products`), its append-only price history (`price_history`) and the manual-scrape cooldown anchor (`scrape_cooldown`); phase 4 adds the scheduling, worker-run, log and scrape-cache tables; phase 5 adds the `carts` and `cart_members` tables. The per-cart alert-type rows and their baseline arrive in later phases.
+> English translation of the Italian reference [`docs-ita/4-capabilities/database/schema.md`](../../../docs-ita/4-capabilities/database/schema.md), limited to what is implemented (DOC-12). Phase 1 ships the `users` table; phase 3 adds the per-user catalog (`products`), its append-only price history (`price_history`) and the manual-scrape cooldown anchor (`scrape_cooldown`); phase 4 adds the scheduling, worker-run, log and scrape-cache tables; phase 5 adds the `carts` and `cart_members` tables; phase 6 adds the alert tables (`cart_alert_types`, `alert_snapshot`, `alert_log`). The notifier/delivery, summary and admin-message tables arrive in later phases.
 
 Engine **PostgreSQL 16**, accessed via SQLAlchemy, I/O validated with Pydantic v2. The schema is created idempotently at startup by web and worker (`create_all`).
 
@@ -31,6 +31,14 @@ Engine **PostgreSQL 16**, accessed via SQLAlchemy, I/O validated with Pydantic v
 |---|---|---|
 | `carts` | id, user_id FK **CASCADE**, name, mode (`cross`\|`scraper_specific`), scraper_id (String, null), threshold_amount (Numeric(12,2), null), created_at | per-user (DB-R1). `mode` fixed at creation (CART-R2); `scraper_id` = the scraper's `plugin_id` for `scraper_specific`, **NULL** for `cross` (CART-R4/R5). `threshold_amount` = the savings threshold, an **absolute €** value (`> 0`) or **NULL** = none (CART-R9); the percentage is only a UI input aid, never stored |
 | `cart_members` | id, cart_id FK **CASCADE**, product_id FK **CASCADE** — **UNIQUE (cart_id, product_id)** | a product's membership in a cart (CART-R1). Both FKs cascade: deleting the cart drops its members; deleting the catalog product removes it from every cart (CAT-R8). The UNIQUE constraint makes adds idempotent. No membership state is stored — active/excluded is derived from the product's `is_available`/`removed` by the Cart Engine |
+
+## Alerts (phase 6)
+
+| Table | Columns | Notes |
+|---|---|---|
+| `cart_alert_types` | id, cart_id FK **CASCADE**, alert_type — **UNIQUE (cart_id, alert_type)** | the alert types enabled on a cart (6.B1). **Presence of a row = enabled** (no `enabled` column); `alert_type` is an [`AlertType`](../contracts/alert-event.md) value. Enabling the first type **seeds** the baseline; clearing them all **deletes** it |
+| `alert_snapshot` | user_id FK **CASCADE**, cart_id FK **CASCADE**, snapshot_json (JSON), taken_at — **PK (user_id, cart_id)** | the per-(user, cart) **baseline** the diff compares against: for each non-delisted member `{on_sale, available, price_current}`, plus cart-level `all_on_sale` / `threshold_reached`. Seeded on the first alert type enabled, **advanced every run**, deleted when all types are disabled (6.B2/6.B3) |
+| `alert_log` | id, user_id FK **CASCADE**, kind (`alert_digest`\|…), admin_message_id (Integer, null — its FK/table land in phase 10), payload_json (JSON), created_at, read_at (null = unread) | one in-app notification, **written always** (6.B6); INDEX (user_id, created_at). `payload_json` is the self-sufficient digest (Decimal as string, datetime ISO-8601, DB-R3). `read_at` null = unread (the sidebar badge). Phase 6 writes only `alert_digest`; per-channel delivery outcomes (`alert_delivery`) arrive in phase 7 |
 
 ## Scheduling & monitoring (phase 4)
 

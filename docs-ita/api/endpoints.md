@@ -22,12 +22,6 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 
 > La lettura del catalogo (`GET /api/catalog`) è già implementata (vedi wiki inglese). Lo **scrape-now** non è un endpoint di catalogo: è **per-scraper**, esposto dal plugin sotto `/api/plugins/{route}/scrape-now`. Il catalogo si scrive solo via Catalog Update Service, mai da qui.
 
-## Carrelli — tipi di alert — [cart-engine](../../docs/4-capabilities/core/cart-engine.md)
-
-| Metodo | Path | Ruolo | Body / Query | Note |
-|---|---|---|---|---|
-| PUT | `/api/carts/{id}/alert-types` | 👤 | `{alert_types: [...]}` | set completo; primo tipo → seed baseline, vuoto → delete baseline |
-
 ## Storico prezzi — [price-history](../4-capabilities/core/price-history.md)
 
 | Metodo | Path | Ruolo | Query | Note |
@@ -35,16 +29,6 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 | GET | `/api/products/{id}/history` | 👤 | `?range=week\|month\|all` | serie a gradini con flag disponibilità |
 | GET | `/api/carts/{id}/history` | 👤 | `?range=` | serie aggregata (composizione corrente) |
 | GET | `/api/products/{id}/stats` | 👤 | — | statistiche + indicatore di convenienza, o `insufficient_history` — [price-analytics](../4-capabilities/core/price-analytics.md) |
-
-## Storico alert — [alert-engine](../4-capabilities/core/alert-engine.md)
-
-| Metodo | Path | Ruolo | Body / Query | Note |
-|---|---|---|---|---|
-| GET | `/api/alerts` | 👤 | `?page=&kind=` | elenco con stato lettura ed esiti di consegna |
-| GET | `/api/alerts/{id}` | 👤 | — | payload completo + delivery per canale |
-| POST | `/api/alerts/{id}/read` | 👤 | — | marca letto |
-| GET | `/api/alerts/unread-count` | 👤 | — | per il badge in dashboard |
-| DELETE | `/api/alerts` | 👤 | `{ids: [...]}` | elimina in blocco i propri alert (selezione multipla); id non propri ignorati |
 
 ## Notifier (utente) — [profile-and-notifiers](../3-features/user/profile-and-notifiers.md)
 

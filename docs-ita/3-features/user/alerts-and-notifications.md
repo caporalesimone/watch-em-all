@@ -1,66 +1,31 @@
-# Alert e notifiche (lato utente)
+# Alert e notifiche — lato utente (spec-ahead)
 
-> **Layer 3 — Feature utente** · Audience: architetti, developer · Testo + Mermaid, niente codice. Architettura: [notification-architecture](../../2-architecture/notification-architecture.md) · Capability: [alert-engine](../../4-capabilities/core/alert-engine.md).
+> **Layer 3 — Feature utente** · Audience: architetti, developer · Testo + Mermaid, niente codice.
+>
+> I requisiti **implementati** (trigger event-driven, tipi di alert per-carrello, diff su baseline, digest aggregato unico, prima run silenziosa, tag prodotto/carrello, storico con letto/non letto e cancellazione multipla) sono ora nel mirror inglese canonico [`docs/3-features/user/alerts-and-notifications.md`](../../../docs/3-features/user/alerts-and-notifications.md) (DOC-12). Questo file conserva solo i requisiti **non ancora costruiti**. Architettura: [notification-architecture](../../2-architecture/notification-architecture.md) · Capability: [alert-engine](../../4-capabilities/core/alert-engine.md).
 
-## Requisiti
-
-### Cadenza (quando)
-- **ALERT-R1** — Gli alert girano **a fine di ogni scrape** che ha cambiato il catalogo dell'utente (scrape schedulato nel worker, scrape-now manuale, "simula scrape" del TP). Nessuna configurazione di orario o giorni: scrape e notifica sono **accoppiati** (event-driven).
-- **ALERT-R2** — Ogni run di scrape produce **un solo digest aggregato per utente** (`alert_digest`), che raccoglie tutti i carrelli con eventi di quella run.
-- **ALERT-R3** — La baseline è seminata quando si abilita il **primo** tipo di alert su un carrello e cancellata quando si disabilitano **tutti** i tipi su quel carrello (nessun arretrato: alla riabilitazione riparte da "ora"). La UI avverte di questo effetto.
-
-### Diff e contenuti (cosa)
-- **ALERT-R4** — Il rilevamento è un **diff vs ultima run**: si notifica solo ciò che è cambiato, qualunque sia il numero di scrape intermedi. Nessuna policy di ripetizione (un evento già notificato non si ripete).
-- **ALERT-R5** — Per ogni carrello si valutano **solo i tipi abilitati su quel carrello**.
-- **ALERT-R6** — Una run produce **al più una** notifica: zero se il diff è vuoto (la baseline avanza comunque), altrimenti l'unico digest aggregato di ALERT-R2.
-- **ALERT-R7** — Ogni prodotto negli eventi porta: i **tag** (può averne più d'uno), **prezzo precedente e attuale**, % sconto, **provenienza** (icona/nome scraper) e link. Ogni carrello: totali correnti e stato soglia. Il digest deve bastare per decidere senza aprire l'app.
-- **ALERT-R8** — La prima run dopo l'abilitazione non notifica (baseline appena seminata); gli elementi senza baseline (prodotto appena aggiunto a un carrello attivo) sono seminati in silenzio.
+## Requisiti (spec-ahead)
 
 ### Tipi di alert
-- **ALERT-R9** — Tag di **prodotto** (validi solo dentro il carrello): entrato in offerta / uscito di offerta / diventato indisponibile / tornato disponibile / **minimo storico** (un ribasso ha portato il prezzo al minimo mai registrato — vedi [price-analytics](price-analytics.md)).
-- **ALERT-R10** — Eventi di **carrello**: tutto in offerta / soglia raggiunta / soglia raggiunta parziale (con prodotti esclusi perché non attivi).
-- **ALERT-R11** — Semantica formale di "in offerta": sconto > 0 rispetto al listino. Il passaggio di stato (fuori offerta → in offerta) genera il tag; un **ulteriore ribasso** mentre già in offerta genera di nuovo il tag "in offerta" (il prezzo è cambiato a favore: è un'informazione che l'utente vuole). Prezzo risalito sopra il listino o tornato pieno → "uscito di offerta".
-- **ALERT-R12** — I prodotti delistati sono **ignorati** dagli alert (nessun tag); se erano presenti nella baseline e vengono delistati, l'evento visibile è la loro esclusione dai totali (eventuale "soglia parziale").
+- **ALERT-R9 (estensione)** — Tag di **prodotto** aggiuntivo: **minimo storico** (un ribasso ha portato il prezzo al minimo mai registrato). Dipende dalle price analytics — vedi [price-analytics](price-analytics.md) (fase 11). I quattro tag già attivi (entrato/uscito di offerta, diventato indisponibile/tornato disponibile) sono implementati e documentati nel mirror inglese.
 
 ### Storico e consegna
-- **ALERT-R13** — Ogni notifica è **sempre** registrata nello storico interno, anche senza canali configurati; ha uno stato **letto/non letto** (badge in dashboard).
-- **ALERT-R14** — La consegna avviene su **tutti i canali abilitati** dall'utente; l'esito è registrato **per canale** (consegnata / fallita con motivo / nessun canale). Un fallimento di consegna non blocca né nasconde nulla.
-- **ALERT-R15** — Lo storico è consultabile e paginato; il dettaglio di una notifica mostra il digest completo e gli esiti di consegna.
+- **ALERT-R14** — La consegna avviene su **tutti i canali abilitati** dall'utente ed è **asincrona**: alla scrittura del digest il core registra una riga `alert_delivery` in stato **`pending`** per ogni canale abilitato (o `skipped_no_notifier` se nessun canale è configurato), che il **worker drena** fuori dal ciclo di scrape. L'esito è registrato **per canale** (consegnata / fallita con motivo / nessun canale). Un fallimento di consegna non blocca né nasconde nulla (il digest è già nello storico interno — ALERT-R13).
 - **ALERT-R16** — Lo storico distingue **due categorie**: notifiche di **sistema** (digest, summary) e notifiche **admin** (messaggi inviati dall'amministratore — [admin-notifications](../admin/admin-notifications.md)). Le notifiche admin hanno **icona e colore dedicati** e lo storico è filtrabile per categoria. Anche per le notifiche admin valgono ALERT-R13/R14: sempre in storico, consegna sui canali abilitati.
 
-## Flusso di una run
+### Report periodico
+- Il **summary** (fase 11) è una fotografia periodica opt-in dello stato dei carrelli (non un diff). Riusa la stessa pipeline: una riga nello storico interno **sempre** e consegna sui canali abilitati (ALERT-R14). È distinto dal digest per tipo di payload; i notifier lo formattano diversamente.
+
+## Consegna di una run (spec-ahead)
 
 ```mermaid
 flowchart TD
-    T[Fine di uno scrape<br/>che ha cambiato il catalogo] --> L[Carica baseline + stato corrente]
-    L --> C{Per ogni carrello<br/>con alert attivi}
-    C --> D[Diff prodotti: tag<br/>Diff carrello: eventi]
-    D --> F{Tipi abilitati<br/>sul carrello?}
-    F -- filtra --> AGG[Aggrega nel digest]
-    AGG --> E{Digest vuoto?}
-    E -- sì --> ADV[Solo avanzamento baseline]
-    E -- no --> LOG[(Storico alert + non letto)]
-    LOG --> CH[Consegna su ogni canale abilitato]
-    CH --> REC[(Esito per canale)]
-    REC --> ADV2[Avanzamento baseline]
+    LOG[(Storico alert<br/>digest già scritto — ALERT-R13)] --> DISP[Righe alert_delivery 'pending'<br/>per canale abilitato]
+    DISP --> CH[Il worker drena le consegne]
+    CH --> REC[(Esito per canale:<br/>consegnata / fallita / saltata)]
 ```
 
-## Esempio di digest
-
-Carrello "Cthulhu Starter" (5 prodotti): uno era indisponibile, è tornato **e** è in sconto; la stima finale è scesa sotto soglia.
-
-> **Watch 'Em All — 2 carrelli con novità**
->
-> **Cthulhu Starter** — Soglia raggiunta 🎯 (stima €78.00, soglia €80.00)
-> - *Necronomicon* 🏷 di nuovo disponibile · 🏷 in offerta — €25.00 → **€19.90** (−20%) · da *Sito A* · [apri]
->
-> **Fotocamera** (cross)
-> - *Fotocamera X100* 🏷 in offerta — €1.099 → **€949** (−14%) · da *Sito B* · [apri]
-
-I tag sono resi come badge grafici; lo stesso prodotto può cumulare più tag nella stessa notifica.
-
-## Interazioni UI
+## Interazioni UI (spec-ahead)
 
 - **Profilo → Notifiche**: configurazione canali con flag on/off e bottone **Test** per ciascuno ([profile-and-notifiers.md](profile-and-notifiers.md)). Nessun picker di giorni/orario: gli alert sono event-driven (a fine scrape).
-- **Carrello**: selezione dei tipi di alert (default: nessuno). L'abilitazione/disabilitazione mostra l'effetto sulla baseline ("il monitoraggio riparte da ora").
-- **Storico alert**: elenco con badge non letto, filtro per categoria (sistema/admin) e per tipo (digest/summary), notifiche admin evidenziate con icona e colore dedicati, messaggi testuali resi in Markdown (sanificato), dettaglio con esiti di consegna.
+- **Storico alert (parti spec-ahead)**: filtro per categoria (sistema/admin) e per tipo (digest/summary), notifiche admin evidenziate con icona e colore dedicati, messaggi testuali resi in Markdown (sanificato), dettaglio con esiti di consegna per canale. La lista base, il badge non letto e la cancellazione multipla sono implementati (mirror inglese).

@@ -70,12 +70,12 @@ Normative notes:
 
 ## Persistence
 
-Tables `carts` (with `mode` and `scraper_id` nullable for cross carts, `threshold_amount` nullable) and `cart_members` — schema in [database/schema.md](../database/schema.md). The threshold is a column of `carts` (a 1:1 relationship, no separate table). The per-cart alert types (rows-present = type enabled) are a later phase and are not present yet.
+Tables `carts` (with `mode` and `scraper_id` nullable for cross carts, `threshold_amount` nullable) and `cart_members` — schema in [database/schema.md](../database/schema.md). The threshold is a column of `carts` (a 1:1 relationship, no separate table). The per-cart alert types (rows-present = type enabled) and their baseline ship in phase 6 (`cart_alert_types` / `alert_snapshot`); see [alert-engine](alert-engine.md).
 
 ## Interactions
 
 | Caller | For what |
 |---|---|
 | Carts API | cards, detail, validations |
-| Alert Engine (later phase) | current state to compare against the baseline |
+| [Alert Engine](alert-engine.md) | current state to compare against the baseline (phase 6) |
 | Summary (later phase) | periodic snapshot |

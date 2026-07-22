@@ -34,7 +34,7 @@ With Watch 'Em All, Giulia:
 2. creates a **cross-store cart** "Camera" and adds the product **three times: once per site**;
 3. watches each row's price and availability in the cart.
 
-Inside the cart Giulia sees **clearly which site each row comes from**: the provenance (shop name and icon) is always shown next to every product, both in the carts pages and in the cart detail. Without this information a cross cart would be unreadable — three identical rows with no way to know who is discounting. *(The per-product alerts "on offer" / "back in stock", and their notification, arrive in a later phase.)*
+Inside the cart Giulia sees **clearly which site each row comes from**: the provenance (shop name and icon) is always shown next to every product, both in the carts pages and in the cart detail. Without this information a cross cart would be unreadable — three identical rows with no way to know who is discounting. *(The per-product alerts — "on sale" / "back in stock" — and their in-app notification ship in phase 6; see [alerts-and-notifications](../3-features/user/alerts-and-notifications.md). Delivery over email/other channels is a later phase.)*
 
 **What this use case demands of the system**: carts that accept products from different scrapers, the "same" product present several times (once per site), **provenance always explicit** on every row, and — later — per-product alerts inside the cart.
 

@@ -45,7 +45,9 @@
 
 - A new **Alerts** section lists your notifications newest-first (paginated), each row showing when
   it was generated, how many carts changed, and an **unread** marker. Opening one shows the full,
-  readable digest and **marks it read**. The sidebar carries an **unread count** badge.
+  readable digest (tags as graphic badges) and **marks it read**. You can **select multiple and
+  delete** them. The sidebar carries an **unread count** badge that stays **live** (it polls every
+  20s), so a new alert shows up without a reload.
 
 _Under the hood:_ three new tables (`cart_alert_types`, `alert_snapshot`, `alert_log`) and the
 `src/core/alert_engine.py` module (baseline seed/advance/delete, the product and cart-event diffs,
@@ -79,9 +81,10 @@ docker compose -f compose-dev.yml down -v               # reset the DB (admin re
 #   …edit a TP product's price, then POST /api/plugins/tp-scraper/scrape — the scrape runs the
 #    alert engine for you and writes the digest…
 #   GET   /api/alerts                   # the history (paginated)
-#   GET   /api/alerts/unread-count      # the dashboard badge
+#   GET   /api/alerts/unread-count      # the sidebar badge
 #   GET   /api/alerts/{id}              # the full digest
 #   POST  /api/alerts/{id}/read         # mark read
+#   DELETE /api/alerts                  {"ids":[1,2]}   # bulk delete
 ```
 
 **pgweb** (DB browser) — http://localhost:8081. New tables to inspect this phase:

@@ -42,7 +42,7 @@ Attivi gli alert su un carrello, un prezzo cambia allo scrape successivo, e **su
 - [x] **6.F1 — UI tipi di alert sulla card** (~1h): selezione per carrello con avviso sugli effetti baseline ("il monitoraggio riparte da ora"). *Verifica: selezione → baseline coerente.*
 - [x] **6.F2 — (rimosso)** — la UI cadenza nel Profilo è stata **eliminata** con il passaggio a event-driven: non c'è più nulla da configurare (niente giorni/orario). La scelta *quali* tipi di alert resta sulla card del carrello (6.F1).
 - [x] **6.F3 — Storico alert: elenco + dettaglio** (~1h): lista paginata, dettaglio digest leggibile. *Verifica: digest completo da browser.*
-- [x] **6.F4 — Letto/non letto + badge** (~1h): stato di lettura, badge unread in dashboard. *Verifica: lettura → badge aggiornato.*
+- [x] **6.F4 — Letto/non letto + badge** (~1h): stato di lettura, badge unread in sidebar **aggiornato live** (poll 20s), tag di prodotto resi come badge localizzati (AEV-R3), **eliminazione multipla** degli alert dallo storico (`DELETE /api/alerts`). *Verifica: lettura → badge aggiornato; nuovo alert → badge cambia entro 20s; selezione + elimina.*
 
 ## Definition of Done
 

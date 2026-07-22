@@ -2,7 +2,7 @@
 
 > The single, canonical reference of the core HTTP endpoints. Conventions and Swagger: [README.md](README.md).
 >
-> English translation of the Italian reference [`docs-ita/api/endpoints.md`](../../docs-ita/api/endpoints.md), limited to what is implemented (DOC-12). Phase 1 ships Auth, Me and Health; phase 3 adds admin user management, plugin discovery, the read-only **catalog** and the scraper plugin's own routes; phase 4 adds the scraper scheduling/worker admin, the system log and the runtime settings/feature-flags; phase 5 adds **carts** (CRUD, membership and the computed state). Cart/product **history**, **alerts**, **notifiers** and the per-cart **alert types** arrive in later phases.
+> English translation of the Italian reference [`docs-ita/api/endpoints.md`](../../docs-ita/api/endpoints.md), limited to what is implemented (DOC-12). Phase 1 ships Auth, Me and Health; phase 3 adds admin user management, plugin discovery, the read-only **catalog** and the scraper plugin's own routes; phase 4 adds the scraper scheduling/worker admin, the system log and the runtime settings/feature-flags; phase 5 adds **carts** (CRUD, membership and the computed state); phase 6 adds the per-cart **alert types** and the in-app **alert history**. Cart/product **history** and **notifier** delivery arrive in later phases.
 
 Role legend: 🌐 public · 👤 user · 🛡 admin
 
@@ -81,8 +81,21 @@ The catalog is **read-only** here: it is written only through the Catalog Update
 | DELETE | `/api/carts/{id}` | 👤 | — | **204**; deletes only the cart (members cascade; catalog products untouched, CART-R3) |
 | POST | `/api/carts/{id}/items` | 👤 | `{product_ids}` | add members (idempotent). Batch-validated: your catalog only (**422** `product_not_found`), no delisted (**422** `product_delisted`), single currency (**422** `currency_mismatch`), and for `scraper_specific` only that scraper's products (**422** `product_scraper_mismatch`). Returns the updated detail |
 | DELETE | `/api/carts/{id}/items` | 👤 | `{product_ids}` | remove members; absent ids are a no-op. Returns the updated detail |
+| PUT | `/api/carts/{id}/alert-types` | 👤 | `{alert_types: [...]}` | set the **full** set of enabled alert types on the cart (presence = enabled; 6.B1). Values validated against the `AlertType` enum (**422** `unknown_alert_type`). Enabling the first type **seeds the baseline**; an empty list **deletes** it. Returns the updated detail (whose `alert_types` reflects the set) |
 
-The cart state (totals over the **active** members, adjustments for scraper-specific carts, the final estimate, the threshold state and the `has_delisted` health flag) is computed on demand by the [Cart Engine](../4-capabilities/core/cart-engine.md) — nothing is persisted beyond the cart definition and its members. The per-cart **alert types** (and their baseline) and the cart **price history** arrive in later phases.
+The cart state (totals over the **active** members, adjustments for scraper-specific carts, the final estimate, the threshold state and the `has_delisted` health flag) is computed on demand by the [Cart Engine](../4-capabilities/core/cart-engine.md) — nothing is persisted beyond the cart definition and its members. The cart **price history** arrives in a later phase.
+
+## Alerts — [alert-engine](../4-capabilities/core/alert-engine.md)
+
+The in-app alert history (phase 6). Alerts are **event-driven**: the engine runs after each scrape that changed the user's catalog and writes at most one aggregated digest per user (no cadence). Per-channel **delivery** and its outcomes arrive in phase 7.
+
+| Method | Path | Role | Body / Query | Notes |
+|---|---|---|---|---|
+| GET | `/api/alerts` | 👤 | `?page=&page_size=&kind=` | the user's notifications, newest first, paginated → `{items, total, page, page_size}`. Each item: `{id, kind, created_at, read, cart_count}`. Optional `kind` filter |
+| GET | `/api/alerts/unread-count` | 👤 | — | `{count}` — the unread count for the sidebar badge |
+| GET | `/api/alerts/{id}` | 👤 | — | one notification in full: `{id, kind, created_at, read, payload, deliveries}` — `payload` is the self-sufficient digest; `deliveries` is empty until phase 7. Another user's alert → **404** |
+| POST | `/api/alerts/{id}/read` | 👤 | — | **204**; mark read (idempotent — keeps the first read timestamp). Another user's alert → **404** |
+| DELETE | `/api/alerts` | 👤 | `{ids: [...]}` | **204**; bulk-delete the user's own alerts (multi-select). Ids the caller doesn't own are simply not matched |
 
 ## Scraper plugin routes — Dragon Store (implemented)
 

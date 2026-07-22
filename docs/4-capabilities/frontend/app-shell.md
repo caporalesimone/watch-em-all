@@ -42,7 +42,7 @@ The **forced password change** page shows only *new password* + *confirm*: the c
 
 ## Shell and navigation
 
-- **Left sidebar** (persistent): Dashboard · **Product Picker** · **Carts** · Profile · Log out, plus a collapsible **SCRAPERS** group at the bottom (populated dynamically from `GET /api/plugins` — phase 2, see [Plugins](#plugins-phase-2)), kept **last** so it grows without shifting the core entries. Price history and Alerts entries join when those pages arrive.
+- **Left sidebar** (persistent): Dashboard · **Product Picker** · **Carts** · **Alerts** (with a live **unread badge**) · Profile · Log out, plus a collapsible **SCRAPERS** group at the bottom (populated dynamically from `GET /api/plugins` — phase 2, see [Plugins](#plugins-phase-2)), kept **last** so it grows without shifting the core entries. The Price history entry joins when that page arrives.
 - **No top bar**: the **theme** (light/dark) toggle lives in **Profile → Settings** (the language selector is planned but not exposed in V1, English-only).
 
 ## Theme and language
@@ -59,7 +59,8 @@ The **forced password change** page shows only *new password* + *confirm*: the c
 | Forced change | new + confirm only (no current password); greets by name | 1 |
 | Profile | **account fields** (Username, Name, Surname, Role — read-only), a **Settings** section (light/dark theme toggle), change password (current password required), language (read-only, English) | 1 |
 | Product Picker | server-side paginated **catalog** table (`GET /api/catalog`): name search, sort by column, filters by availability / delisted, provenance (plugin icon). Read-only view — the catalog is populated by a scrape | 3 |
-| Carts | cart **cards** and a **detail** page: create (mode fixed at creation), rename, delete, add/remove members; the Cart Engine's computed totals (full / discounted), plugin adjustments (scraper_specific), final estimate, savings threshold state and the delisted-member health flag. The per-cart **alert types** are a later phase | 5 |
+| Carts | cart **cards** and a **detail** page: create (mode fixed at creation), rename, delete, add/remove members; the Cart Engine's computed totals (full / discounted), plugin adjustments (scraper_specific), final estimate, savings threshold state and the delisted-member health flag; the per-cart **alert types** are chosen on the detail page | 5 |
+| Alerts | the in-app **alert history**: a paginated, mailbox-style list with an unread marker and **multi-select delete**, and a **detail** view of the digest (per-cart events + per-product tags/prices/provenance). Opening one marks it read; the sidebar's unread badge is kept live | 6 |
 
 ## Plugins (phase 2)
 
