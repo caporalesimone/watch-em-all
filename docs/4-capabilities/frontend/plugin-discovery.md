@@ -2,7 +2,7 @@
 
 > **Layer 4 — Capability** · Audience: developer.
 >
-> English translation of the Italian reference [`docs-ita/4-capabilities/frontend/plugin-discovery.md`](../../../docs-ita/4-capabilities/frontend/plugin-discovery.md), limited to what is implemented (DOC-12).
+> Limited to what is implemented (DOC-12).
 
 ## Purpose
 

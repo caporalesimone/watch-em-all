@@ -8,6 +8,7 @@
 		getCart,
 		patchCart,
 		removeCartItems,
+		setCartAlertTypes,
 		type CartDetail
 	} from '$lib/api/client';
 	import DiscountBadge from '$lib/components/DiscountBadge.svelte';
@@ -183,6 +184,45 @@
 			span > 0 ? Math.max(0, Math.min(1, (full - current) / span)) * 100 : t.reached ? 100 : 0;
 		return { pct, remaining: Math.max(current - target, 0).toFixed(2), reached: t.reached };
 	});
+
+	// --- Alert types (6.F1) ---
+	// User-facing toggles → backend StrEnum values. "Threshold reached" maps to BOTH the
+	// full and partial cart events (enabled/disabled together).
+	const PRODUCT_TOGGLES: { label: string; types: string[] }[] = [
+		{ label: 'alertTypes.productOnSale', types: ['PRODUCT_ON_SALE'] },
+		{ label: 'alertTypes.productOffSale', types: ['PRODUCT_OFF_SALE'] },
+		{ label: 'alertTypes.productUnavailable', types: ['PRODUCT_UNAVAILABLE'] },
+		{ label: 'alertTypes.productAvailableAgain', types: ['PRODUCT_AVAILABLE_AGAIN'] }
+	];
+	const CART_TOGGLES: { label: string; types: string[] }[] = [
+		{ label: 'alertTypes.cartAllOnSale', types: ['CART_ALL_ON_SALE'] },
+		{
+			label: 'alertTypes.cartThresholdReached',
+			types: ['CART_THRESHOLD_REACHED', 'CART_THRESHOLD_REACHED_PARTIAL']
+		}
+	];
+
+	// A toggle reads as on when any of its underlying events is enabled on the cart.
+	function alertOn(types: string[]): boolean {
+		return !!cart && types.some((t) => cart!.alert_types.includes(t));
+	}
+
+	// Flip a toggle: add/remove its whole group, then PUT the full desired set and adopt
+	// the server's response. Busy-guarded like the rest of the page.
+	async function toggleAlert(types: string[], on: boolean): Promise<void> {
+		if (!cart || busy) return;
+		const desired = new Set(cart.alert_types);
+		for (const t of types) {
+			if (on) desired.add(t);
+			else desired.delete(t);
+		}
+		busy = true;
+		try {
+			cart = await setCartAlertTypes(cart.id, [...desired]);
+		} finally {
+			busy = false;
+		}
+	}
 
 	const th = 'py-2 pr-4 font-normal';
 </script>
@@ -363,6 +403,46 @@
 						</div>
 					{/if}
 				{/if}
+			</div>
+		</div>
+
+		<!-- Alert types (6.F1) -->
+		<div class="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+			<h2 class="font-medium">{$_('alertTypes.title')}</h2>
+			<p class="mt-1 max-w-prose text-xs text-slate-400">{$_('alertTypes.hint')}</p>
+			<div class="mt-3 grid gap-4 sm:grid-cols-2">
+				<fieldset class="space-y-1.5">
+					<legend class="text-xs font-semibold tracking-wide text-slate-400 uppercase"
+						>{$_('alertTypes.productHeading')}</legend
+					>
+					{#each PRODUCT_TOGGLES as t (t.label)}
+						<label class="flex items-center gap-2 text-sm">
+							<input
+								type="checkbox"
+								checked={alertOn(t.types)}
+								disabled={busy}
+								onchange={() => toggleAlert(t.types, !alertOn(t.types))}
+							/>
+							<span>{$_(t.label)}</span>
+						</label>
+					{/each}
+				</fieldset>
+				<fieldset class="space-y-1.5">
+					<legend class="text-xs font-semibold tracking-wide text-slate-400 uppercase"
+						>{$_('alertTypes.cartHeading')}</legend
+					>
+					{#each CART_TOGGLES as t (t.label)}
+						<label class="flex items-center gap-2 text-sm">
+							<input
+								type="checkbox"
+								checked={alertOn(t.types)}
+								disabled={busy}
+								onchange={() => toggleAlert(t.types, !alertOn(t.types))}
+							/>
+							<span>{$_(t.label)}</span>
+						</label>
+					{/each}
+				</fieldset>
 			</div>
 		</div>
 

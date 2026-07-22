@@ -172,6 +172,77 @@ class CartMember(Base):
     )
 
 
+class CartAlertType(Base):
+    """An alert type enabled on a cart (schema.md, alerts). Phase 6 (6.B1).
+
+    **Presence of a row = that type is enabled** — there is no ``enabled`` column
+    (schema.md). UNIQUE ``(cart_id, alert_type)``; the FK CASCADEs so deleting the cart
+    drops its alert types. ``alert_type`` holds an :class:`~src.core.contracts.AlertType`
+    value. Enabling the first type seeds the per-cart baseline; clearing them all deletes
+    it (6.B2/6.B3)."""
+
+    __tablename__ = "cart_alert_types"
+    __table_args__ = (
+        UniqueConstraint("cart_id", "alert_type", name="uq_cart_alert_types_identity"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    cart_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("carts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    alert_type: Mapped[str] = mapped_column(String(48), nullable=False)
+
+
+class AlertSnapshot(Base):
+    """The per-cart alert **baseline** (alert-engine.md, schema.md). Phase 6 (6.B2).
+
+    One row per **(user, cart)** — a composite primary key. ``snapshot_json`` is the
+    reference state the next run diffs against: for each (non-delisted) member product
+    ``{on_sale, available, price_current}``, plus the cart-level ``all_on_sale`` and
+    ``threshold_reached`` flags. Seeded when the first alert type is enabled, advanced on
+    every run, deleted when all types are disabled or the cadence goes off (6.B2/6.B3).
+    ``taken_at`` records when the baseline was last written."""
+
+    __tablename__ = "alert_snapshot"
+
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    cart_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("carts.id", ondelete="CASCADE"), primary_key=True
+    )
+    snapshot_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    taken_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class AlertLog(Base):
+    """One notification in a user's in-app history (schema.md, alerts). Phase 6 (6.B6).
+
+    Written **always**, before any channel delivery (delivery is phase 7). ``kind`` is a
+    :class:`~src.core.contracts.NotificationKind` and gives the category; phase 6 writes
+    only ``alert_digest``. ``payload_json`` is the full self-sufficient digest (AEV-R2) —
+    ``Decimal`` as string, ``datetime`` ISO-8601 (DB-R3). ``read_at`` null = unread (the
+    dashboard badge, 6.F4). ``admin_message_id`` stays null until the admin-message table
+    arrives in phase 10 (kept as a plain nullable column; the FK lands with that table)."""
+
+    __tablename__ = "alert_log"
+    __table_args__ = (Index("ix_alert_log_user_created", "user_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    admin_message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    payload_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class ScrapeCooldown(Base):
     """Anchor for the manual scrape-now cooldown (SCR-R15).
 

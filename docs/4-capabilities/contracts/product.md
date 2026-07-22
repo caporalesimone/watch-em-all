@@ -2,7 +2,7 @@
 
 > **Layer 4 — Capability (contract)** · Audience: developer, architect.
 >
-> English translation of the Italian reference [`docs-ita/4-capabilities/contracts/product.md`](../../../docs-ita/4-capabilities/contracts/product.md), limited to what is implemented (DOC-12). `Product` is the single type that crosses the scraper↔core boundary: every scraper produces only `Product` instances, the core fills the missing price fields and persists `brand`/`tags`/`category` as-is.
+> Limited to what is implemented (DOC-12). `Product` is the single type that crosses the scraper↔core boundary: every scraper produces only `Product` instances, the core fills the missing price fields and persists `brand`/`tags`/`category` as-is.
 
 ## Purpose
 

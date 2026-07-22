@@ -32,4 +32,4 @@ Il runner è **seriale** per scelta (SCHED-R6): un solo scraper alla volta, cari
 
 ## Auto-update delle installazioni
 
-Le immagini versionate su GHCR e il deploy kit esistono già ([deployment](../infrastructure/deployment.md), INF-17); l'aggiornamento resta però manuale (`WEA_VERSION` + `pull`). **Miglioria**: aggiornamento automatico con watchtower o equivalente. **Rimandato perché**: su un'installazione personale l'update va scelto, non subìto. **Trigger**: più installazioni da mantenere che restano indietro di versione.
+Le immagini versionate su GHCR e il deploy kit esistono già ([deployment](../../docs/infrastructure/deployment.md), INF-17); l'aggiornamento resta però manuale (`WEA_VERSION` + `pull`). **Miglioria**: aggiornamento automatico con watchtower o equivalente. **Rimandato perché**: su un'installazione personale l'update va scelto, non subìto. **Trigger**: più installazioni da mantenere che restano indietro di versione.

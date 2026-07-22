@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { afterNavigate } from '$app/navigation';
+	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 
 	import { createCart, listCarts, type CartCard, type CartMode } from '$lib/api/client';
@@ -30,8 +30,12 @@
 		}
 	}
 
-	// Reload on entry and whenever we return here (e.g. after editing/deleting on a detail page).
-	afterNavigate(() => {
+	// Load on mount. Returning here from a detail page remounts this route component
+	// (list and detail are separate routes), so this also refreshes after edit/delete.
+	// NB: must be onMount, not afterNavigate — the shell defers mounting page content
+	// until auth bootstrap finishes, by which point the initial "enter" navigation has
+	// already settled, so afterNavigate's on-mount callback never fires on a full reload.
+	onMount(() => {
 		void load();
 	});
 

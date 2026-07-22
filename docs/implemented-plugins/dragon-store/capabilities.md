@@ -2,7 +2,7 @@
 
 > **Implemented plugin — Dragon Store (scraper)** · Audience: developer.
 >
-> English translation of the Italian reference [`docs-ita/implemented-plugins/dragon-store/capabilities.md`](../../../docs-ita/implemented-plugins/dragon-store/capabilities.md), limited to what is implemented (DOC-12). It covers the phase-3 internals: the real `.gp` single-product parser via `context.http`, product identity, the availability map, the title sanitizer, the plugin routes and the watch snapshot. Files: `backend/__init__.py`, `plugin.py`, `parser.py`, `sanitizer.py` (+ labels JSON), `discount.py`, `routes.py`.
+> Limited to what is implemented (DOC-12). It covers the phase-3/5 internals: the real `.gp` single-product parser via `context.http`, product identity, the availability map, the title sanitizer, the cart adjustments, the plugin routes and the watch snapshot. Files: `backend/__init__.py` (plugin class + routes), `adjustments.py`, `parser.py`, `sanitizer.py` (+ `title_labels.json`).
 
 ## Plugin tables
 
@@ -10,8 +10,9 @@ Created in `initialize()`, idempotent, naming `plugin_dragon_store_*`:
 
 | Table | Content |
 |---|---|
-| `plugin_dragon_store_watches` | user_id, kind (`product`\|`category`), url, **include_ammaccati** (bool, default `false` — used only for `kind=category`), created_at — the user's inputs |
-| `plugin_dragon_store_config` | discount thresholds `[{min_amount, discount_pct}]`, operational parameters — *populated once the admin config arrives in a later phase* |
+| `plugin_dragon_store_watches` | id, user_id, kind (`product`\|`category` — phase 3 uses `product` only), url, **snapshot_json** (display snapshot of the last scraped product: name, image, brand, tags, category — null until the first successful scrape), created_at — the user's inputs |
+
+The per-category `include_ammaccati` flag arrives with categories in phase 9. There is **no config table yet**: the adjustment values live in code (`adjustments.py`); the admin discount-threshold editor (and its persistence) arrives with the plugin admin config in a later phase.
 
 ## `run_for_user` flow
 
@@ -39,21 +40,35 @@ Note on DRG-R8 (inclusion wins): the dented filter runs **per-watch, before the 
 
 > **Phase 3 (MVP)**: only the **`kind=product` branch** is implemented (single `.gp` listing via `scrape_product`); categories, the dented filter and pagination are **phase 9**. The real parsing of the product page is documented below (§ Product page `.gp`).
 
-## Adjustments
+## Adjustments (5.B5)
 
-*Adjustments arrive in a later phase, together with the admin discount-threshold config.*
+Implemented in `adjustments.py` as a small rules class (`DragonAdjustments`), applied to a scraper_specific cart's **discounted total**. Each rule yields a signed `Adjustment` (positive = saving, negative = cost) carrying the **full i18n key** the frontend localizes (`id`) and its interpolation `params`; `description` is debug-only. The core sums them. The phase-5 values live in code (admin-editable later).
+
+- **Threshold discount** (`dragon_store.adjustments.threshold_discount`): a **non-cumulative** band — only the highest whose minimum is reached applies. Bands: `≥100 €→5%`, `≥200 €→10%`, `≥300 €→15%`. Below 100 € there is no discount.
+- **Shipping**: `dragon_store.adjustments.free_shipping` (amount `0.00`) when the total ≥ 100 €, else `dragon_store.adjustments.shipping` with amount `−5.00 €`.
 
 ```
-def get_adjustments(self, cart_total):
-    thresholds = sorted(config.discount_thresholds, key=lambda t: t.min_amount)
-    best = max((t for t in thresholds if cart_total >= t.min_amount),
-               default=None, key=lambda t: t.min_amount)
-    out = []
-    if best:
-        out.append(Adjustment(description=f"Threshold discount {best.min_amount}€",
-                              amount=cart_total * best.discount_pct / 100))
-    return out
+class DragonAdjustments:
+    discount_bands = ((100, 5), (200, 10), (300, 15))   # (min discounted total, percent)
+    shipping_cost = 5.00
+    free_shipping_min = 100
+
+    def compute(self, cart_total):
+        out = []
+        pct = highest_band_reached(self.discount_bands, cart_total)   # 0 below the first minimum
+        if pct > 0:
+            out.append(Adjustment(id="dragon_store.adjustments.threshold_discount",
+                                   amount=round(cart_total * pct / 100, 2),   # positive → saving
+                                   params={"pct": pct}))
+        if cart_total >= self.free_shipping_min:
+            out.append(Adjustment(id="dragon_store.adjustments.free_shipping", amount=0.00))
+        else:
+            out.append(Adjustment(id="dragon_store.adjustments.shipping",
+                                   amount=-self.shipping_cost, params={"cost": self.shipping_cost}))
+        return out
 ```
+
+The plugin's `get_adjustments(self, products, cart_total)` delegates to `ADJUSTMENTS.compute(cart_total)`.
 
 ## Product identity
 
@@ -105,7 +120,7 @@ Besides the sanitizer, the **`PreOrder`** state adds the **"Pre Order"** tag (wh
 
 ## Plugin routes
 
-Under `/api/plugins/dragon-store` ([convention](../../api/endpoints.md)): `config-schema/{admin|user}`, `admin-config` (GET/PUT), `test` (dry-run), `scrape-now` (POST immediate scrape for the user + GET cooldown status), `watches` (GET/POST/DELETE). The `scrape-now` and its cooldown are provided by the `ScraperPlugin` base (core convention, not rewritten by the plugin). Swagger tag: `Plugin: Dragon Store`.
+Under `/api/plugins/dragon-store` ([convention](../../api/endpoints.md)), the plugin's own router implements `test` (dry-run, `POST`) and `watches` (`GET` list, `POST` add → 201, `DELETE /watches/{watch_id}`). The `scrape-now` pair (`POST` immediate scrape for the user + `GET` cooldown status) is provided by the `ScraperPlugin` base (core convention, not rewritten by the plugin). The `config-schema/{admin|user}` and `admin-config` (GET/PUT) convention routes are **not implemented yet** — they arrive with the plugin admin config in a later phase. Swagger tag: `Plugin: Dragon Store`.
 
 **Watches**: `POST /watches` rejects a URL **already present** for the user (`409 duplicate_watch`) and performs a **one-off scrape** (`_dry_context`, no catalog write) to resolve the title immediately, saving a **snapshot** of the product (title, image, brand, tags, category) on the watch row (column `snapshot_json`), refreshed on every scheduled/manual run. The user page therefore shows the watches as the **preview**: image, title (link), brand, category, tags column and a Remove button — the title is already there at add time, without depending on the catalog.
 

@@ -2,7 +2,7 @@
 
 > **Implemented plugin — Dragon Store (scraper)** · Audience: developer.
 >
-> English translation of the Italian reference [`docs-ita/implemented-plugins/dragon-store/overview.md`](../../../docs-ita/implemented-plugins/dragon-store/overview.md), limited to what is implemented (DOC-12). It introduces the system's first scraper and what it monitors today: a single product page on `dragonstore.it`.
+> Limited to what is implemented (DOC-12). It introduces the system's first scraper and what it monitors today: a single product page on `dragonstore.it`.
 
 ## What it does
 
@@ -21,7 +21,7 @@ The typical user is the collector from use case [UC-1](../../../docs-ita/1-busin
 | User input | URL of a **single product** (implemented in phase 3) and URL of a **category** (enumerated with pagination — arrives in phase 9) |
 | Site exclusions | **"dented"** (damaged) products: excluded **by default**, includable with a **per-category** toggle; a dented item added as a single product is always included (explicit choice, flagged in red in the UI) — arrives in phase 9 |
 | Out-of-stock | included with `is_available=false` (contract) |
-| Adjustments | **threshold discounts** on the cart total (store rules), configurable by the admin — arrives in a later phase |
+| Adjustments | **implemented (phase 5)**: a non-cumulative **threshold discount** + **shipping** (free above a threshold) on the cart total (store rules); the phase-5 values live in `adjustments.py`, becoming admin-editable later |
 | Product identity | the site's **native numeric ID** (present in the `.gp.<id>.uw` URLs and in the cards) — verified in pre-analysis, see [capabilities](capabilities.md) |
 | Technical strategy | **server-rendered** pages (classic ASP): HTTP + HTML parsing, no headless browser |
 
@@ -29,7 +29,7 @@ The typical user is the collector from use case [UC-1](../../../docs-ita/1-busin
 
 - Listing pages are **server-rendered** with prices and availability already in the HTML; AJAX only for sorting and view changes (pre-analysis: see [capabilities](capabilities.md)).
 - Products in special states ("dented") are published as **separate listings** with a title prefix and reduced price: excluded by default from monitoring, includable at the user's choice (per category, or by adding them explicitly as a single product) — this filtering arrives in phase 9.
-- Threshold discount rules on the cart total (e.g. −10% above 50 €, −15% above 100 €) — arrives in a later phase.
+- Threshold discount rules on the cart total, applied as cart **adjustments** (implemented in phase 5): a single, non-cumulative band (the highest reached — `≥100 €→5%`, `≥200 €→10%`, `≥300 €→15%`) plus shipping (`+5.00 €`, free above `100 €`).
 
 ## Documents
 

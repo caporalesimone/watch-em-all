@@ -8,7 +8,7 @@ listed separately at the bottom — they are *not* WEA-prefixed on purpose.
 
 Configuration lives in a single `.env` file (copied from [`.env.example`](../.env.example)), read by
 both composes. Bootstrap values are interpolated into [`config.yaml`](../config.yaml) by the app loader
-at startup ([configuration](../../docs-ita/infrastructure/configuration.md)); secrets and a few
+at startup ([configuration](infrastructure/configuration.md)); secrets and a few
 container vars come straight from the environment.
 
 ## WEA_ variables (managed by the app)

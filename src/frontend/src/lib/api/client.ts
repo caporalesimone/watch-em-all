@@ -443,6 +443,7 @@ export interface CartCard {
 	final_price: string;
 	threshold_amount: string | null;
 	threshold: CartThreshold | null;
+	alert_types: string[];
 	created_at: string;
 }
 
@@ -504,4 +505,113 @@ export async function removeCartItems(id: number, productIds: number[]): Promise
 		body: JSON.stringify({ product_ids: productIds })
 	});
 	return asJson<CartDetail>(res);
+}
+
+// Replace the cart's enabled alert types with the full set (6.B1). Presence = enabled;
+// pass [] to disable all.
+export async function setCartAlertTypes(id: number, alertTypes: string[]): Promise<CartDetail> {
+	const res = await apiFetch(`/api/carts/${id}/alert-types`, {
+		method: 'PUT',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ alert_types: alertTypes })
+	});
+	return asJson<CartDetail>(res);
+}
+
+// Alert history (6.B8). Money is Decimal-as-string; dates are ISO-8601.
+export interface AlertDigestProduct {
+	product_id: number;
+	name: string;
+	url: string;
+	plugin_id: string;
+	tags: string[];
+	price_previous: string | null;
+	price_current: string;
+	discount_pct: string;
+	currency: string;
+}
+
+export interface AlertDigestThreshold {
+	target: string;
+	current: string;
+	reached: boolean;
+	partial: boolean;
+	excluded: string[];
+}
+
+export interface AlertDigestCart {
+	cart_id: number;
+	cart_name: string;
+	mode: string;
+	cart_events: string[];
+	products: AlertDigestProduct[];
+	totals: { full: string; discounted: string; final: string };
+	threshold: AlertDigestThreshold | null;
+}
+
+export interface AlertDigestPayload {
+	kind: string;
+	user_id: number;
+	generated_at: string;
+	cart_alerts: AlertDigestCart[];
+}
+
+export interface AlertListItem {
+	id: number;
+	kind: string;
+	created_at: string;
+	read: boolean;
+	cart_count: number;
+}
+
+export interface AlertPage {
+	items: AlertListItem[];
+	total: number;
+	page: number;
+	page_size: number;
+}
+
+export interface AlertDetail {
+	id: number;
+	kind: string;
+	created_at: string;
+	read: boolean;
+	payload: AlertDigestPayload;
+	deliveries: Record<string, unknown>[];
+}
+
+export function listAlerts(
+	params: { page?: number; page_size?: number; kind?: string } = {}
+): Promise<AlertPage> {
+	const q = new URLSearchParams();
+	if (params.page) q.set('page', String(params.page));
+	if (params.page_size) q.set('page_size', String(params.page_size));
+	if (params.kind) q.set('kind', params.kind);
+	const qs = q.toString();
+	return apiFetch(`/api/alerts${qs ? `?${qs}` : ''}`).then(asJson<AlertPage>);
+}
+
+export function getAlert(id: number): Promise<AlertDetail> {
+	return apiFetch(`/api/alerts/${id}`).then(asJson<AlertDetail>);
+}
+
+export async function markAlertRead(id: number): Promise<void> {
+	await asEmpty(await apiFetch(`/api/alerts/${id}/read`, { method: 'POST' }));
+}
+
+// Bulk-delete the user's own alerts (6.F3). Ids not owned by the caller are ignored.
+export async function deleteAlerts(ids: number[]): Promise<void> {
+	await asEmpty(
+		await apiFetch('/api/alerts', {
+			method: 'DELETE',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ ids })
+		})
+	);
+}
+
+export function getUnreadCount(): Promise<number> {
+	return apiFetch('/api/alerts/unread-count')
+		.then(asJson<{ count: number }>)
+		.then((r) => r.count);
 }

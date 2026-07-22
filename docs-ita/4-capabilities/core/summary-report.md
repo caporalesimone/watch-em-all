@@ -83,4 +83,4 @@ class SummaryConfig(BaseModel):
     last_run_date: date | None = None  # guardia anti-doppione + recupero intra-day
 ```
 
-Trigger e regole del "dovuto" nel [Cron Worker](cron-worker.md) (CRON-R4); consegna e registrazione esiti come per i digest ([alert-engine — dispatch](alert-engine.md)).
+Trigger e regole del "dovuto" nel [Cron Worker](../../../docs/4-capabilities/core/cron-worker.md) (CRON-R4); consegna e registrazione esiti come per i digest ([alert-engine — dispatch](alert-engine.md)).

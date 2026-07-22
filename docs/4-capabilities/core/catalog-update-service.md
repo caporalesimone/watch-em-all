@@ -2,7 +2,7 @@
 
 > **Layer 4 — Capability** · Audience: developer.
 >
-> English translation of the Italian reference [`docs-ita/4-capabilities/core/catalog-update-service.md`](../../../docs-ita/4-capabilities/core/catalog-update-service.md), limited to what is implemented (DOC-12). The single place where scraper output becomes persistent state — delta, history, delisting — so the scraper stays stateless.
+> Limited to what is implemented (DOC-12). The single place where scraper output becomes persistent state — delta, history, delisting — so the scraper stays stateless.
 
 ## Purpose
 

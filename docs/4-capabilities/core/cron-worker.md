@@ -55,12 +55,10 @@ def tick(now):
         if slot is not None and slot > s.last_slot:
             runner.submit(scraper_job(s.scraper_id, slot))  # non-blocking; the runner is serial: lock + FIFO queue
 
-    # --- ALERT: per-user, days of the week ---
-    for a in alert_schedules where a.weekdays:
-        if now.weekday() in a.weekdays and now.time() >= a.time and a.last_run_date < now.date():
-            try: alert_engine.run(a.user_id)
-            except Exception as e: log_error("alert", a.user_id, e)
-            a.last_run_date = now.date()              # always, even on error (CRON-R6)
+    # --- ALERT: NOT here. Alerts are event-driven — the alert engine runs right AFTER a
+    #     scrape delivers catalog changes (inside scraper_job for scheduled runs, and in
+    #     the web for scrape-now / TP simulate), for the users that scrape touched. There
+    #     is no per-user time schedule.
 
     # --- SUMMARY: weekly/monthly ---
     for c in summary_configs where c.enabled:
@@ -91,6 +89,6 @@ The comparison on **slots** (datetime, not just date) for scrapers is what makes
 
 | Direction | What |
 |---|---|
-| Reads | `scraper_schedule`, `alert_schedule`, `summary_config`, `users` (deletion deadlines), system settings |
+| Reads | `scraper_schedule`, `summary_config`, `users` (deletion deadlines), system settings |
 | Writes | `last_slot` / `last_run_date`, `system_log`, heartbeat; purge of expired users and retention (daily maintenance) |
-| Invokes | [Scraper Runner](scraper-pool.md) (submit), [Alert Engine](alert-engine.md), [Summary](summary-report.md), plugins' `delete_user_data` (purge, USR-R10) |
+| Invokes | [Scraper Runner](scraper-pool.md) (submit), [Alert Engine](alert-engine.md), [Summary](../../../docs-ita/4-capabilities/core/summary-report.md), plugins' `delete_user_data` (purge, USR-R10) |

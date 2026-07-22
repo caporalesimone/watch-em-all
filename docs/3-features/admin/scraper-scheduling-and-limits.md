@@ -62,6 +62,6 @@ flowchart LR
 ## Rationale of the choices
 
 - **Explicit slots, not intervals** ("every 4 hours"): the admin reasons in terms of moments of the day that are useful for the data (prices change in the morning; flash deals call for an extra slot), and slots make computing the "due" state and the recovery trivial.
-- **Serial, not parallel**: at a few dozen runs per day parallelism buys nothing and complicates everything (limits to tune, load spikes, contention). One scraper at a time makes the load predictable and the calendar view a faithful snapshot of the day. (Reintroducing parallelism is a [future improvement](../../future-improvements/platform.md) should the slots ever saturate the day.)
+- **Serial, not parallel**: at a few dozen runs per day parallelism buys nothing and complicates everything (limits to tune, load spikes, contention). One scraper at a time makes the load predictable and the calendar view a faithful snapshot of the day. (Reintroducing parallelism is a [future improvement](../../../docs-ita/future-improvements/platform.md) should the slots ever saturate the day.)
 - **Centralized limits**: politeness is not delegated to the plugins (a badly written plugin cannot violate it, the HTTP client enforces it) and seriality is a property of the system, not of the individual scrapers.
 - **Error = slot consumed**: an immediate retry would turn a site under maintenance into a barrage of attempts every minute; the natural cadence of the slots is the right retry.

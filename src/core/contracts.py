@@ -14,9 +14,40 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+
+class AlertType(StrEnum):
+    """The alert types a user can enable on a cart (alert-event.md). The position in the
+    payload (a product's ``tags`` vs a cart's ``cart_events``) tells product tags from
+    cart events apart; this single enum is the shared vocabulary of the alert engine.
+
+    ``PRODUCT_ALL_TIME_LOW`` is intentionally absent in phase 6 — it depends on the price
+    analytics capability, which lands in phase 11 (11.B5)."""
+
+    # Product tags (valid inside ProductAlert.tags)
+    PRODUCT_ON_SALE = "PRODUCT_ON_SALE"  # entered a discount, or dropped further while on sale
+    PRODUCT_OFF_SALE = "PRODUCT_OFF_SALE"
+    PRODUCT_UNAVAILABLE = "PRODUCT_UNAVAILABLE"
+    PRODUCT_AVAILABLE_AGAIN = "PRODUCT_AVAILABLE_AGAIN"
+    # Cart events (valid inside CartAlert.cart_events)
+    CART_ALL_ON_SALE = "CART_ALL_ON_SALE"
+    CART_THRESHOLD_REACHED = "CART_THRESHOLD_REACHED"
+    CART_THRESHOLD_REACHED_PARTIAL = "CART_THRESHOLD_REACHED_PARTIAL"
+
+
+class NotificationKind(StrEnum):
+    """The kind of a notification, which also gives its category (alert-event.md). Phase 6
+    writes only ``ALERT_DIGEST``; the summary (phase 11) and the admin/system text messages
+    (phase 10) reuse the same ``alert_log`` and channel with a different payload."""
+
+    ALERT_DIGEST = "alert_digest"  # diff vs baseline (category: system)
+    SUMMARY = "summary"  # periodic snapshot (category: system)
+    SYSTEM_MESSAGE = "system_message"  # core-generated text message (category: system)
+    ADMIN_MESSAGE = "admin_message"  # admin-written text message (category: admin)
 
 
 class BrandRef(BaseModel):

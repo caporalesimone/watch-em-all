@@ -8,11 +8,19 @@ Il primo canale di consegna reale: contratto notifier, configurazione a due live
 
 ## Risultato apprezzabile
 
-L'admin configura l'SMTP dalla sua pagina; l'utente mette il suo indirizzo nel Profilo, preme Test e riceve la prova; alla prossima cadenza con eventi, **il digest arriva in casella**, formattato e leggibile.
+L'admin configura l'SMTP dalla sua pagina; l'utente mette il suo indirizzo nel Profilo, preme Test e riceve la prova; appena uno scrape produce eventi, **il digest arriva in casella**, formattato e leggibile.
+
+## 📌 Reminder — consegna ASINCRONA (deciso ragionando in fase 6, 2026-07-22)
+
+> **Contesto della decisione.** In fase 6 la **cadenza a orario è stata rimossa**: gli alert sono **event-driven**, il motore gira **a fine scrape** (schedulato + scrape-now + "Simula scraping" del TP) e produce **un digest aggregato per utente per run di scrape**, scritto **sempre** in `alert_log`. Ragionando sullo scenario "50–100 utenti, uno scrape automatico ne notifica 15" abbiamo separato due cose: **calcolare/scrivere il digest** (economico, nessuna coda — `alert_log` è già la parte durevole) e **consegnarlo sui canali** (lento, può fallire).
+>
+> **Decisione per la fase 7:** la consegna sui canali è **asincrona / disaccoppiata**, NON inline dentro il run di scrape. Quando il digest è scritto, si creano le righe **`alert_delivery` in stato `pending`** (una per canale attivo); un **passo separato del worker le drena** (invio + retry/backoff, poi `delivered`/`failed`). Motivi: a 50–100 utenti un singolo scrape può generare molti invii SMTP; farli inline bloccherebbe il worker (mono-thread, seriale) e mangerebbe il timeout del run; un SMTP appeso inchioderebbe tutto. È **best-effort** (coerente con la doc: lo storico interno è la fonte primaria; un invio fallito non si ritenta all'infinito, il prossimo digest porta il nuovo stato). Riusa la tabella **`alert_delivery` già a piano** → niente broker/coda pesante né dead-letter (si resta nello spirito "niente code asincrone" della doc, con una coda-leggera solo perché il volume degli invii può avere picchi).
+>
+> **Impatto sugli MVP sotto:** 7.B1/7.B2 vanno implementati col modello **pending → drain** (scrivi `alert_delivery` pending alla scrittura del digest; il worker scoda e aggiorna gli esiti), non con invio sincrono dentro il motore alert.
 
 ## ⚠️ Da discutere PRIMA di iniziare — design system condiviso dei plugin
 
-La Fase 7 introduce il **primo notifier** ed è il **primo caso multi-plugin della stessa famiglia** (sono previsti **2-3 notifier**). È il momento giusto per decidere *come* i plugin condividono la UI **prima** di scrivere tre notifier che divergono. L'astrazione vera resta rimandata (con un solo scraper sarebbe prematura, [discussione 0.3.4]), ma le scelte qui sotto vanno fissate ora per **non obbligare un refactor importante** dopo. Vincoli già vigenti: [FE-8/FE-13/FE-16/FE-17/FE-18](../developer-rules/frontend/rules.md) (riuso in `$lib/components`, "un pattern usato due volte si estrae", i plugin **devono** usare il design system, widget condivisi self-contained/props-driven), [SCR-R12](../3-features/plugins/scraper-plugin.md) (tabella dry-run condivisa) e 7.F1 (form di config = "componente unico del DS").
+La Fase 7 introduce il **primo notifier** ed è il **primo caso multi-plugin della stessa famiglia** (sono previsti **2-3 notifier**). È il momento giusto per decidere *come* i plugin condividono la UI **prima** di scrivere tre notifier che divergono. L'astrazione vera resta rimandata (con un solo scraper sarebbe prematura, [discussione 0.3.4]), ma le scelte qui sotto vanno fissate ora per **non obbligare un refactor importante** dopo. Vincoli già vigenti: [FE-8/FE-13/FE-16/FE-17/FE-18](../../docs/developer-rules/frontend/rules.md) (riuso in `$lib/components`, "un pattern usato due volte si estrae", i plugin **devono** usare il design system, widget condivisi self-contained/props-driven), [SCR-R12](../../docs/3-features/plugins/scraper-plugin.md) (tabella dry-run condivisa) e 7.F1 (form di config = "componente unico del DS").
 
 **Argomenti di discussione:**
 

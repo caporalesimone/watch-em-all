@@ -1,12 +1,13 @@
-# Implemented Plugins
+# Implemented Plugins (spec-ahead)
 
-> Documentazione dei **plugin reali** dell'installazione. La documentazione generica del sistema descrive solo i contratti astratti ([scraper](../3-features/plugins/scraper-plugin.md), [notifier](../3-features/plugins/notifier-plugin.md)); tutto ciò che è specifico di un sito o di un canale vive qui.
+> Documentazione dei **plugin reali** dell'installazione. La documentazione generica del sistema descrive solo i contratti astratti ([scraper](../../docs/3-features/plugins/scraper-plugin.md), [notifier](../3-features/plugins/notifier-plugin.md)); tutto ciò che è specifico di un sito o di un canale vive qui.
+>
+> I plugin **già rilasciati** sono documentati nella wiki inglese canonica: [`docs/implemented-plugins/`](../../docs/implemented-plugins/README.md) (oggi lo scraper **Dragon Store**). Questo file elenca solo i plugin **non ancora rilasciati** (spec-ahead).
 
-## Plugin
+## Plugin (previsti)
 
 | Plugin | Tipo | Stato | Documenti |
 |---|---|---|---|
-| **Dragon Store** | scraper | primo scraper, riferimento per i futuri | [dragon-store/](dragon-store/overview.md) |
 | **Email** | notifier | primo notifier previsto | [notifiers/email.md](notifiers/email.md) |
 | **Discord** | notifier | pianificato (placeholder) | [notifiers/discord.md](notifiers/discord.md) |
 

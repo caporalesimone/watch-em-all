@@ -1,20 +1,17 @@
-# Profilo e configurazione notifier (lato utente)
+# Profilo — consegna notifiche e notifier (lato utente)
 
 > **Layer 3 — Feature utente** · Audience: architetti, developer · Testo + Mermaid, niente codice.
+>
+> **Spec-ahead (fasi 6/7/11).** La parte **account** della pagina Profilo (identità in sola lettura, lingua dell'interfaccia, tema, cambio password) è già implementata in fase 1 ed è documentata in inglese: [`docs/3-features/user/profile-and-notifiers.md`](../../../docs/3-features/user/profile-and-notifiers.md). Questo file conserva solo la parte **non ancora implementata**: la **consegna delle notifiche** — report periodico, esportazione dati, e i **canali notifier** personali. (Gli alert sono **event-driven**: non c'è una cadenza da configurare nel Profilo.)
 
 ## Scopo
 
-La pagina Profilo concentra tutto ciò che riguarda l'account e la consegna delle notifiche: lingua, password, cadenza alert, report periodico e canali di notifica personali. I notifier stanno qui (non nella barra di navigazione) per alleggerire la nav.
+La pagina Profilo concentra anche tutto ciò che riguarda la consegna delle notifiche: report periodico, esportazione dei propri dati e canali di notifica personali. I notifier stanno qui (non nella barra di navigazione) per alleggerire la nav.
 
 ## Requisiti
 
-### Account
-- **PROF-R1** — Cambio password (vecchia + nuova, requisiti minimi di lunghezza); il cambio invalida tutte le sessioni attive.
-- **PROF-R2** — Scelta della **lingua** dell'interfaccia, persistita sul profilo: usata dalla UI a ogni login e dal core per generare il testo delle **notifiche**. Default di sistema per i nuovi utenti. **V1 English-only**: `locale` fisso a `en`, selettore non esposto; l'impianto (campo, chiavi, risoluzione per-utente) resta attivo per il [multilingua futuro](../../future-improvements/platform.md).
-- **PROF-R3** — Il tema (chiaro/scuro) è una preferenza **di browser** (non di account), ricordata localmente; default scuro. Scelta dichiarata: il tema è estetica del dispositivo, la lingua è identità dell'utente.
-
 ### Notifiche
-- **PROF-R4** — Cadenza alert: picker dei giorni della settimana + orario ([dettagli](alerts-and-notifications.md)).
+- **PROF-R4** — Nessuna cadenza alert nel Profilo: gli alert sono **event-driven** (scattano a fine scrape); i *tipi* di alert si scelgono sulla card del carrello ([dettagli](alerts-and-notifications.md)).
 - **PROF-R5** — Report periodico: on/off, frequenza, giorno, orario ([dettagli](summary-report.md)).
 
 ### I miei dati

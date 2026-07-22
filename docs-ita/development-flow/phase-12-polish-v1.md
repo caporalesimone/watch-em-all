@@ -19,7 +19,7 @@ Chiudere il perimetro della 1.0: il secondo canale di notifica (che dimostra la 
 - [ ] **12.B3 — Discord: errori del webhook** (~1h): gestione 404 (webhook revocato) e 429 (rate limit) — chiude DSC-Q1/Q2. *Verifica: webhook revocato → esito failed con motivo chiaro all'utente.*
 - [ ] **12.B4 — Test di contratto: scraper** (~1h): suite di contratto eseguita in CI per ogni scraper abilitato ([checklist-and-testing](../plugin-development/checklist-and-testing.md)). *Verifica: rompere il contratto di Dragon Store → CI rossa.*
 - [ ] **12.B5 — Test di contratto: notifier** (~1h): idem per i notifier (Email, Discord). *Verifica: rompere un contratto notifier → CI rossa.*
-- [ ] **12.B6 — Integrazione su Postgres effimero** (~1h): test d'integrazione in CI su Postgres effimero, coverage dei moduli critici ([ci](../infrastructure/ci.md)). *Verifica: suite verde in CI, rossa su regressione DB.*
+- [ ] **12.B6 — Integrazione su Postgres effimero** (~1h): test d'integrazione in CI su Postgres effimero, coverage dei moduli critici ([ci](../../docs/infrastructure/ci.md)). *Verifica: suite verde in CI, rossa su regressione DB.*
 
 ### Frontend
 
@@ -33,7 +33,7 @@ Chiudere il perimetro della 1.0: il secondo canale di notifica (che dimostra la 
 - [ ] **12.T1 — Audit i18n: backend e notifier** (~1h): `en.json` completo nelle cartelle `i18n/` di core e plugin backend (notifier inclusi); nessuna stringa cablata né concatenata. *Verifica: notifiche complete in inglese, nessuna chiave mancante a runtime.*
 - [ ] **12.T2 — Audit i18n: frontend** (~1h): `en.json` completo per core e plugin frontend (FE-13), fallback su `en` verificato. **Estende il gate i18n di [4.B11](phase-04-worker-scheduling.md)** (`src/frontend/scripts/i18n-check.mjs`) con la **parità multi-locale** (modalità `--locales`): ogni locale presente — `it.json` core e i futuri `it.json` dei plugin — deve avere **esattamente** il set di chiavi di `en` (niente chiavi in più né mancanti per locale); aggancio anche questo controllo a CI (PR + tag). *Verifica: app completa in inglese; una chiave presente solo in un locale → gate rosso.*
 - [ ] **12.T3 — Doc allineata + audit README** (~1h): verifica documentazione vs implementato (DOC-8); audit del README come manuale operativo completo — install, update, backup/restore, tutti i comandi e script (INF-18). *Verifica: nessuna divergenza doc/codice nota; README autosufficiente.*
-- [ ] **12.T4 — Release 1.0** (~1h): changelog, tag `1.0.0` → publish delle immagini su GHCR (il deploy kit vive nel repo, scaricato al tag — [ci](../infrastructure/ci.md), INF-17); prova di installazione pull-based da zero seguendo **solo il README**. *Verifica: macchina pulita con solo Docker + i due file del kit → sito su e manutenibile senza conoscenze esterne.*
+- [ ] **12.T4 — Release 1.0** (~1h): changelog, tag `1.0.0` → publish delle immagini su GHCR (il deploy kit vive nel repo, scaricato al tag — [ci](../../docs/infrastructure/ci.md), INF-17); prova di installazione pull-based da zero seguendo **solo il README**. *Verifica: macchina pulita con solo Docker + i due file del kit → sito su e manutenibile senza conoscenze esterne.*
 
 ## Definition of Done
 
@@ -44,4 +44,4 @@ Chiudere il perimetro della 1.0: il secondo canale di notifica (che dimostra la 
 
 ## Riferimenti
 
-[product-overview](../1-business/product-overview.md) · [developer-rules](../developer-rules/README.md)
+[product-overview](../1-business/product-overview.md) · [developer-rules](../../docs/developer-rules/README.md)

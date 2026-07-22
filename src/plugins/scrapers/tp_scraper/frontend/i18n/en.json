@@ -10,6 +10,11 @@
 		"empty": "No TP products yet — add one.",
 		"remove": "Remove",
 		"available": "Available",
-		"unavailable": "Out of stock"
+		"unavailable": "Out of stock",
+		"price": "Price",
+		"toggleAvailability": "Toggle availability",
+		"scrape": "Simulate scrape",
+		"scrapeHint": "Edit price or availability below, then press \"Simulate scrape\" to push every product to the catalog and record the changes — the alerts you enabled will pick them up on the next cadence run.",
+		"scrapeResult": "Scrape done: {found} product(s) delivered, {price_changes} price/availability change(s), {removed} delisted."
 	}
 }

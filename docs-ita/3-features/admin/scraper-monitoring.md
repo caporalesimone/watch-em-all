@@ -1,6 +1,6 @@
 # Monitoraggio e statistiche degli scraper (admin)
 
-> **Layer 3 — Feature admin** · Audience: architetti, developer · Testo + Mermaid, niente codice. Capability: [scraper-pool](../../4-capabilities/core/scraper-pool.md), [database](../../4-capabilities/database/schema.md).
+> **Layer 3 — Feature admin** · Audience: architetti, developer · Testo + Mermaid, niente codice. Capability: [scraper-pool](../../../docs/4-capabilities/core/scraper-pool.md), [database](../../4-capabilities/database/schema.md).
 
 ## Scopo
 

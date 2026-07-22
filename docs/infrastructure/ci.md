@@ -1,8 +1,8 @@
 # CI
 
 > **Infrastructure** · Audience: DevOps, developer.
->
-> English translation of the Italian reference [`docs-ita/infrastructure/ci.md`](../../docs-ita/infrastructure/ci.md), limited to what is implemented (DOC-12). The pipeline is born minimal in phase 0 and **grows with the flow**: linters and typecheck arrive with the first code (phase 1), contract and integration tests at scale (phase 12). Only the jobs that exist today are described here.
+
+A minimal pipeline (GitHub Actions) on every push/PR: it runs the tools already chosen by the project — the CI introduces no new rules, it makes the existing ones real. The pipeline was born minimal in phase 0 and has **grown with the flow**: linters and typecheck with the first code (phase 1), integration and plugin tests as the subsystems arrived.
 
 ## Jobs
 
@@ -17,7 +17,7 @@
 | Build images | builds `watch-em-all` (app) and `watch-em-all-ops`; **on PRs** pushes them as `dev-<branch>` (see *Dev images*) | blocking |
 | CHANGELOG guard | the PR must update `CHANGELOG.md` (one PR = one version, INF-19) | blocking |
 
-Policy: `main` is always green; PRs are not merged with red jobs. Process details in [developer-rules](../../docs-ita/developer-rules/README.md).
+Policy: `main` is always green; PRs are not merged with red jobs. Process details in [developer-rules](../developer-rules/README.md).
 
 ### Backend tests — layout and commands
 
@@ -45,7 +45,7 @@ To **try the container before merge**, the build job pushes the images to GHCR w
 - **No per-commit tags**: to pin an exact build use the **digest** (`@sha256:…`), always available.
 - The `dev-*` images are **ephemeral**: the `dev-<branch>` tag is **deleted automatically when the PR closes** — merge or abandon — by the `cleanup-dev-images.yml` workflow (it also removes the orphan untagged manifest left behind), so the packages do not fill up with dead tags. Only release tags `x.y.z` are permanent (never touched by the cleanup).
 
-How to install a dev image to try it: [deployment](deployment.md#trying-a-dev-image).
+How to install a dev image to try it: [deployment](deployment.md#trying-a-development-image).
 
 ## Publish (on tag)
 
@@ -61,7 +61,13 @@ The tag is the only publish trigger: a green `main` publishes nothing — and th
 
 The product follows **SemVer** (`MAJOR.MINOR.PATCH`) with a **single version for the whole bundle** (core + first-party plugins, shipped together in the images); it is rule INF-19.
 
-- `0.x` during development; **every PR** carries a version bump + a `CHANGELOG.md` entry (**1 MVP = 1 PR = 1 version**), but **tags are not per-PR**: the owner creates them by hand when a release is wanted, so the repo does not fill up with tags.
+| Part | When it is bumped |
+|---|---|
+| **MAJOR** | a break of the public HTTP API **or** a non-purely-additive DB schema (manual migration, DB-R4) |
+| **MINOR** | new backward-compatible features (typically the close of a [flow](../../docs-ita/development-flow/README.md) phase) |
+| **PATCH** | backward-compatible fixes |
+
+- `0.x` during development: the **close of a phase** raises the **MINOR** (phase 1 — Foundations — leads to **0.1.0**) and **1.0** marks v1 (phase 12) — milestones decided in the PR that closes the phase. **Every PR** carries a version bump + a `CHANGELOG.md` entry (**1 MVP = 1 PR = 1 version**), but **tags are not per-PR**: the owner creates them by hand when a release is wanted, so the repo does not fill up with tags.
 - `CHANGELOG.md` is updated in the **same PR** (the CI CHANGELOG guard enforces it).
 
 ### Single source of truth for the version
@@ -87,4 +93,6 @@ The `x.y.z` tag (plain SemVer, **no `v` prefix**) is created **by the owner by h
 
 ## Notes
 
+- The backend test job uses a Postgres 16 service container: the integration tests (catalog delta, cart engine, auth) run on a real ephemeral DB.
+- The plugin tests (identity stability, parsing on saved fixtures) run as part of the pytest suite for every plugin under `tests/plugins/`: a scraper that breaks the `external_id` rules fails the CI, not production.
 - No automatic deploy to installations: the CI **publishes** the images, updating stays the user's choice (`WEA_VERSION` in `.env` + `pull`), consistent with the self-hosted posture.

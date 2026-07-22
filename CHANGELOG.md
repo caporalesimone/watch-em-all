@@ -6,6 +6,26 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 Each entry is **short** and reads as a user-facing story: first a **bullet list of what changed for you** (additions, removals and changes together, light on jargon), then a brief **_under the hood_** paragraph on the architectural/technical changes. Older entries predate this style and are left as they are.
 
+## [0.6.0] - Unreleased
+
+**Phase 6 — in-app alerts: a price or availability change becomes a readable digest in the Alert History, delivered at the cadence you choose. Entries land below as they ship.**
+
+### New
+
+- **In-app alerts.** Watch 'Em All now tells you when something worth buying happens — **automatically, right after prices update**. On each **cart** you pick which changes matter — a product goes **on sale** / its discount ends / goes **out of stock** / is **back in stock**, the **whole cart goes on sale**, or the **savings threshold is reached**. There's **nothing to schedule**: whenever a scrape updates your catalog (automatic, on-demand, or the test generator), the system compares each cart against the last time it looked and, if anything changed, drops a single aggregated **digest** into a new **Alerts** section — what changed, old → new price, where it's from, and the cart's totals and threshold. The sidebar shows an **unread** badge (kept live) and you can **select and delete** notifications from the history. It's all **in-app** for now (email and other channels come later), and every notification is kept in the history until you remove it. Enabling alerts on a cart **starts monitoring from now**, so you're told about future changes, not past ones.
+
+- **The catalog's "add to cart" picker now guides your choice.** When you select products and pick a target cart, **single-store carts that don't match your selection are greyed out** — a single-store cart only accepts products from its own store, and if your selection spans more than one store all single-store carts are disabled (cross-store carts always stay available). A short note explains why, so an incompatible add is prevented up front instead of failing on submit.
+
+### Changed
+
+- **TP Scraper (dev tool) can now stage changes and "simulate a scrape".** On the TP Scraper page you can **edit a product's price or availability** inline and then press **Simulate scrape** to push every product's current values into the catalog at once — the same way a real scrape would. It makes the new alerts easy to try end to end: build a cart, enable alerts, drop a price, simulate a scrape, and watch the digest appear at your next cadence run.
+
+### Fixed
+
+- **Carts no longer vanish on a full page reload.** Reloading the browser on the **Carts** page left it empty; you had to click **Carts** in the sidebar again for the list to appear. It now loads its contents on reload like every other page.
+
+_Under the hood:_ the carts list was the only page that triggered its data fetch from `afterNavigate` instead of `onMount`. Because the app shell (a CSR-only SPA) defers mounting page content until the auth bootstrap finishes, on a hard reload the initial "enter" navigation has already settled by the time the carts page mounts, so `afterNavigate`'s on-mount callback never fired and `load()` never ran. Switched it to `onMount`, matching every other route; returning from a cart's detail page still refreshes the list, since the two are separate routes and the list component remounts.
+
 ## [0.5.0] - 2026-07-09
 
 **Phase 5 — carts (the functional heart): the two cart modes, computed totals, adjustments and the savings threshold. Opening with some catalog polish; the cart work lands below as it ships.**

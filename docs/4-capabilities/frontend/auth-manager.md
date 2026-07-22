@@ -2,7 +2,7 @@
 
 > **Layer 4 — Capability** · Audience: developer.
 >
-> English translation of the Italian reference [`docs-ita/4-capabilities/frontend/auth-manager.md`](../../../docs-ita/4-capabilities/frontend/auth-manager.md), limited to what is implemented (DOC-12). Delivered in phase 1 (`src/frontend/src/lib/auth/`).
+> Limited to what is implemented (DOC-12). Delivered in phase 1 (`src/frontend/src/lib/auth/`).
 
 ## Purpose
 

@@ -19,7 +19,8 @@
 		"notifiers": "Notifiers",
 		"featureFlags": "Feature flags",
 		"systemLogs": "System logs",
-		"settings": "Settings"
+		"settings": "Settings",
+		"alerts": "Alerts"
 	},
 	"catalog": {
 		"title": "Catalog",
@@ -84,7 +85,49 @@
 		"chooseCart": "Choose a cart…",
 		"selected": "{count} selected",
 		"added": "Added to {name}",
-		"addError": "Could not add to the cart."
+		"addError": "Could not add to the cart.",
+		"pickerIncompatibleHint": "Some single-store carts are disabled — they don't match the store(s) of your selection."
+	},
+	"alertTypes": {
+		"title": "Alerts for this cart",
+		"hint": "Changing the selection restarts monitoring from now — you'll be alerted on the next changes, not past ones.",
+		"productHeading": "Products",
+		"cartHeading": "This cart",
+		"productOnSale": "A product goes on sale",
+		"productOffSale": "A product's discount ends",
+		"productUnavailable": "A product goes out of stock",
+		"productAvailableAgain": "A product is back in stock",
+		"cartAllOnSale": "Every product is on sale",
+		"cartThresholdReached": "The savings threshold is reached"
+	},
+	"alerts": {
+		"title": "Alerts",
+		"empty": "No alerts yet. You'll see your digests here once monitoring finds changes.",
+		"error": "Could not load your alerts.",
+		"detailError": "Could not load this alert.",
+		"summary": "{count} carts with changes",
+		"unread": "Unread",
+		"count": "{total} alerts",
+		"back": "← Back to alerts",
+		"selectAll": "Select all on this page",
+		"selected": "{count} selected",
+		"delete": "Delete",
+		"deleteConfirm": "Delete {count} selected alert(s)? This can't be undone.",
+		"deleteError": "Could not delete the alerts.",
+		"eventAllOnSale": "All on sale",
+		"eventThresholdReached": "Threshold reached",
+		"eventThresholdPartial": "Threshold reached (partial)",
+		"tagOnSale": "On sale",
+		"tagOffSale": "Discount ended",
+		"tagUnavailable": "Out of stock",
+		"tagAvailableAgain": "Back in stock",
+		"totals": "Totals",
+		"threshold": "Threshold",
+		"thresholdTarget": "target",
+		"thresholdCurrent": "current",
+		"thresholdReached": "Reached",
+		"thresholdPartial": "Partially reached",
+		"excluded": "Excluded: {names}"
 	},
 	"admin": {
 		"users": {

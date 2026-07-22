@@ -2,7 +2,7 @@
 
 > **Layer 4 — Capability** · Audience: developer · Pseudocode allowed.
 >
-> English translation of the Italian reference [`docs-ita/4-capabilities/core/cart-engine.md`](../../../docs-ita/4-capabilities/core/cart-engine.md), limited to what is implemented (DOC-12). Phase 5 ships the read-only evaluation (totals, adjustments, final estimate, threshold state, health flag). The alert baseline and the summary snapshot arrive in later phases. Feature: [carts](../../3-features/user/carts.md) · Contract: [adjustment](../contracts/adjustment.md).
+> Limited to what is implemented (DOC-12). Phase 5 ships the read-only evaluation (totals, adjustments, final estimate, threshold state, health flag). The alert baseline and the summary snapshot arrive in later phases. Feature: [carts](../../3-features/user/carts.md) · Contract: [adjustment](../contracts/adjustment.md).
 
 ## Purpose
 
@@ -70,12 +70,12 @@ Normative notes:
 
 ## Persistence
 
-Tables `carts` (with `mode` and `scraper_id` nullable for cross carts, `threshold_amount` nullable) and `cart_members` — schema in [database/schema.md](../database/schema.md). The threshold is a column of `carts` (a 1:1 relationship, no separate table). The per-cart alert types (rows-present = type enabled) are a later phase and are not present yet.
+Tables `carts` (with `mode` and `scraper_id` nullable for cross carts, `threshold_amount` nullable) and `cart_members` — schema in [database/schema.md](../database/schema.md). The threshold is a column of `carts` (a 1:1 relationship, no separate table). The per-cart alert types (rows-present = type enabled) and their baseline ship in phase 6 (`cart_alert_types` / `alert_snapshot`); see [alert-engine](alert-engine.md).
 
 ## Interactions
 
 | Caller | For what |
 |---|---|
 | Carts API | cards, detail, validations |
-| Alert Engine (later phase) | current state to compare against the baseline |
+| [Alert Engine](alert-engine.md) | current state to compare against the baseline (phase 6) |
 | Summary (later phase) | periodic snapshot |

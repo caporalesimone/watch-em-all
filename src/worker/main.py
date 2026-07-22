@@ -20,12 +20,14 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.core.alert_engine import run_for_user
+from src.core.cart_engine import AdjustmentFn
 from src.core.config import get_settings
 from src.core.db import Base, create_schema, get_engine, init_engine, new_session
 from src.core.feature_flags import effective_flags, worker_tick_seconds
 from src.core.locks import scraper_lock
 from src.core.maintenance import purge_expired
-from src.core.models import ScraperSchedule, ScrapeRun, ScrapeUserLog
+from src.core.models import Cart, ScraperSchedule, ScrapeRun, ScrapeUserLog
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.context import PluginContext, build_context
 from src.core.plugins.registry import LoadedPlugin, load_plugins
@@ -43,6 +45,10 @@ HEARTBEAT_FILE = os.environ.get("WEA_HEARTBEAT_FILE", "/tmp/worker-heartbeat")
 
 # Schedulable scrapers (scraper_id -> LoadedPlugin), populated at boot.
 _loaded: dict[str, LoadedPlugin] = {}
+
+# All loaded scraper plugins (scraper_id -> ScraperPlugin), for binding get_adjustments
+# during alert runs — a scraper_specific cart's scraper may not be schedulable.
+_scrapers: dict[str, ScraperPlugin] = {}
 
 # Submit a scraper run to the runner: (scraper_id, slot, trigger) -> enqueued?
 Submit = Callable[[str, datetime, str], bool]
@@ -67,9 +73,12 @@ def _boot() -> None:
     create_schema()
     loaded = load_plugins(None)  # initialize plugins; the worker serves no HTTP
     _loaded.clear()
+    _scrapers.clear()
     for lp in loaded:
-        if isinstance(lp.plugin, ScraperPlugin) and implements_scraping(lp.plugin):
-            _loaded[lp.plugin.plugin_id] = lp
+        if isinstance(lp.plugin, ScraperPlugin):
+            _scrapers[lp.plugin.plugin_id] = lp.plugin
+            if implements_scraping(lp.plugin):
+                _loaded[lp.plugin.plugin_id] = lp
     metadatas = [Base.metadata] + [
         lp.plugin.table_metadata for lp in loaded if lp.plugin.table_metadata is not None
     ]
@@ -131,16 +140,18 @@ def _run_scraper(
     slot: datetime,
     deadline: datetime | None = None,
     trigger: str = "scheduled",
-) -> None:
+) -> set[int]:
     """Run one scheduled scrape for every configured user, one at a time, recording a
     ``scrape_run`` + a ``scrape_user_log`` per user with counters (4.B6). Stamps the
     manual-cooldown anchor (SCR-R15) per user; a per-user error doesn't stop the others
     (POOL-R5); a run past ``deadline`` stops between users (SCHED-R7); the last slot is
-    recorded even on failure/timeout (CRON-R6)."""
+    recorded even on failure/timeout (CRON-R6). Returns the set of user ids processed, so
+    the caller can run the alert engine for them (event-driven alerts)."""
     run = ScrapeRun(scraper_id=scraper_id, trigger=trigger, slot=slot, started_at=datetime.now(UTC))
     ctx.db.add(run)
     ctx.db.commit()
     outcomes: list[str] = []
+    processed: set[int] = set()
     timed_out = False
     try:
         for user_id in plugin.configured_users(ctx):
@@ -148,6 +159,7 @@ def _run_scraper(
                 timed_out = True
                 log.warning("scrape timed out: %s (slot %s)", scraper_id, slot)
                 break
+            processed.add(user_id)
             ulog = ScrapeUserLog(run_id=run.run_id, user_id=user_id, started_at=datetime.now(UTC))
             ctx.db.add(ulog)
             before = ctx.http.request_count
@@ -198,6 +210,7 @@ def _run_scraper(
             run.http_requests,
             run.cache_hits,
         )
+    return processed
 
 
 def scraper_job(scraper_id: str, slot: datetime, trigger: str = "scheduled") -> None:
@@ -219,7 +232,10 @@ def scraper_job(scraper_id: str, slot: datetime, trigger: str = "scheduled") -> 
             purge_expired_cache(ctx.db, scraper_id)  # POOL-R3: drop expired cache before the run
             timeout_min = get_system_settings(ctx.db).scraper_run_timeout_min
             deadline = datetime.now(UTC) + timedelta(minutes=timeout_min)
-            _run_scraper(plugin, ctx, scraper_id, slot, deadline)
+            processed = _run_scraper(plugin, ctx, scraper_id, slot, deadline)
+            # Event-driven alerts: right after the scrape, run the alert engine for the
+            # users it touched (one aggregated digest each; no time-cadence).
+            _run_alerts_for_users(ctx.db, processed)
         finally:
             ctx.db.close()
 
@@ -230,6 +246,28 @@ def dispatch_due(session: Session, now: datetime, tz: ZoneInfo, submit: Submit) 
         slot = due_slot(sched, now, tz)
         if slot is not None and submit(sched.scraper_id, slot, "scheduled"):
             log.info("scheduled run due: %s (slot %s) → queued", sched.scraper_id, slot)
+
+
+def _alert_adjuster(cart: Cart) -> AdjustmentFn | None:
+    """Bind a scraper_specific cart's ``get_adjustments`` from the loaded plugins."""
+    if cart.mode != "scraper_specific" or cart.scraper_id is None:
+        return None
+    plugin = _scrapers.get(cart.scraper_id)
+    return plugin.get_adjustments if plugin is not None else None
+
+
+def _run_alerts_for_users(session: Session, user_ids: set[int]) -> None:
+    """Run the alert engine for each user a scrape just touched (event-driven alerts): at
+    most one aggregated digest per user, written to the history. A per-user failure is
+    logged and never blocks the others; nothing runs on cadence any more."""
+    for user_id in sorted(user_ids):
+        try:
+            result = run_for_user(session, user_id, _alert_adjuster)
+            if result is not None:
+                log.info("alert digest written for user %s (alert_log %s)", user_id, result.id)
+        except Exception:
+            session.rollback()
+            log.exception("alert run failed for user %s", user_id)
 
 
 def _current_tick_seconds() -> int:

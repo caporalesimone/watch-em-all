@@ -1,6 +1,6 @@
 # Scraper Runner (serial execution)
 
-> **Layer 4 — Capability** · Audience: developer · Pseudocode allowed. Feature: [scraper-scheduling-and-limits](../../3-features/admin/scraper-scheduling-and-limits.md), [scraper-monitoring](../../3-features/admin/scraper-monitoring.md).
+> **Layer 4 — Capability** · Audience: developer · Pseudocode allowed. Feature: [scraper-scheduling-and-limits](../../3-features/admin/scraper-scheduling-and-limits.md), [scraper-monitoring](../../../docs-ita/3-features/admin/scraper-monitoring.md).
 
 ## Purpose
 

@@ -13,15 +13,16 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from sqlalchemy import select
 
-from src.core.cart_engine import AdjustmentFn, CartState, evaluate_cart
-from src.core.contracts import Adjustment, BrandRef, CategoryRef
+from src.core.alert_engine import delete_snapshot, snapshot_payload, upsert_snapshot
+from src.core.cart_engine import CartState, evaluate_cart
+from src.core.contracts import Adjustment, AlertType, BrandRef, CategoryRef
 from src.core.errors import APIError
-from src.core.models import Cart, CartMember, CatalogProduct
-from src.core.plugins.base import ScraperPlugin
-from src.core.plugins.registry import LoadedPlugin
+from src.core.models import Cart, CartAlertType, CartMember, CatalogProduct
+from src.web.adjust import adjuster_for, loaded_scrapers
 from src.web.deps import SessionDep, UserDep
 from src.web.schemas import (
     CartAdjustment,
+    CartAlertTypesBody,
     CartCard,
     CartCreate,
     CartDetail,
@@ -32,12 +33,6 @@ from src.web.schemas import (
 )
 
 router = APIRouter(prefix="/carts", tags=["Carts"])
-
-
-def _loaded_scrapers(request: Request) -> dict[str, ScraperPlugin]:
-    """Loaded scraper instances keyed by plugin_id (targets for scraper_specific)."""
-    loaded: list[LoadedPlugin] = list(getattr(request.app.state, "loaded_plugins", []))
-    return {lp.plugin.plugin_id: lp.plugin for lp in loaded if isinstance(lp.plugin, ScraperPlugin)}
 
 
 def _get_owned(db: SessionDep, user: UserDep, cart_id: int) -> Cart:
@@ -60,13 +55,12 @@ def _cart_products(db: SessionDep, cart_id: int) -> list[CatalogProduct]:
     )
 
 
-def _adjuster(request: Request, cart: Cart) -> AdjustmentFn | None:
-    """Bind the cart's scraper ``get_adjustments`` for a scraper_specific cart, or
-    None (cross carts, or scraper not loaded → no adjustments)."""
-    if cart.mode != "scraper_specific" or cart.scraper_id is None:
-        return None
-    plugin = _loaded_scrapers(request).get(cart.scraper_id)
-    return plugin.get_adjustments if plugin is not None else None
+def _alert_types(db: SessionDep, cart_id: int) -> list[str]:
+    """The alert types enabled on the cart (6.B1): each row present = one type enabled,
+    returned sorted for a stable payload."""
+    return sorted(
+        db.scalars(select(CartAlertType.alert_type).where(CartAlertType.cart_id == cart_id)).all()
+    )
 
 
 def _to_adjustment(a: Adjustment) -> CartAdjustment:
@@ -103,11 +97,13 @@ def _member_out(p: CatalogProduct, active: bool) -> CartMemberOut:
 
 def _state(db: SessionDep, request: Request, cart: Cart) -> tuple[CartState, list[CatalogProduct]]:
     products = _cart_products(db, cart.id)
-    state = evaluate_cart(cart.mode, products, _adjuster(request, cart), cart.threshold_amount)
+    state = evaluate_cart(cart.mode, products, adjuster_for(request, cart), cart.threshold_amount)
     return state, products
 
 
-def _card_kwargs(cart: Cart, state: CartState, n_members: int) -> dict[str, object]:
+def _card_kwargs(
+    cart: Cart, state: CartState, n_members: int, alert_types: list[str]
+) -> dict[str, object]:
     return {
         "id": cart.id,
         "name": cart.name,
@@ -126,19 +122,22 @@ def _card_kwargs(cart: Cart, state: CartState, n_members: int) -> dict[str, obje
         "final_price": state.final_price,
         "threshold_amount": cart.threshold_amount,
         "threshold": _to_threshold(state),
+        "alert_types": alert_types,
         "created_at": cart.created_at,
     }
 
 
 def _card(db: SessionDep, request: Request, cart: Cart) -> CartCard:
     state, products = _state(db, request, cart)
-    return CartCard(**_card_kwargs(cart, state, len(products)))  # type: ignore[arg-type]
+    kwargs = _card_kwargs(cart, state, len(products), _alert_types(db, cart.id))
+    return CartCard(**kwargs)  # type: ignore[arg-type]
 
 
 def _detail(db: SessionDep, request: Request, cart: Cart) -> CartDetail:
     state, products = _state(db, request, cart)
     members = [_member_out(p, p.is_available and not p.removed) for p in products]
-    return CartDetail(**_card_kwargs(cart, state, len(products)), members=members)  # type: ignore[arg-type]
+    kwargs = _card_kwargs(cart, state, len(products), _alert_types(db, cart.id))
+    return CartDetail(**kwargs, members=members)  # type: ignore[arg-type]
 
 
 @router.get("", response_model=list[CartCard], summary="List the current user's carts (cards).")
@@ -158,7 +157,7 @@ def create_cart(body: CartCreate, user: UserDep, db: SessionDep, request: Reques
             raise APIError(
                 422, "scraper_id_required", "scraper_specific carts require a scraper_id"
             )
-        if body.scraper_id not in _loaded_scrapers(request):
+        if body.scraper_id not in loaded_scrapers(request):
             raise APIError(422, "unknown_scraper", f"no loaded scraper {body.scraper_id!r}")
         scraper_id = body.scraper_id
     else:  # cross
@@ -267,4 +266,51 @@ def remove_items(
     for m in members:  # absent ids are a no-op
         db.delete(m)
     db.commit()
+    return _detail(db, request, cart)
+
+
+@router.put(
+    "/{cart_id}/alert-types",
+    response_model=CartDetail,
+    summary="Set the alert types enabled on a cart (6.B1).",
+)
+def set_alert_types(
+    cart_id: int, body: CartAlertTypesBody, user: UserDep, db: SessionDep, request: Request
+) -> CartDetail:
+    """Replace the cart's enabled alert types with the full set in the body (presence =
+    enabled). Unknown types are rejected as a batch. Enabling the first type seeds the
+    per-cart baseline and clearing them all deletes it (6.B2/6.B3)."""
+    cart = _get_owned(db, user, cart_id)
+
+    valid = {t.value for t in AlertType}
+    desired = list(dict.fromkeys(body.alert_types))  # dedupe, preserve order
+    unknown = [t for t in desired if t not in valid]
+    if unknown:
+        raise APIError(422, "unknown_alert_type", f"unknown alert type(s): {unknown}")
+
+    current = set(
+        db.scalars(select(CartAlertType.alert_type).where(CartAlertType.cart_id == cart.id)).all()
+    )
+    target = set(desired)
+    for row in db.scalars(
+        select(CartAlertType).where(CartAlertType.cart_id == cart.id)
+    ):  # remove no-longer-wanted rows
+        if row.alert_type not in target:
+            db.delete(row)
+    for t in desired:  # add newly-enabled rows (presence = enabled)
+        if t not in current:
+            db.add(CartAlertType(cart_id=cart.id, alert_type=t))
+    db.commit()
+
+    # Baseline lifecycle (6.B2/6.B3): seed on the first type enabled — from the cart's
+    # current state, so the first run has a reference and stays silent (ALERT-R8) — and
+    # delete it once the last type is disabled. (Cadence off/on re-seeding is 6.B7.)
+    if target:
+        if not current:  # 0 → ≥1 types: seed the baseline
+            state, products = _state(db, request, cart)
+            upsert_snapshot(db, user.sub, cart.id, snapshot_payload(products, state))
+            db.commit()
+    else:  # ≥0 → 0 types: drop the baseline
+        delete_snapshot(db, user.sub, cart.id)
+        db.commit()
     return _detail(db, request, cart)

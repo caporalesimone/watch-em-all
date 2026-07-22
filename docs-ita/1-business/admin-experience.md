@@ -1,43 +1,27 @@
-# L'esperienza dell'amministratore
+# L'esperienza dell'amministratore — parti ancora da realizzare
 
 > **Layer 1 — Business / UX** · Audience: tutti · Solo testo descrittivo.
+>
+> La parte **già realizzata** (primo avvio, creazione utenti con crea+lista, governo degli scraper, registro di sistema, manutenzione e impostazioni globali, il confine di privacy) è stata migrata nella wiki inglese canonica: [`docs/1-business/admin-experience.md`](../../docs/1-business/admin-experience.md). Qui restano **solo le esperienze che dipendono da capacità non ancora costruite** (fase 6+). I dettagli funzionali sono nel [Layer 3 — feature admin](../3-features/admin/).
 
-Il racconto dell'esperienza di chi governa l'installazione. I dettagli funzionali sono nel [Layer 3 — feature admin](../3-features/admin/).
+## Gestione avanzata degli utenti
 
-## Il primo avvio
-
-L'amministratore installa il sistema (un comando, vedi la documentazione di [infrastruttura](../infrastructure/deployment.md)) e accede con l'account admin creato automaticamente al primo avvio; il sistema gli impone subito il cambio della password temporanea. Da qui in poi la sua casa è l'area di amministrazione.
-
-## Creare gli utenti
-
-Non esiste auto-registrazione: è l'admin a creare ogni account, assegnando username e una password temporanea che l'utente dovrà cambiare al primo accesso. Dalla stessa pagina può disabilitare un account (con effetto immediato sulle sessioni) o reimpostarne la password. La lista mostra anche **l'ultimo accesso** di ciascun utente, ordinabile, così gli account inattivi saltano all'occhio; un filtro rapido separa con un click gli account **attivi**, **disabilitati** e **in cancellazione**.
+Oltre a crearli ed elencarli (già realizzato), l'admin potrà disabilitare un account (con effetto immediato sulle sessioni) o reimpostarne la password. La lista mostrerà anche filtri rapidi che separano con un click gli account **attivi**, **disabilitati** e **in cancellazione**, e l'ordinamento per ultimo accesso.
 
 La **cancellazione è differita**, come un cestino con la data di svuotamento: "cancella" disattiva l'account, lo marca **in cancellazione** e fissa una **scadenza** (per default 30 giorni dopo, l'admin può cambiare la durata del periodo). Nessun dato viene perso in questa fase, e finché la scadenza non arriva un tasto **annulla la cancellazione** — l'account torna disabilitato (mai direttamente attivo), e disabilitato può restare per sempre: non c'è alcuna scadenza sugli account disabilitati. La perdita vera avviene **automaticamente**: una volta al giorno il sistema elimina gli account la cui scadenza è passata. A quel punto viene eliminato **tutto**: prima ogni plugin cancella i propri dati di quell'utente, poi il sistema elimina quelli centrali — cataloghi, carrelli, storici, recapiti dei canali.
 
 L'utente è avvisato con una notifica di cortesia quando viene disabilitato o marcato (sui suoi canali attivi: chi non ne ha non riceve nulla); il purge definitivo non avvisa nessuno. Se un utente disabilitato o in cancellazione prova a entrare, il sistema gli dice che l'accesso non è più possibile e di contattare l'amministratore.
 
-## Governare gli scraper
+## Sorvegliare il lavoro — statistiche degli scraper
 
-È la responsabilità più importante. Per ogni scraper installato l'admin decide:
-
-- **Quante volte al giorno e a che ora** lo scraper gira: da una a più esecuzioni quotidiane, ciascuna a un orario scelto, **indipendente da quello degli altri scraper**. Un negozio con prezzi lampo può girare tre volte al giorno; uno statico, una sola. Gli scraper non lavorano mai in parallelo tra loro: ognuno gira al suo orario, uno alla volta, con calma, un sito alla volta. La regola di casa è ferma: **mai martellare un sito** — niente raffiche, niente decine di richieste simultanee.
-- Per distribuire bene gli orari l'admin ha una **vista calendario della giornata**: tutte le esecuzioni pianificate di tutti gli scraper a colpo d'occhio, in sola lettura; un click su uno scraper porta alla sua pagina di configurazione.
-- **I parametri operativi** di ciascuno scraper (tempi di attesa, identificazione del client, regole di sconto del sito, durata della cache), dalla pagina di configurazione che ogni plugin fornisce.
-- La **cache delle ricerche**: se due utenti osservano la stessa cosa, o due esecuzioni ravvicinate ripetono la stessa ricerca, il sistema riusa i dati appena raccolti invece di tornare sul sito. L'admin decide per ogni scraper quanto a lungo i dati restano "freschi" e può svuotare la cache con un pulsante.
-- L'eventuale **interruttore di emergenza**: uno scraper può essere sospeso senza disinstallarlo.
-
-## Sorvegliare il lavoro
-
-L'admin ha bisogno di sapere **quanto lavorano** gli scraper e **se stanno bene**. La sua plancia offre:
+Oltre al registro di sistema (già realizzato), l'admin avrà bisogno di sapere **quanto lavorano** gli scraper e **se stanno bene**. La sua plancia offrirà:
 
 - per ogni scraper, l'esito dell'**ultima esecuzione** (durata reale, prodotti trovati, novità, variazioni di prezzo, prodotti spariti, errori) e l'**andamento nel tempo** delle esecuzioni — quante al giorno, quanto durano, quante richieste fanno ai siti;
-- il dettaglio di ogni esecuzione, **utente per utente**, per capire chi genera il carico;
-- il **registro di sistema** in tempo quasi reale: esecuzioni, recuperi dopo un fermo, esecuzioni saltate perché la precedente era ancora in corso, errori — con filtri per gravità e per origine;
-- un segnale di **vita del motore di pianificazione**: se il componente che orchestra le esecuzioni si ferma, l'admin lo vede subito.
+- il dettaglio di ogni esecuzione, **utente per utente**, per capire chi genera il carico.
 
 ## Misurare il carico
 
-Accanto alla salute degli scraper, l'admin ha una **dashboard con i numeri dell'installazione**: quanti prodotti e carrelli esistono in totale, quali utenti hanno caricato più dati, quanto carico genera ciascun utente su ogni scraper (richieste verso i siti, tempi di lavorazione), e quante notifiche escono dal sistema — in totale, per utente e per canale, con le medie del periodo.
+Accanto alla salute degli scraper, l'admin avrà una **dashboard con i numeri dell'installazione**: quanti prodotti e carrelli esistono in totale, quali utenti hanno caricato più dati, quanto carico genera ciascun utente su ogni scraper (richieste verso i siti, tempi di lavorazione), e quante notifiche escono dal sistema — in totale, per utente e per canale, con le medie del periodo.
 
 Sono sempre e soltanto numeri: la dashboard dice che un utente ha trecento prodotti e quattro carrelli, **mai quali**. Serve a capire chi e cosa fa lavorare il sistema, e a regolare di conseguenza orari, limiti e — quando serve — una conversazione con l'utente dalla configurazione esagerata.
 
@@ -51,12 +35,6 @@ Come per gli scraper, l'admin ha anche l'**interruttore globale**: può disabili
 
 L'admin può scrivere direttamente agli utenti attraverso il sistema stesso: una pagina dedicata gli permette di comporre un messaggio (titolo e testo) e inviarlo **a tutti** o **a un utente specifico** — un avviso di manutenzione, una novità, una segnalazione personale. Il messaggio viaggia sui canali di notifica che ciascun utente ha attivato; chi non ha alcun canale lo trova comunque **nella pagina delle notifiche ricevute**, dove i messaggi dell'admin sono evidenziati con un'icona e un colore propri. L'admin vede gli esiti di consegna dei propri messaggi, non lo stato di lettura.
 
-## Manutenzione
+## Manutenzione — parti da realizzare
 
-- **Pulizia degli storici**: l'admin applica regole globali per data ("elimina le notifiche di tutti più vecchie di 90 giorni") senza mai vedere il contenuto delle notifiche degli utenti.
-- **Parametri globali**: tempo massimo di un'esecuzione, conservazione dei log, durata del periodo di grazia prima dell'eliminazione degli account cancellati.
-- **Salute del sistema**: un controllo di vita esposto dall'applicazione e lo stato dei contenitori; per l'ispezione diretta dei dati in sviluppo esiste uno strumento dedicato, mai attivo in produzione.
-
-## Cosa l'admin non può fare
-
-Non vede i carrelli, i cataloghi né le notifiche degli utenti: dei loro dati conosce **solo i numeri** (quanti prodotti, quanti carrelli, quante notifiche — la dashboard del carico), mai i contenuti. Configura il sistema, non i contenuti. Se serve aiutare un utente, lo fa guidandolo — non entrando nei suoi dati.
+- **Pulizia degli storici alert**: l'admin applica regole globali per data ("elimina le notifiche di tutti più vecchie di 90 giorni") senza mai vedere il contenuto delle notifiche degli utenti. *(Richiede l'esistenza delle notifiche, fase 6+.)*

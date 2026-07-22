@@ -2,7 +2,7 @@
 
 > **Layer 4 — Contract** · Audience: developer, plugin developer · Pseudocode allowed.
 >
-> English translation of the Italian reference [`docs-ita/4-capabilities/contracts/adjustment.md`](../../../docs-ita/4-capabilities/contracts/adjustment.md), limited to what is implemented (DOC-12). The implemented model carries an i18n `id` and `params` (localized on the frontend) in addition to `description` and `amount`. Feature: [carts](../../3-features/user/carts.md).
+> Limited to what is implemented (DOC-12). The implemented model carries an i18n `id` and `params` (localized on the frontend) in addition to `description` and `amount`. Feature: [carts](../../3-features/user/carts.md).
 
 ## Purpose
 

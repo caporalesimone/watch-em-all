@@ -188,6 +188,7 @@ class CartCard(BaseModel):
     final_price: Decimal
     threshold_amount: Decimal | None = None  # the stored target (the editor's value)
     threshold: CartThreshold | None = None  # computed status (null without active members)
+    alert_types: list[str] = Field(default_factory=list)  # enabled alert types (6.B1)
     created_at: datetime
 
 
@@ -200,3 +201,47 @@ class CartItemsBody(BaseModel):
     # a batch: all ids must be the user's, listed (not delisted), of the cart's scraper
     # (scraper_specific) and one currency — else the whole batch is rejected.
     product_ids: list[int] = Field(min_length=1)
+
+
+class AlertListItem(BaseModel):
+    # A row of the alert history list (6.B8). `read` = read_at is set; `cart_count` is the
+    # number of carts in a digest (0 for non-digest kinds) — a light preview for the list.
+    id: int
+    kind: str
+    created_at: datetime
+    read: bool
+    cart_count: int
+
+
+class AlertPage(BaseModel):
+    items: list[AlertListItem]
+    total: int
+    page: int
+    page_size: int
+
+
+class AlertDetail(BaseModel):
+    # One notification in full (6.B8): the self-sufficient digest payload plus its read
+    # state. `deliveries` (per-channel outcomes) stays empty until phase 7 adds channels.
+    id: int
+    kind: str
+    created_at: datetime
+    read: bool
+    payload: dict[str, Any]
+    deliveries: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class UnreadCount(BaseModel):
+    count: int
+
+
+class AlertIdsBody(BaseModel):
+    # Bulk delete of the user's own alerts (6.F3). Ids not owned by the caller are ignored.
+    ids: list[int] = Field(min_length=1)
+
+
+class CartAlertTypesBody(BaseModel):
+    # The full desired set of enabled alert types for a cart (6.B1). Full-set semantics:
+    # the endpoint stores exactly this set (presence = enabled). Values are validated
+    # against the AlertType enum. Empty list = disable all (deletes the baseline).
+    alert_types: list[str] = Field(default_factory=list)

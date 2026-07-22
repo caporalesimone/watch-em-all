@@ -2,7 +2,7 @@
 
 > **Layer 3 — Plugin feature** · Audience: architects, plugin developers.
 >
-> English translation of the Italian reference [`docs-ita/3-features/plugins/dynamic-integration.md`](../../../docs-ita/3-features/plugins/dynamic-integration.md), limited to what is implemented (DOC-12). Architecture view: [plugin-architecture](../../2-architecture/plugin-architecture.md) · technical detail: [plugin-registry](../../4-capabilities/core/plugin-registry.md).
+> Limited to what is implemented (DOC-12). Architecture view: [plugin-architecture](../../2-architecture/plugin-architecture.md) · technical detail: [plugin-registry](../../4-capabilities/core/plugin-registry.md).
 
 ## The manifest: the plugin's ID card
 

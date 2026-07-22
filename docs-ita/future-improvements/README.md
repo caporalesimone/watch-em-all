@@ -12,7 +12,7 @@
 
 ## Criterio di rinvio
 
-Il progetto è un hobby project per ≤5 utenti ([security posture](../2-architecture/security-posture.md)): un miglioramento si rimanda quando il suo costo (complessità, manutenzione) supera il valore a questa scala. Il rinvio è una decisione, non una dimenticanza: se manca il "perché no adesso", non è un future improvement — è un buco di specifica.
+Il progetto è un hobby project per ≤5 utenti ([security posture](../../docs/2-architecture/security-posture.md)): un miglioramento si rimanda quando il suo costo (complessità, manutenzione) supera il valore a questa scala. Il rinvio è una decisione, non una dimenticanza: se manca il "perché no adesso", non è un future improvement — è un buco di specifica.
 
 ## Top 3 per probabilità di promozione
 

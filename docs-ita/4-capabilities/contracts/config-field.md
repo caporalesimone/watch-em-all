@@ -1,6 +1,6 @@
 # Contratto — `ConfigField` (form dinamici)
 
-> **Layer 4 — Contratto** · Audience: developer, plugin developer · Pseudocodice ammesso. Feature: [plugin-configuration](../../3-features/admin/plugin-configuration.md), [profile-and-notifiers](../../3-features/user/profile-and-notifiers.md).
+> **Layer 4 — Contratto** · Audience: developer, plugin developer · Pseudocodice ammesso. Feature: [plugin-configuration](../../../docs/3-features/admin/plugin-configuration.md), [profile-and-notifiers](../../3-features/user/profile-and-notifiers.md).
 
 ## Scopo
 

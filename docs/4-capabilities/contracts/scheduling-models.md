@@ -1,8 +1,8 @@
 # Contracts — Scheduling and monitoring models
 
-> **Layer 4 — Contract** · Audience: developer · Pseudocode allowed. Feature: [scraper-scheduling-and-limits](../../3-features/admin/scraper-scheduling-and-limits.md), [scraper-monitoring](../../3-features/admin/scraper-monitoring.md).
+> **Layer 4 — Contract** · Audience: developer · Pseudocode allowed. Feature: [scraper-scheduling-and-limits](../../3-features/admin/scraper-scheduling-and-limits.md), [scraper-monitoring](../../../docs-ita/3-features/admin/scraper-monitoring.md).
 
-Three schedules with different owners plus the global settings, read by the dispatcher; scheduled scraper runs produce the execution records:
+Two schedules with different owners plus the global settings, read by the dispatcher; scheduled scraper runs produce the execution records. **Alerts have no schedule** — they are event-driven (the alert engine runs after each scrape that changed a user's catalog).
 
 ```mermaid
 flowchart TB
@@ -11,10 +11,9 @@ flowchart TB
         SET[SystemSettings<br/>timeout · retention · deletion grace]
     end
     subgraph USR["Per-user"]
-        AS[AlertSchedule<br/>weekdays, time, last_run_date]
         SC[SummaryConfig<br/>weekly/monthly, last_run_date]
     end
-    CRON[Cron Worker<br/>tick/min] --> SS & AS & SC
+    CRON[Cron Worker<br/>tick/min] --> SS & SC
     SS --> REC[ScrapeRun + ScrapeUserLog<br/>execution records]
 ```
 
@@ -30,14 +29,9 @@ class ScraperSchedule(BaseModel):
     last_slot: datetime | None = None  # last EXECUTED slot (datetime, not date:
                                        # supports N slots/day and cross-midnight catch-up)
 
-# Alert — per-user: calendar cadence
-class AlertSchedule(BaseModel):
-    user_id: int
-    scheduled_time: time
-    weekdays: list[int] = []           # 0=Mon..6=Sun (Python date.weekday() convention;
-                                       # ⚠ JS Date.getDay() starts on Sunday: the UI maps it)
-                                       # [] = off · 7 days = daily
-    last_run_date: date | None = None  # anti-duplicate guard + intra-day catch-up
+# Alert — NO schedule: event-driven. The alert engine runs after each scrape that
+# changed the user's catalog (scheduled scrape, scrape-now, TP simulate); the per-cart
+# alert TYPES live in cart_alert_types, not here.
 
 # Summary — per-user: see SummaryConfig in core/summary-report.md
 ```
