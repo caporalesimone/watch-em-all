@@ -1,33 +1,16 @@
-# Glossario
+# Glossario — termini ancora da realizzare
 
 > **Layer 1 — Business** · Audience: tutti.
+>
+> I termini **già in uso** nel prodotto realizzato (Scraper, Notifier, Plugin, Catalogo, Product Picker, Carrello, Modalità carrello, Adjustment, Soglia, Provenienza, Identità del prodotto, Non disponibile, Delistato, Run, Slot, Cache di scrape, Dry-run/Test, Core, Worker) sono stati migrati nel glossario inglese canonico: [`docs/1-business/glossary.md`](../../docs/1-business/glossary.md). Qui restano **solo i termini che nominano capacità non ancora costruite** (fase 6+).
 
 | Termine | Definizione |
 |---|---|
-| **Scraper** | Plugin che osserva un singolo sito e-commerce ed estrae prodotti (prezzi, disponibilità). Internamente lavora **in modo sequenziale** (un solo flusso di lavoro per scraper); anche il sistema li esegue **uno alla volta**, ciascuno al proprio orario. |
-| **Notifier** | Plugin che consegna le notifiche su un canale (email, Discord, …). |
-| **Plugin** | Unità autonoma full-stack (backend + interfaccia) che estende il sistema. Due famiglie: scraper e notifier. Ogni plugin è configurabile a livello **admin** (parametri di sistema) e a livello **utente** (parametri personali). |
-| **Catalogo** | L'insieme dei prodotti estratti per un utente. Personale e isolato per utente. |
-| **Product Picker** | La tabella del catalogo da cui l'utente sceglie i prodotti da mettere nei carrelli. Distinta dalle pagine dei singoli scraper (dove si sceglie *cosa osservare sul sito*). |
-| **Carrello (cart)** | Gruppo di prodotti del catalogo con soglia di risparmio e tipi di avviso. Unità minima di monitoraggio con notifica. |
-| **Modalità carrello** | `scraper_specific`: prodotti di un solo sito, totali calcolati con le regole di quel sito (adjustments). `cross`: prodotti da siti diversi, anche lo stesso prodotto ripetuto una volta per sito; nessun adjustment; **provenienza sempre visibile** per riga. Immutabile dopo la creazione. |
-| **Adjustment** | Voce correttiva sul totale di un carrello scraper-specific, calcolata dal plugin: sconto a soglia (positiva) o costo aggiuntivo come la spedizione (negativa). |
-| **Soglia** | Valore (assoluto in € o percentuale di sconto) al di sotto/sopra del quale scatta l'avviso di carrello. |
-| **Provenienza** | Il sito/scraper da cui proviene un prodotto. Mostrata sempre (icona + nome) nel Product Picker, nelle card dei carrelli e nelle notifiche — indispensabile nei carrelli cross. |
-| **Identità del prodotto** | Il modo in cui il sistema riconosce "lo stesso prodotto" tra un'osservazione e l'altra: un identificatore stabile fornito dallo scraper (`external_id`), insieme al plugin e all'utente. |
-| **Non disponibile (`is_available = false`)** | Prodotto temporaneamente esaurito sul sito. Resta nel catalogo e nei carrelli, escluso dai totali finché non torna. Deciso dallo **scraper**. |
-| **Delistato (`removed`)** | Prodotto sparito dal sito (non più trovato dallo scraper). Resta nel catalogo, grigiato e ignorato, finché l'utente non lo pulisce manualmente. Deciso dal **core**. |
 | **Alert digest** | La notifica aggregata: il **diff** di tutti i carrelli rispetto all'ultima notifica, in un unico messaggio. |
 | **Summary** | Il report periodico opzionale: una **fotografia** dello stato corrente dei carrelli (non un diff). |
 | **Cadenza** | Quando l'utente riceve gli alert: giorni della settimana + orario, a livello di account. *Quali* avvisi ricevere si decide invece carrello per carrello. |
 | **Baseline** | Lo stato di riferimento con cui il sistema confronta per capire "cosa è cambiato" dall'ultima notifica. |
-| **Run (di scrape)** | Una singola esecuzione di uno scraper, che processa tutti gli utenti che lo hanno configurato. Programmata dall'admin, da 1 a N volte al giorno. |
-| **Slot** | Uno degli orari programmati di una run. Se il sistema era fermo, recupera lo slot più recente perso (uno solo). |
-| **Cache di scrape** | Il riuso dei risultati di una ricerca recente: la stessa query, tra utenti diversi o run ravvicinate, non torna sul sito finché l'**emivita** (durata di validità, configurata dall'admin per plugin) non scade. |
 | **Cancellazione differita** | La cancellazione di un account da parte dell'admin: l'account viene disabilitato e marcato **in cancellazione** con una **scadenza** (default 30 giorni); fino ad allora è annullabile con un tasto (torna disabilitato), dopo viene eliminato automaticamente con tutti i suoi dati. |
-| **Dry-run / Test** | Esecuzione di prova di uno scraper che mostra i prodotti trovati **senza salvare nulla**. |
-| **Core** | Il cuore del sistema: orchestra i plugin, possiede i dati, calcola carrelli e notifiche. Non conosce la logica interna dei plugin (né, ad esempio, il concetto di "categoria", che è interno agli scraper). |
-| **Worker** | Il processo che fa girare le cose al momento giusto: esecuzioni scraper, notifiche, report. |
 | **Storico alert** | L'archivio interno delle notifiche dell'utente, consultabile dall'app anche senza canali configurati, con stato di lettura. |
 | **Storico prezzi** | L'archivio permanente delle variazioni di prezzo e disponibilità, base dei grafici. |
 | **Minimo storico (all-time low)** | Il prezzo più basso mai registrato per un prodotto nello storico dell'utente. Mostrato come badge e disponibile come tipo di avviso ("ribasso al minimo storico"). |
