@@ -100,15 +100,6 @@
 		"cartAllOnSale": "Every product is on sale",
 		"cartThresholdReached": "The savings threshold is reached"
 	},
-	"weekdays": {
-		"mon": "Mon",
-		"tue": "Tue",
-		"wed": "Wed",
-		"thu": "Thu",
-		"fri": "Fri",
-		"sat": "Sat",
-		"sun": "Sun"
-	},
 	"alerts": {
 		"title": "Alerts",
 		"empty": "No alerts yet. You'll see your digests here once monitoring finds changes.",
@@ -296,14 +287,7 @@
 		"theme": "Theme",
 		"themeDark": "Dark",
 		"themeLight": "Light",
-		"changePassword": "Change password",
-		"cadence": "Alert cadence",
-		"cadenceHint": "Choose when to receive your alert digest. Turning it off (no days selected) clears the monitoring baselines.",
-		"cadenceDays": "Days",
-		"cadenceTime": "Time",
-		"cadenceOff": "Notifications are off — pick at least one day to receive a digest.",
-		"cadenceResetCleared": "Monitoring was reset — baselines cleared.",
-		"cadenceResetReseeded": "Monitoring restarted from now."
+		"changePassword": "Change password"
 	},
 	"dashboard": {
 		"title": "Dashboard",

@@ -11,7 +11,6 @@ Le nuove relazioni pendono dalle tabelle già rilasciate (`users`, `carts` — m
 ```mermaid
 erDiagram
     users ||--o{ alert_log : riceve
-    users ||--o| alert_schedule : ha
     users ||--o| summary_config : ha
     users ||--o{ notifier_user_config : configura
     carts ||--o{ cart_alert_types : "tipi abilitati (CASCADE)"
@@ -30,7 +29,6 @@ erDiagram
 
 | Tabella | Colonne | Note |
 |---|---|---|
-| `alert_schedule` | user_id PK/FK, scheduled_time, weekdays (int[], 0=lun), last_run_date | cadenza per-utente; [] = off |
 | `summary_config` | user_id PK/FK, enabled, frequency (`weekly`\|`monthly`), weekday, scheduled_time, last_run_date | opt-in; monthly = giorno 1 |
 | `alert_snapshot` | user_id FK, cart_id FK **CASCADE**, snapshot_json, taken_at — **PK (user_id, cart_id)** | baseline **per-carrello**: seed all'abilitazione, avanza a ogni run, delete alla disabilitazione |
 | `alert_log` | id, user_id FK, kind (`alert_digest`\|`summary`\|`system_message`\|`admin_message`), admin_message_id FK (null se non admin), payload_json, created_at, read_at (null = non letto) | sempre scritto; INDEX (user_id, created_at); purge admin per data; kind determina la categoria (sistema/admin); per i messaggi testuali il body nel payload è Markdown (AEV-R7) |

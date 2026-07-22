@@ -8,8 +8,6 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 
 | Metodo | Path | Ruolo | Body / Query | Risposta | Note |
 |---|---|---|---|---|---|
-| GET | `/api/me/alert-schedule` | 👤 | — | `AlertSchedule` | |
-| PUT | `/api/me/alert-schedule` | 👤 | `{scheduled_time, weekdays}` | 200 | weekdays []=off; cambia stato → effetti baseline dichiarati nella risposta |
 | GET | `/api/me/summary-config` | 👤 | — | `SummaryConfig` | |
 | PUT | `/api/me/summary-config` | 👤 | `{enabled, frequency, weekday?, scheduled_time}` | 200 | |
 | GET | `/api/me/export` | 👤 | `?format=json\|csv` | file download | tutti i propri dati; csv = zip multi-file; secret esclusi — [data-export](../3-features/user/data-export.md) |

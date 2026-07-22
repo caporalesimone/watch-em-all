@@ -23,7 +23,7 @@ flowchart TB
 
 ## Concetti chiave non ancora realizzati
 
-- **Notifica**: il sistema raccoglie tutto ciò che è cambiato e lo comunica all'utente in un **unico messaggio aggregato**, all'orario e nei giorni scelti dall'utente, tramite i canali configurati (es. email, Discord). Ogni notifica resta comunque consultabile nello storico interno dell'applicazione, anche senza canali configurati.
+- **Notifica**: il sistema raccoglie tutto ciò che è cambiato e lo comunica all'utente in un **unico messaggio aggregato**, **appena uno scrape aggiorna i prezzi** (event-driven, nessun orario da configurare), tramite i canali configurati (es. email, Discord). Ogni notifica resta comunque consultabile nello storico interno dell'applicazione, anche senza canali configurati.
 - **Storico prezzi**: ogni variazione di prezzo viene registrata per sempre; grafici interattivi mostrano l'andamento di ogni prodotto e di ogni carrello.
 
 ### Il ciclo di valore completo

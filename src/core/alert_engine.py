@@ -184,30 +184,6 @@ def delete_snapshot(db: Session, user_id: int, cart_id: int) -> None:
     )
 
 
-def seed_all_snapshots(db: Session, user_id: int, adjuster_provider: AdjusterProvider) -> int:
-    """(Re-)seed the baseline of every cart of the user that has alert types enabled, from
-    the current state (cadence turned on — ALERT-R3). Returns the number seeded. The caller
-    commits. Existing baselines are overwritten so monitoring restarts from now."""
-    count = 0
-    for cart in _carts_with_alert_types(db, user_id):
-        products = _member_products(db, cart.id)
-        state = evaluate_cart(cart.mode, products, adjuster_provider(cart), cart.threshold_amount)
-        upsert_snapshot(db, user_id, cart.id, snapshot_payload(products, state))
-        count += 1
-    return count
-
-
-def delete_all_snapshots(db: Session, user_id: int) -> int:
-    """Drop every baseline of a user (cadence off — ALERT-R3). Returns the number of rows
-    removed. Re-enabling the cadence re-seeds from the then-current state, so there is no
-    backlog. The caller commits. Wired into the alert-schedule API in 6.B7."""
-    count = len(
-        db.scalars(select(AlertSnapshot.cart_id).where(AlertSnapshot.user_id == user_id)).all()
-    )
-    db.execute(sa_delete(AlertSnapshot).where(AlertSnapshot.user_id == user_id))
-    return count
-
-
 # ---------------------------------------------------------------------------
 # Digest payload (alert-event.md) — the self-sufficient AlertEvent written to the
 # history and (from phase 7) handed to the notifiers. Decimal serialises to a string

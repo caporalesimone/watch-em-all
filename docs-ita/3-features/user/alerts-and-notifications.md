@@ -5,14 +5,14 @@
 ## Requisiti
 
 ### Cadenza (quando)
-- **ALERT-R1** — L'utente imposta a livello account un **orario** e i **giorni della settimana** (tutti = giornaliera; nessuno = off), validi per tutti i suoi carrelli.
-- **ALERT-R2** — La run avviene solo nei giorni dovuti, all'orario scelto. Gli alert **non** partono mai subito dopo uno scrape: scrape e notifica sono disaccoppiati.
-- **ALERT-R3** — Mettere la cadenza a off elimina le baseline dell'utente; riattivarla le risemina dallo stato corrente (nessun arretrato). La UI avverte di questo effetto.
+- **ALERT-R1** — Gli alert girano **a fine di ogni scrape** che ha cambiato il catalogo dell'utente (scrape schedulato nel worker, scrape-now manuale, "simula scrape" del TP). Nessuna configurazione di orario o giorni: scrape e notifica sono **accoppiati** (event-driven).
+- **ALERT-R2** — Ogni run di scrape produce **un solo digest aggregato per utente** (`alert_digest`), che raccoglie tutti i carrelli con eventi di quella run.
+- **ALERT-R3** — La baseline è seminata quando si abilita il **primo** tipo di alert su un carrello e cancellata quando si disabilitano **tutti** i tipi su quel carrello (nessun arretrato: alla riabilitazione riparte da "ora"). La UI avverte di questo effetto.
 
 ### Diff e contenuti (cosa)
 - **ALERT-R4** — Il rilevamento è un **diff vs ultima run**: si notifica solo ciò che è cambiato, qualunque sia il numero di scrape intermedi. Nessuna policy di ripetizione (un evento già notificato non si ripete).
 - **ALERT-R5** — Per ogni carrello si valutano **solo i tipi abilitati su quel carrello**.
-- **ALERT-R6** — Una run produce **al più una notifica** (`alert_digest`) che aggrega tutti i carrelli con eventi.
+- **ALERT-R6** — Una run produce **al più una** notifica: zero se il diff è vuoto (la baseline avanza comunque), altrimenti l'unico digest aggregato di ALERT-R2.
 - **ALERT-R7** — Ogni prodotto negli eventi porta: i **tag** (può averne più d'uno), **prezzo precedente e attuale**, % sconto, **provenienza** (icona/nome scraper) e link. Ogni carrello: totali correnti e stato soglia. Il digest deve bastare per decidere senza aprire l'app.
 - **ALERT-R8** — La prima run dopo l'abilitazione non notifica (baseline appena seminata); gli elementi senza baseline (prodotto appena aggiunto a un carrello attivo) sono seminati in silenzio.
 
@@ -32,7 +32,7 @@
 
 ```mermaid
 flowchart TD
-    T[Orario di alert dell'utente<br/>in un giorno dovuto] --> L[Carica baseline + stato corrente]
+    T[Fine di uno scrape<br/>che ha cambiato il catalogo] --> L[Carica baseline + stato corrente]
     L --> C{Per ogni carrello<br/>con alert attivi}
     C --> D[Diff prodotti: tag<br/>Diff carrello: eventi]
     D --> F{Tipi abilitati<br/>sul carrello?}
@@ -61,6 +61,6 @@ I tag sono resi come badge grafici; lo stesso prodotto può cumulare più tag ne
 
 ## Interazioni UI
 
-- **Profilo → Notifiche**: picker dei giorni (L–D) + orario; configurazione canali con flag on/off e bottone **Test** per ciascuno ([profile-and-notifiers.md](profile-and-notifiers.md)).
+- **Profilo → Notifiche**: configurazione canali con flag on/off e bottone **Test** per ciascuno ([profile-and-notifiers.md](profile-and-notifiers.md)). Nessun picker di giorni/orario: gli alert sono event-driven (a fine scrape).
 - **Carrello**: selezione dei tipi di alert (default: nessuno). L'abilitazione/disabilitazione mostra l'effetto sulla baseline ("il monitoraggio riparte da ora").
 - **Storico alert**: elenco con badge non letto, filtro per categoria (sistema/admin) e per tipo (digest/summary), notifiche admin evidenziate con icona e colore dedicati, messaggi testuali resi in Markdown (sanificato), dettaglio con esiti di consegna.

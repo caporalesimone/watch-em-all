@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { _ } from 'svelte-i18n';
 
@@ -16,63 +15,6 @@
 
 	const field =
 		'w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900';
-
-	// --- Alert cadence (6.F2) ---
-	// weekdays: 0=Mon … 6=Sun; [] = off. The backend canonicalises the time; we bind
-	// "HH:MM" to the <input type="time">.
-	const WEEKDAYS: { value: number; key: string }[] = [
-		{ value: 0, key: 'weekdays.mon' },
-		{ value: 1, key: 'weekdays.tue' },
-		{ value: 2, key: 'weekdays.wed' },
-		{ value: 3, key: 'weekdays.thu' },
-		{ value: 4, key: 'weekdays.fri' },
-		{ value: 5, key: 'weekdays.sat' },
-		{ value: 6, key: 'weekdays.sun' }
-	];
-
-	let cadenceDays = $state<number[]>([]);
-	let cadenceTime = $state('09:00');
-	let cadenceLoaded = $state(false);
-	let cadenceBusy = $state(false);
-	let cadenceNotice = $state('');
-
-	onMount(async () => {
-		try {
-			const s = await api.getAlertSchedule();
-			cadenceDays = [...s.weekdays].sort((a, b) => a - b);
-			if (s.scheduled_time) cadenceTime = s.scheduled_time.slice(0, 5);
-		} catch {
-			/* leave the defaults; the Save button still works */
-		} finally {
-			cadenceLoaded = true;
-		}
-	});
-
-	function toggleDay(value: number): void {
-		cadenceDays = cadenceDays.includes(value)
-			? cadenceDays.filter((d) => d !== value)
-			: [...cadenceDays, value].sort((a, b) => a - b);
-	}
-
-	async function saveCadence(): Promise<void> {
-		cadenceBusy = true;
-		cadenceNotice = '';
-		try {
-			const res = await api.setAlertSchedule({
-				scheduled_time: cadenceTime,
-				weekdays: cadenceDays
-			});
-			cadenceDays = [...res.weekdays].sort((a, b) => a - b);
-			if (res.scheduled_time) cadenceTime = res.scheduled_time.slice(0, 5);
-			// ALERT-R3: flipping the on/off state clears or reseeds the monitoring baselines.
-			if (res.baseline_effect === 'cleared') cadenceNotice = $_('profile.cadenceResetCleared');
-			else if (res.baseline_effect === 'reseeded')
-				cadenceNotice = $_('profile.cadenceResetReseeded');
-			else cadenceNotice = $_('common.saved');
-		} finally {
-			cadenceBusy = false;
-		}
-	}
 
 	async function submit(event: SubmitEvent): Promise<void> {
 		event.preventDefault();
@@ -135,57 +77,6 @@
 			>
 				{$theme === 'dark' ? `☾ ${$_('profile.themeDark')}` : `☀ ${$_('profile.themeLight')}`}
 			</button>
-		</div>
-	</section>
-
-	<section class="space-y-3 text-sm">
-		<h2 class="font-medium">{$_('profile.cadence')}</h2>
-		<p class="text-slate-500 dark:text-slate-400">{$_('profile.cadenceHint')}</p>
-
-		<div class="space-y-1">
-			<span class="block text-slate-500 dark:text-slate-400">{$_('profile.cadenceDays')}</span>
-			<div class="flex flex-wrap gap-1">
-				{#each WEEKDAYS as d (d.value)}
-					<button
-						type="button"
-						aria-pressed={cadenceDays.includes(d.value)}
-						onclick={() => toggleDay(d.value)}
-						class="rounded border px-2.5 py-1 text-xs {cadenceDays.includes(d.value)
-							? 'border-indigo-500 bg-indigo-600 text-white'
-							: 'border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'}"
-					>
-						{$_(d.key)}
-					</button>
-				{/each}
-			</div>
-		</div>
-
-		<div class="flex items-center gap-2">
-			<label for="cadence-time" class="text-slate-500 dark:text-slate-400"
-				>{$_('profile.cadenceTime')}</label
-			>
-			<input
-				id="cadence-time"
-				type="time"
-				bind:value={cadenceTime}
-				class="rounded border border-slate-300 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-900"
-			/>
-		</div>
-
-		{#if cadenceDays.length === 0}
-			<p class="text-amber-600 dark:text-amber-400">{$_('profile.cadenceOff')}</p>
-		{/if}
-
-		<div class="flex items-center gap-3">
-			<button
-				type="button"
-				onclick={saveCadence}
-				disabled={cadenceBusy || !cadenceLoaded}
-				class="rounded bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
-			>
-				{$_('common.save')}
-			</button>
-			{#if cadenceNotice}<span class="text-xs text-slate-500">{cadenceNotice}</span>{/if}
 		</div>
 	</section>
 

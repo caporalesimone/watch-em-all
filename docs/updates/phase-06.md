@@ -1,11 +1,11 @@
 # Phase 6 — In-app alerts
 
 > Feature-level recap. Phase 6 turns the carts into a **notification engine**, delivered for now
-> **in-app only**: you pick which changes matter on each cart, the system compares every run
-> against a **baseline** and, at the cadence you choose, drops a single readable **digest** into a
+> **in-app only**: you pick which changes matter on each cart, and **right after every scrape** the
+> system compares each cart against a **baseline** and drops a single readable **digest** into a
 > new **Alerts** section — what changed, old → new price, where it's from, threshold state — with an
-> **unread badge** in the sidebar. The external channels (email, Discord) come later; keeping them
-> separate makes this phase small and verifiable.
+> **unread badge** in the sidebar. No scheduling to configure — it's **event-driven**. The external
+> channels (email, Discord) come later; keeping them separate makes this phase small and verifiable.
 
 ## What's implemented (0.6.0)
 
@@ -27,20 +27,19 @@
 - The **first run after enabling is silent** (nothing has changed against a just-taken baseline);
   delisted products are ignored; a product newly added to an active cart is seeded silently.
 
-### 3) One digest per run
+### 3) Event-driven — right after each scrape
 
-- At your alert time the engine collects every cart with changes into a **single digest** — never
-  one message per cart. Each digest is **self-sufficient**: per product the event tags, previous and
-  current price, discount, **provenance** (which store), and a link; per cart the totals and
+- There's **nothing to schedule**. Whenever a scrape updates your catalog — the automatic scheduled
+  run, an on-demand scrape-now, or the TP test generator's **Simulate scrape** — the engine runs for
+  the affected users immediately. So an alert lands **seconds after** the price change that caused it,
+  and manual testing is instant.
+
+### 4) One digest per run
+
+- Each scrape run collects every cart of yours that changed into a **single aggregated digest** —
+  never one message per cart. Each digest is **self-sufficient**: per product the event tags, previous
+  and current price, discount, **provenance** (which store), and a link; per cart the totals and
   threshold state. It is always written to the in-app history.
-
-### 4) Your cadence
-
-- In **Profile → Alert cadence** you set the **weekdays** and the **time** you want to be told (all
-  days = daily, none = off). The worker runs the engine only when due, with **same-day catch-up** if
-  it was down at the time (a single run, never a flood). Turning the cadence **off** clears your
-  baselines; turning it **on** re-seeds them from the current state — the app tells you which
-  happened.
 
 ### 5) The Alerts history + unread badge
 
@@ -48,15 +47,15 @@
   it was generated, how many carts changed, and an **unread** marker. Opening one shows the full,
   readable digest and **marks it read**. The sidebar carries an **unread count** badge.
 
-_Under the hood:_ four new tables (`cart_alert_types`, `alert_snapshot`, `alert_schedule`,
-`alert_log`) and the `src/core/alert_engine.py` module (baseline seed/advance/delete, the product
-and cart-event diffs, and `run_for_user` which aggregates one `AlertEvent` per user and writes it to
-`alert_log`). The cadence lives in `src/core/alert_cadence.py`; the worker dispatches a synchronous
-alert run per due user each tick, mirroring the scraper dispatcher. The API adds
-`GET/PUT /api/me/alert-schedule`, `PUT /api/carts/{id}/alert-types` and the `/api/alerts` history
-(list, detail, mark-read, unread-count). Delivery to external channels — the `alert_delivery` table
-and the dispatch to notifiers — is deliberately deferred to phase 7; here the digest only lands in
-the history.
+_Under the hood:_ three new tables (`cart_alert_types`, `alert_snapshot`, `alert_log`) and the
+`src/core/alert_engine.py` module (baseline seed/advance/delete, the product and cart-event diffs,
+and `run_for_user` which aggregates one `AlertEvent` per user and writes it to `alert_log`). The run
+is **triggered by the scrape**: the worker runs it after a scheduled scrape for the users it touched,
+and the web runs it right after a scrape-now / TP simulate (`src/web/adjust.run_user_alerts`) — no
+time-cadence, no `alert_schedule`. The API adds `PUT /api/carts/{id}/alert-types` and the
+`/api/alerts` history (list, detail, mark-read, unread-count). Delivery to external channels — the
+`alert_delivery` table and the dispatch to notifiers — is deliberately deferred to phase 7 (and will
+be **asynchronous**: pending rows drained by the worker); here the digest only lands in the history.
 
 ## Good to know
 
@@ -66,8 +65,8 @@ the history.
   run after that produces no notification (nothing has changed yet).
 - **All-time-low is not here.** The "lowest price ever" tag depends on price analytics, which lands
   in phase 11.
-- Use the **TP Scraper** page to add products, and drop a price (or use a real Dragon Store scrape)
-  to see a digest appear at your next cadence run.
+- Easiest way to try it: on the **TP Scraper** page enable an alert type on a cart, **edit** a
+  product's price/availability, then press **Simulate scrape** — the digest appears at once.
 
 ## Useful Commands
 
@@ -77,16 +76,13 @@ docker compose -f compose-dev.yml down -v               # reset the DB (admin re
 
 # A quick end-to-end (user token required):
 #   PUT   /api/carts/{id}/alert-types   {"alert_types":["PRODUCT_ON_SALE"]}   # seeds the baseline
-#   PUT   /api/me/alert-schedule        {"scheduled_time":"09:00","weekdays":[0,1,2,3,4,5,6]}
-#   …a scrape (or a price change) then a due cadence run writes the digest…
+#   …edit a TP product's price, then POST /api/plugins/tp-scraper/scrape — the scrape runs the
+#    alert engine for you and writes the digest…
 #   GET   /api/alerts                   # the history (paginated)
 #   GET   /api/alerts/unread-count      # the dashboard badge
 #   GET   /api/alerts/{id}              # the full digest
 #   POST  /api/alerts/{id}/read         # mark read
-
-# Speed up the worker tick while testing (admin token):
-#   PATCH /api/admin/feature-flags      {"worker_tick":{"seconds":3}}
 ```
 
 **pgweb** (DB browser) — http://localhost:8081. New tables to inspect this phase:
-`cart_alert_types`, `alert_snapshot`, `alert_schedule`, `alert_log`.
+`cart_alert_types`, `alert_snapshot`, `alert_log`.

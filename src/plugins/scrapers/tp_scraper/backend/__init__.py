@@ -49,6 +49,7 @@ from src.core.contracts import BrandRef, CategoryRef, DeltaCounters, Product
 from src.core.errors import APIError
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.context import PluginContext
+from src.web.adjust import run_user_alerts
 from src.web.deps import SessionDep, UserDep
 
 PLUGIN_ID = "tp_scraper"
@@ -336,9 +337,11 @@ class TpScraperPlugin(ScraperPlugin):
         def scrape(user: UserDep, db: SessionDep) -> ScrapeResult:
             """Simulate a scrape: deliver every product's CURRENT values (including any
             edits) to the catalog through the sanctioned Catalog Update Service, which
-            records price/availability changes into the history — so the alert engine
-            has something to diff on the next cadence run."""
+            records price/availability changes into the history. Then run the alert engine
+            for the user (event-driven alerts) so a digest appears immediately if a cart
+            changed — exactly what a real scrape does."""
             delta = self._deliver(db, user.sub)
+            run_user_alerts(db, user.sub)
             return ScrapeResult(
                 found=delta.found,
                 new=delta.new,

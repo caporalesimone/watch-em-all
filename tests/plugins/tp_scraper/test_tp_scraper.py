@@ -175,6 +175,45 @@ def test_edit_unknown_product_404(client: TestClient) -> None:
     assert resp.status_code == 404
 
 
+def test_scrape_triggers_event_driven_alert(client: TestClient) -> None:
+    """A simulated scrape runs the alert engine for the user (event-driven, no cadence):
+    with an on-sale alert enabled, dropping a product's price then scraping writes a digest."""
+    from src.core.db import new_session
+    from src.core.models import AlertLog
+
+    token = _admin_token(client)
+    hdr = _bearer(token)
+    uid = client.get("/api/me", headers=hdr).json()["id"]
+
+    client.post(TP, json={}, headers=hdr)
+    tp_id = client.get(TP, headers=hdr).json()[0]["id"]
+    pid = client.get("/api/catalog", headers=hdr).json()["items"][0]["id"]
+
+    cart_id = client.post(
+        "/api/carts", json={"name": "Trigger", "mode": "cross"}, headers=hdr
+    ).json()["id"]
+    client.post(f"/api/carts/{cart_id}/items", json={"product_ids": [pid]}, headers=hdr)
+    # Enabling the alert type seeds the baseline from the current state.
+    client.put(
+        f"/api/carts/{cart_id}/alert-types",
+        json={"alert_types": ["PRODUCT_ON_SALE"]},
+        headers=hdr,
+    )
+
+    with new_session() as db:
+        assert db.query(AlertLog).filter_by(user_id=uid).count() == 0  # nothing yet
+
+    # Drop the price well below the baseline, then scrape → the scrape triggers the alert run.
+    client.patch(f"{TP}/{tp_id}", json={"price_current": "1.00"}, headers=hdr)
+    client.post("/api/plugins/tp-scraper/scrape", headers=hdr)
+
+    with new_session() as db:
+        rows = db.query(AlertLog).filter_by(user_id=uid).all()
+        assert len(rows) == 1  # one aggregated digest written by the event-driven run
+        tags = rows[0].payload_json["cart_alerts"][0]["products"][0]["tags"]
+        assert "PRODUCT_ON_SALE" in tags
+
+
 def test_tp_scraper_is_not_schedulable(client: TestClient) -> None:
     # It must NOT implement run_for_user, so no scrape-now endpoints are mounted.
     from src.core.scrape import implements_scraping

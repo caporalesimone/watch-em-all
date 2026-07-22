@@ -28,6 +28,7 @@ from src.core.plugins.context import build_context
 from src.core.plugins.registry import LoadedPlugin
 from src.core.scrape import CooldownStatus, claim_scrape, cooldown_status
 from src.core.scraper_config import get_scraper_config
+from src.web.adjust import run_user_alerts
 from src.web.deps import SessionDep, UserDep
 
 log = logging.getLogger(__name__)
@@ -79,6 +80,9 @@ def make_scrape_now_router(loaded: LoadedPlugin) -> APIRouter:
         ctx = build_context(manifest, plugin)
         try:
             plugin.run_for_user(ctx, user_id)
+            # Event-driven alerts: right after the delivery, diff this user's carts and
+            # write a digest if anything changed (no time-cadence).
+            run_user_alerts(ctx.db, user_id)
         except Exception:  # background task: log, never surface to a response
             log.exception("scrape-now failed for plugin %s user %s", plugin.plugin_id, user_id)
         finally:

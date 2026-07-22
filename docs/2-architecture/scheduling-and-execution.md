@@ -2,17 +2,17 @@
 
 > **Layer 2 — Architecture** · Audience: SW architects, system engineers · Text + Mermaid, no code.
 >
-> Limited to what is implemented (phases 0–5): the worker dispatches the **scrape** flow and runs daily maintenance. The **alert** and **summary** scheduled flows (per-account cadence, aggregated notification) arrive with the alerts phase and are described in the Italian [scheduling-and-execution](../../docs-ita/2-architecture/scheduling-and-execution.md).
+> The worker dispatches the **scrape** flow and runs daily maintenance. **Alerts are event-driven** — the alert engine runs right after a scrape that changed a user's catalog (no schedule); details in the Italian [notification-architecture](../../docs-ita/2-architecture/notification-architecture.md). The **summary** scheduled flow (per-account cadence) arrives in the insights phase and is described in the Italian [scheduling-and-execution](../../docs-ita/2-architecture/scheduling-and-execution.md).
 
 ## The scheduled flows
 
-There is no single cron table: the flows have different owners, granularities, and logics, and they are **deliberately decoupled** (the scrape updates the data; the notification arrives when the user wants it). Today the worker drives the **scrape** flow; the user-owned alert and summary flows are added later.
+There is no single cron table: the flows have different owners, granularities, and logics. The **scrape** is scheduled by slots; the **alert** is **event-driven** (it runs at the end of each scrape that changed the catalog — no time schedule); the **summary** is a per-account scheduled flow added later.
 
 | Flow | Owner | Granularity | Frequency | Status |
 |---|---|---|---|---|
 | **Scrape** | Admin | Per-scraper | **1..N slots per day** (a list of times per scraper) | Implemented |
-| **Alert** | User | Per-account | Chosen days of the week + a single time | Alerts phase |
-| **Summary** | User | Per-account | Weekly (chosen day) or monthly (day 1), opt-in | Alerts phase |
+| **Alert** | User | Per-account | **Event-driven**: after each scrape that changed the catalog (no schedule) | Implemented |
+| **Summary** | User | Per-account | Weekly (chosen day) or monthly (day 1), opt-in | Insights phase |
 
 ## The dispatcher (Cron Worker)
 
@@ -33,7 +33,7 @@ flowchart TD
 Honest limits of catch-up (declared, a hobby-project choice):
 
 - **Scraper**: catch-up crosses midnight (*slots* are compared, not dates) — a scraper down since 23:00 recovers the 23:50:00 slot even at 1 a.m.
-- The alert and summary flows follow the same "most recent missed slot" principle **within the day they are due** once they ship; see the Italian reference.
+- **Alerts** need no catch-up: being event-driven, they run whenever a scrape produces changes. The summary flow follows the "most recent missed slot within the day" principle once it ships; see the Italian reference.
 
 ## The serial runner
 

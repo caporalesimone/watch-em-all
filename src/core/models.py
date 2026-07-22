@@ -7,14 +7,13 @@ used from phase 10) so the table is created once and grows only additively.
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
     JSON,
     Boolean,
-    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -242,25 +241,6 @@ class AlertLog(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-
-
-class AlertSchedule(Base):
-    """A user's alert cadence (schema.md, ALERT-R1). Phase 6 (6.B7).
-
-    One row per user. ``scheduled_time`` is a wall-clock ``"HH:MM:SS"`` in the installation
-    timezone; ``weekdays`` is a JSON int array (0=Monday … 6=Sunday) — **all** = daily,
-    **empty** = off. ``last_run_date`` is the last local date the engine ran for the user
-    (its own dedup + same-day catch-up anchor, like the scrapers' ``last_slot``). Turning
-    the cadence off deletes the user's baselines; turning it back on re-seeds them (ALERT-R3)."""
-
-    __tablename__ = "alert_schedule"
-
-    user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
-    scheduled_time: Mapped[str] = mapped_column(String(8), nullable=False, default="09:00:00")
-    weekdays: Mapped[list[int]] = mapped_column(JSON, nullable=False, default=list)
-    last_run_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
 
 class ScrapeCooldown(Base):

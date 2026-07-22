@@ -6,28 +6,30 @@
 
 ## I flussi dell'utente
 
-Lo scrape aggiorna i dati; la notifica arriva quando l'utente la vuole: i due flussi sono **deliberatamente disaccoppiati** dallo scrape. Sono per-account (una cadenza per-carrello renderebbe impossibile il messaggio unico aggregato).
+Lo scrape aggiorna i dati; poi ci sono due flussi di notifica, con tempistiche diverse:
 
 | Flusso | Owner | Granularità | Frequenza |
 |---|---|---|---|
-| **Alert** | Utente | Per-account | Giorni della settimana scelti + un orario |
-| **Summary** | Utente | Per-account | Settimanale (giorno scelto) o mensile (giorno 1), opt-in |
+| **Alert** | Utente | Per-account | **Event-driven**: a fine di ogni scrape che ha cambiato il catalogo (nessun orario) — vedi [notification-architecture](notification-architecture.md) |
+| **Summary** | Utente | Per-account | Schedulato: settimanale (giorno scelto) o mensile (giorno 1), opt-in — spec-ahead (fase 11) |
 
-## Il dispatcher (estensione dei flussi utente)
+L'alert **non** ha una cadenza a orario: appena uno scrape produce eventi, parte il digest aggregato (uno per utente per run di scrape). Il summary resta invece un flusso **schedulato**, disaccoppiato dallo scrape.
 
-Il dispatcher del worker, oltre ad accodare gli scraper dovuti, valuta a ogni tick i flussi utente e li esegue all'orario scelto:
+## Il dispatcher
+
+Il dispatcher del worker accoda gli scraper dovuti e, **a fine di ogni scrape**, esegue l'Alert Engine per gli utenti che quello scrape ha toccato (event-driven). Il **summary** (spec-ahead) resta un flusso a cadenza valutato al tick:
 
 ```mermaid
 flowchart TD
-    A{Per ogni utente:<br/>alert dovuto oggi?}
-    A -- sì --> AE[Run Alert Engine]
-    A --> SU{Per ogni utente:<br/>summary dovuto?}
+    SC[Fine di uno scrape] --> AE[Run Alert Engine<br/>per gli utenti toccati]
+    T{Tick del worker} --> SU{Per ogni utente:<br/>summary dovuto?}
     SU -- sì --> SM[Run Summary]
     SU --> HB[Heartbeat + ritorno al tick]
 ```
 
 Limiti onesti del catch-up (dichiarati, scelta da hobby project):
 
-- **Alert e summary**: il recupero vale **entro il giorno dovuto**. Se il sistema resta fermo per l'intera giornata dovuta, quella notifica salta e gli eventi confluiranno nella successiva (il diff è cumulativo per natura: nulla va perso nei contenuti, solo nel momento della consegna).
+- **Alert**: essendo event-driven, girano ad ogni scrape con cambiamenti; nessun concetto di "giorno dovuto".
+- **Summary** (spec-ahead): il recupero vale **entro il giorno dovuto**. Se il sistema resta fermo per l'intera giornata dovuta, quel report salta e i dati confluiranno nel successivo.
 
 Vedi l'[architettura delle notifiche](notification-architecture.md) per la semantica di baseline, diff, digest, multi-canale e summary.

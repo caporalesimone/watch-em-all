@@ -4,11 +4,11 @@
 
 ## Scopo
 
-All'orario di alert dell'utente: calcolare il **diff** di ogni carrello con alert attivi rispetto alla **baseline**, aggregare gli eventi in un solo digest, registrarlo nello storico, consegnarlo ai canali attivi, avanzare la baseline.
+A fine scrape (per ogni utente il cui catalogo è cambiato in quella run): calcolare il **diff** di ogni carrello con alert attivi rispetto alla **baseline**, aggregare gli eventi in un solo digest, registrarlo nello storico, consegnarlo ai canali attivi, avanzare la baseline.
 
 ```mermaid
 flowchart TD
-    START["run(user_id)"] --> LOOP{per ogni carrello<br/>con alert attivi}
+    START["run(user_id)<br/>(invocato a fine scrape)"] --> LOOP{per ogni carrello<br/>con alert attivi}
     LOOP --> SNAP[carica baseline<br/>alert_snapshot]
     SNAP -->|mai seminata| SEED[seed silenzioso] --> LOOP
     SNAP --> EVAL[cart_engine.evaluate]
@@ -24,7 +24,7 @@ flowchart TD
 
 | | |
 |---|---|
-| **Input** | `user_id` (dal Cron Worker, nei giorni dovuti) |
+| **Input** | `user_id` (dopo ogni scrape che ha aggiornato il suo catalogo) |
 | **Output** | 0 o 1 `AlertEvent` (digest) in `alert_log` + esiti per canale in `alert_delivery`; baseline avanzata |
 
 ## La baseline
@@ -34,8 +34,6 @@ Una riga per **(utente, carrello)** in `alert_snapshot`: per ogni prodotto del c
 ```
 on enable_first_alert_type(cart):   seed_snapshot(cart)        # stato corrente, nessuna notifica
 on disable_all_alert_types(cart):   delete_snapshot(cart)
-on cadenza_off(user):               delete_snapshots(user)
-on cadenza_riattivata(user):        seed_snapshot(c) for c in carts_with_alerts(user)
 ```
 
 ## Pseudocodice della run

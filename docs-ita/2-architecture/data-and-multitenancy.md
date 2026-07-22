@@ -8,7 +8,6 @@
 
 ```mermaid
 erDiagram
-    USERS ||--o| ALERT_SCHEDULE : "cadenza notifiche"
     USERS ||--o| SUMMARY_CONFIG : "report periodico"
     USERS ||--o{ ALERT_LOG : "storico notifiche"
     ALERT_LOG ||--o{ ALERT_DELIVERY : "esito per canale"
@@ -21,7 +20,7 @@ Aree (schema completo nel [Layer 4 — database](../4-capabilities/database/sche
 
 | Area | Dati | Owner del dato |
 |---|---|---|
-| Notifiche | storico, esiti di consegna per canale, baseline, cadenza, report | utente (config), core (storico) |
+| Notifiche | storico, esiti di consegna per canale, baseline, report periodico (summary) | utente (config), core (storico) |
 | Notifier config | config admin e config per-utente dei canali | admin + utente |
 
 ## Storico alert (fase alert)

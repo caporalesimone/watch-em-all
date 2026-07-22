@@ -24,6 +24,7 @@ from src.core.plugins.registry import load_plugins
 from src.core.schema_drift import SchemaDriftItem, check_schema_drift
 from src.core.scrape import implements_scraping
 from src.core.system_log import install_system_log_handler
+from src.web.adjust import register_scrapers
 from src.web.deps import require_user
 from src.web.error_handlers import register_error_handlers
 from src.web.routers import (
@@ -74,6 +75,9 @@ def create_app() -> FastAPI:
         # are logged; the core stays up. Stored for the discovery endpoint. Every
         # plugin route sits behind authentication (#3).
         _app.state.loaded_plugins = load_plugins(_app, router_dependencies=[Depends(require_user)])
+        # Cache the loaded scrapers so the event-driven alert run (after a manual scrape)
+        # can bind each cart's adjustments without a request (adjust.run_user_alerts).
+        register_scrapers(_app.state.loaded_plugins)
         # Schema-drift guard (4.B0): now that the schema is ensured (create_schema +
         # each plugin's initialize), compare the ORM model — core Base.metadata plus
         # every plugin's declared table_metadata — against the live DB. It ALWAYS runs

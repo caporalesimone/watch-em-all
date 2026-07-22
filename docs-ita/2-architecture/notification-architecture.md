@@ -13,7 +13,7 @@ stateDiagram-v2
     [*] --> SenzaBaseline: carrello senza alert attivi
     SenzaBaseline --> Baseline: l'utente abilita ≥1 tipo di alert<br/>(seed silenzioso: stato corrente, nessuna notifica)
     Baseline --> Baseline: ogni run → diff vs baseline,<br/>poi la baseline avanza allo stato corrente
-    Baseline --> SenzaBaseline: alert disabilitati o cadenza off<br/>(baseline eliminata)
+    Baseline --> SenzaBaseline: alert disabilitati<br/>(baseline eliminata)
 ```
 
 Proprietà che ne derivano (tutte volute):
@@ -23,16 +23,16 @@ Proprietà che ne derivano (tutte volute):
 - **Indipendenza dagli scrape intermedi**: tra due notifiche possono esserci 1 o 10 scrape; il diff è sempre "vs ultima notifica". Un prezzo sceso e risalito tra due notifiche non produce rumore.
 - **Elementi nuovi senza baseline** (es. prodotto appena aggiunto al carrello): seminati in silenzio alla prima run che li incontra.
 
-## Quando: la cadenza è dell'utente
+## Quando: a ogni scrape (event-driven)
 
-- *Quando* ricevere: **per-account** — giorni della settimana (tutti = giornaliera, nessuno = off) + un orario. Una cadenza per-carrello renderebbe impossibile il messaggio unico aggregato.
+- *Quando* ricevere: **a fine scrape** — l'alert engine gira al termine di ogni scrape che ha cambiato il catalogo dell'utente (scrape schedulato nel worker, scrape-now manuale, "simula scrape" del TP). Nessuna configurazione per-account di giorni/orario. Ogni run di scrape produce **un solo digest aggregato per utente**: una cadenza per-carrello renderebbe impossibile il messaggio unico aggregato.
 - *Cosa* ricevere: **per-carrello** — l'utente sceglie i tipi di evento che gli interessano su ciascun carrello (sconti, disponibilità, soglia…). Default: nessuno attivo.
 
 ## Come: un solo digest, più canali
 
 ```mermaid
 flowchart TD
-    AE[Alert Engine<br/>run all'orario dell'utente] --> D{diff non vuoto?}
+    AE[Alert Engine<br/>run a fine scrape] --> D{diff non vuoto?}
     D -- no --> END[Nessuna notifica<br/>la baseline avanza comunque]
     D -- sì --> DIG[Digest aggregato:<br/>tutti i carrelli con eventi,<br/>prezzi vecchi/nuovi, provenienza]
     DIG --> LOG[(Storico alert<br/>scritto SEMPRE)]

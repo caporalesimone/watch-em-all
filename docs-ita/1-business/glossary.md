@@ -8,7 +8,7 @@
 |---|---|
 | **Alert digest** | La notifica aggregata: il **diff** di tutti i carrelli rispetto all'ultima notifica, in un unico messaggio. |
 | **Summary** | Il report periodico opzionale: una **fotografia** dello stato corrente dei carrelli (non un diff). |
-| **Cadenza** | Quando l'utente riceve gli alert: giorni della settimana + orario, a livello di account. *Quali* avvisi ricevere si decide invece carrello per carrello. |
+| **Cadenza (summary)** | Quando l'utente riceve il **report periodico** (settimanale/mensile, opt-in). Gli **alert** invece non hanno cadenza: sono **event-driven**, scattano a fine scrape. *Quali* avvisi ricevere si decide carrello per carrello. |
 | **Baseline** | Lo stato di riferimento con cui il sistema confronta per capire "cosa è cambiato" dall'ultima notifica. |
 | **Cancellazione differita** | La cancellazione di un account da parte dell'admin: l'account viene disabilitato e marcato **in cancellazione** con una **scadenza** (default 30 giorni); fino ad allora è annullabile con un tasto (torna disabilitato), dopo viene eliminato automaticamente con tutti i suoi dati. |
 | **Storico alert** | L'archivio interno delle notifiche dell'utente, consultabile dall'app anche senza canali configurati, con stato di lettura. |
