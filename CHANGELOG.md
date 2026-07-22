@@ -6,9 +6,9 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 Each entry is **short** and reads as a user-facing story: first a **bullet list of what changed for you** (additions, removals and changes together, light on jargon), then a brief **_under the hood_** paragraph on the architectural/technical changes. Older entries predate this style and are left as they are.
 
-## [0.6.0] - Unreleased
+## [0.6.0] - 2026-07-23
 
-**Phase 6 — in-app alerts: a price or availability change becomes a readable digest in the Alert History, delivered at the cadence you choose. Entries land below as they ship.**
+**Phase 6 — in-app alerts: on each cart you pick which changes matter, and right after every scrape the system drops a single readable digest into the Alert History — event-driven, with nothing to schedule.**
 
 ### New
 
@@ -18,7 +18,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 ### Changed
 
-- **TP Scraper (dev tool) can now stage changes and "simulate a scrape".** On the TP Scraper page you can **edit a product's price or availability** inline and then press **Simulate scrape** to push every product's current values into the catalog at once — the same way a real scrape would. It makes the new alerts easy to try end to end: build a cart, enable alerts, drop a price, simulate a scrape, and watch the digest appear at your next cadence run.
+- **TP Scraper (dev tool) can now stage changes and "simulate a scrape".** On the TP Scraper page you can **edit a product's price or availability** inline and then press **Simulate scrape** to push every product's current values into the catalog at once — the same way a real scrape would. It makes the new alerts easy to try end to end: build a cart, enable alerts, drop a price, simulate a scrape, and watch the digest appear right away.
 
 ### Fixed
 
