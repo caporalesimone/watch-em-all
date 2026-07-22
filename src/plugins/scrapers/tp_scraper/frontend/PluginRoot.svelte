@@ -218,7 +218,7 @@
 								<input
 									type="number"
 									min="0"
-									step="0.01"
+									step="0.5"
 									value={Number(p.price_current).toFixed(2)}
 									onchange={(e) => editPrice(p, e)}
 									disabled={busy}
