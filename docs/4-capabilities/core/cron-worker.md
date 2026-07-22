@@ -93,4 +93,4 @@ The comparison on **slots** (datetime, not just date) for scrapers is what makes
 |---|---|
 | Reads | `scraper_schedule`, `alert_schedule`, `summary_config`, `users` (deletion deadlines), system settings |
 | Writes | `last_slot` / `last_run_date`, `system_log`, heartbeat; purge of expired users and retention (daily maintenance) |
-| Invokes | [Scraper Runner](scraper-pool.md) (submit), [Alert Engine](alert-engine.md), [Summary](summary-report.md), plugins' `delete_user_data` (purge, USR-R10) |
+| Invokes | [Scraper Runner](scraper-pool.md) (submit), [Alert Engine](../../../docs-ita/4-capabilities/core/alert-engine.md), [Summary](../../../docs-ita/4-capabilities/core/summary-report.md), plugins' `delete_user_data` (purge, USR-R10) |

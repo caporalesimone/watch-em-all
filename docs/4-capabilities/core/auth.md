@@ -2,7 +2,7 @@
 
 > **Layer 4 — Capability** · Audience: developer.
 >
-> English translation of the Italian reference [`docs-ita/4-capabilities/core/auth.md`](../../../docs-ita/4-capabilities/core/auth.md), limited to what is implemented (DOC-12). Phase 1 ships the full stateless-JWT auth: login/logout, refresh with rotation, the forced first password change and the normal change, the initial-admin bootstrap and the login rate limit.
+> Limited to what is implemented (DOC-12). Phase 1 ships the full stateless-JWT auth: login/logout, refresh with rotation, the forced first password change and the normal change, the initial-admin bootstrap and the login rate limit.
 
 ## Purpose
 

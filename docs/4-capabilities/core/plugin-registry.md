@@ -2,7 +2,7 @@
 
 > **Layer 4 — Capability** · Audience: developer.
 >
-> English translation of the Italian reference [`docs-ita/4-capabilities/core/plugin-registry.md`](../../../docs-ita/4-capabilities/core/plugin-registry.md), limited to what is implemented (DOC-12).
+> Limited to what is implemented (DOC-12).
 
 ## Purpose
 
@@ -65,6 +65,6 @@ def load_plugins(app, context_builder):
 
 ## Notes
 
-- The `web` app loads plugins in its lifespan and stores the result on `app.state` for the discovery endpoint. The `worker` will run the same load (without registering HTTP routers) when it arrives.
+- The `web` app loads plugins in its lifespan and stores the result on `app.state` for the discovery endpoint. The `worker` runs the same load at boot (without registering HTTP routers — it only needs `initialize` + the instances for the runner).
 - The `icon` declared in the manifest is served as a static asset from `/api/plugin-assets/{name}/icon` and referenced by the discovery response.
 - The registry keeps the `plugin_id → instance` map used later by the runner, cart engine and notification dispatch.

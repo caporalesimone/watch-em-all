@@ -2,7 +2,7 @@
 
 > **Layer 4 — Capability** · Audience: developer · Pseudocode allowed.
 >
-> English translation of the Italian reference [`docs-ita/4-capabilities/core/cart-engine.md`](../../../docs-ita/4-capabilities/core/cart-engine.md), limited to what is implemented (DOC-12). Phase 5 ships the read-only evaluation (totals, adjustments, final estimate, threshold state, health flag). The alert baseline and the summary snapshot arrive in later phases. Feature: [carts](../../3-features/user/carts.md) · Contract: [adjustment](../contracts/adjustment.md).
+> Limited to what is implemented (DOC-12). Phase 5 ships the read-only evaluation (totals, adjustments, final estimate, threshold state, health flag). The alert baseline and the summary snapshot arrive in later phases. Feature: [carts](../../3-features/user/carts.md) · Contract: [adjustment](../contracts/adjustment.md).
 
 ## Purpose
 

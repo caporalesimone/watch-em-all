@@ -1,50 +1,30 @@
-# Database — Schema logico
+# Database — Schema logico (tabelle spec-ahead)
 
 > **Layer 4 — Capability** · Audience: developer · Riferimenti tecnici ammessi. Architettura: [data-and-multitenancy](../../2-architecture/data-and-multitenancy.md).
+>
+> Le tabelle **già rilasciate** (`users`, `products`, `price_history`, `carts`, `cart_members`, `scrape_cooldown`, `scraper_schedule`, `scraper_admin_config`, `feature_flags`, `scrape_run`, `scrape_user_log`, `scrape_cache`, `system_settings`, `system_log`) sono documentate in inglese in [`docs/4-capabilities/database/schema.md`](../../../docs/4-capabilities/database/schema.md). Restano qui solo le tabelle ancora **spec-ahead** delle fasi 6+ (alert e notifiche) più le regole trasversali dello schema.
 
 Motore **PostgreSQL 16**, accesso via SQLAlchemy, validazione I/O Pydantic v2. Schema creato idempotentemente all'avvio da web e worker; tabelle dei plugin create dai plugin stessi.
 
-Le relazioni principali del core (le tabelle di sola configurazione — `system_settings`, `system_message_template`, `notifier_admin_config`, `scrape_cache` — e le tabelle dei plugin stanno fuori dal grafo):
+Le nuove relazioni pendono dalle tabelle già rilasciate (`users`, `carts` — mostrate per contesto):
 
 ```mermaid
 erDiagram
-    users ||--o{ products : possiede
-    users ||--o{ carts : possiede
     users ||--o{ alert_log : riceve
     users ||--o| alert_schedule : ha
     users ||--o| summary_config : ha
     users ||--o{ notifier_user_config : configura
-    products ||--o{ price_history : "storico (CASCADE)"
-    products ||--o{ cart_members : "membership (CASCADE)"
-    carts ||--o{ cart_members : contiene
     carts ||--o{ cart_alert_types : "tipi abilitati (CASCADE)"
     carts ||--o| alert_snapshot : "baseline per-carrello"
     alert_log ||--o{ alert_delivery : "esiti per canale (CASCADE)"
     admin_message ||--o{ alert_log : "una riga per destinatario"
-    scraper_schedule ||--o{ scrape_run : pianifica
-    scrape_run ||--o{ scrape_user_log : "dettaglio per utente (CASCADE)"
 ```
 
-## Auth
+## Carrelli — tipi di alert
 
 | Tabella | Colonne | Note |
 |---|---|---|
-| `users` | id, username **UNIQUE**, first_name, last_name, password_hash, role (`admin`\|`user`), is_active, deletion_marked_at (timestamptz, null), deletion_due_at (timestamptz, null), last_login_at (timestamptz, null), locale, must_change_password, token_version, refresh_jti, created_at | [auth](../core/auth.md): **first_name + last_name** = nome e cognome, **entrambi obbligatori** per gli account creati dall'admin (USR); l'admin iniziale di bootstrap nasce con `first_name="Admin"` e cognome da completare. refresh_jti = ultimo refresh emesso (rotazione); token_version = invalidazione globale; deletion_marked_at ≠ null = in cancellazione (sempre con is_active=false; USR-R7); deletion_due_at = scadenza fissata alla marcatura (purge automatico, USR-R9); last_login_at = ultimo login riuscito (USR-R13) |
-
-## Catalogo e storico
-
-| Tabella | Colonne | Note |
-|---|---|---|
-| `products` | id, user_id FK, plugin_id, external_id, url, name, image_url, brand_text, brand_link, tags (JSON), category (JSON), extra_json, currency, price_current, price_original, discount_pct, is_available, removed, first_seen_at, last_seen_at | **UNIQUE (user_id, plugin_id, external_id)** = identità del prodotto; catalogo per-utente. `brand_text`/`brand_link` (PROD-R6, link opzionale), `tags` (array JSON di tag, PROD-R5) e `category` (array JSON di `{text, link}`, breadcrumb, PROD-R7) sono dati dello scraper, persistiti senza interpretazione |
-| `price_history` | id, product_id FK **CASCADE**, user_id, price_current, price_original, discount_pct, is_available, recorded_at | Append-only; entry su cambio prezzo **o** disponibilità; INDEX (product_id, recorded_at); **nessuna retention** |
-
-## Carrelli
-
-| Tabella | Colonne | Note |
-|---|---|---|
-| `carts` | id, user_id FK, name, mode (`cross`\|`scraper_specific`), scraper_id (null se cross), threshold_amount (€, null = nessuna soglia), created_at | mode immutabile; soglia = importo € fisso, colonna 1:1 (CART-R9, la % è solo input UI) |
-| `cart_members` | cart_id FK **CASCADE**, product_id FK **CASCADE** | **UNIQUE (cart_id, product_id)**; la cascata da products realizza CAT-R8 |
-| `cart_alert_types` | cart_id FK **CASCADE**, alert_type | **Presenza riga = tipo abilitato** (niente colonna enabled); UNIQUE (cart_id, alert_type) |
+| `cart_alert_types` | cart_id FK **CASCADE**, alert_type | **Presenza riga = tipo abilitato** (niente colonna enabled); UNIQUE (cart_id, alert_type). La tabella `carts` è già rilasciata (schema inglese) |
 
 ## Notifiche
 
@@ -60,30 +40,12 @@ erDiagram
 | `notifier_admin_config` | plugin_id PK, config_json, **enabled** (default true), updated_at | parametri di sistema del canale; enabled = interruttore globale admin (PCFG-R8) |
 | `notifier_user_config` | plugin_id, user_id FK, **enabled** (flag attivazione), config_json — PK (plugin_id, user_id) | disattivare ≠ cancellare la config |
 
-## Scheduling e monitoraggio
-
-| Tabella | Colonne | Note |
-|---|---|---|
-| `scraper_schedule` | scraper_id PK, times (JSON, orari canonici `"HH:MM:SS"`), enabled, last_slot (timestamptz, null = mai) | 1..N slot/giorno; input `HH:MM`/`HH:MM:SS` → archiviati canonici `HH:MM:SS` (4.F1); last_slot = ultimo slot eseguito |
-| `scraper_admin_config` | plugin_id PK, config_json, updated_at | config admin dello scraper (PCFG, 4.B10): `config_json` contiene i **campi dichiarati dal plugin** (regole del sito, fase 7+) **e** le **chiavi riservate del core** (`politeness_delay_ms`, `http_timeout_s`, `cache_ttl_min`, `scrape_now_min_interval_s`) lette dal core (client HTTP, cache, cooldown dello scrape-now) e non dal plugin (CTX); default = le costanti che sostituiscono, override merge-ati, chiavi ignote ignorate. **Niente `enabled`**: la sospensione è in `scraper_schedule`. Speculare a `notifier_admin_config` (che invece ha `enabled` = interruttore del canale) |
-| `scrape_cooldown` | id, plugin_id, user_id FK **CASCADE**, last_scraped_at — **UNIQUE (plugin_id, user_id)** | anchor "ultimo scrape" per *(scraper, utente)* per il **cooldown dello scrape-now manuale** (SCR-R15): scritto all'**inizio** di **ogni** scrape (manuale ora; schedulato da fase 4), ma **letto** — e quindi vincolante — **solo** dallo scrape-now manuale (asimmetria scrive-vs-legge); upsert, **una riga per coppia** (non è un log di run). Implementato in 0.3.2 |
-| `feature_flags` | key PK, value (JSON) | **feature flags di sviluppo** (4.B1a): override runtime di knob **solo-dev**, condivisi tra web e worker (processi separati); il web li **azzera all'avvio** → non persistenti. Settati dall'admin via Swagger (`PATCH /api/admin/feature-flags`). Primo flag: `worker_tick.seconds` (intervallo del tick del worker). |
-| `scrape_run` | run_id, scraper_id, trigger, slot, started_at, finished_at, status, users_processed, products_found, products_new, price_changes, products_removed, products_excluded, http_requests, cache_hits, error_message | una riga per run; INDEX (scraper_id, started_at); retention |
-| `scrape_user_log` | run_id FK **CASCADE**, user_id, started_at, finished_at, products_found, products_new, price_changes, http_requests, cache_hits, status, error_message | dettaglio per utente; http_requests/cache_hits attribuite all'utente in lavorazione (run mono-thread); retention |
-| `scrape_cache` | id, plugin_id, cache_key, response_body, response_meta_json (status, content-type), fetched_at, expires_at | cache delle risposte di scrape ([plugin-context](../core/plugin-context.md), CTX-R9): cache_key = hash della richiesta normalizzata; **UNIQUE (plugin_id, cache_key)**; INDEX (expires_at); gli scaduti sono eliminati a inizio run, svuotamento manuale dalla pagina admin del plugin |
-| `system_settings` | key PK, value_json, updated_at | impostazioni runtime ([SystemSettings](../contracts/scheduling-models.md)); seed dei default al primo avvio |
-| `system_log` | id (PK incrementale, cursore del polling), created_at, level, source (`worker`\|`scraper`\|`notifier`\|`alert`\|`summary`), message, context_json | INDEX (id); retention; mai contenuti operativi degli utenti |
-
-## Tabelle dei plugin
-
-Naming `plugin_<nomeplugin>_<nometabella>` (underscore: gli identificatori SQL col trattino richiederebbero quoting). Create **dal plugin** in `initialize()`, idempotentemente. Il core non le conosce; tipicamente contengono gli **input per-utente** dello scraper e i suoi parametri. Esempi reali in [implemented-plugins/](../../implemented-plugins/).
-
 ## Regole trasversali
 
 - **DB-R1** — Ogni tabella operativa ha `user_id`: ogni query applicativa filtra per l'utente del token (multi-tenancy).
 - **DB-R2** — Purge di un utente (automatico, dal job giornaliero del worker sugli account con `deletion_due_at` scaduta — USR-R9) → cascata completa dei suoi dati core, **dopo** che ogni plugin ha eliminato i propri (`delete_user_data`, in sequenza; solo se tutti completano si procede — USR-R10). La marcatura "in cancellazione" non elimina nulla.
 - **DB-R3** — Serializzazione nei campi `*_json`: `Decimal` come stringa, `datetime` ISO-8601 UTC; i confronti "è cambiato?" avvengono sul dato deserializzato.
 - **DB-R4** — **Migrazioni V1**: schema additivo con `CREATE ... IF NOT EXISTS`; per i breaking change, script SQL manuali documentati nel changelog — **mai** drop&recreate dell'intero schema: `price_history` non è ricostruibile. (Alembic: [future improvement](../../future-improvements/README.md).)
-- **DB-R5** — Backup/export/ripristino: script versionati in `ops/` e cucinati nell'immagine `ops`, eseguiti a mano (`docker compose run --rm ops …`); il dump include tutte le configurazioni (config DB-first) e l'archivio anche i file di bootstrap locali ([backup-and-restore](../../infrastructure/backup-and-restore.md)).
+- **DB-R5** — Backup/export/ripristino: script versionati in `ops/` e cucinati nell'immagine `ops`, eseguiti a mano (`docker compose run --rm ops …`); il dump include tutte le configurazioni (config DB-first) e l'archivio anche i file di bootstrap locali ([backup-and-restore](../../../docs/infrastructure/backup-and-restore.md)).
 - **DB-R6** — Ispezione dev: pgweb, nello stack di sviluppo (`compose-dev.yml`; assente dal release, in cui si usa `docker compose exec db psql` o il container `ops`).
-- **DB-R7** — Ogni plugin che possiede tabelle (`plugin_<id>_*`) **dichiara la propria `MetaData`** con l'attributo `table_metadata` su `BasePlugin` (la `_Base.metadata` del plugin; `None` se non ha tabelle). Il registry lo **impone al load** per convenzione di naming: un plugin con tabelle `plugin_<id>_*` non coperte da `table_metadata` è rifiutato (`PluginLoadError`). La **guardia di disallineamento schema** (4.B0) itera `Base.metadata` + le `table_metadata` dei plugin e segnala tabelle/colonne presenti nel modello ma assenti nel DB (`create_all` crea solo le tabelle mancanti, non altera quelle esistenti → una colonna aggiunta a una tabella esistente non comparirebbe); gira sempre e logga, e l'esposizione è sul feed **admin-only** `GET /api/admin/errors` (errori/warning per l'admin; lo schema-drift è una voce dietro `WEA_SCHEMA_DRIFT_ALERT`), mai sulla sonda pubblica `/api/health`.
+- **DB-R7** — Ogni plugin che possiede tabelle (`plugin_<id>_*`) **dichiara la propria `MetaData`** con l'attributo `table_metadata` su `BasePlugin` (la `_Base.metadata` del plugin; `None` se non ha tabelle). Il registry lo **impone al load** per convenzione di naming: un plugin con tabelle `plugin_<id>_*` non coperte da `table_metadata` è rifiutato (`PluginLoadError`). La **guardia di disallineamento schema** (4.B0) itera `Base.metadata` + le `table_metadata` dei plugin e segnala tabelle/colonne presenti nel modello ma assenti nel DB; gira sempre e logga, esposta sul feed **admin-only** `GET /api/admin/errors` (dietro `WEA_SCHEMA_DRIFT_ALERT`), mai sulla sonda pubblica `/api/health`.

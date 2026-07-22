@@ -1,6 +1,6 @@
 # Contracts — Scheduling and monitoring models
 
-> **Layer 4 — Contract** · Audience: developer · Pseudocode allowed. Feature: [scraper-scheduling-and-limits](../../3-features/admin/scraper-scheduling-and-limits.md), [scraper-monitoring](../../3-features/admin/scraper-monitoring.md).
+> **Layer 4 — Contract** · Audience: developer · Pseudocode allowed. Feature: [scraper-scheduling-and-limits](../../3-features/admin/scraper-scheduling-and-limits.md), [scraper-monitoring](../../../docs-ita/3-features/admin/scraper-monitoring.md).
 
 Three schedules with different owners plus the global settings, read by the dispatcher; scheduled scraper runs produce the execution records:
 
