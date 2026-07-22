@@ -1,88 +1,8 @@
-# Architettura dei plugin e integrazione dinamica
+# Architettura dei plugin — contratti spec-ahead
 
 > **Layer 2 — Architettura** · Audience: architetti SW, system engineer · Testo + Mermaid, niente codice.
-
-## Il principio: plugin-first full-stack
-
-Un plugin è un'**unità indivisibile full-stack**: backend Python e frontend Svelte co-localizzati in un'unica cartella, descritti da un **manifest** dichiarativo che è l'unica source of truth del plugin (identità, tipo, attivazione, entry point, icona, traduzioni, versione di contratto).
-
-Due famiglie, entrambe derivate da un contratto base comune:
-
-```mermaid
-classDiagram
-    class BasePlugin {
-        <<abstract>>
-        initialize(context)
-        register_routes(router)
-        delete_user_data(context, user)
-    }
-    class ScraperPlugin {
-        <<abstract>>
-        run_for_user(context, user)
-        run_test(context, params)
-        get_adjustments(cart_total)
-        get_admin_config_schema()
-        get_user_config_schema()
-        has_user_config(user)
-    }
-    class NotifierPlugin {
-        <<abstract>>
-        send(notification, config)
-        send_test(config)
-        get_admin_config_schema()
-        get_user_config_schema()
-    }
-    BasePlugin <|-- ScraperPlugin
-    BasePlugin <|-- NotifierPlugin
-    ScraperPlugin <|-- ScraperConcreto
-    NotifierPlugin <|-- NotifierConcreto
-```
-
-I plugin concreti (un esempio di scraper reale e i notifier email/Discord) sono documentati a parte in [implemented-plugins/](../implemented-plugins/): **tutta la documentazione generica descrive solo i contratti astratti**, senza dipendere da alcun sito o canale reale.
-
-`delete_user_data(context, user)` è il gancio del **purge utente** ([user-management](../3-features/admin/user-management.md), USR-R10): ogni plugin elimina **idempotentemente** le righe di quell'utente dalle proprie tabelle. Default no-op nella base (molti notifier non hanno tabelle); chi possiede dati per-utente **deve** implementarlo — il core non conosce le tabelle dei plugin e non può farlo al posto loro.
-
-## Integrazione dinamica — backend
-
-All'avvio, ogni container che carica i plugin (web e worker) esegue la stessa sequenza deterministica. **Nessun plugin switching a runtime**: l'attivazione è statica via manifest, e una modifica richiede rebuild + restart.
-
-```mermaid
-flowchart TD
-    A[Scan filesystem<br/>cartelle scrapers/ e notifiers/] --> B[Lettura e validazione manifest<br/>type vs cartella, api_version, name univoco]
-    B --> C{enabled?}
-    C -- no --> X[Plugin ignorato]
-    C -- sì --> D[Import dinamico entry point backend]
-    D --> E[initialize con Plugin Context dedicato<br/>il plugin crea le proprie tabelle se mancano]
-    E --> F[Registrazione route API del plugin<br/>sotto /api/plugins/route_base]
-    F --> G[Plugin attivo]
-    D -- errore --> Y[Plugin rifiutato, log error<br/>core e altri plugin non impattati]
-```
-
-Garanzie del registry: validazione del manifest (tipo coerente con la cartella, `api_version` compatibile col core, nome univoco e coincidente con l'identità del plugin), isolamento del fallimento (un plugin rotto non carica, il resto sì).
-
-## Integrazione dinamica — frontend
-
-Il frontend dei plugin è incluso nello **stesso build** dell'app (un solo processo Vite): uno step automatico legge i manifest, filtra i plugin abilitati e genera il registro dei componenti; a runtime la SPA chiede al backend la lista dei plugin attivi e monta dinamicamente le route.
-
-```mermaid
-flowchart LR
-    subgraph "Build time"
-        M[manifest.json di ogni plugin] --> GEN[Generazione registro<br/>componenti frontend]
-        GEN --> V[Build Vite unificato<br/>app + componenti plugin]
-    end
-    subgraph "Runtime"
-        SPA[SPA] -->|GET /api/plugins| API[Lista plugin abilitati<br/>name, type, route_base, icon]
-        API --> RT[Registrazione route dinamiche<br/>route_base → componente lazy]
-    end
-    V -.bundle.-> SPA
-```
-
-Proprietà importanti:
-
-- **Aggiungere un plugin non tocca il codice di build**: basta la cartella con manifest valido ed entry frontend conforme.
-- I plugin **importano liberamente i componenti del design system** del core: build unico, nessun problema cross-bundle.
-- Ogni plugin porta le **proprie traduzioni** in un namespace dedicato e una **icona** statica usata ovunque serva la provenienza (Product Picker, carrelli, notifiche).
-- Build e runtime restano coerenti per costruzione: la stessa fonte (manifest) alimenta entrambi; per questo l'attivazione richiede rebuild (vedi [build system](../infrastructure/build-system.md)).
+>
+> Il **backbone implementato** (principio plugin-first full-stack, integrazione dinamica backend/frontend, isolamento "sandbox soft", regole sui dati dei plugin, runtime dello scraper e `update_catalog`) è stato migrato nella wiki inglese: [`docs/2-architecture/plugin-architecture.md`](../../docs/2-architecture/plugin-architecture.md). Qui restano solo i contratti **spec-ahead** ancora da implementare: la **configurazione a due livelli** e i contratti del **notifier**.
 
 ## Configurazione a due livelli (sempre, per ogni plugin)
 
@@ -107,20 +27,18 @@ graph TB
 - Per gli **scraper**: la config admin governa il comportamento (timeout, ritmo, regole del sito); la config utente è *cosa osservare* e vive nelle tabelle del plugin.
 - Per i **notifier**: la config admin è l'infrastruttura del canale (es. server di posta); la config utente è il recapito personale, con un flag di **attivazione per-utente** e un'azione di **test**.
 
-## Isolamento: la "sandbox soft"
+> Nota di stato: oggi il core legge già le **chiavi riservate** della config admin dello scraper (politeness, timeout, emivita della cache) via `scraper_config`; l'infrastruttura `ConfigField` per i campi dichiarati dal plugin e la config utente arrivano in una fase successiva (7+).
 
-Ogni plugin riceve un **Plugin Context** con tutto ciò che gli serve e nient'altro: sessione DB, logger, la propria sezione di config, un client HTTP con politeness integrata, e il callback per consegnare i prodotti al core.
+## Contratti del notifier (spec-ahead)
 
-**Trust model dichiarato**: i plugin girano in-process e sono **codice first-party fidato**. Il contesto è una disciplina architetturale (manutenibilità, confini chiari), **non** un confine di sicurezza — Python non può impedire a un plugin malevolo di accedere a ciò che vuole. Le protezioni reali contro i plugin *difettosi* (non malevoli) sono: timeout di run, lock anti-overlap, isolamento degli errori, tabelle namespaced. Coerente con la [postura di sicurezza](security-posture.md) del progetto.
+La famiglia `NotifierPlugin` è oggi un marker: i metodi runtime arrivano più avanti.
 
-## Regole sui dati dei plugin
-
-- Ogni plugin possiede **una o più tabelle dedicate** (naming namespaced per plugin) che crea da sé, idempotentemente, all'inizializzazione. Niente tabelle generiche condivise.
-- Lo scraper **non scrive mai** nelle tabelle del catalogo core: l'unica via d'ingresso dei prodotti è il callback `update_catalog`.
-- Il core non legge mai le tabelle dei plugin: quando ha bisogno di sapere qualcosa (es. "questo utente ha configurato questo scraper?") lo **chiede al plugin** tramite contratto.
+- `send(notification, config)` — consegna il payload sul canale; il core costruisce il payload strutturato e fornisce la lingua dell'utente, il plugin lo rende nel formato del canale.
+- `send_test(config)` — invio di prova dalla UI di configurazione del canale.
+- `get_admin_config_schema()` / `get_user_config_schema()` — gli schemi dichiarativi dei due livelli di config del canale.
 
 ## Approfondimenti
 
 - Dettaglio funzionale dei contratti: [Layer 3 — plugins](../3-features/plugins/)
-- Contratti tecnici e pseudocodice: [Layer 4 — core](../4-capabilities/core/plugin-registry.md) e [contratti](../4-capabilities/contracts/)
+- Contratti tecnici e pseudocodice: [Layer 4 — core](../../docs/4-capabilities/core/plugin-registry.md) e [contratti](../4-capabilities/contracts/)
 - Guida per sviluppare un plugin: [plugin-development/](../plugin-development/README.md)

@@ -1,37 +1,39 @@
 # Scraper scheduling and execution
 
 > **Layer 2 — Architecture** · Audience: SW architects, system engineers · Text + Mermaid, no code.
+>
+> Limited to what is implemented (phases 0–5): the worker dispatches the **scrape** flow and runs daily maintenance. The **alert** and **summary** scheduled flows (per-account cadence, aggregated notification) arrive with the alerts phase and are described in the Italian [scheduling-and-execution](../../docs-ita/2-architecture/scheduling-and-execution.md).
 
-## The three scheduled flows
+## The scheduled flows
 
-There is no single cron table: the three flows have different owners, granularities, and logics, and they are **deliberately decoupled** (the scrape updates the data; the notification arrives when the user wants it).
+There is no single cron table: the flows have different owners, granularities, and logics, and they are **deliberately decoupled** (the scrape updates the data; the notification arrives when the user wants it). Today the worker drives the **scrape** flow; the user-owned alert and summary flows are added later.
 
-| Flow | Owner | Granularity | Frequency |
-|---|---|---|---|
-| **Scrape** | Admin | Per-scraper | **1..N slots per day** (a list of times per scraper) |
-| **Alert** | User | Per-account | Chosen days of the week + a single time |
-| **Summary** | User | Per-account | Weekly (chosen day) or monthly (day 1), opt-in |
+| Flow | Owner | Granularity | Frequency | Status |
+|---|---|---|---|---|
+| **Scrape** | Admin | Per-scraper | **1..N slots per day** (a list of times per scraper) | Implemented |
+| **Alert** | User | Per-account | Chosen days of the week + a single time | Alerts phase |
+| **Summary** | User | Per-account | Weekly (chosen day) or monthly (day 1), opt-in | Alerts phase |
 
 ## The dispatcher (Cron Worker)
 
-The worker wakes up every minute and compares the current time against the schedules. The "due" principle: a job is due when there is a **scheduled slot already in the past** that has not yet been executed. This gives **catch-up** for free: if the worker was down, on restart it runs the most recent missed slot — **only one**, never a replay of all the backlogged slots.
+The worker wakes up every tick and compares the current time against the schedules. The "due" principle: a job is due when there is a **scheduled slot already in the past** that has not yet been executed. This gives **catch-up** for free: if the worker was down, on restart it runs the most recent missed slot — **only one**, never a replay of all the backlogged slots.
 
 ```mermaid
 flowchart TD
-    T[Tick: every minute] --> S{For each scraper:<br/>last due slot > last executed?}
+    T[Tick] --> M{New UTC day?}
+    M -- yes --> DM[Daily maintenance<br/>retention purge]
+    M -- no --> HB
+    DM --> HB[Heartbeat]
+    HB --> S{For each scraper:<br/>last due slot > last executed?}
     S -- yes --> RUN[Enqueue to the serial runner<br/>if not already queued/running]
-    S -- no --> A
-    RUN --> A{For each user:<br/>alert due today?}
-    A -- yes --> AE[Run Alert Engine]
-    A --> SU{For each user:<br/>summary due?}
-    SU -- yes --> SM[Run Summary]
-    SU --> HB[Heartbeat + back to tick]
+    S -- no --> W[Wait for the next tick]
+    RUN --> W
 ```
 
 Honest limits of catch-up (declared, a hobby-project choice):
 
 - **Scraper**: catch-up crosses midnight (*slots* are compared, not dates) — a scraper down since 23:00 recovers the 23:50:00 slot even at 1 a.m.
-- **Alert and summary**: catch-up applies **within the day it is due**. If the system stays down for the entire due day, that notification is skipped and the events will flow into the next one (the diff is cumulative by nature: nothing is lost in the content, only in the moment of delivery).
+- The alert and summary flows follow the same "most recent missed slot" principle **within the day they are due** once they ship; see the Italian reference.
 
 ## The serial runner
 
@@ -63,7 +65,7 @@ It is an optimization with a double effect: **across different users in the same
 
 ## Observability of executions
 
-Every run produces an **execution record** (actual duration, products found/new/changed/disappeared, HTTP requests made, cache reuses, outcome) with the **per-user detail**; operational events (executions, catch-ups, skips due to overlap, errors, heartbeats) end up in the system log, viewable by the admin in near-real-time. It is the basis of the [admin reporting](../3-features/admin/scraper-monitoring.md).
+Every run produces an **execution record** (actual duration, products found/new/changed/disappeared, HTTP requests made, cache reuses, outcome) with the **per-user detail**; operational events (executions, catch-ups, skips due to overlap, errors, heartbeats) end up in the system log, viewable by the admin in near-real-time. It is the basis of the [admin reporting](../../docs-ita/3-features/admin/scraper-monitoring.md).
 
 ```mermaid
 sequenceDiagram

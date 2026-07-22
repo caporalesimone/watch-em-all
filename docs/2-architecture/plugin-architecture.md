@@ -2,7 +2,7 @@
 
 > **Layer 2 — Architecture** · Audience: SW architects, system engineers.
 >
-> English translation of the Italian reference [`docs-ita/2-architecture/plugin-architecture.md`](../../docs-ita/2-architecture/plugin-architecture.md), limited to what is implemented (DOC-12). Phase 2 ships the dynamic **backbone**: discovery, validation, isolated loading, a minimal context, and dynamic frontend mounting. The richer contracts (two-level configuration, the politeness HTTP client, `update_catalog`, notification rendering) arrive in later phases and are described in the Italian reference.
+> English translation of the Italian reference [`docs-ita/2-architecture/plugin-architecture.md`](../../docs-ita/2-architecture/plugin-architecture.md), limited to what is implemented (phases 0–5, DOC-12). The dynamic **backbone** (discovery, validation, isolated loading, dynamic frontend mounting), the scraper runtime (identity, `run_for_user`/`run_test`, `get_adjustments`), the `update_catalog` write path and the polite HTTP client all ship. The remaining contracts — the **two-level user configuration** (declarative `ConfigField` schemas) and the **notifier** `send`/config contracts — arrive in later phases and are described in the Italian reference.
 
 ## The principle: plugin-first, full-stack
 
@@ -19,17 +19,23 @@ classDiagram
         router()
         delete_user_data(context, user)
     }
-    class ScraperPlugin
+    class ScraperPlugin {
+        identity_seed(raw)
+        run_for_user(context, user)
+        run_test(context, params)
+        configured_users(context)
+        get_adjustments(products, cart_total)
+    }
     class NotifierPlugin
     BasePlugin <|-- ScraperPlugin
     BasePlugin <|-- NotifierPlugin
 ```
 
-In phase 2 the base contract is intentionally minimal — `initialize`, `router`, `delete_user_data` (all with safe defaults) — and the families are markers; the type-specific runtime methods (scrape, send, config schemas) land in later phases.
+The base contract is minimal — `initialize`, `router`, `delete_user_data` (all with safe defaults). The **scraper** family adds the shipped runtime: the abstract `identity_seed` (the only site-specific point of the product identity; a scraper that omits it does not load), the `run_for_user`/`run_test` entry points, `configured_users` (whom a scheduled run iterates), and `get_adjustments` (site-specific cart rules). The **notifier** family is still a marker: its `send` and config-schema contracts land in later phases.
 
 ## Dynamic integration — backend
 
-At startup every container that loads plugins (today: `web`) runs the same deterministic sequence. **No runtime plugin switching**: activation is static via the manifest, and a change needs a rebuild + restart.
+At startup every container that loads plugins (`web` and `worker`) runs the same deterministic sequence. **No runtime plugin switching**: activation is static via the manifest, and a change needs a rebuild + restart.
 
 ```mermaid
 flowchart TD
@@ -71,9 +77,9 @@ Key properties:
 
 ## Isolation: the "soft sandbox"
 
-Each plugin receives a **Plugin Context** with what it needs and, by convention, nothing else. In phase 2 that is: a DB session/engine for its **own** tables, a namespaced logger, and its (empty, for now) admin config. See [plugin-context](../4-capabilities/core/plugin-context.md).
+Each plugin receives a **Plugin Context** with what it needs and, by convention, nothing else: a DB session/engine for its **own** tables, a namespaced logger, the `update_catalog` callback (a scraper's only write path to the catalog), and a polite, counted, retrying HTTP client backed by the per-plugin scrape cache. The plugin's own declared config stays empty until the `ConfigField` infrastructure lands (later phase). See [plugin-context](../4-capabilities/core/plugin-context.md).
 
-**Declared trust model**: plugins run in-process and are **trusted first-party code**. The context is an architectural discipline (maintainability, clear boundaries), **not** a security boundary — Python cannot stop a malicious plugin from reaching whatever it wants. The real protections against *faulty* (not malicious) plugins are error isolation at load and namespaced tables; run timeouts and anti-overlap locks arrive with the worker. Consistent with the project's security posture.
+**Declared trust model**: plugins run in-process and are **trusted first-party code**. The context is an architectural discipline (maintainability, clear boundaries), **not** a security boundary — Python cannot stop a malicious plugin from reaching whatever it wants. The real protections against *faulty* (not malicious) plugins are error isolation at load, namespaced tables, the per-scraper run timeout and the anti-overlap DB lock. Consistent with the project's security posture.
 
 ## Plugin data rules
 
