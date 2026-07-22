@@ -19,7 +19,8 @@
 		"notifiers": "Notifiers",
 		"featureFlags": "Feature flags",
 		"systemLogs": "System logs",
-		"settings": "Settings"
+		"settings": "Settings",
+		"alerts": "Alerts"
 	},
 	"catalog": {
 		"title": "Catalog",
@@ -86,6 +87,47 @@
 		"added": "Added to {name}",
 		"addError": "Could not add to the cart.",
 		"pickerIncompatibleHint": "Some single-store carts are disabled — they don't match the store(s) of your selection."
+	},
+	"alertTypes": {
+		"title": "Alerts for this cart",
+		"hint": "Changing the selection restarts monitoring from now — you'll be alerted on the next changes, not past ones.",
+		"productHeading": "Products",
+		"cartHeading": "This cart",
+		"productOnSale": "A product goes on sale",
+		"productOffSale": "A product's discount ends",
+		"productUnavailable": "A product goes out of stock",
+		"productAvailableAgain": "A product is back in stock",
+		"cartAllOnSale": "Every product is on sale",
+		"cartThresholdReached": "The savings threshold is reached"
+	},
+	"weekdays": {
+		"mon": "Mon",
+		"tue": "Tue",
+		"wed": "Wed",
+		"thu": "Thu",
+		"fri": "Fri",
+		"sat": "Sat",
+		"sun": "Sun"
+	},
+	"alerts": {
+		"title": "Alerts",
+		"empty": "No alerts yet. You'll see your digests here once monitoring finds changes.",
+		"error": "Could not load your alerts.",
+		"detailError": "Could not load this alert.",
+		"summary": "{count} carts with changes",
+		"unread": "Unread",
+		"count": "{total} alerts",
+		"back": "← Back to alerts",
+		"eventAllOnSale": "All on sale",
+		"eventThresholdReached": "Threshold reached",
+		"eventThresholdPartial": "Threshold reached (partial)",
+		"totals": "Totals",
+		"threshold": "Threshold",
+		"thresholdTarget": "target",
+		"thresholdCurrent": "current",
+		"thresholdReached": "Reached",
+		"thresholdPartial": "Partially reached",
+		"excluded": "Excluded: {names}"
 	},
 	"admin": {
 		"users": {
@@ -250,7 +292,14 @@
 		"theme": "Theme",
 		"themeDark": "Dark",
 		"themeLight": "Light",
-		"changePassword": "Change password"
+		"changePassword": "Change password",
+		"cadence": "Alert cadence",
+		"cadenceHint": "Choose when to receive your alert digest. Turning it off (no days selected) clears the monitoring baselines.",
+		"cadenceDays": "Days",
+		"cadenceTime": "Time",
+		"cadenceOff": "Notifications are off — pick at least one day to receive a digest.",
+		"cadenceResetCleared": "Monitoring was reset — baselines cleared.",
+		"cadenceResetReseeded": "Monitoring restarted from now."
 	},
 	"dashboard": {
 		"title": "Dashboard",

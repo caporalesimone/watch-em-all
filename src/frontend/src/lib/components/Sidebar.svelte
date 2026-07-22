@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { _ } from 'svelte-i18n';
 
+	import { unreadCount, refreshUnread } from '$lib/stores/alerts';
 	import { auth, signOut } from '$lib/stores/auth';
 	import { mountedPlugins } from '$lib/stores/plugins';
 	import { version } from '$lib/stores/version';
@@ -9,6 +11,12 @@
 	// Roles don't overlap (personas-and-roles.md): an admin governs (no personal
 	// catalog/carts), a user owns their data. The shell shows one or the other.
 	const isAdmin = $derived(($auth.user?.role ?? 'user') === 'admin');
+
+	// Seed the unread-alerts badge once (users only; the endpoint is user-scoped). The
+	// alert history refreshes this store after marking notifications read.
+	onMount(() => {
+		if (!isAdmin) void refreshUnread();
+	});
 
 	type NavItem = { href: string; key: string; children?: { href: string; key: string }[] };
 	const primary = $derived<NavItem[]>(
@@ -31,7 +39,8 @@
 			: [
 					{ href: '/', key: 'nav.dashboard' },
 					{ href: '/catalog', key: 'nav.catalog' },
-					{ href: '/carts', key: 'nav.carts' }
+					{ href: '/carts', key: 'nav.carts' },
+					{ href: '/alerts', key: 'nav.alerts' }
 				]
 	);
 
@@ -48,7 +57,20 @@
 	<div class="mb-6 text-center text-lg font-semibold">{$_('app.name')}</div>
 	<nav class="flex flex-1 flex-col gap-1">
 		{#each primary as link (link.href)}
-			<a href={link.href} class={itemClass(link.href)}>{$_(link.key)}</a>
+			{#if link.href === '/alerts'}
+				<!-- Alerts: an unread-count pill rides on the right of the nav row (6.F4). -->
+				<a href={link.href} class="{itemClass(link.href)} flex items-center justify-between">
+					<span>{$_(link.key)}</span>
+					{#if $unreadCount > 0}
+						<span
+							class="ml-2 rounded-full bg-indigo-600 px-1.5 py-0.5 text-xs font-medium text-white"
+							>{$unreadCount}</span
+						>
+					{/if}
+				</a>
+			{:else}
+				<a href={link.href} class={itemClass(link.href)}>{$_(link.key)}</a>
+			{/if}
 			{#if link.children}
 				{#each link.children as child (child.href)}
 					<!-- Child entry: clickable, indented (ml-4) to read as a sub-page. -->

@@ -11,6 +11,7 @@
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import { setupI18n } from '$lib/i18n';
 	import { adminErrors } from '$lib/stores/adminErrors';
+	import { resetUnread } from '$lib/stores/alerts';
 	import { auth, bootstrap } from '$lib/stores/auth';
 	import { loadPlugins, resetPlugins } from '$lib/stores/plugins';
 	import { theme } from '$lib/stores/theme';
@@ -71,6 +72,7 @@
 		} else if (state.status === 'anon' && pluginsLoaded) {
 			pluginsLoaded = false;
 			resetPlugins();
+			resetUnread();
 		}
 	});
 
