@@ -3,12 +3,6 @@
 Running list of issues / polish noted by Simone, to address in a future pass.
 New items get appended over time.
 
-## Open
-
-- **Cart disappears on page reload.** Refreshing the browser on a cart page makes the cart vanish
-  (it is no longer shown after reload). Investigate whether it's a client-side load/hydration issue
-  (SPA re-fetch on reload) or the reloaded request returning empty (auth/token or route data). To fix.
-
 ## Off topic
 
 - **Two Claude Code skills: start-of-work and end-of-work.** Create a `/start-work` skill that opens a

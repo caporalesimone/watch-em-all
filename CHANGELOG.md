@@ -10,6 +10,12 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 **Phase 6 — in-app alerts: a price or availability change becomes a readable digest in the Alert History, delivered at the cadence you choose. Entries land below as they ship.**
 
+### Fixed
+
+- **Carts no longer vanish on a full page reload.** Reloading the browser on the **Carts** page left it empty; you had to click **Carts** in the sidebar again for the list to appear. It now loads its contents on reload like every other page.
+
+_Under the hood:_ the carts list was the only page that triggered its data fetch from `afterNavigate` instead of `onMount`. Because the app shell (a CSR-only SPA) defers mounting page content until the auth bootstrap finishes, on a hard reload the initial "enter" navigation has already settled by the time the carts page mounts, so `afterNavigate`'s on-mount callback never fired and `load()` never ran. Switched it to `onMount`, matching every other route; returning from a cart's detail page still refreshes the list, since the two are separate routes and the list component remounts.
+
 ## [0.5.0] - 2026-07-09
 
 **Phase 5 — carts (the functional heart): the two cart modes, computed totals, adjustments and the savings threshold. Opening with some catalog polish; the cart work lands below as it ships.**
