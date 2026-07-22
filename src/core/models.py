@@ -193,6 +193,30 @@ class CartAlertType(Base):
     alert_type: Mapped[str] = mapped_column(String(48), nullable=False)
 
 
+class AlertSnapshot(Base):
+    """The per-cart alert **baseline** (alert-engine.md, schema.md). Phase 6 (6.B2).
+
+    One row per **(user, cart)** — a composite primary key. ``snapshot_json`` is the
+    reference state the next run diffs against: for each (non-delisted) member product
+    ``{on_sale, available, price_current}``, plus the cart-level ``all_on_sale`` and
+    ``threshold_reached`` flags. Seeded when the first alert type is enabled, advanced on
+    every run, deleted when all types are disabled or the cadence goes off (6.B2/6.B3).
+    ``taken_at`` records when the baseline was last written."""
+
+    __tablename__ = "alert_snapshot"
+
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    cart_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("carts.id", ondelete="CASCADE"), primary_key=True
+    )
+    snapshot_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    taken_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
 class ScrapeCooldown(Base):
     """Anchor for the manual scrape-now cooldown (SCR-R15).
 

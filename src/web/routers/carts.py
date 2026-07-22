@@ -13,6 +13,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from sqlalchemy import select
 
+from src.core.alert_engine import snapshot_payload, upsert_snapshot
 from src.core.cart_engine import AdjustmentFn, CartState, evaluate_cart
 from src.core.contracts import Adjustment, AlertType, BrandRef, CategoryRef
 from src.core.errors import APIError
@@ -317,6 +318,11 @@ def set_alert_types(
             db.add(CartAlertType(cart_id=cart.id, alert_type=t))
     db.commit()
 
-    # Baseline lifecycle (6.B2/6.B3): seed on the first type enabled, delete when none
-    # remain. Wired in the baseline MVPs; the type persistence above is complete for 6.B1.
+    # Baseline lifecycle: seed on the first type enabled (6.B2), from the cart's current
+    # state, so the first run has a reference and produces no notification (ALERT-R8).
+    # Deleting it when the last type is disabled is 6.B3.
+    if not current and target:
+        state, products = _state(db, request, cart)
+        upsert_snapshot(db, user.sub, cart.id, snapshot_payload(products, state))
+        db.commit()
     return _detail(db, request, cart)

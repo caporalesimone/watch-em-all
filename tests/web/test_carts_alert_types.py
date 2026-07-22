@@ -117,6 +117,32 @@ def test_unknown_alert_type_rejected(client: TestClient) -> None:
     assert client.get(f"/api/carts/{cart_id}", headers=_bearer(token)).json()["alert_types"] == []
 
 
+def test_enabling_first_type_seeds_baseline(client: TestClient) -> None:
+    """6.B2: enabling the first alert type seeds the per-cart baseline from the current
+    state; enabling more types afterwards does not re-seed (baseline advances via runs)."""
+    from src.core.db import new_session
+    from src.core.models import AlertSnapshot
+
+    token = _make_user(client, _admin_token(client), "alice")
+    cart_id = _make_cart(client, token)
+
+    # No types yet → no baseline.
+    with new_session() as db:
+        assert db.query(AlertSnapshot).filter_by(cart_id=cart_id).one_or_none() is None
+
+    client.put(
+        f"/api/carts/{cart_id}/alert-types",
+        json={"alert_types": ["PRODUCT_ON_SALE"]},
+        headers=_bearer(token),
+    )
+    with new_session() as db:
+        snap = db.query(AlertSnapshot).filter_by(cart_id=cart_id).one_or_none()
+        assert snap is not None  # seeded on first enable
+        assert snap.snapshot_json["products"] == {}  # empty cart → empty product map
+        assert snap.snapshot_json["all_on_sale"] is False
+        assert snap.snapshot_json["threshold_reached"] is False
+
+
 def test_alert_types_are_per_user(client: TestClient) -> None:
     admin = _admin_token(client)
     token_a = _make_user(client, admin, "alice")
