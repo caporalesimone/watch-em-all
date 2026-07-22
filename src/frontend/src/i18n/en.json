@@ -84,7 +84,8 @@
 		"chooseCart": "Choose a cart…",
 		"selected": "{count} selected",
 		"added": "Added to {name}",
-		"addError": "Could not add to the cart."
+		"addError": "Could not add to the cart.",
+		"pickerIncompatibleHint": "Some single-store carts are disabled — they don't match the store(s) of your selection."
 	},
 	"admin": {
 		"users": {

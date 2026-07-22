@@ -34,19 +34,53 @@
 	const pages = $derived(data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1);
 
 	// Selection → "add to cart" (5.F4). Delisted rows can't be added (the backend rejects
-	// them); the multi-scraper compatibility UX is deferred to phase 6 (6.F0).
+	// them). We track each selected product's plugin_id (6.F0) so the cart picker can grey
+	// out single-store carts that don't match the selection — selection persists across
+	// pages, so we can't recover a product's store from the current page alone.
 	let selectedIds = $state<number[]>([]);
+	let selectedPluginById = $state<Record<number, string>>({});
 	let carts = $state<CartCard[]>([]);
 	let targetCartId = $state<number | ''>('');
 	let adding = $state(false);
 	let addMsg = $state<string | null>(null);
 	let addErr = $state<string | null>(null);
 
-	function toggleSelect(id: number): void {
-		selectedIds = selectedIds.includes(id)
-			? selectedIds.filter((x) => x !== id)
-			: [...selectedIds, id];
+	// The distinct stores (scraper plugin_ids) covered by the current selection.
+	const selectedScrapers = $derived([
+		...new Set(selectedIds.map((id) => selectedPluginById[id]).filter(Boolean))
+	]);
+
+	// 6.F0: a cross cart always accepts the selection; a scraper_specific cart accepts it
+	// only when every selected product comes from that cart's own scraper (matching the
+	// server-side rule from 5.B2). Spanning multiple stores disables all single-store carts.
+	function cartSelectable(cart: CartCard): boolean {
+		if (cart.mode !== 'scraper_specific') return true;
+		return selectedScrapers.length <= 1 && selectedScrapers.every((s) => s === cart.scraper_id);
 	}
+
+	function toggleSelect(item: CatalogItem): void {
+		if (selectedIds.includes(item.id)) {
+			selectedIds = selectedIds.filter((x) => x !== item.id);
+			const { [item.id]: _drop, ...rest } = selectedPluginById;
+			selectedPluginById = rest;
+		} else {
+			selectedIds = [...selectedIds, item.id];
+			selectedPluginById = { ...selectedPluginById, [item.id]: item.plugin_id };
+		}
+	}
+
+	// If the selection changed so the chosen cart is no longer compatible, drop the choice
+	// (never let the user submit into a now-incompatible single-store cart).
+	$effect(() => {
+		if (targetCartId === '') return;
+		const chosen = carts.find((c) => c.id === targetCartId);
+		if (chosen && !cartSelectable(chosen)) targetCartId = '';
+	});
+
+	// Whether any cart is disabled by the current selection (drives the hint line).
+	const someCartDisabled = $derived(
+		selectedIds.length > 0 && carts.some((c) => !cartSelectable(c))
+	);
 
 	async function loadCarts(): Promise<void> {
 		try {
@@ -65,6 +99,7 @@
 			const cart = await addCartItems(Number(targetCartId), selectedIds);
 			addMsg = $_('carts.added', { values: { name: cart.name } });
 			selectedIds = [];
+			selectedPluginById = {};
 			carts = carts.map((c) => (c.id === cart.id ? cart : c));
 		} catch (e) {
 			addErr = e instanceof ApiErr ? e.detail : $_('carts.addError');
@@ -178,7 +213,7 @@
 			>
 				<option value="">{$_('carts.chooseCart')}</option>
 				{#each carts as c (c.id)}
-					<option value={c.id}>{c.name}</option>
+					<option value={c.id} disabled={!cartSelectable(c)}>{c.name}</option>
 				{/each}
 			</select>
 			<button
@@ -189,6 +224,9 @@
 				{$_('carts.addToCart')}
 			</button>
 			{#if addErr}<span class="text-red-500">{addErr}</span>{/if}
+			{#if someCartDisabled}
+				<span class="w-full text-xs text-slate-500">{$_('carts.pickerIncompatibleHint')}</span>
+			{/if}
 		</div>
 	{/if}
 
@@ -233,7 +271,7 @@
 								type="checkbox"
 								checked={selectedIds.includes(item.id)}
 								disabled={item.removed}
-								onchange={() => toggleSelect(item.id)}
+								onchange={() => toggleSelect(item)}
 								aria-label={$_('carts.addToCart')}
 							/>
 						</td>

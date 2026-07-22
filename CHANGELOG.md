@@ -10,6 +10,10 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 **Phase 6 — in-app alerts: a price or availability change becomes a readable digest in the Alert History, delivered at the cadence you choose. Entries land below as they ship.**
 
+### New
+
+- **The catalog's "add to cart" picker now guides your choice.** When you select products and pick a target cart, **single-store carts that don't match your selection are greyed out** — a single-store cart only accepts products from its own store, and if your selection spans more than one store all single-store carts are disabled (cross-store carts always stay available). A short note explains why, so an incompatible add is prevented up front instead of failing on submit.
+
 ### Fixed
 
 - **Carts no longer vanish on a full page reload.** Reloading the browser on the **Carts** page left it empty; you had to click **Carts** in the sidebar again for the list to appear. It now loads its contents on reload like every other page.
