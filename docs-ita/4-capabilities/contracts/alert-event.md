@@ -29,9 +29,10 @@ classDiagram
         price_current
     }
     class ThresholdInfo {
-        pct
         target
         current
+        reached
+        partial
         excluded
     }
     class TextMessageEvent {
@@ -73,9 +74,10 @@ Un solo enum per i tipi: la distinzione prodotto/carrello è data dalla **posizi
 
 ```python
 class ThresholdInfo(BaseModel):
-    pct: Decimal          # soglia salvata (%)
-    target: Decimal       # soglia in € sul totale pieno corrente
+    target: Decimal       # soglia € — importo fisso salvato (CART-R9: la % è solo input UI)
     current: Decimal      # stima finale corrente
+    reached: bool         # stima finale ≤ target
+    partial: bool         # raggiunta mentre alcuni prodotti sono esclusi (non attivi)
     excluded: list[str] = []   # nomi dei prodotti esclusi (per il caso PARTIAL)
 
 class ProductAlert(BaseModel):
@@ -132,5 +134,6 @@ CartAlert(cart_name="Cthulhu Starter", mode="scraper_specific",
                            price_previous=Decimal("25.00"),
                            price_current=Decimal("19.90"), discount_pct=Decimal("20"))],
     totals=CartTotals(full="100.00", discounted="85.00", final="78.00"),
-    threshold=ThresholdInfo(pct=20, target=Decimal("80.00"), current=Decimal("78.00")))
+    threshold=ThresholdInfo(target=Decimal("80.00"), current=Decimal("78.00"),
+                            reached=True, partial=False))
 ```
