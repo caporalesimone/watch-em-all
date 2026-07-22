@@ -11,7 +11,6 @@
 	import DiscountBadge from '$lib/components/DiscountBadge.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import ProductCell from '$lib/components/ProductCell.svelte';
-	import ProductTags from '$lib/components/ProductTags.svelte';
 	import SourceTag from '$lib/components/SourceTag.svelte';
 	import { money } from '$lib/format';
 	import { refreshUnread } from '$lib/stores/alerts';
@@ -29,6 +28,21 @@
 		CART_THRESHOLD_REACHED: 'alerts.eventThresholdReached',
 		CART_THRESHOLD_REACHED_PARTIAL: 'alerts.eventThresholdPartial'
 	};
+
+	// Product tag (StrEnum value) → i18n label. Rendered as a graphic badge, never as the
+	// raw underscore string (AEV-R3). "Good news" tags (on sale / back in stock) read green.
+	const TAG_LABEL: Record<string, string> = {
+		PRODUCT_ON_SALE: 'alerts.tagOnSale',
+		PRODUCT_OFF_SALE: 'alerts.tagOffSale',
+		PRODUCT_UNAVAILABLE: 'alerts.tagUnavailable',
+		PRODUCT_AVAILABLE_AGAIN: 'alerts.tagAvailableAgain'
+	};
+	const GOOD_TAGS = new Set(['PRODUCT_ON_SALE', 'PRODUCT_AVAILABLE_AGAIN']);
+	function tagClass(tag: string): string {
+		return GOOD_TAGS.has(tag)
+			? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+			: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300';
+	}
 
 	async function load(id: number): Promise<void> {
 		loading = true;
@@ -112,7 +126,11 @@
 											<ProductCell name={p.name} url={p.url} />
 											<div class="mt-1 flex flex-wrap items-center gap-2">
 												<SourceTag pluginId={p.plugin_id} />
-												<ProductTags tags={p.tags} />
+												{#each p.tags as tag (tag)}
+													<span class="rounded px-1.5 py-0.5 text-xs {tagClass(tag)}">
+														{$_(TAG_LABEL[tag] ?? tag)}
+													</span>
+												{/each}
 											</div>
 										</div>
 										<div class="shrink-0 text-right text-sm">
