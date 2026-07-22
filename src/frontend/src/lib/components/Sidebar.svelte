@@ -12,10 +12,15 @@
 	// catalog/carts), a user owns their data. The shell shows one or the other.
 	const isAdmin = $derived(($auth.user?.role ?? 'user') === 'admin');
 
-	// Seed the unread-alerts badge once (users only; the endpoint is user-scoped). The
-	// alert history refreshes this store after marking notifications read.
+	// Keep the unread-alerts badge live (users only; the endpoint is user-scoped). Alerts
+	// arrive event-driven after a scrape, so we poll every 20s in addition to the one-off
+	// on mount and the refresh the alert history does after marking notifications read.
+	const UNREAD_POLL_MS = 20_000;
 	onMount(() => {
-		if (!isAdmin) void refreshUnread();
+		if (isAdmin) return;
+		void refreshUnread();
+		const timer = setInterval(() => void refreshUnread(), UNREAD_POLL_MS);
+		return () => clearInterval(timer);
 	});
 
 	type NavItem = { href: string; key: string; children?: { href: string; key: string }[] };
