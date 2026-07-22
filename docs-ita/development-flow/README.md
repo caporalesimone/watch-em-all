@@ -4,7 +4,7 @@
 
 ## Le regole del flusso
 
-1. **Un MVP = una PR**: piccolo, completo, mergiato su `main` verde ([regole di processo](../developer-rules/README.md)).
+1. **Un MVP = una PR**: piccolo, completo, mergiato su `main` verde ([regole di processo](../../docs/developer-rules/README.md)).
 2. **Ordine delle fasi vincolante, ordine degli MVP interno flessibile** (salvo dipendenze indicate).
 3. **Una fase è chiusa solo se la sua *Definition of Done* è vera** provandola da utente, non leggendo il codice.
 4. **Le checkbox si aggiornano nella stessa PR** che completa l'MVP (questo indice + il documento di fase).

@@ -8,7 +8,7 @@
 
 Far sì che le connessioni verso i siti su cui si fa scraping non risultino tutte dallo **stesso** user-agent (e, più in generale, dalla stessa "impronta" di richiesta), ma siano **decise dal core** secondo una logica centrale — così uno scraper non hardcoda il proprio UA e il comportamento di rete è coerente e governabile in un punto solo.
 
-Motivazione: ridurre la probabilità di blocco/penalizzazione lato sito e rendere il traffico più realistico, restando dentro il principio di **politeness** già adottato (CTX-R1) — l'obiettivo è robustezza, non evasione aggressiva (resta un hobby project per ≤5 utenti, [security posture](../2-architecture/security-posture.md)).
+Motivazione: ridurre la probabilità di blocco/penalizzazione lato sito e rendere il traffico più realistico, restando dentro il principio di **politeness** già adottato (CTX-R1) — l'obiettivo è robustezza, non evasione aggressiva (resta un hobby project per ≤5 utenti, [security posture](../../docs/2-architecture/security-posture.md)).
 
 ## Risultato apprezzabile
 
@@ -37,4 +37,4 @@ Due run successive (o due scraper) verso lo stesso sito partono con user-agent d
 
 ## Riferimenti
 
-[plugin-context](../4-capabilities/core/plugin-context.md) (CTX-R1..R4, `context.http`) · [scraper-plugin](../3-features/plugins/scraper-plugin.md) (SCR-R6) · config riservata per-scraper ([phase-04](phase-04-worker-scheduling.md) 4.B10) · [future-improvements/platform](../future-improvements/platform.md)
+[plugin-context](../4-capabilities/core/plugin-context.md) (CTX-R1..R4, `context.http`) · [scraper-plugin](../../docs/3-features/plugins/scraper-plugin.md) (SCR-R6) · config riservata per-scraper ([phase-04](phase-04-worker-scheduling.md) 4.B10) · [future-improvements/platform](../future-improvements/platform.md)
