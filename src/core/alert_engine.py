@@ -109,6 +109,37 @@ def diff_products(
     return out
 
 
+def diff_cart_events(
+    state: CartState, snapshot: dict[str, Any], enabled: set[str]
+) -> list[AlertType]:
+    """Diff the cart-level events against the baseline (alert-engine.md, ALERT-R10):
+
+    - ``CART_ALL_ON_SALE`` when every active member becomes discounted (a false→true
+      transition of ``all_on_sale``);
+    - ``CART_THRESHOLD_REACHED`` / ``CART_THRESHOLD_REACHED_PARTIAL`` when the threshold
+      becomes reached (false→true); the *partial* variant is chosen when some members are
+      excluded from the totals.
+
+    A cart with no active members has ``all_on_sale = False`` and ``threshold = None``
+    (CART-R12), so both are naturally guarded. Events are filtered to ``enabled`` (ALERT-R5)."""
+    events: list[AlertType] = []
+    if (
+        AlertType.CART_ALL_ON_SALE in enabled
+        and state.all_on_sale
+        and not snapshot.get("all_on_sale", False)
+    ):
+        events.append(AlertType.CART_ALL_ON_SALE)
+    if state.threshold and state.threshold.reached and not snapshot.get("threshold_reached", False):
+        ev = (
+            AlertType.CART_THRESHOLD_REACHED_PARTIAL
+            if state.threshold.partial
+            else AlertType.CART_THRESHOLD_REACHED
+        )
+        if ev in enabled:
+            events.append(ev)
+    return events
+
+
 def get_snapshot(db: Session, user_id: int, cart_id: int) -> AlertSnapshot | None:
     """The cart's baseline row, or ``None`` if it was never seeded."""
     return db.get(AlertSnapshot, (user_id, cart_id))
