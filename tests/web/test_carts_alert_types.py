@@ -143,6 +143,29 @@ def test_enabling_first_type_seeds_baseline(client: TestClient) -> None:
         assert snap.snapshot_json["threshold_reached"] is False
 
 
+def test_disabling_all_types_deletes_baseline(client: TestClient) -> None:
+    """6.B3: clearing the last alert type drops the per-cart baseline."""
+    from src.core.db import new_session
+    from src.core.models import AlertSnapshot
+
+    token = _make_user(client, _admin_token(client), "alice")
+    cart_id = _make_cart(client, token)
+
+    client.put(
+        f"/api/carts/{cart_id}/alert-types",
+        json={"alert_types": ["PRODUCT_ON_SALE"]},
+        headers=_bearer(token),
+    )
+    with new_session() as db:
+        assert db.query(AlertSnapshot).filter_by(cart_id=cart_id).one_or_none() is not None
+
+    client.put(
+        f"/api/carts/{cart_id}/alert-types", json={"alert_types": []}, headers=_bearer(token)
+    )
+    with new_session() as db:
+        assert db.query(AlertSnapshot).filter_by(cart_id=cart_id).one_or_none() is None
+
+
 def test_alert_types_are_per_user(client: TestClient) -> None:
     admin = _admin_token(client)
     token_a = _make_user(client, admin, "alice")

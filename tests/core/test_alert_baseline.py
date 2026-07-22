@@ -13,7 +13,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from src.core import models  # noqa: F401  (register models on Base.metadata)
-from src.core.alert_engine import delete_snapshot, get_snapshot, snapshot_payload, upsert_snapshot
+from src.core.alert_engine import (
+    delete_all_snapshots,
+    delete_snapshot,
+    get_snapshot,
+    snapshot_payload,
+    upsert_snapshot,
+)
 from src.core.cart_engine import CartState, ThresholdState
 from src.core.db import Base
 from src.core.models import CatalogProduct
@@ -105,3 +111,24 @@ def test_upsert_get_delete_roundtrip() -> None:
         delete_snapshot(db, 1, 1)
         db.commit()
         assert get_snapshot(db, 1, 1) is None
+
+
+def test_delete_all_snapshots_is_per_user() -> None:
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    Base.metadata.create_all(engine)
+    empty = {"products": {}, "all_on_sale": False, "threshold_reached": False}
+    with Session(engine) as db:
+        upsert_snapshot(db, 1, 1, empty)
+        upsert_snapshot(db, 1, 2, empty)
+        upsert_snapshot(db, 2, 1, empty)  # another user's baseline
+        db.commit()
+
+        removed = delete_all_snapshots(db, 1)
+        db.commit()
+
+        assert removed == 2
+        assert get_snapshot(db, 1, 1) is None
+        assert get_snapshot(db, 1, 2) is None
+        assert get_snapshot(db, 2, 1) is not None  # untouched (ALERT-R3 is per-user)

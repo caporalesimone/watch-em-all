@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import delete as sa_delete
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.core.models import AlertSnapshot
@@ -75,3 +76,14 @@ def delete_snapshot(db: Session, user_id: int, cart_id: int) -> None:
             AlertSnapshot.user_id == user_id, AlertSnapshot.cart_id == cart_id
         )
     )
+
+
+def delete_all_snapshots(db: Session, user_id: int) -> int:
+    """Drop every baseline of a user (cadence off — ALERT-R3). Returns the number of rows
+    removed. Re-enabling the cadence re-seeds from the then-current state, so there is no
+    backlog. The caller commits. Wired into the alert-schedule API in 6.B7."""
+    count = len(
+        db.scalars(select(AlertSnapshot.cart_id).where(AlertSnapshot.user_id == user_id)).all()
+    )
+    db.execute(sa_delete(AlertSnapshot).where(AlertSnapshot.user_id == user_id))
+    return count
