@@ -1,6 +1,6 @@
 # Guida — Sviluppare uno scraper
 
-> Audience: plugin developer. Contratto normativo: [3-features/plugins/scraper-plugin.md](../3-features/plugins/scraper-plugin.md) · Esempio reale: [implemented-plugins](../implemented-plugins/).
+> Audience: plugin developer. Contratto normativo: [3-features/plugins/scraper-plugin.md](../../docs/3-features/plugins/scraper-plugin.md) · Esempio reale: [implemented-plugins](../implemented-plugins/).
 
 ## Il contratto da implementare
 

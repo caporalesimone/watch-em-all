@@ -1,6 +1,6 @@
 # Checklist di rilascio e test dei plugin
 
-> Audience: plugin developer. La CI esegue i test di contratto su ogni plugin abilitato ([ci](../infrastructure/ci.md)).
+> Audience: plugin developer. La CI esegue i test di contratto su ogni plugin abilitato ([ci](../../docs/infrastructure/ci.md)).
 
 ## Test di contratto (forniti dal core, obbligatori)
 

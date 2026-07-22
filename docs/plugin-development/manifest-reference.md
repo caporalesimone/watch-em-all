@@ -2,7 +2,7 @@
 
 > Audience: plugin developer.
 >
-> English translation of the Italian reference [`docs-ita/plugin-development/manifest-reference.md`](../../docs-ita/plugin-development/manifest-reference.md), limited to what is implemented (DOC-12). Phase 2 ships the manifest and its load-time validation; the configuration fields (admin/user schemas) arrive with the config infrastructure in later phases.
+> Phase 2 ships the manifest and its load-time validation; the configuration fields (admin/user schemas) arrive with the config infrastructure in later phases.
 
 The `manifest.json` is the plugin's declarative contract: everything the system knows about it without executing it. It is validated at load by the [plugin registry](../4-capabilities/core/plugin-registry.md); an invalid field means the plugin is rejected with an explicit error, while the rest of the system carries on.
 
@@ -16,7 +16,7 @@ The `manifest.json` is the plugin's declarative contract: everything the system 
 | `version` | string (semver) | ✅ | The plugin's own version (informative). |
 | `api_version` | int | ✅ | The supported **plugin-contract** version. Different from the core's = rejected. Current: `1`. |
 | `enabled` | bool | ✅ | **The only source of truth** for activation. `false` = ignored entirely (no import). Changing it needs a rebuild + restart. |
-| `icon` | path | recommended | Relative to the plugin folder. Square SVG (or PNG ≥48px). Served as a static asset and referenced by discovery. Absent = neutral icon. |
+| `icon` | path | optional | Explicit override (relative to the plugin folder). **If omitted**, the core auto-detects `frontend/assets/plugin-icon.{ico,svg}` (prefers `.ico`), resolved **once at load**. Square, rendered at 24×24 in the provenance cells. No file = neutral icon. |
 | `backend.entry` | path | ✅ | **Relative to the plugin folder** (e.g. `backend/__init__.py`). Must export the plugin instance as `plugin`. |
 | `backend.i18n` | path | notifier | Backend language folder (notification texts). `en.json` is the fallback. |
 | `frontend.entry` | path | ✅\* | Relative; exports `default { component }`. *Omitted only by plugins without their own UI (notifiers).* |
@@ -33,7 +33,6 @@ The `manifest.json` is the plugin's declarative contract: everything the system 
   "version": "1.0.0",
   "api_version": 1,
   "enabled": true,
-  "icon": "frontend/assets/icon.svg",
   "backend":  { "entry": "backend/__init__.py" },
   "frontend": { "entry": "frontend/index.ts",
                 "route_base": "/plugins/my-store",

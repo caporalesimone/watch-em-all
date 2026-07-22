@@ -48,7 +48,7 @@ src/plugins/<scrapers|notifiers>/<nome_plugin>/
 }
 ```
 
-Tutti i campi e le regole di validazione: [manifest-reference.md](manifest-reference.md).
+Tutti i campi e le regole di validazione: [manifest-reference.md](../../docs/plugin-development/manifest-reference.md).
 
 ## Il ciclo di vita
 
@@ -73,7 +73,7 @@ Tutti i campi e le regole di validazione: [manifest-reference.md](manifest-refer
 
 | Documento | Quando |
 |---|---|
-| [manifest-reference.md](manifest-reference.md) | sempre |
+| [manifest-reference.md](../../docs/plugin-development/manifest-reference.md) | sempre |
 | [scraper-development-guide.md](scraper-development-guide.md) | se scrivi uno scraper |
 | [notifier-development-guide.md](notifier-development-guide.md) | se scrivi un notifier |
 | [checklist-and-testing.md](checklist-and-testing.md) | prima del rilascio |

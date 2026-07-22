@@ -2,11 +2,11 @@
 
 > **Infrastructure** · Audience: DevOps, system engineer. Config snippets allowed (declared layer-rule exception).
 >
-> English translation of the Italian reference [`docs-ita/infrastructure/deployment.md`](../../docs-ita/infrastructure/deployment.md), limited to what is implemented (DOC-12). This document is the **reference**; the end-user operations manual is the repo **`README.md`** (INF-18). In phase 0 the application containers are **stubs** — the deploy process is real, the served page is a placeholder.
+> This document is the **reference**; the end-user operations manual is the repo **`README.md`**, which by rule (INF-18) holds all the deploy and maintenance instructions with every available command and script, and is updated with every new command introduced.
 
 ## Host requirements
 
-The portal is hosted on **Linux**: locally inside **WSL2** or on a **dedicated server**. The only prerequisite is **Docker Engine + the Compose plugin** — no development or runtime software is installed on the host (no Python, Node, psql: everything lives in containers, INF-15). The hosting images are multi-stage and self-contained (INF-5).
+The portal is hosted on **Linux**: locally inside **WSL2** or on a **dedicated server**. The only prerequisite is **Docker Engine + the Compose plugin** — no development or runtime software is installed on the host (no Python, Node, psql: everything lives in containers, INF-15). Development follows the same principle through the [dev container](dev-container.md); the hosting images are multi-stage and self-contained (the frontend is built inside the `web` image, INF-5).
 
 ## Installation: pull, not build
 
@@ -30,21 +30,25 @@ The repo and the GHCR packages are **public**: the `pull` is **anonymous**, no `
 
 | Image | Content |
 |---|---|
-| `ghcr.io/<owner>/watch-em-all:<ver>` | the app. **One image, two roles** selected by the command: `web` and `worker`. In phase 0: stub (placeholder page + heartbeat) |
-| `ghcr.io/<owner>/watch-em-all-ops:<ver>` | `postgres:16` + backup/export/restore scripts (placeholders in phase 0, real in 1.T2/1.T3) |
+| `ghcr.io/<owner>/watch-em-all:<ver>` | the app: FastAPI + built SPA + all first-party plugins + dispatcher/runner. **One image, two roles** selected by the command: `web` (API + SPA) and `worker` (scheduler + maintenance) |
+| `ghcr.io/<owner>/watch-em-all-ops:<ver>` | `postgres:16` + [backup/export/restore](backup-and-restore.md) scripts |
+
+**`config.yaml`**: the default is **inside the image** — no local file is needed. To customise it, create a copy next to the compose and mount it over the image's one (`./config.yaml:/app/config.yaml:ro`, a ready commented line in the release compose): the mount wins, the image stays the fallback.
+
+**Plugins**: the plugin set is fixed **at image build** (the frontend bundle is baked in); the published images include **all the enabled first-party plugins**, and fine control stays at runtime (scraper suspension, notifier global switch PCFG-R8). A custom set requires a build from sources (the developer path, [build-system](build-system.md)).
 
 ## Services
 
 | Service | Role | Exposure |
 |---|---|---|
 | `db` | PostgreSQL 16, the system's only state | internal network only |
-| `web` | app role: serves the page and `GET /api/health` | `:8080` |
-| `worker` | worker role: heartbeat loop (real scheduling in 4.B1) | none |
-| `ops` | backup/export/restore scripts, **ephemeral** (`run --rm`, profile `ops`) | none |
+| `web` | FastAPI + SPA bundle; API, auth, on-demand scrape | `:8080` |
+| `worker` | Dispatcher + serial scraper runner, alerts, summary, daily maintenance | none |
+| `ops` | backup/export/restore scripts, **ephemeral** (`run --rm`, `ops` profile) | none |
 
 The release kit ships **no DB browser** (production-shaped): inspect the database with `docker compose exec db psql -U $POSTGRES_USER $POSTGRES_DB` or the `ops` container. The pgweb browser lives only in `compose-dev.yml`.
 
-`web` and `worker` are **two services from the same image** `watch-em-all` (the role is chosen by `command`); both wait for `db` to be healthy.
+`web` and `worker` are **two services from the same image** `watch-em-all` (the role is chosen by `command`); they communicate **only through the DB**, both wait for `db` to be healthy and ensure the schema at startup (idempotent: no need to order them relative to each other).
 
 ## compose.yml (release, the deploy-kit file)
 
@@ -71,6 +75,8 @@ services:
     image: ghcr.io/<owner>/watch-em-all:${WEA_VERSION}
     command: ["web"]
     ports: ["8080:8080"]
+    # config.yaml default included in the image; to customise it:
+    # volumes: ["./config.yaml:/app/config.yaml:ro"]
     env_file: [.env]
     depends_on:
       db: { condition: service_healthy }
@@ -85,6 +91,7 @@ services:
   worker:
     image: ghcr.io/<owner>/watch-em-all:${WEA_VERSION}
     command: ["worker"]
+    # volumes: ["./config.yaml:/app/config.yaml:ro"]   # same as web, optional
     env_file: [.env]
     tmpfs:
       - /tmp          # heartbeat in RAM: the per-tick write never hits the disk
@@ -104,7 +111,9 @@ services:
     profiles: [ops]                      # never runs on its own: docker compose run --rm ops …
     env_file: [.env]
     volumes:
-      - ./backups:/backups               # archive destination
+      - ./backups:/backups               # archives destination
+      - ./.env:/host/.env:ro             # included in the backup
+      # - ./config.yaml:/host/config.yaml:ro   # if a local override exists, back it up too
     depends_on:
       db: { condition: service_healthy }
 
@@ -112,11 +121,48 @@ volumes:
   pgdata:
 ```
 
-Notes: no `version` field (deprecated in Compose v2); images pinned via `WEA_VERSION` in `.env`; log rotation everywhere (INF-2). `curl` ships in the app image, so the same healthcheck is used by the development and release composes. The repo also has the **development compose** (`compose-dev.yml`, with `build:` instead of `image:`): the developer path used by the [dev container](dev-container.md) — the two files share the same shape.
+Notes: no `version` field (deprecated in Compose v2); images pinned via `WEA_VERSION` in `.env`; log rotation everywhere. The `${VAR}` interpolation **inside** `config.yaml` is done by the application loader at startup, not by Docker (which only interpolates the compose file). The repo also has the **development compose** (`compose-dev.yml`, with `build:` instead of `image:`): the developer path, used by the [dev container](dev-container.md) — the two files share the same shape.
 
-## Updating
+## Startup
 
-Change the version in `.env` (`WEA_VERSION`) → `docker compose pull && docker compose up -d`. No sources, no build; the `pgdata` volume and your `.env` are untouched.
+```bash
+cp .env.example .env            # then fill in the values
+docker compose up -d            # production (no DB browser; inspect via `compose exec db psql` or `ops`)
+```
+
+First startup: the schema is created, the initial admin is born with the `WEA_ADMIN_INITIAL_PASSWORD` password and a forced change at first login.
+
+## Health and monitoring
+
+- `GET /api/health` → 200 if the app is alive and the DB reachable (includes the worker heartbeat age for information), otherwise 503.
+- The worker is watched by the **heartbeat file** (healthcheck above) and by the heartbeat line in the system log (admin page).
+
+## Exposure to the Internet (optional)
+
+The project's posture accepts **HTTP on the LAN** ([security posture](../2-architecture/security-posture.md)). If the installation is exposed to the Internet, put a reverse proxy with TLS in front; example with Caddy:
+
+```
+watchemall.example.com {
+    reverse_proxy localhost:8080
+}
+```
+
+## Backup, export and restore
+
+Scripts versioned in `ops/` and **baked into the `ops` image**, run **by hand** as an ephemeral container — details, rules and archive contents in [backup-and-restore.md](backup-and-restore.md):
+
+```bash
+docker compose run --rm ops backup.sh        # full archive: dump + .env (+ config.yaml if a local override)
+docker compose run --rm ops export.sh        # readable SQL dump, for inspection/migration
+docker compose run --rm ops restore.sh /backups/watchemall-backup-<date>.tar.gz
+```
+
+The dump covers **all the configuration too** (DB-first config). Recommended cadence: weekly, daily if the history is precious (a host cron invoking `backup.sh` is enough).
+
+## Updates and plugins
+
+- **Update the system**: new version in `.env` (`WEA_VERSION`) → `docker compose pull && docker compose up -d`. No sources, no build; the `pgdata` volume and your `.env` are untouched.
+- **The plugin set is the image's** (all the first-party ones, see above): governance is at runtime — scraper suspension from the scheduler, notifier global switch (PCFG-R8). A different set requires a build from sources ([build-system](build-system.md)).
 
 ## Trying a development image
 
@@ -128,4 +174,4 @@ WEA_VERSION=dev-<branch>     # e.g. dev-catalog
 docker compose pull && docker compose up -d
 ```
 
-`dev-<branch>` is **overwritten** on every push to the branch (you always get the latest build) and exists **only while the PR is open** (it is deleted on close). To pin an exact build use the **digest** (`watch-em-all@sha256:…`). For normal use stay on a release `x.y.z`.
+`dev-<branch>` is **overwritten** on every push to the branch (you always get the latest build). To pin an exact build use the **digest** (`image: ghcr.io/<owner>/watch-em-all@sha256:…`). The `dev-*` images are ephemeral: for normal use stay on a release `x.y.z`.

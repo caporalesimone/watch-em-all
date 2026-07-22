@@ -1,8 +1,6 @@
 # Dev container (zero-install development)
 
 > **Infrastructure** · Audience: developer, DevOps. Config snippets allowed.
->
-> English translation of the Italian reference [`docs-ita/infrastructure/dev-container.md`](../../docs-ita/infrastructure/dev-container.md), limited to what is implemented (DOC-12). The dev container is delivered in phase 0.
 
 ## Principle: no toolchain on the host
 
@@ -46,6 +44,7 @@ Declared choices:
 - **Git and GitHub are used from the host, never from the container**: the dev container is for building and running; commit, push and PR (`git`, `gh`) happen **outside**, on the host — the single declared exception to zero-install (the `gh` CLI is installed on the host). The `git` binary still ships in the image because Poetry/npm need it for repository dependencies.
 - **`root` user in the container** (declared simplification): non-root access to the Docker socket would require aligning the host `docker` group GID; inside a local dev container, root is accepted practice and removes that complexity.
 - **Tolerant post-create**: `post-create.sh` installs dependencies only if the toolchain files exist (`pyproject.toml` arrives with 1.B1, `src/frontend/package.json` with 1.F1) — the dev container is born in phase 0, before any code, without failing.
+- The daily flow does not change: `docker compose -f compose-dev.yml up` (from the terminal **inside** the dev container) brings up the whole development stack, pgweb included.
 
 ## Workflow
 
@@ -60,6 +59,49 @@ flowchart LR
 3. Inside the container: `cp .env.example .env`, `docker compose -f compose-dev.yml up`.
 4. Test, lint, build: always from the dev container terminal — never from the host.
 5. Commit, push and PR: **from the host** (`git` and `gh` live outside the container).
+
+## Full architecture
+
+The overview of docker-outside-of-docker: a single engine (the host's), the dev container as a sibling — not a parent — of the application containers, and the editor as pure UI.
+
+```mermaid
+flowchart TB
+    DEV["👤 Developer"]
+    BROWSER["🌐 Browser<br/>localhost:8080 / 8081"]
+
+    subgraph HOST["Host Linux / WSL2 — installed: Docker + git/gh"]
+        EDITOR["VS Code<br/>(UI on the host, no build toolchain)"]
+        GIT["git · gh<br/>(VCS operations, host only)"]
+
+        ENGINE["⚙️ Docker Engine<br/>the only daemon, the host's<br/>/var/run/docker.sock"]
+
+        subgraph CONTAINERS["containers — all siblings, on the same engine"]
+            subgraph DC["🛠️ dev container"]
+                TOOLS["toolchain<br/>Python 3.12 + Poetry<br/>Node 22 + npm<br/>docker CLI"]
+                SRC["📁 /workspace<br/>repo (bind mount)"]
+            end
+            DB[("db<br/>PostgreSQL 16")]
+            WEB["web<br/>FastAPI + SPA"]
+            WK["worker"]
+            ADM["pgweb<br/>(DB browser)"]
+        end
+    end
+
+    GITHUB["☁️ GitHub<br/>repo · PR · GHCR"]
+
+    DEV --> EDITOR
+    DEV --> GIT
+    EDITOR -- "attach (Dev Containers)" --> DC
+    TOOLS -- "docker compose up<br/>via mounted socket" --> ENGINE
+    ENGINE -- "creates and governs" --> DB & WEB & WK & ADM
+    WEB --- DB
+    WK --- DB
+    ADM --- DB
+    GIT -- "commit · push · PR" --> GITHUB
+    BROWSER -- "forward 8080 (web) · 8081 (pgweb)" --> WEB & ADM
+```
+
+Read from the drawing: the application containers created from inside the dev container are born **alongside** it (a `docker ps` from the host sees everything, dev container included); the boundary is sharp — **inside** the container you build, test and run, **from the host** you commit, push and PR (`git`/`gh`, the declared exception to zero-install); only the forwarded ports and the host's VCS traffic leave towards the outside.
 
 ## Hosting
 
