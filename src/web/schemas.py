@@ -203,6 +203,20 @@ class CartItemsBody(BaseModel):
     product_ids: list[int] = Field(min_length=1)
 
 
+class AlertScheduleOut(BaseModel):
+    # A user's alert cadence (6.B7). weekdays: 0=Monday … 6=Sunday; [] = off.
+    # baseline_effect is set only on a PUT that changed the on/off state (ALERT-R3 UI
+    # warning): "cleared" (turned off) or "reseeded" (turned on); null otherwise.
+    scheduled_time: str
+    weekdays: list[int]
+    baseline_effect: str | None = None
+
+
+class AlertSchedulePut(BaseModel):
+    scheduled_time: str = Field(min_length=4, max_length=8)  # "HH:MM" or "HH:MM:SS"
+    weekdays: list[int] = Field(default_factory=list)
+
+
 class CartAlertTypesBody(BaseModel):
     # The full desired set of enabled alert types for a cart (6.B1). Full-set semantics:
     # the endpoint stores exactly this set (presence = enabled). Values are validated

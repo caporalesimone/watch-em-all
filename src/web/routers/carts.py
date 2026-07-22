@@ -14,12 +14,11 @@ from fastapi import APIRouter, Request
 from sqlalchemy import select
 
 from src.core.alert_engine import delete_snapshot, snapshot_payload, upsert_snapshot
-from src.core.cart_engine import AdjustmentFn, CartState, evaluate_cart
+from src.core.cart_engine import CartState, evaluate_cart
 from src.core.contracts import Adjustment, AlertType, BrandRef, CategoryRef
 from src.core.errors import APIError
 from src.core.models import Cart, CartAlertType, CartMember, CatalogProduct
-from src.core.plugins.base import ScraperPlugin
-from src.core.plugins.registry import LoadedPlugin
+from src.web.adjust import adjuster_for, loaded_scrapers
 from src.web.deps import SessionDep, UserDep
 from src.web.schemas import (
     CartAdjustment,
@@ -34,12 +33,6 @@ from src.web.schemas import (
 )
 
 router = APIRouter(prefix="/carts", tags=["Carts"])
-
-
-def _loaded_scrapers(request: Request) -> dict[str, ScraperPlugin]:
-    """Loaded scraper instances keyed by plugin_id (targets for scraper_specific)."""
-    loaded: list[LoadedPlugin] = list(getattr(request.app.state, "loaded_plugins", []))
-    return {lp.plugin.plugin_id: lp.plugin for lp in loaded if isinstance(lp.plugin, ScraperPlugin)}
 
 
 def _get_owned(db: SessionDep, user: UserDep, cart_id: int) -> Cart:
@@ -68,15 +61,6 @@ def _alert_types(db: SessionDep, cart_id: int) -> list[str]:
     return sorted(
         db.scalars(select(CartAlertType.alert_type).where(CartAlertType.cart_id == cart_id)).all()
     )
-
-
-def _adjuster(request: Request, cart: Cart) -> AdjustmentFn | None:
-    """Bind the cart's scraper ``get_adjustments`` for a scraper_specific cart, or
-    None (cross carts, or scraper not loaded → no adjustments)."""
-    if cart.mode != "scraper_specific" or cart.scraper_id is None:
-        return None
-    plugin = _loaded_scrapers(request).get(cart.scraper_id)
-    return plugin.get_adjustments if plugin is not None else None
 
 
 def _to_adjustment(a: Adjustment) -> CartAdjustment:
@@ -113,7 +97,7 @@ def _member_out(p: CatalogProduct, active: bool) -> CartMemberOut:
 
 def _state(db: SessionDep, request: Request, cart: Cart) -> tuple[CartState, list[CatalogProduct]]:
     products = _cart_products(db, cart.id)
-    state = evaluate_cart(cart.mode, products, _adjuster(request, cart), cart.threshold_amount)
+    state = evaluate_cart(cart.mode, products, adjuster_for(request, cart), cart.threshold_amount)
     return state, products
 
 
@@ -173,7 +157,7 @@ def create_cart(body: CartCreate, user: UserDep, db: SessionDep, request: Reques
             raise APIError(
                 422, "scraper_id_required", "scraper_specific carts require a scraper_id"
             )
-        if body.scraper_id not in _loaded_scrapers(request):
+        if body.scraper_id not in loaded_scrapers(request):
             raise APIError(422, "unknown_scraper", f"no loaded scraper {body.scraper_id!r}")
         scraper_id = body.scraper_id
     else:  # cross

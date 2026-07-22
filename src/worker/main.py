@@ -20,12 +20,15 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.core.alert_cadence import alert_due
+from src.core.alert_engine import run_for_user
+from src.core.cart_engine import AdjustmentFn
 from src.core.config import get_settings
 from src.core.db import Base, create_schema, get_engine, init_engine, new_session
 from src.core.feature_flags import effective_flags, worker_tick_seconds
 from src.core.locks import scraper_lock
 from src.core.maintenance import purge_expired
-from src.core.models import ScraperSchedule, ScrapeRun, ScrapeUserLog
+from src.core.models import AlertSchedule, Cart, ScraperSchedule, ScrapeRun, ScrapeUserLog
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.context import PluginContext, build_context
 from src.core.plugins.registry import LoadedPlugin, load_plugins
@@ -43,6 +46,10 @@ HEARTBEAT_FILE = os.environ.get("WEA_HEARTBEAT_FILE", "/tmp/worker-heartbeat")
 
 # Schedulable scrapers (scraper_id -> LoadedPlugin), populated at boot.
 _loaded: dict[str, LoadedPlugin] = {}
+
+# All loaded scraper plugins (scraper_id -> ScraperPlugin), for binding get_adjustments
+# during alert runs — a scraper_specific cart's scraper may not be schedulable.
+_scrapers: dict[str, ScraperPlugin] = {}
 
 # Submit a scraper run to the runner: (scraper_id, slot, trigger) -> enqueued?
 Submit = Callable[[str, datetime, str], bool]
@@ -67,9 +74,12 @@ def _boot() -> None:
     create_schema()
     loaded = load_plugins(None)  # initialize plugins; the worker serves no HTTP
     _loaded.clear()
+    _scrapers.clear()
     for lp in loaded:
-        if isinstance(lp.plugin, ScraperPlugin) and implements_scraping(lp.plugin):
-            _loaded[lp.plugin.plugin_id] = lp
+        if isinstance(lp.plugin, ScraperPlugin):
+            _scrapers[lp.plugin.plugin_id] = lp.plugin
+            if implements_scraping(lp.plugin):
+                _loaded[lp.plugin.plugin_id] = lp
     metadatas = [Base.metadata] + [
         lp.plugin.table_metadata for lp in loaded if lp.plugin.table_metadata is not None
     ]
@@ -232,6 +242,36 @@ def dispatch_due(session: Session, now: datetime, tz: ZoneInfo, submit: Submit) 
             log.info("scheduled run due: %s (slot %s) → queued", sched.scraper_id, slot)
 
 
+def _alert_adjuster(cart: Cart) -> AdjustmentFn | None:
+    """Bind a scraper_specific cart's ``get_adjustments`` from the loaded plugins (6.B7)."""
+    if cart.mode != "scraper_specific" or cart.scraper_id is None:
+        return None
+    plugin = _scrapers.get(cart.scraper_id)
+    return plugin.get_adjustments if plugin is not None else None
+
+
+def dispatch_alerts_due(session: Session, now: datetime, tz: ZoneInfo) -> None:
+    """Run the alert engine for every user whose cadence is due now (6.B7, ALERT-R2).
+
+    Runs synchronously in the tick (pochi utenti; a run touches only that user's carts),
+    with same-day catch-up via ``last_run_date``. Writes the digest to the history; a
+    per-user failure is logged and never stops the others."""
+    for sched in session.scalars(select(AlertSchedule)):
+        if not alert_due(sched, now, tz):
+            continue
+        try:
+            result = run_for_user(session, sched.user_id, _alert_adjuster, now=now)
+            sched.last_run_date = now.astimezone(tz).date()
+            session.commit()
+            if result is not None:
+                log.info(
+                    "alert digest written for user %s (alert_log %s)", sched.user_id, result.id
+                )
+        except Exception:
+            session.rollback()
+            log.exception("alert run failed for user %s", sched.user_id)
+
+
 def _current_tick_seconds() -> int:
     session = new_session()
     try:
@@ -255,6 +295,7 @@ def _loop(submit: Submit, max_ticks: int | None = None) -> None:
         session = new_session()
         try:
             dispatch_due(session, now, tz, submit)
+            dispatch_alerts_due(session, now, tz)
         finally:
             session.close()
         ticks += 1

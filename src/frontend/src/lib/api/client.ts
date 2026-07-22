@@ -517,3 +517,27 @@ export async function setCartAlertTypes(id: number, alertTypes: string[]): Promi
 	});
 	return asJson<CartDetail>(res);
 }
+
+// Alert cadence (6.B7). weekdays: 0=Monday … 6=Sunday; [] = off. On a PUT that flips the
+// on/off state, baseline_effect is "reseeded" (turned on) or "cleared" (turned off).
+export interface AlertSchedule {
+	scheduled_time: string;
+	weekdays: number[];
+	baseline_effect?: string | null;
+}
+
+export function getAlertSchedule(): Promise<AlertSchedule> {
+	return apiFetch('/api/me/alert-schedule').then(asJson<AlertSchedule>);
+}
+
+export async function setAlertSchedule(payload: {
+	scheduled_time: string;
+	weekdays: number[];
+}): Promise<AlertSchedule> {
+	const res = await apiFetch('/api/me/alert-schedule', {
+		method: 'PUT',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(payload)
+	});
+	return asJson<AlertSchedule>(res);
+}
