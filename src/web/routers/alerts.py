@@ -10,12 +10,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Query
+from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select
 
 from src.core.errors import APIError
 from src.core.models import AlertLog
 from src.web.deps import SessionDep, UserDep
-from src.web.schemas import AlertDetail, AlertListItem, AlertPage, UnreadCount
+from src.web.schemas import AlertDetail, AlertIdsBody, AlertListItem, AlertPage, UnreadCount
 
 router = APIRouter(prefix="/alerts", tags=["Alerts"])
 
@@ -75,6 +76,13 @@ def unread_count(user: UserDep, db: SessionDep) -> UnreadCount:
         or 0
     )
     return UnreadCount(count=count)
+
+
+@router.delete("", status_code=204, summary="Delete the user's alerts by id (bulk).")
+def delete_alerts(body: AlertIdsBody, user: UserDep, db: SessionDep) -> None:
+    # Scoped to the caller's own rows (DB-R1); ids they don't own are simply not matched.
+    db.execute(sa_delete(AlertLog).where(AlertLog.user_id == user.sub, AlertLog.id.in_(body.ids)))
+    db.commit()
 
 
 @router.get("/{alert_id}", response_model=AlertDetail, summary="One notification in full.")

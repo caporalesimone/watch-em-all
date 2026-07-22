@@ -599,6 +599,17 @@ export async function markAlertRead(id: number): Promise<void> {
 	await asEmpty(await apiFetch(`/api/alerts/${id}/read`, { method: 'POST' }));
 }
 
+// Bulk-delete the user's own alerts (6.F3). Ids not owned by the caller are ignored.
+export async function deleteAlerts(ids: number[]): Promise<void> {
+	await asEmpty(
+		await apiFetch('/api/alerts', {
+			method: 'DELETE',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ ids })
+		})
+	);
+}
+
 export function getUnreadCount(): Promise<number> {
 	return apiFetch('/api/alerts/unread-count')
 		.then(asJson<{ count: number }>)

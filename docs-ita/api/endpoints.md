@@ -44,6 +44,7 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 | GET | `/api/alerts/{id}` | 👤 | — | payload completo + delivery per canale |
 | POST | `/api/alerts/{id}/read` | 👤 | — | marca letto |
 | GET | `/api/alerts/unread-count` | 👤 | — | per il badge in dashboard |
+| DELETE | `/api/alerts` | 👤 | `{ids: [...]}` | elimina in blocco i propri alert (selezione multipla); id non propri ignorati |
 
 ## Notifier (utente) — [profile-and-notifiers](../3-features/user/profile-and-notifiers.md)
 

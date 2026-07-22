@@ -235,6 +235,11 @@ class UnreadCount(BaseModel):
     count: int
 
 
+class AlertIdsBody(BaseModel):
+    # Bulk delete of the user's own alerts (6.F3). Ids not owned by the caller are ignored.
+    ids: list[int] = Field(min_length=1)
+
+
 class CartAlertTypesBody(BaseModel):
     # The full desired set of enabled alert types for a cart (6.B1). Full-set semantics:
     # the endpoint stores exactly this set (presence = enabled). Values are validated

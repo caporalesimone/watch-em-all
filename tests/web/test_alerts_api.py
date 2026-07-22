@@ -124,3 +124,29 @@ def test_alerts_are_per_user(client: TestClient) -> None:
     assert client.get("/api/alerts", headers=_bearer(token_b)).json()["total"] == 0
     assert client.get(f"/api/alerts/{alert_id}", headers=_bearer(token_b)).status_code == 404
     assert client.post(f"/api/alerts/{alert_id}/read", headers=_bearer(token_b)).status_code == 404
+
+
+def test_bulk_delete(client: TestClient) -> None:
+    token = _make_user(client, _admin_token(client), "alice")
+    uid = _uid(client, token)
+    a1, a2, a3 = _seed_alert(uid), _seed_alert(uid), _seed_alert(uid)
+
+    resp = client.request("DELETE", "/api/alerts", json={"ids": [a1, a3]}, headers=_bearer(token))
+    assert resp.status_code == 204
+    listed = client.get("/api/alerts", headers=_bearer(token)).json()
+    assert listed["total"] == 1
+    assert listed["items"][0]["id"] == a2
+
+
+def test_delete_is_per_user(client: TestClient) -> None:
+    admin = _admin_token(client)
+    token_a = _make_user(client, admin, "alice")
+    token_b = _make_user(client, admin, "bob")
+    alert_id = _seed_alert(_uid(client, token_a))
+
+    # Bob can't delete Alice's alert — the id simply isn't matched (idempotent 204).
+    resp = client.request(
+        "DELETE", "/api/alerts", json={"ids": [alert_id]}, headers=_bearer(token_b)
+    )
+    assert resp.status_code == 204
+    assert client.get("/api/alerts", headers=_bearer(token_a)).json()["total"] == 1
