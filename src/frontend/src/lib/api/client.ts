@@ -604,7 +604,9 @@ export interface AlertDetail {
 	deliveries: Record<string, unknown>[];
 }
 
-export function listAlerts(params: { page?: number; page_size?: number; kind?: string } = {}): Promise<AlertPage> {
+export function listAlerts(
+	params: { page?: number; page_size?: number; kind?: string } = {}
+): Promise<AlertPage> {
 	const q = new URLSearchParams();
 	if (params.page) q.set('page', String(params.page));
 	if (params.page_size) q.set('page_size', String(params.page_size));

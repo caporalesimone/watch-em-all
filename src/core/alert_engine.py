@@ -13,7 +13,7 @@ Delivery to external channels is phase 7; here the digest only lands in the hist
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Container
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -80,7 +80,7 @@ class ProductDiff:
 
 
 def diff_products(
-    products: list[CatalogProduct], snapshot: dict[str, Any], enabled: set[str]
+    products: list[CatalogProduct], snapshot: dict[str, Any], enabled: Container[str]
 ) -> list[ProductDiff]:
     """Diff each current member against the baseline and return the products that earned
     at least one **enabled** tag (alert-engine.md). Rules (ALERT-R9/R11/R12):
@@ -125,7 +125,7 @@ def diff_products(
 
 
 def diff_cart_events(
-    state: CartState, snapshot: dict[str, Any], enabled: set[str]
+    state: CartState, snapshot: dict[str, Any], enabled: Container[str]
 ) -> list[AlertType]:
     """Diff the cart-level events against the baseline (alert-engine.md, ALERT-R10):
 
