@@ -2,7 +2,7 @@
 
 > **Implemented plugin — Dragon Store (scraper)** · Audience: developer.
 >
-> English translation of the Italian reference [`docs-ita/implemented-plugins/dragon-store/features.md`](../../../docs-ita/implemented-plugins/dragon-store/features.md), limited to what is implemented (DOC-12). It describes the plugin's behaviour: the phase-3 single-product flow (input, dry-run preview, watch list), with the category/dented/adjustment requirements kept as forward-notes. Generic contract: [scraper-plugin](../../3-features/plugins/scraper-plugin.md).
+> Limited to what is implemented (DOC-12). It describes the plugin's behaviour: the phase-3 single-product flow (input, dry-run preview, watch list), with the category/dented/adjustment requirements kept as forward-notes. Generic contract: [scraper-plugin](../../3-features/plugins/scraper-plugin.md).
 
 ## Plugin-specific requirements
 
@@ -12,7 +12,7 @@
 - **DRG-R4** — **"Dented"** products: every observed **category** has an **"include dented" selector**, **off** by default (dented items are excluded and counted in `products_excluded`). The user who wants them can enable it **category by category**. Out-of-stock items are always included with `is_available=false`. *Category-side filtering arrives in phase 9; the out-of-stock contract behaviour applies today.*
 - **DRG-R7** — A dented product added as a **single product** is **always included**: having added it explicitly is a deliberate choice. The UI flags it with a **small red notice** ("Product in DENTED state") in the dry-run preview and in the input list. *Arrives with the dented handling in phase 9.*
 - **DRG-R8** — In case of overlap between sources with different choices (e.g. a dented item excluded from category A but included from category B or added as a single product), **inclusion wins**: the product is delivered. *Arrives in phase 9.*
-- **DRG-R5** — Adjustments: applies to the cart total the **highest discount threshold reached** among those configured (a positive entry); any shipping costs as a negative entry — *if applicable: to be defined, see capabilities*. *Arrives in a later phase.*
+- **DRG-R5** — Adjustments (5.B5): on the cart's **discounted total** it applies **one** discount band (the **highest reached, non-cumulative**) — phase-5 defaults: `≥100 €→5%`, `≥200 €→10%`, `≥300 €→15%` (a positive entry) — plus **shipping**: `+5.00 €` (a negative entry), **free** when the total ≥ 100 €. The values live in the plugin (`adjustments.py`); they will become admin-editable via ConfigFields (phase 7+/9). Each entry carries an i18n key (`dragon_store.adjustments.*`) the frontend localizes.
 - **DRG-R6** — The notion of category stays internal: the core and the Product Picker never see it. *Relevant once categories arrive in phase 9.*
 
 ## User UI (plugin page)
@@ -45,13 +45,12 @@ The admin page arrives with the admin-config work in a later phase. When it land
 
 ## Adjustments example
 
-*Adjustments arrive in a later phase; the example illustrates the intended behaviour.*
+Scraper-specific cart with a discounted total of **250 €** (band `≥200 → 10%`):
 
-Scraper-specific cart of 120 € (discounted total), configured thresholds `{50 → 10%, 100 → 15%}`:
+| Entry | i18n key | Amount |
+|---|---|---|
+| Threshold discount 10% | `dragon_store.adjustments.threshold_discount` | **+25.00** (saving) |
+| Free shipping | `dragon_store.adjustments.free_shipping` | **0.00** |
+| **Final estimate** | | 250 − 25 = **225.00** |
 
-| Entry | Amount |
-|---|---|
-| Threshold discount 100 € (15%) | **+18.00** (saving) |
-| Final estimate | 120 − 18 = **102.00** |
-
-The user's cart threshold is compared against the final estimate (CART-R11): it is the price they would actually pay at the Dragon Store checkout.
+Below 100 € there is no discount and shipping is **−5.00 €** (a negative entry). The discount is **not cumulative**: only the highest band reached applies. The user's cart threshold is compared against the final estimate (CART-R11): it is the price they would actually pay at the Dragon Store checkout.
