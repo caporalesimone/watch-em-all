@@ -541,3 +541,88 @@ export async function setAlertSchedule(payload: {
 	});
 	return asJson<AlertSchedule>(res);
 }
+
+// Alert history (6.B8). Money is Decimal-as-string; dates are ISO-8601.
+export interface AlertDigestProduct {
+	product_id: number;
+	name: string;
+	url: string;
+	plugin_id: string;
+	tags: string[];
+	price_previous: string | null;
+	price_current: string;
+	discount_pct: string;
+	currency: string;
+}
+
+export interface AlertDigestThreshold {
+	target: string;
+	current: string;
+	reached: boolean;
+	partial: boolean;
+	excluded: string[];
+}
+
+export interface AlertDigestCart {
+	cart_id: number;
+	cart_name: string;
+	mode: string;
+	cart_events: string[];
+	products: AlertDigestProduct[];
+	totals: { full: string; discounted: string; final: string };
+	threshold: AlertDigestThreshold | null;
+}
+
+export interface AlertDigestPayload {
+	kind: string;
+	user_id: number;
+	generated_at: string;
+	cart_alerts: AlertDigestCart[];
+}
+
+export interface AlertListItem {
+	id: number;
+	kind: string;
+	created_at: string;
+	read: boolean;
+	cart_count: number;
+}
+
+export interface AlertPage {
+	items: AlertListItem[];
+	total: number;
+	page: number;
+	page_size: number;
+}
+
+export interface AlertDetail {
+	id: number;
+	kind: string;
+	created_at: string;
+	read: boolean;
+	payload: AlertDigestPayload;
+	deliveries: Record<string, unknown>[];
+}
+
+export function listAlerts(params: { page?: number; page_size?: number; kind?: string } = {}): Promise<AlertPage> {
+	const q = new URLSearchParams();
+	if (params.page) q.set('page', String(params.page));
+	if (params.page_size) q.set('page_size', String(params.page_size));
+	if (params.kind) q.set('kind', params.kind);
+	const qs = q.toString();
+	return apiFetch(`/api/alerts${qs ? `?${qs}` : ''}`).then(asJson<AlertPage>);
+}
+
+export function getAlert(id: number): Promise<AlertDetail> {
+	return apiFetch(`/api/alerts/${id}`).then(asJson<AlertDetail>);
+}
+
+export async function markAlertRead(id: number): Promise<void> {
+	await asEmpty(await apiFetch(`/api/alerts/${id}/read`, { method: 'POST' }));
+}
+
+export function getUnreadCount(): Promise<number> {
+	return apiFetch('/api/alerts/unread-count')
+		.then(asJson<{ count: number }>)
+		.then((r) => r.count);
+}

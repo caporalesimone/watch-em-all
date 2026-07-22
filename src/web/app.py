@@ -30,6 +30,7 @@ from src.web.routers import (
     admin_scrapers,
     admin_system,
     admin_users,
+    alerts,
     auth,
     carts,
     catalog,
@@ -141,6 +142,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_scrapers.router, prefix="/api")
     app.include_router(catalog.router, prefix="/api")
     app.include_router(carts.router, prefix="/api")
+    app.include_router(alerts.router, prefix="/api")
     app.include_router(plugins.router, prefix="/api")
     # The SPA catch-all is mounted in the lifespan, after the plugins (see above).
 

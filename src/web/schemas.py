@@ -203,6 +203,38 @@ class CartItemsBody(BaseModel):
     product_ids: list[int] = Field(min_length=1)
 
 
+class AlertListItem(BaseModel):
+    # A row of the alert history list (6.B8). `read` = read_at is set; `cart_count` is the
+    # number of carts in a digest (0 for non-digest kinds) — a light preview for the list.
+    id: int
+    kind: str
+    created_at: datetime
+    read: bool
+    cart_count: int
+
+
+class AlertPage(BaseModel):
+    items: list[AlertListItem]
+    total: int
+    page: int
+    page_size: int
+
+
+class AlertDetail(BaseModel):
+    # One notification in full (6.B8): the self-sufficient digest payload plus its read
+    # state. `deliveries` (per-channel outcomes) stays empty until phase 7 adds channels.
+    id: int
+    kind: str
+    created_at: datetime
+    read: bool
+    payload: dict[str, Any]
+    deliveries: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class UnreadCount(BaseModel):
+    count: int
+
+
 class AlertScheduleOut(BaseModel):
     # A user's alert cadence (6.B7). weekdays: 0=Monday … 6=Sunday; [] = off.
     # baseline_effect is set only on a PUT that changed the on/off state (ALERT-R3 UI
