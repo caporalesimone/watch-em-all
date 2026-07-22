@@ -1,6 +1,6 @@
 # Notifiche admin agli utenti
 
-> **Layer 3 — Feature admin** · Audience: architetti, developer · Testo + Mermaid, niente codice. Architettura: [notification-architecture](../../2-architecture/notification-architecture.md) · Capability: [alert-event](../../4-capabilities/contracts/alert-event.md), [database](../../4-capabilities/database/schema.md). Feature correlate: [alerts-and-notifications](../user/alerts-and-notifications.md), [plugin-configuration](plugin-configuration.md).
+> **Layer 3 — Feature admin** · Audience: architetti, developer · Testo + Mermaid, niente codice. Architettura: [notification-architecture](../../2-architecture/notification-architecture.md) · Capability: [alert-event](../../4-capabilities/contracts/alert-event.md), [database](../../4-capabilities/database/schema.md). Feature correlate: [alerts-and-notifications](../user/alerts-and-notifications.md), [plugin-configuration](../../../docs/3-features/admin/plugin-configuration.md).
 
 ## Scopo
 
@@ -42,7 +42,7 @@ La garanzia chiave è ereditata dal design esistente (ALERT-R13: storico scritto
 - **ADMSG-R3** — Nello storico dell'utente la notifica admin è **visivamente distinta** (icona e colore dedicati alla categoria) e lo storico è filtrabile per categoria.
 - **ADMSG-R4** — Le categorie sono due: **sistema** (`alert_digest`, `summary`, `system_message`) e **admin** (`admin_message`). Il `kind` determina la categoria; i messaggi testuali hanno payload piatto (titolo + body Markdown, niente struttura a carrelli) e ogni canale li rende con gli helper del core (NOT-R8: degradazione, mai fallimento).
 - **ADMSG-R5** — L'admin vede l'elenco dei messaggi **che ha inviato** con gli **esiti di consegna** per destinatario e canale (consegnata / fallita / solo in-app). Non vede lo stato letto/non letto degli utenti né il resto del loro storico.
-- **ADMSG-R6** — Il messaggio inviato è **immutabile** (niente modifica o richiamo); un errore si corregge inviando un nuovo messaggio. La purge globale per data ([manutenzione](system-logs-and-maintenance.md)) si applica anche alle notifiche admin.
+- **ADMSG-R6** — Il messaggio inviato è **immutabile** (niente modifica o richiamo); un errore si corregge inviando un nuovo messaggio. La purge globale per data ([manutenzione](../../../docs/3-features/admin/system-logs-and-maintenance.md)) si applica anche alle notifiche admin.
 
 ## Messaggi di sistema personalizzabili
 
@@ -65,4 +65,4 @@ La risoluzione di un messaggio testuale segue sempre lo stesso ordine: **templat
 
 ## Interazione con i poteri di governo dei canali
 
-L'admin **abilita o disabilita ogni notifier per tutti gli utenti** a runtime ([plugin-configuration](plugin-configuration.md), PCFG-R8) — speculare alla sospensione globale di uno scraper (SCHED-R2). Un canale disabilitato globalmente non consegna nulla, nemmeno i messaggi admin: in quel caso vale la garanzia dello storico in-app.
+L'admin **abilita o disabilita ogni notifier per tutti gli utenti** a runtime ([plugin-configuration](../../../docs/3-features/admin/plugin-configuration.md), PCFG-R8) — speculare alla sospensione globale di uno scraper (SCHED-R2). Un canale disabilitato globalmente non consegna nulla, nemmeno i messaggi admin: in quel caso vale la garanzia dello storico in-app.

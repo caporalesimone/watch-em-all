@@ -2,7 +2,7 @@
 
 > **Layer 3 — User feature** · Audience: architects, developers.
 >
-> English translation of the Italian reference [`docs-ita/3-features/user/catalog-and-product-picker.md`](../../../docs-ita/3-features/user/catalog-and-product-picker.md), limited to what is implemented (DOC-12). Phase 3 ships the read-only catalog view (the per-user, searchable, sortable, paginated table); phase 5 adds the selection role — picking rows and **adding them to an existing cart** (5.F4). The cleanup/mutation actions (remove delisted, selective removal, empty) still arrive in a later phase.
+> Limited to what is implemented (DOC-12). Phase 3 ships the read-only catalog view (the per-user, searchable, sortable, paginated table); phase 5 adds the selection role — picking rows and **adding them to an existing cart** (5.F4). The cleanup/mutation actions (remove delisted, selective removal, empty) still arrive in a later phase.
 
 ## Purpose
 

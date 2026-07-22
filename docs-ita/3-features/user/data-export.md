@@ -26,6 +26,6 @@ flowchart LR
 
 ## Confini dichiarati
 
-- L'export non è un backup del sistema (quello è il dump del DB, responsabilità dell'host — [deployment](../../infrastructure/deployment.md)): è la vista *di un utente* sui *propri* dati.
+- L'export non è un backup del sistema (quello è il dump del DB, responsabilità dell'host — [deployment](../../../docs/infrastructure/deployment.md)): è la vista *di un utente* sui *propri* dati.
 - I segreti (es. password SMTP non c'è a livello utente, ma eventuali campi secret dei canali) non compaiono mai, nemmeno mascherati.
 - L'admin non ha un export dei dati degli utenti (coerente con il principio che non li legge).
