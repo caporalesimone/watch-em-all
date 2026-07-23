@@ -84,9 +84,7 @@ class CartSeriesPoint:
     total: Decimal
 
 
-def cart_series(
-    session: Session, member_ids: list[int], range_: Range
-) -> list[CartSeriesPoint]:
+def cart_series(session: Session, member_ids: list[int], range_: Range) -> list[CartSeriesPoint]:
     """The stepped total series for a cart over ``range_`` (HIST-R4).
 
     Projects the cart's CURRENT composition onto the past (no membership history): each member's
