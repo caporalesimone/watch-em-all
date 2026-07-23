@@ -16,7 +16,6 @@ import os
 import smtplib
 import ssl
 import time
-from datetime import UTC, datetime
 from decimal import Decimal
 from email.message import EmailMessage
 from functools import lru_cache
@@ -24,14 +23,8 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-from src.core.alert_engine import (
-    AlertEvent,
-    CartAlertPayload,
-    CartTotals,
-    ProductAlertPayload,
-    ThresholdInfo,
-)
-from src.core.contracts import AlertType, ConfigField
+from src.core.alert_engine import AlertEvent, CartAlertPayload
+from src.core.contracts import ConfigField
 from src.core.plugins.base import NotifierDeliveryError, NotifierPlugin
 
 _I18N_DIR = Path(__file__).resolve().parent / "i18n"
@@ -123,29 +116,28 @@ class EmailNotifierPlugin(NotifierPlugin):
         subject, html, text = self._format(notification, _strings(locale))
         self._deliver(config, subject, html, text)
 
-    def send_test(self, config: dict[str, Any], locale: str) -> None:
-        strings = _strings(locale)
-        subject, html, text = self._format(self._sample_event(), strings, test=True)
+    def send_test(self, config: dict[str, Any], locale: str, username: str = "") -> None:
+        subject, html, text = self._format_test(username, _strings(locale))
         self._deliver(config, subject, html, text)
+
+    def _format_test(self, username: str, s: dict[str, str]) -> tuple[str, str, str]:
+        """A dedicated, simple test email (not a fake digest): the eyes, the title, and a one-line
+        message naming the account the test was run for."""
+        body = s["test.body"].format(username=username or "—")
+        html = _TEST_SHELL.format(
+            title=escape(s["test.title"]), body=escape(body), note=escape(s["test.note"])
+        )
+        text = f"👀 {s['test.title']}\n\n{body}\n"
+        return s["subject.test"], html, text
 
     # -------------------------------------------------------------- formatting
 
-    def _format(
-        self, event: AlertEvent, s: dict[str, str], *, test: bool = False
-    ) -> tuple[str, str, str]:
+    def _format(self, event: AlertEvent, s: dict[str, str]) -> tuple[str, str, str]:
         n = len(event.cart_alerts)
-        if test:
-            subject = s["subject.test"]
-        elif n == 1:
-            subject = s["subject.digest.one"]
-        else:
-            subject = s["subject.digest.many"].format(count=n)
+        subject = s["subject.digest.one"] if n == 1 else s["subject.digest.many"].format(count=n)
 
         html_parts: list[str] = []
         text_parts: list[str] = []
-        if test:
-            html_parts.append(f'<p style="color:#b45309">{escape(s["test_notice"])}</p>')
-            text_parts.append(s["test_notice"])
         for cart in event.cart_alerts:
             html_parts.append(self._cart_html(cart, s))
             text_parts.append(self._cart_text(cart, s))
@@ -219,34 +211,6 @@ class EmailNotifierPlugin(NotifierPlugin):
         lines.append(f"  {s['total']}: {_money(cart.totals.final, cur)}")
         return "\n".join(lines)
 
-    def _sample_event(self) -> AlertEvent:
-        """A fake one-cart digest for the test email (marked as such by the caller)."""
-        product = ProductAlertPayload(
-            product_id=0,
-            name="Sample product",
-            url="https://example.com/sample",
-            plugin_id="sample_store",
-            tags=[AlertType.PRODUCT_ON_SALE],
-            price_previous=Decimal("49.90"),
-            price_current=Decimal("39.90"),
-            discount_pct=Decimal("20"),
-            currency="EUR",
-        )
-        cart = CartAlertPayload(
-            cart_id=0,
-            cart_name="Sample cart",
-            mode="cross",
-            cart_events=[AlertType.CART_THRESHOLD_REACHED],
-            products=[product],
-            totals=CartTotals(
-                full=Decimal("49.90"), discounted=Decimal("39.90"), final=Decimal("39.90")
-            ),
-            threshold=ThresholdInfo(
-                target=Decimal("40.00"), current=Decimal("39.90"), reached=True, partial=False
-            ),
-        )
-        return AlertEvent(user_id=0, generated_at=datetime.now(UTC), cart_alerts=[cart])
-
     # -------------------------------------------------------------- delivery
 
     def _deliver(self, config: dict[str, Any], subject: str, html: str, text: str) -> None:
@@ -305,6 +269,20 @@ _HTML_SHELL = (
     '<h1 style="font-size:20px">{heading}</h1>{body}'
     '<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">'
     '<p style="color:#6b7280;font-size:12px">{footer}</p></div>'
+)
+
+# The test email: a small centred card with the eyes, the title and a one-line message.
+_TEST_CARD = (
+    "font-family:Arial,Helvetica,sans-serif;color:#111827;max-width:480px;margin:0 auto;"
+    "text-align:center;padding:32px 24px;border:1px solid #e5e7eb;border-radius:14px"
+)
+_TEST_SHELL = (
+    f'<div style="{_TEST_CARD}">'
+    '<div style="font-size:56px;line-height:1">👀</div>'
+    '<h1 style="font-size:24px;margin:12px 0 6px">{title}</h1>'
+    '<p style="font-size:15px;color:#374151;margin:0">{body}</p>'
+    '<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">'
+    '<p style="color:#9ca3af;font-size:12px;margin:0">{note}</p></div>'
 )
 
 plugin = EmailNotifierPlugin()

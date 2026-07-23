@@ -103,7 +103,8 @@ def send_test(db: Session, plugin: NotifierPlugin, user_id: int) -> None:
     Propagates the plugin's error (the caller turns it into a readable API error)."""
     user = db.get(User, user_id)
     locale = user.locale if user is not None else "en"
-    plugin.send_test(merged_config(db, plugin, user_id), locale)
+    username = user.username if user is not None else ""
+    plugin.send_test(merged_config(db, plugin, user_id), locale, username)
 
 
 def send_test_with_config(
@@ -114,8 +115,9 @@ def send_test_with_config(
     on the user schema by the caller."""
     user = db.get(User, user_id)
     locale = user.locale if user is not None else "en"
+    username = user.username if user is not None else ""
     cfg = {**merged_config(db, plugin, user_id), **extra_user_config}
-    plugin.send_test(cfg, locale)
+    plugin.send_test(cfg, locale, username)
 
 
 def in_app_visible(db: Session) -> bool:

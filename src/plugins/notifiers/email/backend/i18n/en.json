@@ -1,9 +1,11 @@
 {
   "subject.digest.one": "Watch 'Em All — 1 cart with news",
   "subject.digest.many": "Watch 'Em All — {count} carts with news",
-  "subject.test": "Watch 'Em All — test email",
+  "subject.test": "👀 Watch 'Em All — test email",
   "heading": "Price watch update",
-  "test_notice": "This is a test email. The data below is fake.",
+  "test.title": "Watch 'Em All",
+  "test.body": "Test mail from Watch-Em-All for user {username}",
+  "test.note": "Automated test message — no action needed.",
   "cart": "Cart",
   "product": "Product",
   "source": "Source",

@@ -225,8 +225,9 @@ class NotifierPlugin(BasePlugin):
         so a notifier that forgets to implement it fails loudly."""
         raise NotImplementedError(f"{self.plugin_id}: send not implemented")
 
-    def send_test(self, config: dict[str, Any], locale: str) -> None:
+    def send_test(self, config: dict[str, Any], locale: str, username: str = "") -> None:
         """Send a **test** notification with the current merged config (NOT-R6), invoked by the
-        user (own target) and the admin (channel check). No persistence. Same error contract as
+        user (own target) and the admin (channel check). ``username`` is the account the test is
+        run for (used to personalise the test message). No persistence. Same error contract as
         :meth:`send`. Default raises; a real notifier overrides it."""
         raise NotImplementedError(f"{self.plugin_id}: send_test not implemented")

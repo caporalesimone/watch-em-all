@@ -86,12 +86,14 @@ def test_send_test_builds_html_and_text(
 ) -> None:
     _FakeSMTP.sent = []
     monkeypatch.setattr(smtplib, "SMTP", _FakeSMTP)
-    _email(client).send_test(_CONFIG, "en")
+    _email(client).send_test(_CONFIG, "en", "alice")
     assert len(_FakeSMTP.sent) == 1
     msg = _FakeSMTP.sent[0]
     assert "test email" in msg["Subject"]
     body = msg.as_string()
     assert "text/html" in body and "text/plain" in body  # HTML + text fallback
+    assert "alice" in body  # dedicated test message names the user
+    assert "Sample cart" not in body  # not the fake digest anymore
 
 
 def test_send_digest_keeps_provenance_and_prices(

@@ -25,7 +25,7 @@ class InAppNotifierPlugin(NotifierPlugin):
     def send(self, notification: AlertEvent, config: dict[str, Any], locale: str) -> None:
         return  # no-op: the alert_log row IS the in-app delivery (marked inline by the core)
 
-    def send_test(self, config: dict[str, Any], locale: str) -> None:
+    def send_test(self, config: dict[str, Any], locale: str, username: str = "") -> None:
         return  # nothing to test: the in-app channel is always available to the user
 
 
