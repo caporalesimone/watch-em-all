@@ -109,8 +109,13 @@
 			</details>
 		{/if}
 	</nav>
+	<!-- Debug: dev tooling links (Mailpit, Swagger, DB browser…), for user and admin alike.
+	     Temporary — to be hidden/removed before v1. -->
+	<a href="/debug" class="{itemClass('/debug')} text-slate-500 dark:text-slate-400"
+		>🛠 {$_('nav.debug')}</a
+	>
 	<button
-		class="mt-4 rounded px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800"
+		class="mt-2 rounded px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800"
 		onclick={() => signOut()}
 	>
 		{$_('nav.logout')}

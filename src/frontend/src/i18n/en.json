@@ -20,7 +20,8 @@
 		"featureFlags": "Feature flags",
 		"systemLogs": "System logs",
 		"settings": "Settings",
-		"alerts": "Alerts"
+		"alerts": "Alerts",
+		"debug": "Debug"
 	},
 	"catalog": {
 		"title": "Catalog",
@@ -127,7 +128,35 @@
 		"thresholdCurrent": "current",
 		"thresholdReached": "Reached",
 		"thresholdPartial": "Partially reached",
-		"excluded": "Excluded: {names}"
+		"excluded": "Excluded: {names}",
+		"deliveriesTitle": "Delivery",
+		"deliveryDelivered": "Delivered",
+		"deliveryPending": "Pending",
+		"deliveryFailed": "Failed",
+		"deliverySkipped": "Skipped",
+		"deliveryNone": "No active channel — this notification lives only in your history.",
+		"channelInApp": "In-app",
+		"channelEmail": "Email"
+	},
+	"notifiers": {
+		"title": "Notification channels",
+		"subtitle": "Choose where your alert digests are delivered. Your full history is always in the app.",
+		"secretSet": "•••••• (saved)",
+		"statusActive": "Active",
+		"statusOff": "Off",
+		"statusNeedsSetup": "Needs your details",
+		"statusUnavailable": "Not available",
+		"statusAlwaysOn": "Always on",
+		"inAppNote": "In-app notifications are always on — your alert history lives here.",
+		"unavailableNote": "This channel hasn't been configured by your administrator yet.",
+		"activate": "Activate",
+		"deactivate": "Deactivate",
+		"test": "Send test",
+		"testOk": "Test sent — check your inbox.",
+		"testFail": "Test failed: {error}",
+		"saved": "Channel settings saved.",
+		"saveError": "Could not save the channel settings.",
+		"loadError": "Could not load your channels."
 	},
 	"admin": {
 		"users": {
@@ -155,10 +184,22 @@
 		},
 		"notifiers": {
 			"title": "Notifiers",
-			"colName": "Notifier",
-			"colVersion": "Version",
+			"subtitle": "Configure the shared delivery channels and toggle their availability for everyone.",
 			"empty": "No notifiers are loaded.",
-			"loadError": "Could not load the notifiers."
+			"loadError": "Could not load the notifiers.",
+			"available": "Available",
+			"notConfigured": "Not configured",
+			"enable": "Enable",
+			"disable": "Disable",
+			"configTitle": "System configuration",
+			"testTitle": "Test this channel",
+			"testHint": "Send a test with the current system config to a target you choose (not saved).",
+			"test": "Send test",
+			"testOk": "Test sent.",
+			"testFail": "Test failed: {error}",
+			"saved": "System configuration saved.",
+			"saveError": "Could not save the configuration.",
+			"inAppNote": "The in-app channel needs no system configuration. It is always available to users unless you disable it here."
 		},
 		"logs": {
 			"title": "System logs",
@@ -297,7 +338,22 @@
 	"dashboard": {
 		"title": "Dashboard",
 		"welcome": "Welcome, {name}.",
-		"empty": "Your watch-em-all is up and running. Catalog and carts arrive in the next phases."
+		"empty": "Your watch-em-all is up and running. Catalog and carts arrive in the next phases.",
+		"noChannelTitle": "Alerts are in-app only",
+		"noChannelBody": "You'll always see your alerts here in the app. To also receive them by email, set up a channel in your",
+		"noChannelLink": "Profile."
+	},
+	"debug": {
+		"title": "Debug",
+		"subtitle": "Quick links to the development tooling. This page is dev-only and will be removed before v1.",
+		"swagger": "API docs (Swagger)",
+		"swaggerDesc": "Interactive API explorer for the backend.",
+		"mailpit": "Mailpit",
+		"mailpitDesc": "Dev mail catcher — the inbox that receives test and digest emails.",
+		"pgweb": "Database browser (pgweb)",
+		"pgwebDesc": "Browse the development database.",
+		"health": "Health",
+		"healthDesc": "Backend health and version endpoint."
 	},
 	"errors": {
 		"generic": "Something went wrong. Please try again.",

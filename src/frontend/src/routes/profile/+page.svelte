@@ -3,6 +3,7 @@
 	import { _ } from 'svelte-i18n';
 
 	import * as api from '$lib/api/client';
+	import NotifierChannels from '$lib/components/NotifierChannels.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { auth, forceAnon } from '$lib/stores/auth';
 	import { theme } from '$lib/stores/theme';
@@ -79,6 +80,8 @@
 			</button>
 		</div>
 	</section>
+
+	<NotifierChannels />
 
 	<form onsubmit={submit} class="space-y-4">
 		<h2 class="font-medium">{$_('profile.changePassword')}</h2>
