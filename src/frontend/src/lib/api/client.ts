@@ -332,6 +332,41 @@ export function listCatalog(query: CatalogQuery = {}): Promise<CatalogPage> {
 	return apiFetch(`/api/catalog${qs ? `?${qs}` : ''}`).then(asJson<CatalogPage>);
 }
 
+// Price history (HIST-*). Series are served ready for the chart (the SPA does not
+// aggregate). Money is Decimal serialised as a string; parse only for plotting.
+export type HistoryRange = 'week' | 'month' | 'all';
+
+export interface PricePoint {
+	t: string;
+	price: string;
+	available: boolean;
+}
+
+export interface ProductHistory {
+	product_id: number;
+	range: HistoryRange;
+	points: PricePoint[];
+}
+
+export function getProductHistory(productId: number, range: HistoryRange): Promise<ProductHistory> {
+	return apiFetch(`/api/products/${productId}/history?range=${range}`).then(asJson<ProductHistory>);
+}
+
+export interface CartPricePoint {
+	t: string;
+	total: string;
+}
+
+export interface CartHistory {
+	cart_id: number;
+	range: HistoryRange;
+	points: CartPricePoint[];
+}
+
+export function getCartHistory(cartId: number, range: HistoryRange): Promise<CartHistory> {
+	return apiFetch(`/api/carts/${cartId}/history?range=${range}`).then(asJson<CartHistory>);
+}
+
 // Admin user management (USR-*): create + list. Admin-only on the backend.
 export interface AdminUser {
 	id: number;

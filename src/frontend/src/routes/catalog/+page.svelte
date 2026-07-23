@@ -258,6 +258,7 @@
 					<th class="{th} {sortable}" onclick={() => sortBy('is_available')}
 						>{$_('catalog.colAvailability')}{arrow('is_available')}</th
 					>
+					<th class={th}></th>
 				</tr>
 			</thead>
 			<tbody>
@@ -294,6 +295,27 @@
 							<DiscountBadge discountPct={item.discount_pct} />
 						</td>
 						<td class="py-2 pr-4 text-slate-500">{availability(item)}</td>
+						<td class="py-2 pr-2 text-right">
+							<a
+								href={`/price-history?product=${item.id}`}
+								title={$_('priceHistory.viewChart')}
+								aria-label={$_('priceHistory.viewChart')}
+								class="inline-block text-slate-400 hover:text-indigo-500"
+							>
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									class="h-4 w-4"
+									aria-hidden="true"
+								>
+									<path d="M3 3v18h18" />
+									<path d="m7 14 3-4 4 3 5-6" />
+								</svg>
+							</a>
+						</td>
 					</tr>
 				{/each}
 			</tbody>

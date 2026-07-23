@@ -10,7 +10,9 @@ never imports the web.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from typing import Annotated
+
+from fastapi import APIRouter, Query, Request
 from sqlalchemy import select
 
 from src.core.alert_engine import delete_snapshot, snapshot_payload, upsert_snapshot
@@ -18,6 +20,7 @@ from src.core.cart_engine import CartState, evaluate_cart
 from src.core.contracts import Adjustment, AlertType, BrandRef, CategoryRef
 from src.core.errors import APIError
 from src.core.models import Cart, CartAlertType, CartMember, CatalogProduct
+from src.core.price_history import Range, cart_series
 from src.web.adjust import adjuster_for, loaded_scrapers
 from src.web.deps import SessionDep, UserDep
 from src.web.schemas import (
@@ -26,9 +29,11 @@ from src.web.schemas import (
     CartCard,
     CartCreate,
     CartDetail,
+    CartHistory,
     CartItemsBody,
     CartMemberOut,
     CartPatch,
+    CartPricePoint,
     CartThreshold,
 )
 
@@ -175,6 +180,27 @@ def create_cart(body: CartCreate, user: UserDep, db: SessionDep, request: Reques
 @router.get("/{cart_id}", response_model=CartDetail, summary="Get one cart with its members.")
 def get_cart(cart_id: int, user: UserDep, db: SessionDep, request: Request) -> CartDetail:
     return _detail(db, request, _get_owned(db, user, cart_id))
+
+
+@router.get(
+    "/{cart_id}/history",
+    response_model=CartHistory,
+    summary="Stepped total series for the cart's current composition (HIST-R4).",
+)
+def cart_history(
+    cart_id: int,
+    user: UserDep,
+    db: SessionDep,
+    range: Annotated[Range, Query(description="time window: week=7d, month=30d, all")] = "month",
+) -> CartHistory:
+    cart = _get_owned(db, user, cart_id)  # 404 if not the user's cart (DB-R1)
+    member_ids = [p.id for p in _cart_products(db, cart.id)]
+    series = cart_series(db, member_ids, range)
+    return CartHistory(
+        cart_id=cart.id,
+        range=range,
+        points=[CartPricePoint(t=p.t, total=p.total) for p in series],
+    )
 
 
 @router.patch("/{cart_id}", response_model=CartDetail, summary="Rename a cart (mode immutable).")

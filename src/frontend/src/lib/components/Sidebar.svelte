@@ -45,6 +45,7 @@
 					{ href: '/', key: 'nav.dashboard' },
 					{ href: '/catalog', key: 'nav.catalog' },
 					{ href: '/carts', key: 'nav.carts' },
+					{ href: '/price-history', key: 'nav.priceHistory' },
 					{ href: '/alerts', key: 'nav.alerts' }
 				]
 	);

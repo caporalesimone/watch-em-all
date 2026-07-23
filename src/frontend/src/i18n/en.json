@@ -21,7 +21,8 @@
 		"systemLogs": "System logs",
 		"settings": "Settings",
 		"alerts": "Alerts",
-		"debug": "Debug"
+		"debug": "Debug",
+		"priceHistory": "Price history"
 	},
 	"catalog": {
 		"title": "Catalog",
@@ -363,5 +364,21 @@
 		"invalid_old_password": "The current password is not correct.",
 		"password_unchanged": "The new password must differ from the old one.",
 		"must_change_password": "You must change your password first."
+	},
+	"priceHistory": {
+		"title": "Price history",
+		"product": "Product",
+		"cart": "Cart",
+		"noProducts": "No products yet",
+		"noCarts": "No carts yet",
+		"empty": "Not enough history yet",
+		"error": "Could not load the price history.",
+		"outOfStock": "Out of stock",
+		"viewChart": "View price chart",
+		"range": {
+			"week": "Week",
+			"month": "Month",
+			"all": "All"
+		}
 	}
 }

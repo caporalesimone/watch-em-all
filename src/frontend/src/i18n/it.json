@@ -19,7 +19,8 @@
 		"notifiers": "Notifier",
 		"featureFlags": "Feature flag",
 		"systemLogs": "Log di sistema",
-		"settings": "Impostazioni"
+		"settings": "Impostazioni",
+		"priceHistory": "Storico prezzi"
 	},
 	"catalog": {
 		"title": "Catalogo",
@@ -264,5 +265,21 @@
 		"invalid_old_password": "La password attuale non è corretta.",
 		"password_unchanged": "La nuova password deve essere diversa dalla precedente.",
 		"must_change_password": "Devi prima cambiare la password."
+	},
+	"priceHistory": {
+		"title": "Storico prezzi",
+		"product": "Prodotto",
+		"cart": "Carrello",
+		"noProducts": "Nessun prodotto",
+		"noCarts": "Nessun carrello",
+		"empty": "Storico non ancora sufficiente",
+		"error": "Impossibile caricare lo storico prezzi.",
+		"outOfStock": "Non disponibile",
+		"viewChart": "Vedi grafico prezzi",
+		"range": {
+			"week": "Settimana",
+			"month": "Mese",
+			"all": "Tutto"
+		}
 	}
 }

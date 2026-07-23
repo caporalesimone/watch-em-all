@@ -70,6 +70,15 @@ Plugin-specific routes are registered by each plugin under `/api{route_base}` (e
 
 The catalog is **read-only** here: it is written only through the Catalog Update Service (a scrape). The cleanup/mutation endpoints (remove delisted, selective/empty) arrive in a later phase, with the cart/Product Picker selection role.
 
+## Price history — [price-history](../4-capabilities/core/price-history.md)
+
+| Method | Path | Role | Query | Notes |
+|---|---|---|---|---|
+| GET | `/api/products/{id}/history` | 👤 | `?range=week\|month\|all` | the product's stepped price/availability series, ready for the chart: `{product_id, range, points}`, `points: [{t, price, available}]` ordered oldest→newest (`price` an exact decimal string). `available=false` marks where the line must **break** (no interpolation, HIST-R2). For `week`/`month` the value in effect at the window start is included, **clamped** to it, so the line starts at the right price. Another user's product → **404** `product_not_found` |
+| GET | `/api/carts/{id}/history` | 👤 | `?range=week\|month\|all` | the cart's stepped **total** series: `{cart_id, range, points}`, `points: [{t, total}]`. The sum of the cart's **current** members, each contributing its price only while it was **available** (unavailable stretches excluded); the current composition is projected onto the past — no membership history (HIST-R4). Another user's cart → **404** |
+
+`range` defaults to `month`. Series are served ready to plot — the SPA does not aggregate (HISTC-R4).
+
 ## Carts — [cart-engine](../4-capabilities/core/cart-engine.md)
 
 | Method | Path | Role | Body | Notes |
@@ -83,7 +92,7 @@ The catalog is **read-only** here: it is written only through the Catalog Update
 | DELETE | `/api/carts/{id}/items` | 👤 | `{product_ids}` | remove members; absent ids are a no-op. Returns the updated detail |
 | PUT | `/api/carts/{id}/alert-types` | 👤 | `{alert_types: [...]}` | set the **full** set of enabled alert types on the cart (presence = enabled; 6.B1). Values validated against the `AlertType` enum (**422** `unknown_alert_type`). Enabling the first type **seeds the baseline**; an empty list **deletes** it. Returns the updated detail (whose `alert_types` reflects the set) |
 
-The cart state (totals over the **active** members, adjustments for scraper-specific carts, the final estimate, the threshold state and the `has_delisted` health flag) is computed on demand by the [Cart Engine](../4-capabilities/core/cart-engine.md) — nothing is persisted beyond the cart definition and its members. The cart **price history** arrives in a later phase.
+The cart state (totals over the **active** members, adjustments for scraper-specific carts, the final estimate, the threshold state and the `has_delisted` health flag) is computed on demand by the [Cart Engine](../4-capabilities/core/cart-engine.md) — nothing is persisted beyond the cart definition and its members. The cart **price history** (stepped total over time) is served by `GET /api/carts/{id}/history` — see [Price history](#price-history--price-history) above.
 
 ## Alerts — [alert-engine](../4-capabilities/core/alert-engine.md)
 

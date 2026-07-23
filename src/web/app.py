@@ -40,6 +40,7 @@ from src.web.routers import (
     me,
     notifiers,
     plugins,
+    products,
 )
 from src.web.routers.scrape import make_scrape_now_router
 from src.web.spa import SpaStaticFiles
@@ -151,6 +152,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_scrapers.router, prefix="/api")
     app.include_router(admin_notifiers.router, prefix="/api")
     app.include_router(catalog.router, prefix="/api")
+    app.include_router(products.router, prefix="/api")
     app.include_router(carts.router, prefix="/api")
     app.include_router(alerts.router, prefix="/api")
     app.include_router(notifiers.router, prefix="/api")
