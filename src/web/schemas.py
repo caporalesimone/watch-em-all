@@ -12,7 +12,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from src.core.contracts import BrandRef, CategoryRef
+from src.core.contracts import BrandRef, CategoryRef, ConfigField
 
 
 class LoginRequest(BaseModel):
@@ -220,15 +220,78 @@ class AlertPage(BaseModel):
     page_size: int
 
 
+class AlertDeliveryOut(BaseModel):
+    # One per-channel delivery outcome of a notification (7.F5). `plugin_id` is empty for the
+    # `skipped_no_notifier` marker. `error` carries the readable failure reason on `failed`.
+    plugin_id: str
+    status: str  # pending | delivered | failed | skipped | skipped_no_notifier
+    error: str | None = None
+    updated_at: datetime
+
+
 class AlertDetail(BaseModel):
-    # One notification in full (6.B8): the self-sufficient digest payload plus its read
-    # state. `deliveries` (per-channel outcomes) stays empty until phase 7 adds channels.
+    # One notification in full (6.B8): the self-sufficient digest payload plus its read state
+    # and the per-channel delivery outcomes (7.F5).
     id: int
     kind: str
     created_at: datetime
     read: bool
     payload: dict[str, Any]
-    deliveries: list[dict[str, Any]] = Field(default_factory=list)
+    deliveries: list[AlertDeliveryOut] = Field(default_factory=list)
+
+
+# --------------------------------------------------------------------------- notifiers (phase 7)
+
+
+class NotifierChannelOut(BaseModel):
+    # A notifier channel as the user's Profile sees it (GET /api/notifiers, PROF-R6/R7).
+    # `config` holds only the non-secret stored values; `is_set` flags whether each secret has
+    # a stored value (CFG-R3, never the value). In-app: no user schema, always active.
+    plugin_id: str
+    display_name: str
+    is_in_app: bool
+    user_schema: list[ConfigField] = Field(default_factory=list)
+    config: dict[str, Any] = Field(default_factory=dict)
+    is_set: dict[str, bool] = Field(default_factory=dict)
+    available: bool  # admin config complete (channel usable)
+    user_config_complete: bool
+    enabled: bool  # the user's own on/off (always True for in-app)
+    active: bool  # delivers to this user
+
+
+class AdminNotifierOut(BaseModel):
+    # A notifier channel as the admin's page sees it (GET /api/admin/notifiers). `user_schema`
+    # is included so the admin can supply a minimal target for the channel test (POST .../test).
+    plugin_id: str
+    display_name: str
+    is_in_app: bool
+    admin_schema: list[ConfigField] = Field(default_factory=list)
+    user_schema: list[ConfigField] = Field(default_factory=list)
+    config: dict[str, Any] = Field(default_factory=dict)
+    is_set: dict[str, bool] = Field(default_factory=dict)
+    enabled: bool  # the admin kill-switch (PCFG-R8)
+    admin_config_complete: bool
+
+
+class NotifierConfigBody(BaseModel):
+    # Save a channel's config (user or admin). Keys are filtered on the relevant schema; an
+    # omitted secret key keeps the stored value (CFG-R3/R5).
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
+class NotifierEnabledBody(BaseModel):
+    enabled: bool
+
+
+class NotifierTestBody(BaseModel):
+    # Ad-hoc user fields for a test send (e.g. a target address). Empty for a user's own test
+    # (their stored config is used); the admin supplies the minimal user fields to probe a channel.
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
+class NotifierTestResult(BaseModel):
+    ok: bool
+    error: str | None = None
 
 
 class UnreadCount(BaseModel):

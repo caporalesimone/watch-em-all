@@ -1,0 +1,11 @@
+{
+  "name": "in_app",
+  "display_name": "In-app",
+  "type": "notifier",
+  "version": "1.0.0",
+  "api_version": 1,
+  "enabled": true,
+  "backend": {
+    "entry": "backend/__init__.py"
+  }
+}

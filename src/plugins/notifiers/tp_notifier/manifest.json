@@ -1,9 +1,0 @@
-{
-	"name": "tp_notifier",
-	"display_name": "TP Notifier",
-	"type": "notifier",
-	"version": "0.1.0",
-	"api_version": 1,
-	"enabled": true,
-	"backend": { "entry": "backend/__init__.py" }
-}

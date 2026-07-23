@@ -26,6 +26,10 @@ def _source_for(logger_name: str) -> str | None:
         return "worker"
     if logger_name.startswith("wea.plugin."):
         return "scraper"
+    if logger_name == "wea.notifier" or logger_name.startswith("wea.notifier."):
+        return "notifier"  # channel delivery (phase 7)
+    if logger_name == "wea.alert" or logger_name.startswith("wea.alert."):
+        return "alert"  # alert engine / dispatch (phase 7)
     return None
 
 

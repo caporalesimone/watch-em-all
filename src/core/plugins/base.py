@@ -29,7 +29,8 @@ if TYPE_CHECKING:
 
     from sqlalchemy import MetaData
 
-    from src.core.contracts import Adjustment, DeltaCounters, Product
+    from src.core.alert_engine import AlertEvent
+    from src.core.contracts import Adjustment, ConfigField, DeltaCounters, Product
     from src.core.models import CatalogProduct
     from src.core.plugins.context import PluginContext
 
@@ -184,5 +185,48 @@ class ScraperPlugin(BasePlugin, ABC):
         return []
 
 
+class NotifierDeliveryError(RuntimeError):
+    """A notifier failed to deliver after its own retries (NOT-R5). The message is
+    user-readable ("channel unreachable", "authentication failed", …): the core records it
+    verbatim as the failure reason on the ``alert_delivery`` row and logs a warning. A
+    notifier must raise this (never swallow the error, never retry forever)."""
+
+
 class NotifierPlugin(BasePlugin):
-    """Notifier family. Phase 2: marker base; send/config contracts land later."""
+    """Notifier family (notifier-plugin.md). Phase 7 gives the marker base its real contract.
+
+    A notifier is the translator between the notification content (the core decides *when*
+    and *what*) and a delivery channel (it decides *how to format* and *where to send*). The
+    core writes the in-app history, iterates the user's active channels, merges the admin+user
+    config (user keys filtered on the user schema), passes the user's locale and records the
+    per-channel outcome; the plugin declares its config schema, formats the payload and sends.
+
+    Config is two-level (NOT-R2): ``get_admin_config_schema`` (channel infrastructure, e.g. an
+    SMTP server) and ``get_user_config_schema`` (personal delivery target). Both default to
+    empty — a channel entirely personal declares no admin fields; a channel with no per-user
+    field declares no user fields. ``display_name`` is a human label for the channel."""
+
+    display_name: str = ""
+
+    def get_admin_config_schema(self) -> list[ConfigField]:
+        """System-level config fields (channel infrastructure). Default: none (CFG-R1)."""
+        return []
+
+    def get_user_config_schema(self) -> list[ConfigField]:
+        """Per-user config fields (personal delivery target). Default: none (CFG-R1)."""
+        return []
+
+    def send(self, notification: AlertEvent, config: dict[str, Any], locale: str) -> None:
+        """Format ``notification`` for the channel (in ``locale``, with the plugin's own
+        backend translations) and deliver it. ``config`` is the admin+user merge already done
+        and filtered by the core. On a transient error retry a few times with backoff, then
+        raise :class:`NotifierDeliveryError` with a readable reason (NOT-R5). Phase 7 delivers
+        only the ``alert_digest`` payload; summary/text messages arrive later. The base raises
+        so a notifier that forgets to implement it fails loudly."""
+        raise NotImplementedError(f"{self.plugin_id}: send not implemented")
+
+    def send_test(self, config: dict[str, Any], locale: str) -> None:
+        """Send a **test** notification with the current merged config (NOT-R6), invoked by the
+        user (own target) and the admin (channel check). No persistence. Same error contract as
+        :meth:`send`. Default raises; a real notifier overrides it."""
+        raise NotImplementedError(f"{self.plugin_id}: send_test not implemented")

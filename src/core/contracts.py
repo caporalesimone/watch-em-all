@@ -15,9 +15,9 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class AlertType(StrEnum):
@@ -48,6 +48,33 @@ class NotificationKind(StrEnum):
     SUMMARY = "summary"  # periodic snapshot (category: system)
     SYSTEM_MESSAGE = "system_message"  # core-generated text message (category: system)
     ADMIN_MESSAGE = "admin_message"  # admin-written text message (category: admin)
+
+
+class ConfigField(BaseModel):
+    """One declarative configuration field (config-field.md, CFG-R1..R6). Phase 7.
+
+    A plugin describes its admin and user config as ``list[ConfigField]``; the core renders
+    ONE dynamic form from the schema alone, without knowing the field names. ``label_key`` /
+    ``help_key`` are **i18n keys** resolved in the plugin's frontend namespace (CFG-R2), never
+    fixed text. Secret fields are masked and write-only (CFG-R3): the server never sends the
+    value back, only an ``is_set`` flag. ``default`` must be typed coherently with ``type``
+    (CFG-R6, e.g. ``587`` / ``True``, not strings). A ``password`` is always ``secret``."""
+
+    key: str  # the key in the persisted config
+    label_key: str  # translation KEY (plugin namespace), not fixed text
+    type: Literal["text", "email", "password", "url", "number", "bool", "select"]
+    required: bool = False
+    secret: bool = False  # masked in the UI, write-only
+    placeholder: str | None = None
+    help_key: str | None = None  # translation key for the help text
+    options: list[str] | None = None  # only for select
+    default: str | int | bool | None = None  # coherent with type
+
+    @model_validator(mode="after")
+    def _password_is_secret(self) -> ConfigField:
+        if self.type == "password":
+            self.secret = True  # a password is always secret
+        return self
 
 
 class BrandRef(BaseModel):

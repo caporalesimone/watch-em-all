@@ -28,7 +28,8 @@ from src.core.feature_flags import effective_flags, worker_tick_seconds
 from src.core.locks import scraper_lock
 from src.core.maintenance import purge_expired
 from src.core.models import Cart, ScraperSchedule, ScrapeRun, ScrapeUserLog
-from src.core.plugins.base import ScraperPlugin
+from src.core.notify import drain_deliveries, enqueue_deliveries
+from src.core.plugins.base import NotifierPlugin, ScraperPlugin
 from src.core.plugins.context import PluginContext, build_context
 from src.core.plugins.registry import LoadedPlugin, load_plugins
 from src.core.schedule import due_slot, install_tz, set_last_slot
@@ -49,6 +50,10 @@ _loaded: dict[str, LoadedPlugin] = {}
 # All loaded scraper plugins (scraper_id -> ScraperPlugin), for binding get_adjustments
 # during alert runs — a scraper_specific cart's scraper may not be schedulable.
 _scrapers: dict[str, ScraperPlugin] = {}
+
+# All loaded notifier plugins, for enqueuing per-channel deliveries after a digest and draining
+# the pending ones each tick (phase 7).
+_notifiers: list[NotifierPlugin] = []
 
 # Submit a scraper run to the runner: (scraper_id, slot, trigger) -> enqueued?
 Submit = Callable[[str, datetime, str], bool]
@@ -74,11 +79,14 @@ def _boot() -> None:
     loaded = load_plugins(None)  # initialize plugins; the worker serves no HTTP
     _loaded.clear()
     _scrapers.clear()
+    _notifiers.clear()
     for lp in loaded:
         if isinstance(lp.plugin, ScraperPlugin):
             _scrapers[lp.plugin.plugin_id] = lp.plugin
             if implements_scraping(lp.plugin):
                 _loaded[lp.plugin.plugin_id] = lp
+        elif isinstance(lp.plugin, NotifierPlugin):
+            _notifiers.append(lp.plugin)
     metadatas = [Base.metadata] + [
         lp.plugin.table_metadata for lp in loaded if lp.plugin.table_metadata is not None
     ]
@@ -264,10 +272,26 @@ def _run_alerts_for_users(session: Session, user_ids: set[int]) -> None:
         try:
             result = run_for_user(session, user_id, _alert_adjuster)
             if result is not None:
+                enqueue_deliveries(session, result, _notifiers)  # per-channel rows; in-app inline
                 log.info("alert digest written for user %s (alert_log %s)", user_id, result.id)
         except Exception:
             session.rollback()
             log.exception("alert run failed for user %s", user_id)
+
+
+def _drain_deliveries_step() -> None:
+    """Periodic worker step (phase 7): send the pending network deliveries and record outcomes.
+    Decoupled from the scrape so a slow/failing channel never blocks a run. Never raises."""
+    session = new_session()
+    try:
+        n = drain_deliveries(session, _notifiers)
+        if n:
+            log.info("delivery drain: processed %d pending delivery(ies)", n)
+    except Exception:
+        session.rollback()
+        log.exception("delivery drain failed")
+    finally:
+        session.close()
 
 
 def _current_tick_seconds() -> int:
@@ -295,6 +319,7 @@ def _loop(submit: Submit, max_ticks: int | None = None) -> None:
             dispatch_due(session, now, tz, submit)
         finally:
             session.close()
+        _drain_deliveries_step()  # phase 7: drain pending channel deliveries, decoupled from scrape
         ticks += 1
         if max_ticks is not None and ticks >= max_ticks:
             break
