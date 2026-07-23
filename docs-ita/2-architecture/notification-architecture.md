@@ -4,6 +4,8 @@
 >
 > La parte **implementata** (cosa notificare = diff su baseline, quando = event-driven a fine scrape, un solo digest aggregato scritto sempre nello storico interno) è ora nel mirror inglese canonico [`docs/2-architecture/notification-architecture.md`](../../docs/2-architecture/notification-architecture.md) (DOC-12). Questo file conserva solo ciò che **non è ancora costruito**: la **consegna sui canali esterni** (notifier, esito per canale, retry — fase 7), il **report periodico** (fase 11) e le **notifiche admin / categorie** (fase 10).
 
+> **Aggiornamento fase 7 (2026-07-23).** La **consegna sui canali** descritta qui è ora **implementata** (mirror EN: [`docs/2-architecture/notification-architecture.md`](../../docs/2-architecture/notification-architecture.md)). Novità rispetto a questa spec: l'**in-app è un canale notifier** (`in_app`) — non disattivabile dall'utente, consegna inline (non drenata), spegnibile solo dall'admin — e l'**interruttore admin per-notifier** (PCFG-R8) è in fase 7. Restano spec-ahead: summary (fase 11) e messaggi/categorie admin (fase 10).
+
 Il digest aggregato è già prodotto a ogni run e scritto **sempre** nello storico interno (la fonte primaria). Le sezioni seguenti descrivono i livelli *aggiuntivi* che vi si innestano sopra e che nessuna funzionalità già esistente richiede.
 
 ## Consegna: un solo digest, più canali

@@ -101,5 +101,18 @@ services:
     restart: unless-stopped
     logging: *logging
 
+  mailpit:
+    image: axllent/mailpit:v1.20           # pinned (INF-1); dev-only mail catcher
+    # Test the email notifier without a real mailbox: it accepts SMTP on 1025 (plain, no
+    # TLS/auth) and shows the captured messages at http://localhost:8025. Configure the
+    # Email notifier in dev with smtp_host=mailpit, smtp_port=1025, use_tls=off. Like pgweb,
+    # it has NO profile (always up with a plain `up`) and is ABSENT from compose.yml
+    # (release): production uses a real SMTP server, never this.
+    ports:
+      - "8025:8025"                        # web UI (the inbox)
+      - "1025:1025"                        # SMTP endpoint
+    restart: unless-stopped
+    logging: *logging
+
 volumes:
   pgdata:

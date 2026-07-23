@@ -12,19 +12,49 @@
 
 ## What's implemented (0.7.0)
 
-_Nothing merged yet — entries land here as each MVP ships._
-
-<!--
-As MVPs land, document them here in the same user-facing voice as the earlier phases, e.g.:
-
 ### 1) The notifier contract + channel dispatch
-### 2) Two-level configuration (admin system config + per-user config)
-### 3) Email channel — SMTP send, HTML digest + text fallback, retries
-### 4) The Profile channels UI + the admin notifier page
-### 5) Delivery outcomes visible in the alert history
 
-_Under the hood:_ …
--->
+A notifier is now a real plugin family: it declares its config (a list of `ConfigField`) and implements
+`send` / `send_test`. When the alert engine writes a digest, the core records **one delivery per active
+channel** and hands the payload to each notifier — the core decides *what* and *when*, the plugin decides
+*how to format* and *where to send*. When a user has no active channel, the notification is still recorded
+in the Alert History (it's the source of truth) and marked `skipped_no_notifier`.
+
+### 2) The in-app channel is now one of the channels
+
+The in-app history you've had since phase 6 is now modelled as a first-class channel (`in_app`), shown in
+the Profile channel list alongside email. It is **always on for the user** (you can't switch it off) and
+its "delivery" is local — the record itself — so it's marked delivered instantly, never queued. Only an
+**admin** can switch it off globally (for a particular need); while off, the inbox is hidden for everyone.
+
+### 3) Two-level configuration with dynamic forms
+
+Every channel has an **admin** config (shared infrastructure — for email: SMTP host, port, credentials,
+sender) and a **user** config (personal target — the address). The core renders one dynamic form from the
+declared schema for both. Saved keys are filtered to the declaring side (a user can't inject an admin key);
+**secrets are write-only** — stored but never returned, only an `is_set` indicator. A channel is "available"
+to users only once the admin config is complete.
+
+### 4) Email channel — SMTP, HTML digest + text fallback, retries
+
+The Email notifier sends over SMTP with STARTTLS (standard library only). The digest renders as HTML
+(inline CSS for client compatibility) with a plain-text fallback: per-cart sections with the event badges,
+old → new price, **provenance**, links, totals and threshold. Transient errors are retried a few times with
+backoff; a permanent failure (recipient refused / auth) fails immediately with a readable reason.
+
+### 5) The Profile channels UI, the admin notifier page, and delivery outcomes
+
+The **Profile → Notification channels** section lists each channel with its composite status, the personal
+form, an on/off toggle and a **Test** button (outcomes shown as a toast). The **Admin → Notifiers** page
+carries the system config form, the global **kill-switch** and a channel test. Opening a notification shows
+its **per-channel delivery outcomes** (delivered / pending / failed with reason / skipped). A dashboard
+banner nudges a user with no external channel active to set one up — never alarming, since in-app is always on.
+
+_Under the hood:_ delivery is decoupled from the scrape (see the design note below). New tables:
+`alert_delivery`, `notifier_admin_config`, `notifier_user_config`. The `NotifierPlugin` contract, the
+`ConfigField` model, the dynamic form, and a single top-center toast portal are the shared pieces the next
+notifiers (Discord, Teams, …) will reuse. A **Debug** sidebar entry (dev-only, to be removed before v1)
+links to Mailpit, Swagger and the DB browser.
 
 ## Design note — delivery is **asynchronous**
 

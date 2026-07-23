@@ -4,6 +4,8 @@
 >
 > **Spec-ahead (fasi 6/7/11).** La parte **account** della pagina Profilo (identità in sola lettura, lingua dell'interfaccia, tema, cambio password) è già implementata in fase 1 ed è documentata in inglese: [`docs/3-features/user/profile-and-notifiers.md`](../../../docs/3-features/user/profile-and-notifiers.md). Questo file conserva solo la parte **non ancora implementata**: la **consegna delle notifiche** — report periodico, esportazione dati, e i **canali notifier** personali. (Gli alert sono **event-driven**: non c'è una cadenza da configurare nel Profilo.)
 
+> **Aggiornamento fase 7 (2026-07-23) — l'in-app è un canale.** L'`in-app` è ora un **canale notifier a pieno titolo** mostrato nell'elenco canali del Profilo, con una regola speciale: **l'utente NON può disattivarlo** (sempre attivo per lui) e non ha config personale; **solo l'admin** può disabilitarlo globalmente (kill-switch). Inoltre l'**interruttore admin per-notifier** (PCFG-R8) è stato implementato in fase 7 (non fase 10): un canale disabilitato dall'admin non è visibile all'utente. Il banner di dashboard è rivisto di conseguenza (l'utente ha sempre l'in-app, salvo kill-switch): segnala l'assenza di **canali esterni** attivi. Vedi il mirror inglese implementato in [`docs/3-features/user/profile-and-notifiers.md`](../../../docs/3-features/user/profile-and-notifiers.md).
+
 ## Scopo
 
 La pagina Profilo concentra anche tutto ciò che riguarda la consegna delle notifiche: report periodico, esportazione dei propri dati e canali di notifica personali. I notifier stanno qui (non nella barra di navigazione) per alleggerire la nav.

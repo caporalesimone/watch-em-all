@@ -87,15 +87,35 @@ The cart state (totals over the **active** members, adjustments for scraper-spec
 
 ## Alerts — [alert-engine](../4-capabilities/core/alert-engine.md)
 
-The in-app alert history (phase 6). Alerts are **event-driven**: the engine runs after each scrape that changed the user's catalog and writes at most one aggregated digest per user (no cadence). Per-channel **delivery** and its outcomes arrive in phase 7.
+The in-app alert history (phase 6). Alerts are **event-driven**: the engine runs after each scrape that changed the user's catalog and writes at most one aggregated digest per user (no cadence). Per-channel **delivery** and its outcomes are phase 7 (see Notifiers below). The **in-app** channel is itself a notifier (`in_app`): the list/badge/detail below are hidden when an admin has globally disabled it.
 
 | Method | Path | Role | Body / Query | Notes |
 |---|---|---|---|---|
-| GET | `/api/alerts` | 👤 | `?page=&page_size=&kind=` | the user's notifications, newest first, paginated → `{items, total, page, page_size}`. Each item: `{id, kind, created_at, read, cart_count}`. Optional `kind` filter |
-| GET | `/api/alerts/unread-count` | 👤 | — | `{count}` — the unread count for the sidebar badge |
-| GET | `/api/alerts/{id}` | 👤 | — | one notification in full: `{id, kind, created_at, read, payload, deliveries}` — `payload` is the self-sufficient digest; `deliveries` is empty until phase 7. Another user's alert → **404** |
+| GET | `/api/alerts` | 👤 | `?page=&page_size=&kind=` | the user's notifications, newest first, paginated → `{items, total, page, page_size}`. Each item: `{id, kind, created_at, read, cart_count}`. Optional `kind` filter. **Empty when the admin has disabled the in-app channel** |
+| GET | `/api/alerts/unread-count` | 👤 | — | `{count}` — the unread count for the sidebar badge (**0** when the in-app channel is admin-disabled) |
+| GET | `/api/alerts/{id}` | 👤 | — | one notification in full: `{id, kind, created_at, read, payload, deliveries}` — `payload` is the self-sufficient digest; `deliveries` is the per-channel outcomes `[{plugin_id, status, error, updated_at}]` (7.F5), `status` ∈ `pending`\|`delivered`\|`failed`\|`skipped`\|`skipped_no_notifier`. Another user's alert → **404** |
 | POST | `/api/alerts/{id}/read` | 👤 | — | **204**; mark read (idempotent — keeps the first read timestamp). Another user's alert → **404** |
 | DELETE | `/api/alerts` | 👤 | `{ids: [...]}` | **204**; bulk-delete the user's own alerts (multi-select). Ids the caller doesn't own are simply not matched |
+
+## Notifiers (user) — [profile-and-notifiers](../3-features/user/profile-and-notifiers.md)
+
+The user's notification channels (phase 7). A channel the admin has globally disabled is **not listed**. The **in-app** channel appears but has no user config and cannot be disabled by the user (always active). Secrets are write-only: never returned, only an `is_set` flag.
+
+| Method | Path | Role | Body | Notes |
+|---|---|---|---|---|
+| GET | `/api/notifiers` | 👤 | — | per channel: `{plugin_id, display_name, is_in_app, user_schema, config, is_set, available, user_config_complete, enabled, active}`. `config` holds only non-secret stored values |
+| PUT | `/api/notifiers/{plugin_id}/config` | 👤 | `{config}` | save the personal config; keys filtered on the user schema (CFG-R5), an omitted secret keeps the stored value (CFG-R3). In-app → **422** `in_app_no_config`. Unknown → **404** |
+| PATCH | `/api/notifiers/{plugin_id}` | 👤 | `{enabled}` | activate/deactivate for the user (config preserved). In-app → **422** `in_app_always_active` |
+| POST | `/api/notifiers/{plugin_id}/test` | 👤 | — | send a test to the user's own target (synchronous, no persistence) → `{ok, error}` |
+
+## Admin — notifiers (system config) — [notifier-plugin](../3-features/plugins/notifier-plugin.md)
+
+| Method | Path | Role | Body | Notes |
+|---|---|---|---|---|
+| GET | `/api/admin/notifiers` | 🛡 | — | per channel: `{plugin_id, display_name, is_in_app, admin_schema, user_schema, config, is_set, enabled, admin_config_complete}` (`user_schema` feeds the channel-test target) |
+| PUT | `/api/admin/notifiers/{plugin_id}/config` | 🛡 | `{config}` | set the system config; keys filtered on the admin schema, secrets write-only. In-app → **422** `in_app_no_config` |
+| PATCH | `/api/admin/notifiers/{plugin_id}` | 🛡 | `{enabled}` | global **kill-switch** (PCFG-R8): off = unavailable to everyone, personal configs preserved. Applies to in-app too |
+| POST | `/api/admin/notifiers/{plugin_id}/test` | 🛡 | `{config}` | probe the channel with the system config + an admin-supplied target (filtered on the user schema; not persisted) → `{ok, error}` |
 
 ## Scraper plugin routes — Dragon Store (implemented)
 
