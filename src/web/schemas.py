@@ -13,6 +13,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from src.core.contracts import BrandRef, CategoryRef, ConfigField
+from src.core.price_history import Range
 
 
 class LoginRequest(BaseModel):
@@ -111,6 +112,22 @@ class CatalogPage(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class PricePoint(BaseModel):
+    # One point of a price series (phase 8): discounted price + availability at a timestamp.
+    # Money is Decimal (serialised as a JSON string — exact). A step line is drawn client-side;
+    # `available=false` marks where the line must break (no interpolation, HIST-R2).
+    t: datetime
+    price: Decimal
+    available: bool
+
+
+class ProductHistory(BaseModel):
+    # The stepped price series for one product over the requested range (phase 8, 8.B1).
+    product_id: int
+    range: Range
+    points: list[PricePoint] = Field(default_factory=list)
 
 
 class CartCreate(BaseModel):
