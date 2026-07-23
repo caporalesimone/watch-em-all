@@ -39,6 +39,9 @@ services:
     image: watch-em-all:dev
     command: ["web"]
     env_file: [.env]            # config from .env (config.yaml interpolation, 1.B1)
+    environment:
+      # Dev-only: pre-fill the Email notifier config form with Mailpit defaults (never in prod).
+      WEA_DEV_MAILPIT_DEFAULTS: "1"
     ports: ["8080:8080"]
     depends_on:
       db: { condition: service_healthy }
@@ -58,6 +61,8 @@ services:
     image: watch-em-all:dev          # the second build is a cache hit. Both build so a
     command: ["worker"]              # plain `up --build` never tries to pull this tag.
     env_file: [.env]                 # same env as web (config.yaml interpolation; stub today)
+    environment:
+      WEA_DEV_MAILPIT_DEFAULTS: "1"  # dev-only: Mailpit pre-fill for the Email notifier form
     tmpfs:
       - /tmp                          # heartbeat is ephemeral runtime state: keep it in
                                       # RAM so the per-tick write never hits the disk

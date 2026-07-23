@@ -12,6 +12,7 @@ permanently refused recipient / auth failure fails immediately (no retry).
 from __future__ import annotations
 
 import json
+import os
 import smtplib
 import ssl
 import time
@@ -36,6 +37,16 @@ from src.core.plugins.base import NotifierDeliveryError, NotifierPlugin
 _I18N_DIR = Path(__file__).resolve().parent / "i18n"
 
 _CURRENCY_SYMBOL = {"EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF "}
+
+# Dev-only convenience (set ONLY in compose-dev.yml, never in production): pre-fill the config
+# form with Mailpit-friendly defaults so a developer can configure the channel in one click. The
+# channel still shows as "not configured" until the admin saves — defaults are form hints, not
+# stored values. In production the flag is unset and the schema keeps sensible SMTP defaults.
+_DEV_MAILPIT = os.environ.get("WEA_DEV_MAILPIT_DEFAULTS", "").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 
 @lru_cache(maxsize=8)
@@ -66,20 +77,44 @@ class EmailNotifierPlugin(NotifierPlugin):
     backoff_base_s = 1.0
 
     def get_admin_config_schema(self) -> list[ConfigField]:
+        # Dev pre-fill (Mailpit) vs production defaults; see _DEV_MAILPIT above.
+        host_default = "mailpit" if _DEV_MAILPIT else None
+        port_default = 1025 if _DEV_MAILPIT else 587
+        tls_default = not _DEV_MAILPIT  # Mailpit: TLS off; production: on
+        from_default = "watch@mailpit.local" if _DEV_MAILPIT else None
         return [
-            ConfigField(key="smtp_host", label_key="email.cfg.host", type="text", required=True),
-            ConfigField(key="smtp_port", label_key="email.cfg.port", type="number", default=587),
+            ConfigField(
+                key="smtp_host",
+                label_key="email.cfg.host",
+                type="text",
+                required=True,
+                default=host_default,
+            ),
+            ConfigField(
+                key="smtp_port", label_key="email.cfg.port", type="number", default=port_default
+            ),
             ConfigField(key="smtp_user", label_key="email.cfg.user", type="text"),
             ConfigField(key="smtp_password", label_key="email.cfg.pass", type="password"),
-            ConfigField(key="use_tls", label_key="email.cfg.tls", type="bool", default=True),
+            ConfigField(key="use_tls", label_key="email.cfg.tls", type="bool", default=tls_default),
             ConfigField(
-                key="from_address", label_key="email.cfg.from", type="email", required=True
+                key="from_address",
+                label_key="email.cfg.from",
+                type="email",
+                required=True,
+                default=from_default,
             ),
         ]
 
     def get_user_config_schema(self) -> list[ConfigField]:
+        to_default = "me@mailpit.local" if _DEV_MAILPIT else None
         return [
-            ConfigField(key="to_address", label_key="email.cfg.to", type="email", required=True)
+            ConfigField(
+                key="to_address",
+                label_key="email.cfg.to",
+                type="email",
+                required=True,
+                default=to_default,
+            )
         ]
 
     # -------------------------------------------------------------- send
