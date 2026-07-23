@@ -94,7 +94,7 @@
 		void loadHistory();
 	}
 
-	onMount(async () => {
+	async function init(): Promise<void> {
 		try {
 			const [cat, cs] = await Promise.all([listCatalog({ page_size: 100 }), listCarts()]);
 			products = cat.items;
@@ -119,6 +119,12 @@
 			cartId = carts[0].id;
 		}
 		await loadHistory();
+	}
+
+	// Sync onMount that kicks off the async load (the shell defers mounting until auth
+	// bootstrap finishes, so this fires after the token is available).
+	onMount(() => {
+		void init();
 	});
 
 	const seg =
