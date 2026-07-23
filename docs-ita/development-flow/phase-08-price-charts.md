@@ -21,10 +21,10 @@ Dal Product Picker apri il grafico di un prodotto: linea a gradini del prezzo, b
 
 ### Frontend
 
-- [ ] **8.F1 — Componente grafico: gradini e gap** (~1h): linea a gradini, gap di disponibilità espliciti e non interpolati — **un componente unico** del design system. **Mock**: alimentato da una serie statica finché non è collegato (8.F3). *Verifica: resa conforme a [price-history (feature)](../3-features/user/price-history.md) sulla serie di prova.*
-- [ ] **8.F2 — Componente grafico: range, tooltip, temi** (~1h): selettori Week/Month/All, tooltip (data, prezzo, disponibilità), entrambi i temi. *Verifica: interazioni fluide nei due temi.*
-- [ ] **8.F3 — Pagina Storico prezzi** (~1h): navigazione per prodotto e per carrello (stesso componente, due sorgenti dati reali). *Verifica: pagina completa da sidebar.*
-- [ ] **8.F4 — Accessi dal Picker e dalla card** (~1h): apertura del grafico dal Product Picker e dalla card del carrello. *Verifica: i punti di accesso portano al grafico giusto.*
+- [x] **8.F1 — Componente grafico: gradini e gap** (~1h): linea a gradini, gap di disponibilità espliciti e non interpolati — **un componente unico** del design system. **Mock**: alimentato da una serie statica finché non è collegato (8.F3). *Verifica: resa conforme a [price-history (feature)](../3-features/user/price-history.md) sulla serie di prova.*
+- [x] **8.F2 — Componente grafico: range, tooltip, temi** (~1h): selettori Week/Month/All, tooltip (data, prezzo, disponibilità), entrambi i temi. *Verifica: interazioni fluide nei due temi.*
+- [x] **8.F3 — Pagina Storico prezzi** (~1h): navigazione per prodotto e per carrello (stesso componente, due sorgenti dati reali). *Verifica: pagina completa da sidebar.*
+- [x] **8.F4 — Accessi dal Picker e dalla card** (~1h): apertura del grafico dal Product Picker e dalla card del carrello. *Verifica: i punti di accesso portano al grafico giusto.*
 
 ## Definition of Done
 

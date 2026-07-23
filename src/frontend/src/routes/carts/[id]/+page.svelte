@@ -254,6 +254,9 @@
 			{/if}
 			{#if !renaming}
 				<div class="flex shrink-0 gap-3 text-sm">
+					<a class="text-slate-500 hover:underline" href={`/price-history?cart=${cart.id}`}
+						>{$_('priceHistory.viewChart')}</a
+					>
 					<button
 						class="text-slate-500 hover:underline"
 						onclick={() => {
