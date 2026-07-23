@@ -1,6 +1,6 @@
 # Fase 9 — Dragon Store completo
 
-> Stato: ☐ da iniziare · Prerequisiti: Fase 4 (e Fase 7 per il valore pieno) · [Indice del flusso](README.md)
+> Stato: 🚧 in corso (avviata 2026-07-24) · Prerequisiti: Fase 4 (e Fase 7 per il valore pieno) · [Indice del flusso](README.md)
 
 > **❓ Punto da chiarire (annotato 2026-07-23).** Valutare se **l'aggiunta di un URL** nello scraper debba **triggerare immediatamente lo scrape** di quel prodotto (comportamento **già presente oggi**) e inserirlo/aggiornarlo subito nel catalogo, così l'utente vede il dato aggiornato senza attendere la run schedulata. **Vale la regola della cache** (nessun refetch entro il TTL del plugin). Da confermare come comportamento voluto e da rendere coerente col dry-run/anteprima e coi contatori del monitoring.
 
