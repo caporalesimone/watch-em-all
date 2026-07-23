@@ -6,7 +6,7 @@
 
 ## Requisiti
 
-- **USR-R3** — L'admin può **reimpostare la password** di un utente (nuova temporanea + cambio forzato): è il flusso di recupero per password dimenticata — non esiste reset self-service via email, scelta coerente con la postura hobby.
+- **USR-R3** — L'admin può **reimpostare la password** di un utente (nuova temporanea + cambio forzato al primo login): **è l'unico modo con cui l'admin cambia la password di un utente** (non esiste un "imposta password definitiva" diretto). È il flusso di recupero per password dimenticata — non esiste reset self-service via email, scelta coerente con la postura hobby.
 - **USR-R4** — L'admin può **disabilitare/riabilitare** un account. La disabilitazione invalida le sessioni (con la tolleranza dichiarata di pochi minuti dell'access token, vedi [security posture](../../../docs/2-architecture/security-posture.md)).
 
 ### Cancellazione differita
