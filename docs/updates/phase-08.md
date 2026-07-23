@@ -6,8 +6,7 @@
 > Week / Month / All range selectors; from a cart card, the trend of its total. One chart
 > component, two data sources (product and cart).
 >
-> 🚧 **In progress (0.8.x).** This page fills in as the phase's MVPs ship; the list below tracks
-> what has actually landed.
+> ✅ **Shipped in 0.8.0.** Everything below landed in this phase.
 
 ## What's implemented (0.8.0)
 

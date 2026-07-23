@@ -32,7 +32,7 @@
   *Risultato: cambio prezzo → notifica nello Storico alert appena lo scrape aggiorna i prezzi (event-driven).*
 - [x] **Fase 7 — Notifiche Email** 🎉 → [phase-07-email-notifier.md](phase-07-email-notifier.md) — rilasciata `0.7.0`
   *Risultato: **la mail col digest arriva in casella — il prodotto fa il suo mestiere (0.1)**.*
-- [ ] **Fase 8 — Grafici dello storico** → [phase-08-price-charts.md](phase-08-price-charts.md) — *in corso (`0.8.x`)*
+- [x] **Fase 8 — Grafici dello storico** 📈 → [phase-08-price-charts.md](phase-08-price-charts.md) — completata (`0.8.0`)
   *Risultato: grafici interattivi per prodotto e carrello.*
 - [ ] **Fase 9 — Dragon Store completo** → [phase-09-dragonstore-complete.md](phase-09-dragonstore-complete.md)
   *Risultato: monitoraggio per categorie, dry-run dalla UI, catalogo gestibile.*
