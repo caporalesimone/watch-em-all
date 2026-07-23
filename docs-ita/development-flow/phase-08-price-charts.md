@@ -28,10 +28,10 @@ Dal Product Picker apri il grafico di un prodotto: linea a gradini del prezzo, b
 
 ## Definition of Done
 
-- [ ] Grafici fluidi su storici reali accumulati dalle fasi precedenti.
-- [ ] Un solo componente grafico nel codice (due sorgenti dati).
-- [ ] Il gap di indisponibilità è visibile e non interpolato.
-- [ ] [docs](../../docs/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
+- [ ] Grafici fluidi su storici reali accumulati dalle fasi precedenti. *(da validare a video su dati reali)*
+- [x] Un solo componente grafico nel codice (due sorgenti dati).
+- [x] Il gap di indisponibilità è visibile e non interpolato.
+- [x] [docs](../../docs/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
 
 ## Riferimenti
 

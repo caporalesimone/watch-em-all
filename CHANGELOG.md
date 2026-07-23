@@ -8,7 +8,14 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 ## [0.8.0] - Unreleased
 
-**Phase 8 — price-history charts: the price/availability series the system has been accumulating since phase 3 become visible — per product and per cart, with availability gaps shown (not interpolated). Entries land below as they ship.**
+**Phase 8 — price-history charts: the price/availability series the system has been accumulating since phase 3 become visible — per product and per cart, with availability gaps shown (not interpolated).**
+
+### New
+
+- **Price-history charts.** The prices Watch 'Em All has been quietly recording since phase 3 are now something you can **look at**. A product's chart is a **step line** of its discounted price with an **explicit gap** over every stretch it was out of stock — the line never pretends there was a price when there wasn't. A cart's chart shows the **total over time** of its current members. Both come with **Week / Month / All** selectors and a hover tooltip (date, price, and “out of stock” on a gap), read cleanly in light and dark, and animate smoothly when you switch range.
+- **A Price history page, plus in-context shortcuts.** There's a new **Price history** entry in the sidebar (Product | Cart toggle + a picker). You can also jump straight there: a **chart icon** on each row of the Product Picker opens that product's chart, and a **View price chart** action on a cart's page opens the cart's total. The links carry the selection, so the page opens on the right series.
+
+_Under the hood:_ the read side of `price_history` is served **ready to plot** — the SPA never aggregates (HISTC-R4). A small `src/core/price_history.py` turns the append-only table into stepped series: `GET /api/products/{id}/history?range=` for a product (with the last change before the window carried in, clamped to the window start, so the line starts at the right price) and `GET /api/carts/{id}/history?range=` for a cart (the stepped sum of the current members, each counted only while available; the current composition is projected onto the past — no membership history). Both are per-user (a product/cart you don't own is a 404). The one chart component is built on **Chart.js** (canvas, explicitly registered to stay lean; animations left on for smooth transitions); the availability gap is rendered by breaking the line, never interpolating. No new data is collected and history is never pruned — this phase only reads and draws.
 
 ## [0.7.0] - 2026-07-23
 
