@@ -695,9 +695,7 @@ export async function setNotifierEnabled(id: string, enabled: boolean): Promise<
 }
 
 export function testNotifier(id: string): Promise<NotifierTestResult> {
-	return apiFetch(`/api/notifiers/${id}/test`, { method: 'POST' }).then(
-		asJson<NotifierTestResult>
-	);
+	return apiFetch(`/api/notifiers/${id}/test`, { method: 'POST' }).then(asJson<NotifierTestResult>);
 }
 
 export function listAdminNotifiers(): Promise<AdminNotifier[]> {

@@ -98,8 +98,7 @@
 	function deliveryClass(status: string): string {
 		if (status === 'delivered')
 			return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300';
-		if (status === 'failed')
-			return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
+		if (status === 'failed') return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
 		return 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400';
 	}
 </script>

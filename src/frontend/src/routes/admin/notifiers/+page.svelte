@@ -69,10 +69,7 @@
 			const res = await testAdminNotifier(id, values);
 			if (res.ok) pushToast($_('admin.notifiers.testOk'), 'success');
 			else
-				pushToast(
-					$_('admin.notifiers.testFail', { values: { error: res.error ?? '' } }),
-					'error'
-				);
+				pushToast($_('admin.notifiers.testFail', { values: { error: res.error ?? '' } }), 'error');
 		} catch (err) {
 			const msg = err instanceof ApiErr ? err.detail : '';
 			pushToast($_('admin.notifiers.testFail', { values: { error: msg } }), 'error');
