@@ -19,13 +19,18 @@ from sqlalchemy.orm import Session
 from src.core.alert_engine import AdjusterProvider, run_for_user
 from src.core.cart_engine import AdjustmentFn
 from src.core.models import Cart
-from src.core.plugins.base import ScraperPlugin
+from src.core.notify import enqueue_deliveries
+from src.core.plugins.base import NotifierPlugin, ScraperPlugin
 from src.core.plugins.registry import LoadedPlugin
 
 log = logging.getLogger(__name__)
 
 # Loaded scraper instances by plugin_id, populated once at app startup (register_scrapers).
 _registry: dict[str, ScraperPlugin] = {}
+
+# Loaded notifier instances, populated at startup — the event-driven alert run enqueues their
+# per-channel deliveries after writing a digest (the worker drains the pending ones).
+_notifiers: list[NotifierPlugin] = []
 
 
 def register_scrapers(loaded_plugins: list[LoadedPlugin]) -> None:
@@ -35,6 +40,15 @@ def register_scrapers(loaded_plugins: list[LoadedPlugin]) -> None:
     for lp in loaded_plugins:
         if isinstance(lp.plugin, ScraperPlugin):
             _registry[lp.plugin.plugin_id] = lp.plugin
+
+
+def register_notifiers(loaded_plugins: list[LoadedPlugin]) -> None:
+    """Cache the loaded notifier plugins at startup so the event-driven alert run can enqueue
+    per-channel deliveries (scrape-now / TP simulate)."""
+    _notifiers.clear()
+    for lp in loaded_plugins:
+        if isinstance(lp.plugin, NotifierPlugin):
+            _notifiers.append(lp.plugin)
 
 
 def loaded_scrapers(request: Request) -> dict[str, ScraperPlugin]:
@@ -66,7 +80,9 @@ def run_user_alerts(db: Session, user_id: int) -> None:
     are logged, never surfaced to the triggering request."""
     provider: AdjusterProvider = _registry_provider
     try:
-        run_for_user(db, user_id, provider)
+        result = run_for_user(db, user_id, provider)
+        if result is not None:
+            enqueue_deliveries(db, result, _notifiers)  # per-channel rows; in-app inline
     except Exception:
         db.rollback()
         log.exception("alert run failed for user %s", user_id)

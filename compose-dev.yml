@@ -39,6 +39,9 @@ services:
     image: watch-em-all:dev
     command: ["web"]
     env_file: [.env]            # config from .env (config.yaml interpolation, 1.B1)
+    environment:
+      # Dev-only: pre-fill the Email notifier config form with Mailpit defaults (never in prod).
+      WEA_DEV_MAILPIT_DEFAULTS: "1"
     ports: ["8080:8080"]
     depends_on:
       db: { condition: service_healthy }
@@ -58,6 +61,8 @@ services:
     image: watch-em-all:dev          # the second build is a cache hit. Both build so a
     command: ["worker"]              # plain `up --build` never tries to pull this tag.
     env_file: [.env]                 # same env as web (config.yaml interpolation; stub today)
+    environment:
+      WEA_DEV_MAILPIT_DEFAULTS: "1"  # dev-only: Mailpit pre-fill for the Email notifier form
     tmpfs:
       - /tmp                          # heartbeat is ephemeral runtime state: keep it in
                                       # RAM so the per-tick write never hits the disk
@@ -98,6 +103,19 @@ services:
     ports: ["8081:8081"]                  # pgweb listens on 8081 (the web/app uses 8080)
     depends_on:
       db: { condition: service_healthy }
+    restart: unless-stopped
+    logging: *logging
+
+  mailpit:
+    image: axllent/mailpit:v1.20           # pinned (INF-1); dev-only mail catcher
+    # Test the email notifier without a real mailbox: it accepts SMTP on 1025 (plain, no
+    # TLS/auth) and shows the captured messages at http://localhost:8025. Configure the
+    # Email notifier in dev with smtp_host=mailpit, smtp_port=1025, use_tls=off. Like pgweb,
+    # it has NO profile (always up with a plain `up`) and is ABSENT from compose.yml
+    # (release): production uses a real SMTP server, never this.
+    ports:
+      - "8025:8025"                        # web UI (the inbox)
+      - "1025:1025"                        # SMTP endpoint
     restart: unless-stopped
     logging: *logging
 

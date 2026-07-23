@@ -2,7 +2,7 @@
 
 > **Layer 2 — Architecture** · Audience: SW architects, system engineers · Text + Mermaid, no code.
 >
-> English mirror of the Italian reference [`docs-ita/2-architecture/notification-architecture.md`](../../docs-ita/2-architecture/notification-architecture.md), limited to what is implemented (DOC-12). Phase 6 ships the **what** (diff against a baseline), the **when** (event-driven, after each scrape) and the **one aggregated digest always written to the in-app history**. **Delivery to external channels** (notifiers, per-channel outcome, retry), the **periodic summary report** and the **admin notifications / categories** are spec-ahead (phases 7/10/11) and stay in the Italian reference.
+> English mirror of the Italian reference [`docs-ita/2-architecture/notification-architecture.md`](../../docs-ita/2-architecture/notification-architecture.md), limited to what is implemented (DOC-12). Phase 6 ships the **what** (diff against a baseline), the **when** (event-driven, after each scrape) and the **one aggregated digest always written to the in-app history**. Phase 7 adds **delivery to channels** (notifiers, two-level config, per-channel outcome) — including the **in-app channel** itself — documented below. The **periodic summary report** and the **admin notifications / categories** are spec-ahead (phases 10/11) and stay in the Italian reference.
 
 Notifications are the product: everything else in the system exists to reach this moment. The implemented architecture answers three questions: **what** to notify, **when**, and **what remains**.
 
@@ -45,6 +45,24 @@ Design decisions:
 1. **One message per run** (`alert_digest`), aggregating all carts with events. Never one notification per cart or per product: a user with 10 carts receives one message, not ten.
 2. **The internal history is the primary source**: every notification is recorded **always**, before anything else. No feature depends on any external channel; delivery to notifier channels is an *additional* layer added later (phase 7).
 3. **Self-sufficient content**: the digest carries everything needed to decide without opening the app — per product: the event tags, the previous and current price, the discount, the **provenance** (essential in cross carts), the product link; per cart: totals and threshold state.
+
+## Delivery to channels (phase 7)
+
+Writing the digest (cheap) is kept **separate** from delivering it to channels (slow, can fail). When the digest is written, the core records **one `alert_delivery` row per active channel**:
+
+```mermaid
+flowchart TD
+    LOG[(Digest written<br/>to alert_log)] --> DISP[Per active channel:<br/>one alert_delivery row]
+    DISP --> INAPP[in-app: local →<br/>delivered inline]
+    DISP --> NET[network channels:<br/>pending]
+    NET --> DRAIN{Worker periodic<br/>drain step}
+    DRAIN --> OUT[(delivered / failed<br/>per channel)]
+```
+
+- **The in-app history is one of the channels.** The `in_app` notifier is a first-class channel: it is **always active for the user** (they cannot switch it off) and its delivery is **local** — the `alert_log` record itself — so it is marked `delivered` inline, never queued. Only an **admin** can disable it globally (kill-switch); while off, the inbox is hidden for everyone. The digest record is still always written (it is the source of truth and what a network channel loads to send).
+- **Network channels are asynchronous.** Email and future channels start `pending`; a **separate periodic worker step drains them** — send (the plugin does its own short retry/backoff), then `delivered`/`failed`. This keeps a slow/failing SMTP from blocking the (single-threaded) worker or the scrape. Best-effort: a `failed` row is not re-drained — the next digest carries the new state. If the user has no active channel at all, a single `skipped_no_notifier` row is written.
+- **Two-level config, no routing.** Each channel has an **admin** config (shared infrastructure) and a **user** config (personal target + on/off); the digest goes to *all* active channels, with no per-event routing. A channel is unavailable until the admin config is complete; the admin kill-switch can disable a whole channel for everyone, personal settings preserved.
+- **Per-channel outcome.** Each delivery records its own result (`delivered`/`failed` with reason/`skipped`) — a broken channel never hides the others, and the outcomes are visible in the alert detail.
 
 ## What remains: the alert history
 

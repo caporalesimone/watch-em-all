@@ -571,13 +571,20 @@ export interface AlertPage {
 	page_size: number;
 }
 
+export interface AlertDelivery {
+	plugin_id: string;
+	status: string; // pending | delivered | failed | skipped | skipped_no_notifier
+	error: string | null;
+	updated_at: string;
+}
+
 export interface AlertDetail {
 	id: number;
 	kind: string;
 	created_at: string;
 	read: boolean;
 	payload: AlertDigestPayload;
-	deliveries: Record<string, unknown>[];
+	deliveries: AlertDelivery[];
 }
 
 export function listAlerts(
@@ -614,4 +621,119 @@ export function getUnreadCount(): Promise<number> {
 	return apiFetch('/api/alerts/unread-count')
 		.then(asJson<{ count: number }>)
 		.then((r) => r.count);
+}
+
+// Notifier channels (phase 7). One declarative form model drives both the user and admin forms;
+// `label_key`/`help_key` are i18n keys, resolved with a humanized fallback when undefined (V1).
+export interface ConfigField {
+	key: string;
+	label_key: string;
+	type: 'text' | 'email' | 'password' | 'url' | 'number' | 'bool' | 'select';
+	required: boolean;
+	secret: boolean;
+	placeholder: string | null;
+	help_key: string | null;
+	options: string[] | null;
+	default: string | number | boolean | null;
+}
+
+// A channel as the user's Profile sees it (composite state + personal schema; secrets write-only).
+export interface NotifierChannel {
+	plugin_id: string;
+	display_name: string;
+	is_in_app: boolean;
+	user_schema: ConfigField[];
+	config: Record<string, unknown>; // non-secret stored values only
+	is_set: Record<string, boolean>; // per secret: whether a value is stored
+	available: boolean;
+	user_config_complete: boolean;
+	enabled: boolean;
+	active: boolean;
+}
+
+// A channel as the admin's page sees it (system schema + kill-switch).
+export interface AdminNotifier {
+	plugin_id: string;
+	display_name: string;
+	is_in_app: boolean;
+	admin_schema: ConfigField[];
+	user_schema: ConfigField[]; // for the admin channel-test target
+	config: Record<string, unknown>;
+	is_set: Record<string, boolean>;
+	enabled: boolean; // the admin kill-switch (PCFG-R8)
+	admin_config_complete: boolean;
+}
+
+export interface NotifierTestResult {
+	ok: boolean;
+	error: string | null;
+}
+
+export function listNotifiers(): Promise<NotifierChannel[]> {
+	return apiFetch('/api/notifiers').then(asJson<NotifierChannel[]>);
+}
+
+export async function setNotifierConfig(
+	id: string,
+	config: Record<string, unknown>
+): Promise<NotifierChannel> {
+	const res = await apiFetch(`/api/notifiers/${id}/config`, {
+		method: 'PUT',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ config })
+	});
+	return asJson<NotifierChannel>(res);
+}
+
+export async function setNotifierEnabled(id: string, enabled: boolean): Promise<NotifierChannel> {
+	const res = await apiFetch(`/api/notifiers/${id}`, {
+		method: 'PATCH',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ enabled })
+	});
+	return asJson<NotifierChannel>(res);
+}
+
+export function testNotifier(id: string): Promise<NotifierTestResult> {
+	return apiFetch(`/api/notifiers/${id}/test`, { method: 'POST' }).then(asJson<NotifierTestResult>);
+}
+
+export function listAdminNotifiers(): Promise<AdminNotifier[]> {
+	return apiFetch('/api/admin/notifiers').then(asJson<AdminNotifier[]>);
+}
+
+export async function setAdminNotifierConfig(
+	id: string,
+	config: Record<string, unknown>
+): Promise<AdminNotifier> {
+	const res = await apiFetch(`/api/admin/notifiers/${id}/config`, {
+		method: 'PUT',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ config })
+	});
+	return asJson<AdminNotifier>(res);
+}
+
+export async function setAdminNotifierEnabled(
+	id: string,
+	enabled: boolean
+): Promise<AdminNotifier> {
+	const res = await apiFetch(`/api/admin/notifiers/${id}`, {
+		method: 'PATCH',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ enabled })
+	});
+	return asJson<AdminNotifier>(res);
+}
+
+export async function testAdminNotifier(
+	id: string,
+	config: Record<string, unknown>
+): Promise<NotifierTestResult> {
+	const res = await apiFetch(`/api/admin/notifiers/${id}/test`, {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ config })
+	});
+	return asJson<NotifierTestResult>(res);
 }

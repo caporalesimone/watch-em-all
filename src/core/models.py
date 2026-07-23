@@ -243,6 +243,80 @@ class AlertLog(Base):
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class AlertDelivery(Base):
+    """Per-channel delivery outcome for one notification (notification-architecture.md). Phase 7.
+
+    One row per (notification, channel). ``status`` starts ``pending`` for network channels
+    and is set to ``delivered`` / ``failed`` when the worker drains it (the plugin does its own
+    short retry/backoff; the drain never re-tries a ``failed`` row — best-effort). The **in-app**
+    channel is local, so its row is written already ``delivered`` (or ``skipped`` if the admin has
+    disabled it) at digest time, never drained. When the user has no active channel at all, a
+    single ``skipped_no_notifier`` row is written with an empty ``plugin_id``. ``error`` carries
+    the readable failure reason. The in-app history (``alert_log``) is the source of truth and is
+    always written regardless of delivery."""
+
+    __tablename__ = "alert_delivery"
+    __table_args__ = (
+        Index("ix_alert_delivery_log", "alert_log_id"),
+        Index("ix_alert_delivery_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    alert_log_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("alert_log.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    plugin_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    # pending | delivered | failed | skipped | skipped_no_notifier
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="pending")
+    error: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class NotifierAdminConfig(Base):
+    """Per-notifier admin config + global toggle (notifier-plugin.md NOT-R2 / PCFG-R8). Phase 7.
+
+    One row per notifier (= plugin_id). ``config_json`` holds the channel-infrastructure fields
+    the notifier declares (e.g. SMTP host / credentials, secrets included). ``enabled`` is the
+    admin **kill-switch**: ``False`` makes the channel unavailable to everyone (and invisible to
+    users), preserving personal configs. In-app has a row too — only ``enabled`` matters (it needs
+    no system config). Typed/whitelisted access lives in :mod:`src.core.notifiers`."""
+
+    __tablename__ = "notifier_admin_config"
+
+    plugin_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    config_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class NotifierUserConfig(Base):
+    """Per-user notifier config + personal activation (profile-and-notifiers.md). Phase 7.
+
+    Composite PK ``(user_id, plugin_id)``. ``config_json`` is the user's personal fields (e.g.
+    their delivery address); ``enabled`` is the user's own on/off — disabling keeps the config so
+    it can be re-activated without re-typing (PROF-R10). The **in-app** channel is exempt: the user
+    cannot disable it, so it never gets a row here (it is always active for the user)."""
+
+    __tablename__ = "notifier_user_config"
+
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    plugin_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    config_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
 class ScrapeCooldown(Base):
     """Anchor for the manual scrape-now cooldown (SCR-R15).
 

@@ -3,9 +3,14 @@
 	import { _ } from 'svelte-i18n';
 
 	import * as api from '$lib/api/client';
+	import NotifierChannels from '$lib/components/NotifierChannels.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { auth, forceAnon } from '$lib/stores/auth';
 	import { theme } from '$lib/stores/theme';
+
+	// Roles don't overlap: an admin governs and owns no carts/alerts, so the personal
+	// notification channels have nothing to deliver — hide them from the admin profile.
+	const isAdmin = $derived(($auth.user?.role ?? 'user') === 'admin');
 
 	let current = $state('');
 	let next = $state('');
@@ -79,6 +84,10 @@
 			</button>
 		</div>
 	</section>
+
+	{#if !isAdmin}
+		<NotifierChannels />
+	{/if}
 
 	<form onsubmit={submit} class="space-y-4">
 		<h2 class="font-medium">{$_('profile.changePassword')}</h2>

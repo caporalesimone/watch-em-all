@@ -2,7 +2,7 @@
 
 > **Layer 3 — User feature** · Audience: architects, developers.
 >
-> English translation of the Italian reference [`docs-ita/3-features/user/profile-and-notifiers.md`](../../../docs-ita/3-features/user/profile-and-notifiers.md), limited to what is implemented (DOC-12). Phase 1 ships the **account** slice of the Profile page: read-only identity, interface language (V1 English-only), theme, and password change. Everything about **notification delivery** — the notifier channels, the alert cadence, the periodic report, the self-service data export — is spec-ahead (phases 6/7/11) and stays in the Italian reference.
+> English translation of the Italian reference [`docs-ita/3-features/user/profile-and-notifiers.md`](../../../docs-ita/3-features/user/profile-and-notifiers.md), limited to what is implemented (DOC-12). Phase 1 shipped the **account** slice (identity, language, theme, password); **phase 7** adds the **notification channels** section (below). The alert cadence is gone (alerts are event-driven), the periodic report and the self-service data export remain spec-ahead (phases 10/11).
 
 ## Purpose
 
@@ -24,6 +24,28 @@ The Profile page gathers what concerns the account itself: identity, interface l
 | Settings | theme toggle (light/dark), a browser-local preference |
 | Change password | current + new + confirmation (min length enforced); on success the session is invalidated and the user returns to login |
 
+## Notification channels (phase 7)
+
+A **Notification channels** section lists every notifier the admin has made available. For each
+channel the user sees its **composite state** and, where applicable, a personal config form (rendered
+from the plugin's [`ConfigField`](../../4-capabilities/contracts/config-field.md) schema), an **on/off**
+toggle and a **Test** button (outcome shown as a toast). See [notifier-plugin](../plugins/notifier-plugin.md).
+
+- **PROF-R6/R7** — A channel delivers only when it is admin-enabled **and** its system config is
+  complete **and** the user's required fields are valid **and** the user has activated it. The
+  composite state is shown plainly (available / needs your details / active). A channel the admin has
+  globally disabled is **not listed**.
+- **PROF-R8** — Each configurable channel has a **Test** button: sends a test with the current merged
+  config; no persistence.
+- **PROF-R9** — Secret fields are masked and write-only (never returned); a stored value is shown as
+  "saved" without revealing it.
+- **PROF-R10** — Deactivating a channel keeps its config (re-activate without re-typing).
+- **In-app channel.** The in-app history is itself a channel, shown here as **always on** — the user
+  cannot disable it (only the admin can, globally). So the dashboard banner no longer means "you get
+  nothing"; it only nudges a user with **no external channel** active (e.g. email) to add one.
+
 ## Deferred (spec-ahead)
 
-The notification-delivery half of the page — the alert cadence (PROF-R4), the periodic report (PROF-R5), the self-service **data export** (PROF-R11), and the personal **notifier channels** with their composite state and the "no notifier configured" dashboard banner (PROF-R6..R10) — arrives with the alerts, notifier and reporting features in later phases. See the Italian reference for the full specification.
+The **periodic report** (PROF-R5) and the self-service **data export** (PROF-R11) arrive in later
+phases. The alert cadence (former PROF-R4) was removed — alerts are event-driven. See the Italian
+reference for the full specification.

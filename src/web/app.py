@@ -24,10 +24,11 @@ from src.core.plugins.registry import load_plugins
 from src.core.schema_drift import SchemaDriftItem, check_schema_drift
 from src.core.scrape import implements_scraping
 from src.core.system_log import install_system_log_handler
-from src.web.adjust import register_scrapers
+from src.web.adjust import register_notifiers, register_scrapers
 from src.web.deps import require_user
 from src.web.error_handlers import register_error_handlers
 from src.web.routers import (
+    admin_notifiers,
     admin_scrapers,
     admin_system,
     admin_users,
@@ -37,6 +38,7 @@ from src.web.routers import (
     catalog,
     health,
     me,
+    notifiers,
     plugins,
 )
 from src.web.routers.scrape import make_scrape_now_router
@@ -78,6 +80,9 @@ def create_app() -> FastAPI:
         # Cache the loaded scrapers so the event-driven alert run (after a manual scrape)
         # can bind each cart's adjustments without a request (adjust.run_user_alerts).
         register_scrapers(_app.state.loaded_plugins)
+        # Cache the loaded notifiers so the event-driven alert run enqueues per-channel
+        # deliveries (phase 7); the worker drains the pending ones.
+        register_notifiers(_app.state.loaded_plugins)
         # Schema-drift guard (4.B0): now that the schema is ensured (create_schema +
         # each plugin's initialize), compare the ORM model — core Base.metadata plus
         # every plugin's declared table_metadata — against the live DB. It ALWAYS runs
@@ -144,9 +149,11 @@ def create_app() -> FastAPI:
     app.include_router(admin_users.router, prefix="/api")
     app.include_router(admin_system.router, prefix="/api")
     app.include_router(admin_scrapers.router, prefix="/api")
+    app.include_router(admin_notifiers.router, prefix="/api")
     app.include_router(catalog.router, prefix="/api")
     app.include_router(carts.router, prefix="/api")
     app.include_router(alerts.router, prefix="/api")
+    app.include_router(notifiers.router, prefix="/api")
     app.include_router(plugins.router, prefix="/api")
     # The SPA catch-all is mounted in the lifespan, after the plugins (see above).
 

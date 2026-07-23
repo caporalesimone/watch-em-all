@@ -14,9 +14,17 @@ from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select
 
 from src.core.errors import APIError
-from src.core.models import AlertLog
+from src.core.models import AlertDelivery, AlertLog
+from src.core.notify import in_app_visible
 from src.web.deps import SessionDep, UserDep
-from src.web.schemas import AlertDetail, AlertIdsBody, AlertListItem, AlertPage, UnreadCount
+from src.web.schemas import (
+    AlertDeliveryOut,
+    AlertDetail,
+    AlertIdsBody,
+    AlertListItem,
+    AlertPage,
+    UnreadCount,
+)
 
 router = APIRouter(prefix="/alerts", tags=["Alerts"])
 
@@ -41,6 +49,8 @@ def list_alerts(
     page_size: int = Query(20, ge=1, le=100),
     kind: str | None = Query(None),
 ) -> AlertPage:
+    if not in_app_visible(db):  # admin disabled the in-app channel → inbox hidden for everyone
+        return AlertPage(items=[], total=0, page=page, page_size=page_size)
     where = [AlertLog.user_id == user.sub]
     if kind is not None:
         where.append(AlertLog.kind == kind)
@@ -67,6 +77,8 @@ def list_alerts(
 
 @router.get("/unread-count", response_model=UnreadCount, summary="Unread count for the badge.")
 def unread_count(user: UserDep, db: SessionDep) -> UnreadCount:
+    if not in_app_visible(db):  # in-app channel disabled by the admin → no badge
+        return UnreadCount(count=0)
     count = (
         db.scalar(
             select(func.count())
@@ -87,14 +99,26 @@ def delete_alerts(body: AlertIdsBody, user: UserDep, db: SessionDep) -> None:
 
 @router.get("/{alert_id}", response_model=AlertDetail, summary="One notification in full.")
 def get_alert(alert_id: int, user: UserDep, db: SessionDep) -> AlertDetail:
+    if not in_app_visible(db):  # in-app channel disabled by the admin → inbox hidden
+        raise APIError(404, "alert_not_found", "alert not found")
     row = _owned(db, user, alert_id)
+    deliveries = [
+        AlertDeliveryOut(
+            plugin_id=d.plugin_id, status=d.status, error=d.error, updated_at=d.updated_at
+        )
+        for d in db.scalars(
+            select(AlertDelivery)
+            .where(AlertDelivery.alert_log_id == row.id)
+            .order_by(AlertDelivery.id)
+        ).all()
+    ]
     return AlertDetail(
         id=row.id,
         kind=row.kind,
         created_at=row.created_at,
         read=row.read_at is not None,
         payload=row.payload_json,
-        deliveries=[],  # per-channel outcomes arrive in phase 7
+        deliveries=deliveries,
     )
 
 

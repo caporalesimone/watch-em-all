@@ -16,3 +16,4 @@ companion changelog-in-prose, not part of the canonical wiki tree.
 - [phase-04.md](phase-04.md) — Worker & scheduling (in progress; dev/admin tooling first)
 - [phase-05.md](phase-05.md) — Carts (two modes, Cart Engine, € threshold, adjustments)
 - [phase-06.md](phase-06.md) — In-app alerts (per-cart alert types, baseline diff, digest, Alert History)
+- [phase-07.md](phase-07.md) — Email notifications 🎉 (in progress; notifier contract, SMTP delivery, async dispatch)
