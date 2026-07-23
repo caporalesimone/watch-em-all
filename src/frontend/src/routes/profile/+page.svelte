@@ -8,6 +8,10 @@
 	import { auth, forceAnon } from '$lib/stores/auth';
 	import { theme } from '$lib/stores/theme';
 
+	// Roles don't overlap: an admin governs and owns no carts/alerts, so the personal
+	// notification channels have nothing to deliver — hide them from the admin profile.
+	const isAdmin = $derived(($auth.user?.role ?? 'user') === 'admin');
+
 	let current = $state('');
 	let next = $state('');
 	let confirm = $state('');
@@ -81,7 +85,9 @@
 		</div>
 	</section>
 
-	<NotifierChannels />
+	{#if !isAdmin}
+		<NotifierChannels />
+	{/if}
 
 	<form onsubmit={submit} class="space-y-4">
 		<h2 class="font-medium">{$_('profile.changePassword')}</h2>
