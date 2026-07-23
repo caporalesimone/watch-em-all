@@ -65,7 +65,7 @@ La Fase 7 introduce il **primo notifier** ed è il **primo caso multi-plugin del
 
 ## Definition of Done
 
-- [ ] 🎉 **0.1**: lo scenario UC-1/UC-2 gira per intero senza toccare nulla — scrape automatico → soglia raggiunta → email in casella.
+- [x] 🎉 **0.1**: lo scenario UC-1/UC-2 gira per intero senza toccare nulla — scrape automatico → soglia raggiunta → email in casella. *(E2E live validato con Mailpit su stack isolato: price drop → simula scrape → digest → worker drena la coda → email digest ricevuta; esiti `email=delivered`+`in_app=delivered`.)*
 - [x] Un canale rotto non perde nulla: digest nello storico, esito failed tracciato, warning nei log admin.
 - [x] Nessuna riga di codice email nel core: tutto nel plugin, dietro il contratto.
 - [x] [docs](../../docs/) aggiornata in inglese con la sola parte implementata in questa fase (DOC-12).
