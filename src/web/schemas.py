@@ -130,6 +130,19 @@ class ProductHistory(BaseModel):
     points: list[PricePoint] = Field(default_factory=list)
 
 
+class CartPricePoint(BaseModel):
+    # One point of a cart series: the summed total of the available members at a timestamp.
+    t: datetime
+    total: Decimal
+
+
+class CartHistory(BaseModel):
+    # The stepped total series for one cart over the requested range (phase 8, 8.B2).
+    cart_id: int
+    range: Range
+    points: list[CartPricePoint] = Field(default_factory=list)
+
+
 class CartCreate(BaseModel):
     # name + mode (immutable after, CART-R2); scraper_id required for scraper_specific,
     # must be absent/null for cross (validated in the router for a clean error envelope).

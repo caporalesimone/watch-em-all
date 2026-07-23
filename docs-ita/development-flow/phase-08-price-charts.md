@@ -17,7 +17,7 @@ Dal Product Picker apri il grafico di un prodotto: linea a gradini del prezzo, b
 ### Backend
 
 - [x] **8.B1 — Serie prodotto** (~1h): `GET /api/products/{id}/history?range=` a gradini con flag disponibilità, inclusa l'entry-prima-del-range ([price-history capability](../4-capabilities/core/price-history.md)). *Verifica: serie corretta su fixture con gap.*
-- [ ] **8.B2 — Serie carrello** (~1h): somma a gradini della composizione corrente (semplificazione HIST-R4), `GET /api/carts/{id}/history`. *Verifica: il totale della serie "oggi" coincide col totale della card.*
+- [x] **8.B2 — Serie carrello** (~1h): somma a gradini della composizione corrente (semplificazione HIST-R4), `GET /api/carts/{id}/history`. *Verifica: il totale della serie "oggi" coincide col totale della card.*
 
 ### Frontend
 

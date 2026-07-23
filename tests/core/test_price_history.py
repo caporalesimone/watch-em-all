@@ -14,7 +14,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from src.core.models import PriceHistory
-from src.core.price_history import product_series
+from src.core.price_history import cart_series, product_series
 
 PRODUCT = 1
 USER = 1
@@ -111,3 +111,38 @@ def test_other_products_are_not_mixed_in(session: Session) -> None:
     series = product_series(session, PRODUCT, "all")
 
     assert [str(p.price) for p in series] == ["10.00"]
+
+
+# --------------------------------------------------------------------------- cart series (8.B2)
+
+
+def test_cart_series_empty_cart() -> None:
+    from src.core.db import new_session
+
+    s = new_session()
+    try:
+        assert cart_series(s, [], "all") == []
+    finally:
+        s.close()
+
+
+def test_cart_series_sums_members_stepwise(session: Session) -> None:
+    _hist(session, days_ago=6, price="10.00", product_id=1)  # p1 known from day 6
+    _hist(session, days_ago=4, price="20.00", product_id=2)  # p2 known from day 4
+
+    series = cart_series(session, [1, 2], "week")
+
+    # day 6: only p1 has a value yet → 10; day 4: both → 30.
+    assert [str(p.total) for p in series] == ["10.00", "30.00"]
+    assert series[0].t < series[1].t
+
+
+def test_cart_series_excludes_unavailable_members(session: Session) -> None:
+    _hist(session, days_ago=3, price="10.00", available=True, product_id=1)
+    _hist(session, days_ago=3, price="20.00", available=False, product_id=2)  # out of stock
+
+    series = cart_series(session, [1, 2], "week")
+
+    # p2 is excluded while unavailable → the total is just p1's price at every instant.
+    assert series
+    assert all(str(p.total) == "10.00" for p in series)

@@ -74,3 +74,46 @@ def product_series(session: Session, product_id: int, range_: Range) -> list[Ser
 
 def _point(row: PriceHistory) -> SeriesPoint:
     return SeriesPoint(t=row.recorded_at, price=row.price_current, available=row.is_available)
+
+
+@dataclass(frozen=True)
+class CartSeriesPoint:
+    """One point of a cart series: the summed total of the available members at ``t``."""
+
+    t: datetime
+    total: Decimal
+
+
+def cart_series(
+    session: Session, member_ids: list[int], range_: Range
+) -> list[CartSeriesPoint]:
+    """The stepped total series for a cart over ``range_`` (HIST-R4).
+
+    Projects the cart's CURRENT composition onto the past (no membership history): each member's
+    own stepped series is computed, then summed on a unified timeline of every change instant —
+    at each instant a member contributes its current price only while it was available (unavailable
+    stretches are excluded, per the declared simplification). An empty cart yields no points.
+    """
+    series = {pid: product_series(session, pid, range_) for pid in member_ids}
+    timeline = sorted({p.t for points in series.values() for p in points})
+
+    out: list[CartSeriesPoint] = []
+    for t in timeline:
+        total = Decimal("0.00")
+        for points in series.values():
+            active = _value_at(points, t)
+            if active is not None and active.available:
+                total += active.price
+        out.append(CartSeriesPoint(t=t, total=total))
+    return out
+
+
+def _value_at(points: list[SeriesPoint], t: datetime) -> SeriesPoint | None:
+    """The step value in effect at ``t`` = the last point at or before it (points sorted asc)."""
+    found: SeriesPoint | None = None
+    for p in points:
+        if p.t <= t:
+            found = p
+        else:
+            break
+    return found
