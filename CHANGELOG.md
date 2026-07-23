@@ -6,6 +6,10 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 Each entry is **short** and reads as a user-facing story: first a **bullet list of what changed for you** (additions, removals and changes together, light on jargon), then a brief **_under the hood_** paragraph on the architectural/technical changes. Older entries predate this style and are left as they are.
 
+## [0.8.0] - Unreleased
+
+**Phase 8 — price-history charts: the price/availability series the system has been accumulating since phase 3 become visible — per product and per cart, with availability gaps shown (not interpolated). Entries land below as they ship.**
+
 ## [0.7.0] - 2026-07-23
 
 **Phase 7 — email notifications: your alert digests stop living only inside the app and start arriving in your inbox. This closes the product's minimum value chain (the 0.1).**
