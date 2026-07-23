@@ -2,6 +2,8 @@
 
 > Stato: ☐ da iniziare · Prerequisiti: Fase 5 (i dati si accumulano dalla Fase 3) · [Indice del flusso](README.md)
 
+> **❓ Punto da chiarire (annotato 2026-07-23).** Serve una soluzione per **gestire i prodotti delisted (`removed`)**: oggi si **accumulano nel DB** e non esiste un modo per eliminarli. Da **discutere a livello di UX** varie proposte — es. pulizia manuale "rimuovi delistati", auto-purge dopo N giorni, nascondi-di-default con toggle "mostra delistati", retention configurabile dall'admin, … La Fase 9 introduce già endpoint di pulizia catalogo (9.B7) e le azioni nel Picker (9.F4) **per Dragon Store**; qui si tratta di decidere la **strategia/UX generale e trasversale** (quale comportamento di default, dove si agisce, cosa cascata su carrelli/storico).
+
 ## Obiettivo
 
 Rendere visibile il tesoro che il sistema accumula da settimane: le serie dello storico prezzi, con i gap di disponibilità, per prodotto e per carrello.

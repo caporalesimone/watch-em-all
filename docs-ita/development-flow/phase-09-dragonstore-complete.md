@@ -2,6 +2,8 @@
 
 > Stato: ☐ da iniziare · Prerequisiti: Fase 4 (e Fase 7 per il valore pieno) · [Indice del flusso](README.md)
 
+> **❓ Punto da chiarire (annotato 2026-07-23).** Valutare se **l'aggiunta di un URL** nello scraper debba **triggerare immediatamente lo scrape** di quel prodotto (comportamento **già presente oggi**) e inserirlo/aggiornarlo subito nel catalogo, così l'utente vede il dato aggiornato senza attendere la run schedulata. **Vale la regola della cache** (nessun refetch entro il TTL del plugin). Da confermare come comportamento voluto e da rendere coerente col dry-run/anteprima e coi contatori del monitoring.
+
 ## Obiettivo
 
 Portare il primo scraper dal "prodotto singolo" alla configurazione ricca: categorie con paginazione, dedup, esclusioni del sito, UI utente completa con dry-run, e la gestione del ciclo di vita del catalogo (delisting e pulizie).
