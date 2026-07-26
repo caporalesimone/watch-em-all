@@ -44,6 +44,8 @@
   *Risultato: secondo canale (Discord), audit i18n English-first, CI piena: release 1.0.*
 - 💡 **Fase 13 — Resilienza dello scraping** (post-1.0, idea da dettagliare) → [phase-13-scraping-resilience.md](phase-13-scraping-resilience.md)
   *Risultato: le connessioni verso i siti usano user-agent (e opzioni di richiesta) decisi dal core, con eventuale preferenza per-scraper. Annotazione, oltre il perimetro 1.0.*
+- 💡 **Fase 14 — Sito usabile da mobile** (post-1.0, idea da dettagliare) → [phase-14-mobile.md](phase-14-mobile.md)
+  *Risultato: le pagine utente si usano da telefono senza zoom né scorrimento orizzontale (14.1); il perimetro dell'area admin (14.2) è da discutere prima, perché è la parte cara.*
 
 ## La logica dell'ordine
 
