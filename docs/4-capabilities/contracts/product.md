@@ -45,7 +45,7 @@ class Product(BaseModel):
     currency: str = "EUR"       # ISO 4217; V1 neither converts nor aggregates different currencies
 
     is_available: bool          # decided by the SCRAPER (temporary out-of-stock)
-    scraped_at: datetime
+    scraped_at: datetime        # when the SITE answered — not "now"; see PROD-R8
     extra: dict = {}            # plugin-specific data, persisted in products.extra_json
 ```
 
@@ -58,6 +58,7 @@ class Product(BaseModel):
 - **PROD-R5** — `tags` is a list (JSON array) of strings = **product "tags"**, generic and **optional** (default empty). The scraper populates it from whatever source it decides (labels extracted from the title, availability status, …); a scraper that does not need it leaves it empty. The core **only persists** it, it does not interpret it; the UI shows it as a list (long-term vision: graphical tags). The **mechanism** to accumulate it is provided by the scraper base ([scraper-plugin](../../3-features/plugins/scraper-plugin.md) SCR-R16); the strings are already **trimmed** and **deduplicated**.
 - **PROD-R6** — `brand` is an object `{text, link?}` (`BrandRef`): `text` mandatory, `link` **optional** (absolute URL to the brand page). The UI renders plain text, or **clickable** text (opens a new tab) when the link is present. `None` if the scraper does not extract the brand. It is a structured attribute in its own right, **distinct** from the `tags` field.
 - **PROD-R7** — `category` is the category **breadcrumb**: an ordered list **root → leaf** of `CategoryRef{text, link?}` (empty if absent). The UI renders it as `text / text / text`, each entry clickable on its `link` (new tab), **without a trailing `/`** after the last one. Generic: the core **only persists** it; the **mechanism** to build it (`add_child`/`get_path`) is provided by the scraper base ([scraper-plugin](../../3-features/plugins/scraper-plugin.md) SCR-R17).
+- **PROD-R8** — `scraped_at` is **when the site produced this data**, which is not always the moment the scraper built the `Product`. A response served from the scrape cache ([plugin-context](../core/plugin-context.md), CTX-R9) carries the timestamp of the fetch that filled it, exposed as `HttpResponse.fetched_at` (`None` = fetched just now); the scraper uses `fetched_at` when present and the clock otherwise. The core stores this value as `products.last_seen_at`, so a scraper that hardcodes `now()` makes data up to a full half-life old look like it was just read — defeating the one field a reader uses to judge freshness.
 
 ## `external_id`: product identity
 

@@ -276,6 +276,7 @@
 		"noProducts": "Nessun prodotto",
 		"noCarts": "Nessun carrello",
 		"lastSeen": "Ultima lettura",
+		"lastSeenNote": "Le cache hit non vengono conteggiate: è il momento in cui il sito è stato letto davvero.",
 		"empty": "Storico non ancora sufficiente",
 		"error": "Impossibile caricare lo storico prezzi.",
 		"outOfStock": "Non disponibile",

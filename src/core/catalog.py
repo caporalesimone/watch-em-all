@@ -13,7 +13,6 @@ to the plugin.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -80,6 +79,8 @@ def _insert_product(
         discount_pct=discount,
         is_available=p.is_available,
         removed=False,
+        first_seen_at=p.scraped_at,
+        last_seen_at=p.scraped_at,
     )
     session.add(row)
     session.flush()  # assign row.id and make it visible to later finds in this delivery
@@ -105,7 +106,11 @@ def _update_mutable_fields(
     row.discount_pct = discount
     row.is_available = p.is_available
     row.removed = False
-    row.last_seen_at = datetime.now(UTC)
+    # The scraper's own observation time, NOT "now": a response replayed from the scrape
+    # cache is old data, and stamping it with the clock made ``last_seen_at`` report when
+    # we last re-served a page instead of when the site last answered — off by up to the
+    # full half-life, in the one field whose entire job is to say how fresh this is.
+    row.last_seen_at = p.scraped_at
 
 
 def _append_history(

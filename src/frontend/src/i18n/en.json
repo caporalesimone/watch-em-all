@@ -375,6 +375,7 @@
 		"noProducts": "No products yet",
 		"noCarts": "No carts yet",
 		"lastSeen": "Last seen",
+		"lastSeenNote": "Cache hits are not counted: this is when the site was actually read.",
 		"empty": "Not enough history yet",
 		"error": "Could not load the price history.",
 		"outOfStock": "Out of stock",

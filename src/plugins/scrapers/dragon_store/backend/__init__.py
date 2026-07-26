@@ -324,9 +324,15 @@ class DragonStorePlugin(ScraperPlugin):
         except DragonStoreParseError as exc:
             context.logger.error("dragon_store: parse failed for %s: %s", url, exc)
             return None
-        return self._to_product(context, url, parsed)
+        return self._to_product(context, url, parsed, response.fetched_at)
 
-    def _to_product(self, context: PluginContext, url: str, parsed: ParsedProduct) -> Product:
+    def _to_product(
+        self,
+        context: PluginContext,
+        url: str,
+        parsed: ParsedProduct,
+        fetched_at: datetime | None = None,
+    ) -> Product:
         clean_name, labels = sanitize_title(parsed.name, load_title_labels())
         tags = self.new_tags()
         for label in labels:
@@ -371,7 +377,9 @@ class DragonStorePlugin(ScraperPlugin):
             discount_pct=None,  # the core derives it from original/current (CATSVC)
             currency=parsed.currency,
             is_available=is_available,
-            scraped_at=datetime.now(UTC),
+            # When the *site* answered: the cache's own timestamp on a hit, the clock on a
+            # real fetch. Stamping "now" either way would date a 12-hour-old page to today.
+            scraped_at=fetched_at or datetime.now(UTC),
             extra=extra,
         )
 

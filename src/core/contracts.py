@@ -124,6 +124,10 @@ class Product(BaseModel):
     currency: str = "EUR"  # ISO 4217; V1 neither converts nor aggregates currencies
 
     is_available: bool  # decided by the SCRAPER; never filtered out (PROD-R2)
+    # When the SITE produced this data, which is not always "now": a response served from
+    # the scrape cache carries the timestamp of the fetch that filled it
+    # (``HttpResponse.fetched_at``). The core stores it as ``last_seen_at``, so a scraper
+    # that hardcodes ``now()`` here makes stale data look fresh.
     scraped_at: datetime
     extra: dict[str, Any] = Field(default_factory=dict)  # plugin-specific, persisted in extra_json
 

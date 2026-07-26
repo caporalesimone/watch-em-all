@@ -35,7 +35,9 @@
 
 	// When the selected product was last actually read from the site. A flat line says
 	// nothing about whether we are still looking, so the timestamp says it instead.
-	// Products only: a cart has one per member, and no single answer.
+	// Products only: a cart has one per member, and no single answer. It is the fetch
+	// time, not the run time — a scrape served from the cache does not move it, which the
+	// caption says out loud so the date is not read as "we checked then".
 	const lastSeen = $derived(
 		source === 'product' && productId != null
 			? (products.find((p) => p.id === productId)?.last_seen_at ?? null)
@@ -195,9 +197,12 @@
 	</div>
 
 	{#if lastSeen}
-		<p class="text-sm text-slate-500">
-			{$_('priceHistory.lastSeen')}: <span class="font-mono">{dateTime(lastSeen)}</span>
-		</p>
+		<div>
+			<p class="text-sm text-slate-500">
+				{$_('priceHistory.lastSeen')}: <span class="font-mono">{dateTime(lastSeen)}</span>
+			</p>
+			<p class="text-xs text-slate-400">{$_('priceHistory.lastSeenNote')}</p>
+		</div>
 	{/if}
 
 	{#if error}

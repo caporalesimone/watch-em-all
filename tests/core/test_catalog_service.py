@@ -8,7 +8,7 @@ does not enforce FKs by default, so a bare user_id needs no users row here.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -70,6 +70,34 @@ def test_new_product_then_idempotent(session: Session) -> None:
     assert (second.found, second.new, second.price_changes, second.removed) == (1, 0, 0, 0)
     assert _count(session, CatalogProduct) == 1
     assert _count(session, PriceHistory) == 1
+
+
+def _seconds_apart(stored: datetime, expected: datetime) -> float:
+    """SQLite hands back naive datetimes; treat them as the UTC they were written as."""
+    aware = stored if stored.tzinfo is not None else stored.replace(tzinfo=UTC)
+    return abs((aware - expected).total_seconds())
+
+
+def test_last_seen_follows_the_scrape_not_the_clock(session: Session) -> None:
+    """``last_seen_at`` is the scraper's observation time. A delivery rebuilt from a cached
+    response carries an older ``scraped_at``, and the row must show *that* — otherwise the
+    one field meant to say how fresh the data is reports when we last replayed it."""
+    observed = datetime.now(UTC) - timedelta(hours=6)
+    update_catalog(session, USER, PLUGIN, [_product(scraped_at=observed)])
+    row = session.scalar(select(CatalogProduct))
+    assert row is not None
+    assert _seconds_apart(row.last_seen_at, observed) < 1
+
+    # A later run served from the same cache entry does not move it forward.
+    update_catalog(session, USER, PLUGIN, [_product(scraped_at=observed)])
+    session.refresh(row)
+    assert _seconds_apart(row.last_seen_at, observed) < 1
+
+    # A real fetch does.
+    fresh = datetime.now(UTC)
+    update_catalog(session, USER, PLUGIN, [_product(scraped_at=fresh)])
+    session.refresh(row)
+    assert _seconds_apart(row.last_seen_at, fresh) < 1
 
 
 def test_price_change_appends_history(session: Session) -> None:

@@ -30,6 +30,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime
 from http.cookiejar import CookieJar
 from typing import TYPE_CHECKING
 
@@ -96,6 +97,11 @@ class HttpResponse:
     content: bytes
     url: str
     headers: dict[str, str] = field(default_factory=dict)
+    # When the *site* produced this body. ``None`` means "just now, over the network";
+    # a value means it came from the scrape cache and is that old. Without this a caller
+    # cannot tell a fresh read from one replayed up to a half-life later, and any
+    # "last seen" it derives silently reports the replay instead of the observation.
+    fetched_at: datetime | None = None
 
     @property
     def text(self) -> str:
@@ -312,6 +318,7 @@ class HttpClient:
                     content=cached.content,
                     url=url,
                     headers=hdrs_hit,
+                    fetched_at=cached.fetched_at,
                 )
 
         interval_s = self._min_interval_s
