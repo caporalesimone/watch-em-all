@@ -34,6 +34,18 @@ L'admin apre il monitoraggio e capisce in un colpo d'occhio quanto lavorano gli 
 - [ ] **10.B18 — API calendario scraper** (~1h): `GET /api/admin/scrapers/calendar?date=` — slot pianificati del giorno + durata media delle run recenti (SCHED-R10). *Verifica: gli slot rispecchiano gli schedule; sospesi esclusi o marcati.*
 - [ ] **10.B19 — Scadenza password configurabile (admin)** (~1h): impostazione di sistema `password_expiry` (in `system_settings`, 10.B7) con **opzioni fisse** — **Mai (default)**, 1 mese, 3 mesi, 6 mesi, 1 anno; nuova colonna `password_changed_at` su `users`, aggiornata a ogni cambio password; al login, se la password è più vecchia della finestra configurata, si **forza il cambio** riusando `must_change_password` e il flusso di cambio forzato già esistente. *Verifica: impostata a 1 mese → un utente con password più vecchia di un mese è forzato al cambio al login; "Mai" → nessun forzamento.*
 
+### Da discutere prima di stimare (nessuna implementazione senza discussione)
+
+> ⛔ **Non implementare nulla di questo blocco prima di averlo discusso e deciso con Simone.** È un'idea annotata il 2026-07-27, non un MVP: manca la scelta di fondo, e sceglierla male costa più che rimandarla.
+
+- [ ] **10.D1 — Notifiche per l'admin sui log** *(da discutere)*: oggi i canali di notifica (fase 7) servono **solo l'utente** e solo per eventi di catalogo/carrello; l'admin non riceve nulla, e per accorgersi di un problema deve aprire la pagina dei log e guardare. L'idea è una sezione di notifiche **propria dell'admin**, dove sottoscriversi a ciò che il sistema logga — l'esempio concreto è "mandami una notifica quando il portale logga degli `error`". Il caso reale che la motiva è il blocco di Dragon Store del 2026-07-25: gli errori c'erano nei log dal primo giorno, ma nessuno li ha visti finché Simone non è andato a leggerli.
+  >
+  > **La decisione aperta è la logica di attivazione**, e le due strade non sono equivalenti:
+  > - **Istantanea** — si notifica appena il log viene scritto. Reattiva, ma un guasto ripetitivo genera una raffica: lo scraper che fallisce su 40 watch produrrebbe 40 notifiche identiche. Servirebbe come minimo un raggruppamento o un antiflood.
+  > - **A finestre** — un engine dedicato all'admin che gira ogni tot ore, guarda i log del periodo e decide cosa è **significativo** (un errore isolato non lo è, venti errori uguali sì; un errore nuovo mai visto prima probabilmente sì). Più simile a come funzionano già gli alert utente, che sono per digest e non per evento singolo.
+  >
+  > Altri punti da chiarire quando se ne parla: chi riceve (tutti gli admin? il super-user di fase 9?); quali canali (riuso di quelli di fase 7 o un percorso separato); che granularità di sottoscrizione (per livello, per sorgente, per testo); e se questo debba diventare un **notifier con destinatario admin** dentro l'infrastruttura esistente invece di un sistema parallelo — che è la domanda architetturale più importante delle quattro.
+
 ### Frontend
 
 - [ ] **10.F1 — Pagina utenti: lista** (~1h): stato, **ultimo accesso ordinabile**, data marcatura e scadenza, **filtro stato** attivo/disabilitato/in cancellazione. *Verifica: ordinamento e filtro corretti da browser.*
