@@ -102,7 +102,8 @@
 		// Adding a watch scrapes the product there and then, and the site's own Crawl-delay
 		// makes that take tens of seconds — plus the anti-bot gate, which costs two extra
 		// waits. Without `busy` the form looked inert for all that time and could be
-		// submitted twice.
+		// submitted twice. The notice states the wait and nothing else: why it is slow is
+		// our problem, not something the user can act on.
 		busy = true;
 		try {
 			const res = await apiFetch(`${BASE}/watches`, {
