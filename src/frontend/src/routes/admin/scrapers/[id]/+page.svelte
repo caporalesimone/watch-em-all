@@ -85,9 +85,11 @@
 	}
 
 	const fields: { key: keyof ScraperConfig; step: number }[] = [
-		{ key: 'politeness_delay_ms', step: 50 },
+		// Steps sized for the shipped defaults (11000 ms, 720 min): a 50 ms step meant
+		// hundreds of clicks to move the politeness delay by anything meaningful.
+		{ key: 'politeness_delay_ms', step: 500 },
 		{ key: 'http_timeout_s', step: 1 },
-		{ key: 'cache_ttl_min', step: 1 },
+		{ key: 'cache_ttl_min', step: 30 },
 		{ key: 'scrape_now_min_interval_s', step: 1 }
 	];
 

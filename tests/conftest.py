@@ -33,8 +33,16 @@ def client(tmp_path: object, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestCl
     monkeypatch.setattr(config_mod, "VERSION_PATH", str(ver))
     config_mod.get_settings.cache_clear()
 
+    from src.core import http as http_mod
     from src.web.app import create_app
     from src.web.routers import auth as auth_mod
+
+    # Web tests must never actually wait. The shipped politeness floor is 11 s (what
+    # Dragon Store's robots.txt asks for), and every client the core builds for a plugin
+    # honours it — including the ones built inside a request. Neutralising the wait here,
+    # on the class, covers every builder without touching production wiring; the real
+    # politeness arithmetic stays fully covered by tests/core/test_http_client.py.
+    monkeypatch.setattr(http_mod.HttpClient, "_wait_before", lambda self, attempt, interval_s: None)
 
     # Fresh limiter per test so login attempts don't accumulate across tests.
     monkeypatch.setattr(

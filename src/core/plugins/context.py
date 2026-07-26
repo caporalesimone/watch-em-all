@@ -34,6 +34,7 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from src.core.catalog import update_catalog as _update_catalog_service
+from src.core.catalog import upsert_products as _upsert_products_service
 from src.core.db import get_engine, new_session
 from src.core.http import HttpClient
 from src.core.scrape_cache import ScrapeCache
@@ -48,6 +49,24 @@ if TYPE_CHECKING:
 UpdateCatalog = Callable[[int, "list[Product]"], "DeltaCounters"]
 
 
+def _no_catalog_write(user_id: int, products: list[Product]) -> DeltaCounters:
+    """Default for a context built without a write path (a dry run must write nothing)."""
+    raise NotImplementedError("this context has no catalog write path")
+
+
+def bind_upsert_catalog(session: Session) -> UpdateCatalog:
+    """The **non-delisting** write path bound to a session (:func:`catalog.upsert_products`).
+
+    Exposed so the paths that build their own context — a watch resolved as it is added —
+    get the core's write path instead of reaching into ``src.core.catalog`` themselves.
+    """
+
+    def _upsert(user_id: int, products: list[Product]) -> DeltaCounters:
+        return _upsert_products_service(session, user_id, products)
+
+    return _upsert
+
+
 @dataclass
 class PluginContext:
     """Everything a plugin may use, and by convention nothing else."""
@@ -56,7 +75,10 @@ class PluginContext:
     db: Session  # a session scoped to the plugin's own tables (plugin_<name>_*)
     logger: Logger  # namespaced; phase 2 -> stdout (system_log lands later)
     config: Mapping[str, Any]  # the plugin's admin-config section (empty in phase 2)
-    update_catalog: UpdateCatalog  # deliver products to the core (the only write path)
+    update_catalog: UpdateCatalog  # deliver a COMPLETE delivery (delists what is missing)
+    # Deliver a delivery that says nothing about the rest of the catalog — a single product
+    # resolved as its watch is added, or a run that failed to read the site. Never delists.
+    upsert_catalog: UpdateCatalog = _no_catalog_write
     http: HttpClient = field(default_factory=HttpClient)  # polite/counted/retrying client (SCR-R6)
 
 
@@ -74,22 +96,38 @@ def build_context(manifest: Manifest, plugin: BasePlugin) -> PluginContext:
     def _update_catalog(user_id: int, products: list[Product]) -> DeltaCounters:
         return _update_catalog_service(session, user_id, plugin_id, products)
 
-    # Core reserved config for this scraper (4.B10): admin-set politeness/timeout/cache
-    # half-life, read here for both scheduled runs and the manual scrape-now. Defaults
-    # mirror the former constants when no admin override exists.
-    cfg = get_scraper_config(session, plugin_id)
+    _upsert_catalog = bind_upsert_catalog(session)
 
+    logger = logging.getLogger(f"wea.plugin.{manifest.name}")
     return PluginContext(
         engine=get_engine(),
         db=session,
-        logger=logging.getLogger(f"wea.plugin.{manifest.name}"),
+        logger=logger,
         config={},
         update_catalog=_update_catalog,
-        # Polite/counted/retrying client (SCR-R6) + per-plugin scrape cache (CTX-R9),
-        # both governed by the admin reserved config; transparent to the plugin.
-        http=HttpClient(
-            timeout_s=cfg.http_timeout_s,
-            min_interval_s=cfg.politeness_delay_ms / 1000,
-            cache=ScrapeCache(get_engine(), plugin_id, ttl_min=cfg.cache_ttl_min),
-        ),
+        upsert_catalog=_upsert_catalog,
+        http=build_http_client(session, plugin_id, logger),
+    )
+
+
+def build_http_client(session: Session, plugin_id: str, logger: Logger) -> HttpClient:
+    """The configured client for a scraper: politeness, timeout and cache half-life from
+    the core reserved admin config (4.B10), plus the per-plugin scrape cache (CTX-R9) and
+    ``robots.txt`` compliance (CTX-R10). Defaults mirror the module constants when no
+    admin override exists.
+
+    Shared on purpose. Every path that talks to a site must get *this* client — a
+    scheduled run, the manual scrape-now, and the read-only paths that build their own
+    context (resolving a watch as it is added, the dry-run test). A hand-rolled
+    ``HttpClient()`` in one of those would silently bypass the admin config and the cache,
+    which is exactly how a scraper ends up hammering a site nobody configured it to hammer.
+    """
+    cfg = get_scraper_config(session, plugin_id)
+    return HttpClient(
+        timeout_s=cfg.http_timeout_s,
+        min_interval_s=cfg.politeness_delay_ms / 1000,
+        cache=ScrapeCache(get_engine(), plugin_id, ttl_min=cfg.cache_ttl_min),
+        # The client logs under the plugin's own namespace so one log stream tells the
+        # whole story of a run: robots.txt, politeness, cache hits, failures.
+        logger=logger,
     )

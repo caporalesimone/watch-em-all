@@ -123,15 +123,12 @@ def _append_history(
     )
 
 
-def update_catalog(
-    session: Session, user_id: int, plugin_id: str, products: list[Product]
-) -> DeltaCounters:
-    """Apply a scraper's current delivery to the user's catalog and return the
-    delta counters (CATSVC-R6).
-
-    ``plugin_id`` is explicit (not read from the products) so an empty delivery
-    still delists that plugin's rows. Atomic: commits its own unit of work.
-    """
+def _apply_delivery(
+    session: Session, user_id: int, products: list[Product]
+) -> tuple[DeltaCounters, set[int]]:
+    """Insert/refresh every delivered product (and its history entry when the price or
+    availability moved). Returns the counters and the touched row ids — the caller decides
+    whether the absence of a row means "delisted" or "we simply were not told". No commit."""
     counters = DeltaCounters(found=len(products))
     seen: set[int] = set()
 
@@ -161,6 +158,39 @@ def update_catalog(
             _append_history(session, row, p, original, discount)
             counters.price_changes += 1
         seen.add(row.id)
+
+    return counters, seen
+
+
+def upsert_products(session: Session, user_id: int, products: list[Product]) -> DeltaCounters:
+    """Apply a delivery **without delisting anything**: CATSVC-R6 minus CATSVC-R2. Atomic.
+
+    For deliveries that say nothing about the rest of the catalog, where the delisting
+    sweep would be plain wrong:
+
+    - a **partial** delivery — one product resolved as the user adds its watch;
+    - a **failed** run — no products because we could not read the site. "We do not know"
+      is not "they are gone": an anti-bot interstitial or an outage would otherwise wipe a
+      user's whole catalog for that scraper, drag their carts to ``has_delisted`` and
+      suppress their alerts (ALERT-R12) until the site came back.
+    """
+    counters, _seen = _apply_delivery(session, user_id, products)
+    session.commit()
+    return counters
+
+
+def update_catalog(
+    session: Session, user_id: int, plugin_id: str, products: list[Product]
+) -> DeltaCounters:
+    """Apply a scraper's **complete** delivery to the user's catalog and return the delta
+    counters (CATSVC-R6), delisting whatever the site no longer offers (CATSVC-R2).
+
+    ``plugin_id`` is explicit (not read from the products) so an empty delivery still
+    delists that plugin's rows — which is right when the site answered and offered
+    nothing, and wrong when we never managed to ask. Callers that cannot tell the
+    difference apart must use :func:`upsert_products`. Atomic: commits its own unit of work.
+    """
+    counters, seen = _apply_delivery(session, user_id, products)
 
     # Delisting (CATSVC-R2): this plugin's rows not seen in this delivery. No
     # history entry — delisting is not a price event.

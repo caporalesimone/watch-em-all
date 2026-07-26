@@ -15,7 +15,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from src.core.catalog import update_catalog
+from src.core.catalog import update_catalog, upsert_products
 from src.core.contracts import Product
 from src.core.models import CatalogProduct, PriceHistory
 
@@ -154,3 +154,48 @@ def test_other_plugin_rows_not_delisted(session: Session) -> None:
     update_catalog(session, USER, PLUGIN, [_product(external_id="a")])
     other = session.scalar(select(CatalogProduct).where(CatalogProduct.plugin_id == "other_plugin"))
     assert other is not None and other.removed is False
+
+
+# --- CATSVC-R2b: the non-delisting write path ---
+
+
+def test_upsert_products_never_delists(session: Session) -> None:
+    """A partial or failed delivery must leave untouched rows alone. This is the guard
+    against the failure that used to wipe a user's catalogue whenever a site went dark."""
+    update_catalog(session, USER, PLUGIN, [_product(external_id="keep")])
+
+    # An empty delivery through the non-delisting path says "we learned nothing".
+    counters = upsert_products(session, USER, [])
+
+    assert counters.removed == 0
+    row = session.scalar(select(CatalogProduct).where(CatalogProduct.external_id == "keep"))
+    assert row is not None
+    assert row.removed is False
+
+
+def test_empty_delivery_through_update_catalog_still_delists(session: Session) -> None:
+    """The complementary contract: a *complete* delivery that offers nothing does delist —
+    that behaviour is deliberate and must not regress with the guard in place."""
+    update_catalog(session, USER, PLUGIN, [_product(external_id="gone")])
+
+    counters = update_catalog(session, USER, PLUGIN, [])
+
+    assert counters.removed == 1
+    row = session.scalar(select(CatalogProduct).where(CatalogProduct.external_id == "gone"))
+    assert row is not None
+    assert row.removed is True
+
+
+def test_upsert_products_inserts_and_updates_like_a_full_delivery(session: Session) -> None:
+    inserted = upsert_products(session, USER, [_product(external_id="p1")])
+    assert (inserted.new, inserted.found) == (1, 1)
+
+    updated = upsert_products(
+        session, USER, [_product(external_id="p1", price_current=Decimal("30.00"))]
+    )
+    assert updated.new == 0
+    row = session.scalar(select(CatalogProduct).where(CatalogProduct.external_id == "p1"))
+    assert row is not None
+    assert row.price_current == Decimal("30.00")
+    # A price move is still a history event on this path (CATSVC-R4).
+    assert session.scalar(select(func.count()).select_from(PriceHistory)) == 2

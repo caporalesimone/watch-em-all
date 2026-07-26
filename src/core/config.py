@@ -81,7 +81,12 @@ def _env_flag(name: str, *, default: bool = False) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _read_version() -> str:
+def read_version() -> str:
+    """The running build's version, from the file baked at build by ``git describe`` (1.T4).
+
+    Public and deliberately standalone — no config parsing, no cache — so callers that only
+    need the version (the scraper User-Agent) can have it without a valid ``config.yaml``.
+    """
     try:
         text = Path(VERSION_PATH).read_text(encoding="utf-8").strip()
     except OSError:
@@ -109,7 +114,7 @@ def load_settings(config_path: str | os.PathLike[str] | None = None) -> Settings
 
     return Settings(
         core=core,
-        version=_read_version(),
+        version=read_version(),
         admin_username=os.environ.get("WEA_ADMIN_INITIAL_USERNAME", "admin"),
         admin_initial_password=os.environ.get("WEA_ADMIN_INITIAL_PASSWORD") or None,
         schema_drift_alert=_env_flag("WEA_SCHEMA_DRIFT_ALERT"),
