@@ -268,15 +268,18 @@
 			placeholder={$_('admin.logs.search')}
 			value={q}
 			oninput={(e) => onSearchInput(e.currentTarget.value)}
-			class="min-w-64 flex-1 rounded border border-slate-300 bg-white px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
+			class="w-full rounded border border-slate-300 bg-white px-3 py-1.5 text-sm sm:w-96 dark:border-slate-700 dark:bg-slate-900"
 		/>
-		<div class="flex items-center gap-1">
+		<!-- Fixed-width search, not flex-1: the level tabs change width when the counts change
+		     (and when the active one gains its background), and a flex-1 input absorbed that
+		     difference — so picking a filter visibly resized the search box. -->
+		<div class="flex shrink-0 items-center gap-1">
 			<button type="button" class={tabClass(level === null)} onclick={() => setLevel(null)}>
-				{$_('admin.logs.all')} <span class="opacity-60">{total}</span>
+				{$_('admin.logs.all')} <span class="tabular-nums opacity-60">{total}</span>
 			</button>
 			{#each ['info', 'warning', 'error'] as const as lv (lv)}
 				<button type="button" class={tabClass(level === lv)} onclick={() => setLevel(lv)}>
-					{LEVEL_LABEL[lv]} <span class="opacity-60">{counts[lv] ?? 0}</span>
+					{LEVEL_LABEL[lv]} <span class="tabular-nums opacity-60">{counts[lv] ?? 0}</span>
 				</button>
 			{/each}
 		</div>
@@ -286,7 +289,7 @@
 			disabled={live}
 			title={live ? $_('admin.logs.disabledInLive') : undefined}
 			onchange={(e) => setSize(Number(e.currentTarget.value))}
-			class="rounded border border-slate-300 bg-white px-2 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900"
+			class="rounded border border-slate-300 bg-white px-2 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-40 sm:ml-auto dark:border-slate-700 dark:bg-slate-900"
 		>
 			{#each SIZES as n (n)}
 				<option value={n}>{$_('admin.logs.perPage', { values: { n } })}</option>
