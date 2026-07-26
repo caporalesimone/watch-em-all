@@ -9,7 +9,8 @@
 			"empty": "No watched products yet. Paste a product URL above.",
 			"remove": "Remove",
 			"invalid": "Enter a product URL first.",
-			"duplicate": "You are already watching this URL."
+			"duplicate": "You are already watching this URL.",
+			"scraping": "Reading the product from the site… this can take up to a minute: the site asks for 10 seconds between requests, and its access check costs two more."
 		},
 		"dry_run": {
 			"action": "Preview (dry-run)",

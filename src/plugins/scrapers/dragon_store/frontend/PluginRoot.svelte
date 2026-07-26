@@ -99,22 +99,31 @@
 			error = $_('dragon_store.watches.invalid');
 			return;
 		}
-		const res = await apiFetch(`${BASE}/watches`, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ url: url.trim() })
-		});
-		if (res.status === 409) {
-			error = $_('dragon_store.watches.duplicate');
-			return;
+		// Adding a watch scrapes the product there and then, and the site's own Crawl-delay
+		// makes that take tens of seconds — plus the anti-bot gate, which costs two extra
+		// waits. Without `busy` the form looked inert for all that time and could be
+		// submitted twice.
+		busy = true;
+		try {
+			const res = await apiFetch(`${BASE}/watches`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ url: url.trim() })
+			});
+			if (res.status === 409) {
+				error = $_('dragon_store.watches.duplicate');
+				return;
+			}
+			if (!res.ok) {
+				error = $_('dragon_store.error');
+				return;
+			}
+			url = '';
+			preview = null;
+			await loadWatches();
+		} finally {
+			busy = false;
 		}
-		if (!res.ok) {
-			error = $_('dragon_store.error');
-			return;
-		}
-		url = '';
-		preview = null;
-		await loadWatches();
 	}
 
 	async function removeWatch(id: number): Promise<void> {
@@ -220,7 +229,16 @@
 				{$_('dragon_store.watches.add')}
 			</button>
 		</div>
-		<p class="text-xs text-slate-400">{$_('dragon_store.dry_run.hint')}</p>
+		{#if busy}
+			<p class="flex items-center gap-2 text-sm text-slate-500">
+				<span
+					class="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600 dark:border-slate-600 dark:border-t-slate-300"
+				></span>
+				{$_('dragon_store.watches.scraping')}
+			</p>
+		{:else}
+			<p class="text-xs text-slate-400">{$_('dragon_store.dry_run.hint')}</p>
+		{/if}
 	</form>
 
 	{#if notice}<p class="text-sm text-green-600 dark:text-green-400">{notice}</p>{/if}
