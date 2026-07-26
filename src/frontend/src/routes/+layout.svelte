@@ -47,8 +47,10 @@
 				if (path !== '/change-password') void goto('/change-password', { replaceState: true });
 			} else if (state.user?.role === 'admin') {
 				// Admin lives in the admin area; no user dashboard/scrapers (roles don't overlap).
+				// System logs are the landing on purpose: the first thing an administrator wants
+				// to know is whether anything is failing right now.
 				if (path === '/login' || path === '/change-password' || path === '/')
-					void goto('/admin/users', { replaceState: true });
+					void goto('/admin/logs', { replaceState: true });
 			} else {
 				// Standard user: keep out of the auth pages and the admin area.
 				if (path === '/login' || path === '/change-password' || path.startsWith('/admin'))

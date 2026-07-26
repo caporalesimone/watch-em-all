@@ -10,6 +10,10 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 **Phase 9 — Dragon Store, complete: paste a category URL, preview it with a dry-run, confirm — and dozens of products flow into your catalog on every run (with de-duplication and the site's own exclusions); delisted products grey out on their own and clear with a click. Entries land below as they ship.**
 
+### Changed
+
+- **Administrators land on the system logs.** Signing in as an administrator used to open the user list. It now opens **System logs**, on the reasoning that the first thing you want to know is whether anything is failing right now.
+
 ## [0.8.1] - 2026-07-26
 
 **Fix — Dragon Store stopped being readable: the site added an anti-bot gate, and we discovered we had been crawling seven times faster than its `robots.txt` asks. Both sides are fixed, plus the worse bug this uncovered: a failed scrape used to wipe your catalogue.**
