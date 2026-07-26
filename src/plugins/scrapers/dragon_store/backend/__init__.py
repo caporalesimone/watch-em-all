@@ -10,7 +10,6 @@ Categories, pagination and the "ammaccato" filter are phase 9.
 The write path is a ``context`` callback — the scraper never writes the catalog itself —
 and *which* callback matters: ``update_catalog`` for a run that read every watch (it
 delists whatever it did not see), ``upsert_catalog`` for anything partial or failed.
-``run_test`` is a dry-run: it scrapes the same way but writes nothing (SCR-R11).
 
 Since 2026-07-25 the site gates the first request of every session behind an anti-bot
 interstitial served as **HTTP 200**, so the status code is no evidence and the body must be
@@ -124,11 +123,11 @@ def _user_watches(db: Session, user_id: int) -> list[Watch]:
     )
 
 
-def _no_write(user_id: int, products: list[Product]) -> DeltaCounters:
-    raise RuntimeError("run_test must not write to the catalog")
+def _refuse_delisting(user_id: int, products: list[Product]) -> DeltaCounters:
+    raise RuntimeError("a single-product delivery must never run the delisting sweep")
 
 
-def _request_context(db: Session, *, upsert: bool) -> PluginContext:
+def _request_context(db: Session) -> PluginContext:
     """A context for a scrape driven by a web request, outside a scheduled run.
 
     The HTTP client comes from :func:`build_http_client`, so these paths get the same
@@ -136,9 +135,8 @@ def _request_context(db: Session, *, upsert: bool) -> PluginContext:
     a hand-rolled client here would quietly ignore the admin config, which is precisely
     the sort of gap that gets a scraper rate-limited.
 
-    ``update_catalog`` is always refused: a single-product delivery must never trigger the
-    delisting sweep. ``upsert`` decides whether the product may be *stored* — true when a
-    user adds a watch (they asked for it in their catalog), false for the dry-run test.
+    Writes go through ``upsert_catalog``; ``update_catalog`` is wired to raise, because a
+    delivery of one product says nothing about the others and must never delist them.
     """
     logger = logging.getLogger(f"wea.plugin.{PLUGIN_ID}")
     return PluginContext(
@@ -146,8 +144,8 @@ def _request_context(db: Session, *, upsert: bool) -> PluginContext:
         db=db,
         logger=logger,
         config={},
-        update_catalog=_no_write,
-        upsert_catalog=bind_upsert_catalog(db) if upsert else _no_write,
+        update_catalog=_refuse_delisting,
+        upsert_catalog=bind_upsert_catalog(db),
         http=build_http_client(db, PLUGIN_ID, logger),
     )
 
@@ -383,7 +381,7 @@ class DragonStorePlugin(ScraperPlugin):
             extra=extra,
         )
 
-    # --- runtime (SCR-R4/R5/R11) ---
+    # --- runtime (SCR-R4/R5) ---
     def run_for_user(self, context: PluginContext, user_id: int) -> DeltaCounters:
         watches = _user_watches(context.db, user_id)
         if not watches:
@@ -428,18 +426,7 @@ class DragonStorePlugin(ScraperPlugin):
         )
         return context.upsert_catalog(user_id, outcome.products)
 
-    def run_test(self, context: PluginContext, params: dict[str, Any]) -> list[Product]:
-        url = str(params.get("url", "")).strip()
-        if not url:
-            return []
-        try:
-            product = self._scrape_one(context, url)
-        except DragonStoreRateLimited as exc:
-            context.logger.error("dragon_store: test scrape of %s rate-limited (%s)", url, exc)
-            return []
-        return [product] if product is not None else []
-
-    # --- routes: watches CRUD + dry-run test (per-user) ---
+    # --- routes: watches CRUD (per-user) ---
     def router(self) -> APIRouter:
         router = APIRouter()
 
@@ -460,7 +447,7 @@ class DragonStorePlugin(ScraperPlugin):
             # wait for a scheduled run — or press Scrape now — before seeing a price: two
             # rounds of requests to the site for a single intention. The watch stays valid
             # even when the scrape fails; the next run fills it in.
-            context = _request_context(db, upsert=True)
+            context = _request_context(db)
             try:
                 product = self._scrape_one(context, url)
             except DragonStoreRateLimited as exc:
@@ -501,11 +488,6 @@ class DragonStorePlugin(ScraperPlugin):
                 raise APIError(404, "not_found", "watch not found")
             db.delete(watch)
             db.commit()
-
-        @router.post("/test", response_model=list[Product])
-        def test(body: WatchIn, user: UserDep, db: SessionDep) -> list[Product]:
-            # Dry run (SCR-R11): scrapes exactly like a real run, writes nothing at all.
-            return self.run_test(_request_context(db, upsert=False), {"url": body.url})
 
         return router
 

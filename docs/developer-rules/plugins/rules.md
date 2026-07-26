@@ -12,7 +12,7 @@
 ## Behaviour
 
 - **PLG-5** — Single-thread by contract: no internal threading/asyncio towards the site. Long work must be interruptible (the runner's run timeout must be able to stop you — and with serial execution a hung job also holds up the queue).
-- **PLG-6** — `run_test`/dry-run: **zero writes**, of any kind. The CI verifies it.
+- **PLG-6** — *withdrawn in 0.9.0.* It required `run_test`/dry-run to write nothing; both the method and the concept are gone (see [scraper-plugin](../../3-features/plugins/scraper-plugin.md), SCR-R11/R12 withdrawn). The number is retired, not reused.
 - **PLG-7** — `external_id`: the plugin implements **only** the abstract seed `identity_seed` (SCR-R10); hashing/normalization is imposed by the base (`final`) and **never reimplemented**. The choice of seed is documented in the plugin's doc under `implemented-plugins/`; changing it is a breaking change for users' data and is done only with a migration note. Never fill `external_id` by hand or hash with the built-in `hash()`.
 - **PLG-8** — Per-run idempotency: two consecutive runs with no changes on the site produce **zero** delta (it is the checklist's check and symptom #1 of an unstable `external_id`).
 

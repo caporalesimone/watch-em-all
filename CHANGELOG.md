@@ -8,7 +8,11 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 ## [0.9.0] - Unreleased
 
-**Phase 9 — Dragon Store, complete: paste a category URL, preview it with a dry-run, confirm — and dozens of products flow into your catalog on every run (with de-duplication and the site's own exclusions); delisted products grey out on their own and clear with a click. Entries land below as they ship.**
+**Phase 9 — Dragon Store, complete: paste a category URL and dozens of products flow into your catalog on every run (with de-duplication and the site's own exclusions); delisted products grey out on their own and clear with a click. Entries land below as they ship.**
+
+### Removed
+
+- **The dry-run preview is gone.** Pasting a URL used to offer a *Preview* that scraped the page and showed what it found without saving it; you then pressed *Add*, which scraped the same page again. Since 0.8.1 adding a URL already stores the product, so the preview was asking a site that requests 10 seconds between requests to serve the same page twice for a single intention — and a preview that saves nothing looked exactly like an add that does. Now there is one button.
 
 ### Changed
 

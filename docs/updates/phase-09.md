@@ -1,9 +1,9 @@
 # Phase 9 — Dragon Store, complete 🐉
 
 > Feature-level recap. Phase 9 takes the first scraper from "one product at a time" to a full
-> configuration: paste a **category URL**, preview it with a **dry-run**, confirm — and dozens of
-> products flow into your catalog on every run, with de-duplication and the site's own exclusions
-> applied. Delisted products **grey out on their own** and clear with a click.
+> configuration: paste a **category URL** and dozens of products flow into your catalog on every
+> run, with de-duplication and the site's own exclusions applied. Delisted products **grey out on
+> their own** and clear with a click.
 >
 > 🚧 **In progress (0.9.x).** This page fills in as the phase's MVPs ship; the list below tracks
 > what has actually landed.
@@ -16,7 +16,7 @@ _Nothing merged yet — entries land here as each MVP ships._
 As MVPs land, document them here in the same user-facing voice as the earlier phases, e.g.:
 
 ### 1) Category scraping (pagination + de-dup + site exclusions)
-### 2) Add-URL with dry-run preview
+### 2) Add a URL and it is already in your catalog
 ### 3) Catalog lifecycle (delisting + cleanups)
 ### 4) Full Dragon Store user UI
 

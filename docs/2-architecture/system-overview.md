@@ -25,20 +25,20 @@ graph TB
     WEB --> DB
     WORKER --> DB
     WORKER -->|scraping| EXT1
-    WEB -->|dry-run / scrape-now| EXT1
+    WEB -->|add-a-watch / scrape-now| EXT1
     ADM -.-> DB
 ```
 
 | Container | Responsibility | Notes |
 |---|---|---|
-| `web` | HTTP API, authentication, serves the built SPA, runs the **on-demand scrapes** (dry-run, scrape-now) as background tasks | Loads the plugins to expose their routes and their config schemas |
+| `web` | HTTP API, authentication, serves the built SPA, runs the **on-demand scrapes** (resolving a watch as it is added, scrape-now) | Loads the plugins to expose their routes and their config schemas |
 | `worker` | Temporal dispatcher (tick every minute) + **serial scraper runner** (one at a time, each on its own schedule); daily maintenance (retention purge of logs and run records); heartbeat | Loads the plugins to execute them |
 | `db` | PostgreSQL: the system's single shared state | MVCC handles the concurrent writes of web and worker |
 | `pgweb` | DB inspection from the browser | Development stack only (`compose-dev.yml`), absent from the release |
 
 **Why PostgreSQL and not SQLite**: two processes write concurrently (web and worker); SQLite with a file lock shared across containers is fragile, Postgres with MVCC is not.
 
-**Why both containers load the plugins**: the worker runs the scheduled runs; the web exposes the plugin routes (UI, dry-run, config schemas) and runs the on-demand scrapes requested from the UI. The executions coordinate through a **per-scraper lock on the DB** (never two runs of the same scraper in parallel, whichever container starts them).
+**Why both containers load the plugins**: the worker runs the scheduled runs; the web exposes the plugin routes (UI, config schemas) and runs the on-demand scrapes requested from the UI. The executions coordinate through a **per-scraper lock on the DB** (never two runs of the same scraper in parallel, whichever container starts them).
 
 ## Core component view
 

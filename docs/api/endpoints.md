@@ -132,10 +132,9 @@ Registered under `/api/plugins/dragon-store` (the generic convention above); the
 
 | Method | Path | Role | Notes |
 |---|---|---|---|
-| POST | `/api/plugins/dragon-store/test` | 👤 | dry-run: returns `list[Product]`, writes nothing (SCR-R11) |
 | POST | `/api/plugins/dragon-store/scrape-now` | 👤 | immediate scrape for the requesting user only (writes the catalog); a run already in progress (scheduled or manual) → **409** (`scrape_in_progress`, SCHED-R4); within the cooldown → **429** with the time remaining; otherwise **202** + a background job (SCR-R15) |
 | GET | `/api/plugins/dragon-store/scrape-now` | 👤 | cooldown status: `{available, available_at, retry_after_seconds, interval_seconds}` (feeds the UI countdown) |
-| GET/POST/DELETE | `/api/plugins/dragon-store/watches` | 👤 | the user's watched product URLs; `POST` rejects a duplicate URL with **409** |
+| GET/POST/DELETE | `/api/plugins/dragon-store/watches` | 👤 | the user's watched product URLs; `POST` scrapes the page there and then and stores the product in the catalog (non-delisting write), and rejects a duplicate URL with **409**. It is slow by design — the site's `Crawl-delay` plus its access check — so the form says so while it waits |
 
 ## Health — [deployment](../infrastructure/deployment.md)
 

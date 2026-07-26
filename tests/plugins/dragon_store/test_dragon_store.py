@@ -181,18 +181,27 @@ def test_add_duplicate_watch_rejected(client: TestClient) -> None:
     assert len(client.get(f"{DS}/watches", headers=h).json()) == 1  # still one
 
 
-# --- HTTP: dry-run (real scrape, no write) ---
+# --- HTTP: adding a watch scrapes and stores the product (0.8.1) ---
+#
+# These used to go through the dry-run route, removed in 0.9.0 along with the whole
+# preview flow: adding a URL already scrapes it and writes it, so a second no-write
+# scrape of the same page was a second round of requests for one intention. The
+# parser coverage they carried is kept, now read back from the catalog.
 
 
-def test_dry_run_discounted_sanitises_title_and_writes_nothing(client: TestClient) -> None:
+def _added_product(client: TestClient, headers: dict[str, str], gp_id: str) -> dict[str, Any]:
+    with DragonServer() as base:
+        added = client.post(f"{DS}/watches", json={"url": gp_url(base, gp_id)}, headers=headers)
+    assert added.status_code == 201
+    page = client.get("/api/catalog", headers=headers).json()
+    assert page["total"] == 1
+    return cast(dict[str, Any], page["items"][0])
+
+
+def test_adding_a_watch_sanitises_the_title_and_stores_the_product(client: TestClient) -> None:
     _uid, token = _user(client)
     h = _bearer(token)
-    with DragonServer() as base:
-        resp = client.post(f"{DS}/test", json={"url": gp_url(base, "896")}, headers=h)
-    assert resp.status_code == 200
-    products = resp.json()
-    assert len(products) == 1
-    product = products[0]
+    product = _added_product(client, h, "896")
     assert product["plugin_id"] == "dragon_store"
     assert product["price_current"] == "9.90"
     assert product["currency"] == "EUR"
@@ -201,26 +210,18 @@ def test_dry_run_discounted_sanitises_title_and_writes_nothing(client: TestClien
     # title label stripped from the name and surfaced as a tag
     assert "OFFERTA RAVEN PRIME" not in product["name"].upper()
     assert "Offerta Raven Prime" in product["tags"]
-    # nothing persisted (dry-run)
-    assert client.get("/api/catalog", headers=h).json()["total"] == 0
 
 
-def test_dry_run_preorder_tags_pre_order_and_is_available(client: TestClient) -> None:
+def test_preorder_tags_pre_order_and_is_available(client: TestClient) -> None:
     _uid, token = _user(client)
-    h = _bearer(token)
-    with DragonServer() as base:
-        resp = client.post(f"{DS}/test", json={"url": gp_url(base, "36099")}, headers=h)
-    product = resp.json()[0]
+    product = _added_product(client, _bearer(token), "36099")
     assert product["is_available"] is True  # PreOrder is orderable
     assert "Pre Order" in product["tags"]
 
 
-def test_dry_run_out_of_stock_is_unavailable(client: TestClient) -> None:
+def test_out_of_stock_is_unavailable(client: TestClient) -> None:
     _uid, token = _user(client)
-    h = _bearer(token)
-    with DragonServer() as base:
-        resp = client.post(f"{DS}/test", json={"url": gp_url(base, "27006")}, headers=h)
-    product = resp.json()[0]
+    product = _added_product(client, _bearer(token), "27006")
     assert product["is_available"] is False
 
 

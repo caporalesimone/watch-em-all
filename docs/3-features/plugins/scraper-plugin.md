@@ -52,9 +52,8 @@ A **stateless** and **internally single-threaded** producer of products: it read
 - **SCR-R9** — Every product carries an `external_id` that is **stable across runs and unique** in the plugin's space. It is the anchor of everything: recognition, history, availability, delisting. If it changes, the core sees a new product and the history is broken.
 - **SCR-R10** — The derivation is a **template method** ([product](../../4-capabilities/contracts/product.md)): the plugin **must** implement only the **seed** (`identity_seed`, abstract method — native SKU/ID if one exists, otherwise `None` for the fallback to the URL; never titles or descriptions); the **hashing and normalization** are imposed by the base (`final`, non-overridable) and identical for all scrapers. The plugin never fills `external_id` by hand and never reimplements the hashing — that is what guarantees stability and uniformity without relying on the plugin's good will. A scraper that does not provide the seed does not load (the abstract fails at load).
 
-### Dry-run / Test
-- **SCR-R11** — Every scraper implements a **test** function: an on-demand scrape that returns the products found **without writing anything** (neither catalog nor inputs). Parametrized by the input collected from the plugin's UI.
-- **SCR-R12** — The display of the test results is **shared** (a design-system table component fed by the result): the plugin does not reimplement the table. The dry-run serves both the user (a preview of what will be watched) and the admin (a functioning check from the plugin's admin page).
+### Dry-run / Test — withdrawn in 0.9.0
+- **SCR-R11**, **SCR-R12** — **withdrawn**, and the numbers are retired rather than reused (they appear in earlier phase records). A scraper no longer implements a no-write test scrape, and there is no preview step. Adding an input already scrapes the page and stores the product, so a dry-run meant asking the site for the same page twice for one intention — costly against a site that publishes a `Crawl-delay`, and confusing, because a preview that writes nothing looked identical to an add that does.
 
 ### Adjustments
 - **SCR-R13** — The scraper exposes the computation of the **adjustments** for the carts bound to it: given the total, it returns the corrective entries according to the site rules (threshold discounts, shipping). The core applies them without knowing their logic. Contract: [adjustment](../../4-capabilities/contracts/adjustment.md).
@@ -63,7 +62,7 @@ A **stateless** and **internally single-threaded** producer of products: it read
 - **SCR-R14** — The scraper implements `delete_user_data(context, user_id)`: it deletes **all** of that user's rows from its own tables (inputs, personal parameters), **idempotently** (callable multiple times without error). It is invoked by the core during an account purge, **before** the cascade on the central data ([user-management](../admin/user-management.md), USR-R10).
 
 ### Manual scrape (scrape-now)
-- **SCR-R15** — Every scraper exposes, on its **own user page**, a **scrape-now** command for the **requesting user only** (it populates the catalog — unlike the dry-run, which writes nothing). It is subject to a **per-scraper minimum interval** (*cooldown*): a **reserved admin parameter** (SCR-R2, imposed by the core and uniform, not left to the individual plugin — same philosophy as politeness), with a **1-hour default**. *(The interval is a CONSTANT for now; making it an admin parameter arrives in a later phase.)* The block is **server-side**: a request within the interval is **rejected** declaring the **time remaining** (HTTP 429), never just hidden in the UI. The UI **disables** the button until the cooldown has elapsed, showing a **countdown** fed by the state read from the server; a **confirmation popup** on press reminds how often the scrape is available. Scrape-now shares the **per-scraper lock** with the scheduled runs ([SCHED-R4](../admin/scraper-scheduling-and-limits.md)). The cooldown relies on a **"last scrape" anchor per *(scraper, user)***, with a precise asymmetry: the anchor is **written at the start of *every* scrape — manual or scheduled — but read (and therefore binding) only by the manual scrape**. Intended consequences: after a **scheduled** run you cannot immediately force a manual one (the run wrote the anchor), while a **manual** one never blocks the next scheduled run (which does not read the anchor); writing the anchor **at the start** (not at the end) makes the cooldown count from the beginning and closes off the close-together double-press. The mechanics (cooldown, anchor, dispatch to the run) are **provided by the base** shared across scrapers, not reimplemented by the plugins.
+- **SCR-R15** — Every scraper exposes, on its **own user page**, a **scrape-now** command for the **requesting user only**, which re-reads every input and populates the catalog. It is subject to a **per-scraper minimum interval** (*cooldown*): a **reserved admin parameter** (SCR-R2, imposed by the core and uniform, not left to the individual plugin — same philosophy as politeness), with a **1-hour default**. *(The interval is a CONSTANT for now; making it an admin parameter arrives in a later phase.)* The block is **server-side**: a request within the interval is **rejected** declaring the **time remaining** (HTTP 429), never just hidden in the UI. The UI **disables** the button until the cooldown has elapsed, showing a **countdown** fed by the state read from the server; a **confirmation popup** on press reminds how often the scrape is available. Scrape-now shares the **per-scraper lock** with the scheduled runs ([SCHED-R4](../admin/scraper-scheduling-and-limits.md)). The cooldown relies on a **"last scrape" anchor per *(scraper, user)***, with a precise asymmetry: the anchor is **written at the start of *every* scrape — manual or scheduled — but read (and therefore binding) only by the manual scrape**. Intended consequences: after a **scheduled** run you cannot immediately force a manual one (the run wrote the anchor), while a **manual** one never blocks the next scheduled run (which does not read the anchor); writing the anchor **at the start** (not at the end) makes the cooldown count from the beginning and closes off the close-together double-press. The mechanics (cooldown, anchor, dispatch to the run) are **provided by the base** shared across scrapers, not reimplemented by the plugins.
 
 ## Flow of a run (contractual view)
 
@@ -88,15 +87,14 @@ sequenceDiagram
 
 ## The plugin's user page
 
-How the user chooses *what to watch* is a free choice of the plugin (browsing by categories, entering URLs, search…), with three constraints:
+How the user chooses *what to watch* is a free choice of the plugin (browsing by categories, entering URLs, search…), with two constraints:
 
 1. it uses the core's **design system**;
-2. it offers the preview **dry-run** (without persistence);
-3. the confirmed selection creates the entries in the plugin's inputs.
+2. the confirmed selection creates the entries in the plugin's inputs — and scrapes them once, there and then, so the products are in the catalog immediately.
 
-The page also hosts the per-scraper **Scrape now** command (SCR-R15) which — unlike the dry-run — **writes** to the catalog, with its button subject to the cooldown (disabled + countdown when unavailable).
+The page also hosts the per-scraper **Scrape now** command (SCR-R15), with its button subject to the cooldown (disabled + countdown when unavailable).
 
-It is **distinct** from the core's Product Picker (which works on the already-extracted catalog). The plugin's **admin** page is in turn distinct: operational parameters (including the Scrape now interval) + test, never content selection.
+It is **distinct** from the core's Product Picker (which works on the already-extracted catalog). The plugin's **admin** page is in turn distinct: operational parameters (including the Scrape now interval), never content selection.
 
 ## Practical guide
 

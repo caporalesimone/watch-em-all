@@ -50,7 +50,8 @@ UpdateCatalog = Callable[[int, "list[Product]"], "DeltaCounters"]
 
 
 def _no_catalog_write(user_id: int, products: list[Product]) -> DeltaCounters:
-    """Default for a context built without a write path (a dry run must write nothing)."""
+    """Default for a context built without that write path: raising beats silently
+    dropping a delivery, and beats defaulting to a path the caller did not choose."""
     raise NotImplementedError("this context has no catalog write path")
 
 
@@ -117,10 +118,10 @@ def build_http_client(session: Session, plugin_id: str, logger: Logger) -> HttpC
     admin override exists.
 
     Shared on purpose. Every path that talks to a site must get *this* client — a
-    scheduled run, the manual scrape-now, and the read-only paths that build their own
-    context (resolving a watch as it is added, the dry-run test). A hand-rolled
-    ``HttpClient()`` in one of those would silently bypass the admin config and the cache,
-    which is exactly how a scraper ends up hammering a site nobody configured it to hammer.
+    scheduled run, the manual scrape-now, and the paths that build their own context
+    (resolving a watch as it is added). A hand-rolled ``HttpClient()`` in one of those
+    would silently bypass the admin config and the cache, which is exactly how a scraper
+    ends up hammering a site nobody configured it to hammer.
     """
     cfg = get_scraper_config(session, plugin_id)
     return HttpClient(

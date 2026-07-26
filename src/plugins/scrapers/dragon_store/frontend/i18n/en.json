@@ -12,11 +12,6 @@
 			"duplicate": "You are already watching this URL.",
 			"scraping": "Reading the product from the site… it can take up to two minutes before it appears in your catalog."
 		},
-		"dry_run": {
-			"action": "Preview (dry-run)",
-			"heading": "Preview",
-			"hint": "A dry-run scrapes without saving anything."
-		},
 		"scrape_now": {
 			"action": "Scrape now",
 			"confirm_title": "Scrape Dragon Store now?",
@@ -29,8 +24,6 @@
 			"shipping": "Shipping",
 			"free_shipping": "Free shipping"
 		},
-		"available": "Available",
-		"unavailable": "Out of stock",
 		"error": "Request failed."
 	}
 }

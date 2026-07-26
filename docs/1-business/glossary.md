@@ -22,6 +22,5 @@
 | **Run (of a scrape)** | A single execution of a scraper, which processes all the users who have configured it. Scheduled by the admin, from 1 to N times a day. |
 | **Slot** | One of a run's scheduled times. If the system was down, it recovers the most recent missed slot (only one). |
 | **Scrape cache** | The reuse of the results of a recent search: the same query, across different users or close-together runs, does not go back to the site until the **half-life** (validity duration, configured by the admin per plugin) expires. |
-| **Dry-run / Test** | A trial execution of a scraper that shows the products found **without saving anything**. |
 | **Core** | The heart of the system: it orchestrates the plugins, owns the data, computes carts. It does not know the plugins' internal logic (nor, for example, the notion of "category", which is internal to the scrapers). |
 | **Worker** | The process that runs things at the right moment: scraper executions (and, later, notifications and reports). |

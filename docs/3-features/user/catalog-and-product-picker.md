@@ -57,8 +57,8 @@ Distinction to keep firm (a frequent source of confusion):
 | | Plugin page | Product Picker (core) |
 |---|---|---|
 | Purpose | Decide **what to watch on the site** | Choose products **already in the catalog** for the carts |
-| Data | Live preview from the site (dry-run) | DB |
-| Writes | Scraper input (plugin tables) | Cart members |
+| Data | Read live from the site | DB |
+| Writes | Scraper input (plugin tables) + the product itself, scraped on the spot | Cart members |
 
 ## "Empty catalog → first population" cycle
 

@@ -5,7 +5,6 @@
 	import ProductCell from '$lib/components/ProductCell.svelte';
 	import ProductTags from '$lib/components/ProductTags.svelte';
 	import ProductThumb from '$lib/components/ProductThumb.svelte';
-	import { money } from '$lib/format';
 	import { _ } from '$lib/i18n';
 
 	const BASE = '/api/plugins/dragon-store';
@@ -28,17 +27,6 @@
 		tags: string[];
 		category: CategoryRef[];
 	}
-	interface PreviewProduct {
-		external_id: string;
-		name: string;
-		url: string;
-		image_url: string | null;
-		brand: BrandRef | null;
-		tags: string[];
-		price_current: string;
-		currency: string;
-		is_available: boolean;
-	}
 	interface ScrapeStatus {
 		available: boolean;
 		available_at: string | null;
@@ -48,7 +36,6 @@
 
 	let watches = $state<Watch[]>([]);
 	let url = $state('');
-	let preview = $state<PreviewProduct[] | null>(null);
 	let status = $state<ScrapeStatus | null>(null);
 	let remaining = $state(0);
 	let confirming = $state(false);
@@ -120,7 +107,6 @@
 				return;
 			}
 			url = '';
-			preview = null;
 			await loadWatches();
 		} finally {
 			busy = false;
@@ -130,29 +116,6 @@
 	async function removeWatch(id: number): Promise<void> {
 		const res = await apiFetch(`${BASE}/watches/${id}`, { method: 'DELETE' });
 		if (res.ok) await loadWatches();
-	}
-
-	async function runPreview(): Promise<void> {
-		error = null;
-		notice = null;
-		if (!url.trim()) {
-			error = $_('dragon_store.watches.invalid');
-			return;
-		}
-		busy = true;
-		try {
-			const res = await apiFetch(`${BASE}/test`, {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ url: url.trim() })
-			});
-			if (!res.ok) throw new Error(String(res.status));
-			preview = (await res.json()) as PreviewProduct[];
-		} catch {
-			error = $_('dragon_store.error');
-		} finally {
-			busy = false;
-		}
 	}
 
 	async function doScrape(): Promise<void> {
@@ -211,7 +174,7 @@
 		<p class="max-w-prose text-sm text-slate-500">{$_('dragon_store.blurb')}</p>
 	</header>
 
-	<!-- Add a watch + dry-run preview (3.F3 / 3.F4) -->
+	<!-- Add a watch (3.F3): one scrape resolves the product AND stores it (0.8.1) -->
 	<form onsubmit={addWatch} class="space-y-3">
 		<div class="flex gap-2">
 			<input
@@ -219,9 +182,6 @@
 				placeholder={$_('dragon_store.watches.url_placeholder')}
 				bind:value={url}
 			/>
-			<button type="button" class={btn} onclick={runPreview} disabled={busy}>
-				{$_('dragon_store.dry_run.action')}
-			</button>
 			<button
 				type="submit"
 				class="rounded bg-slate-800 px-3 py-1 text-sm text-white hover:bg-slate-700 disabled:opacity-50 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white"
@@ -237,36 +197,11 @@
 				></span>
 				{$_('dragon_store.watches.scraping')}
 			</p>
-		{:else}
-			<p class="text-xs text-slate-400">{$_('dragon_store.dry_run.hint')}</p>
 		{/if}
 	</form>
 
 	{#if notice}<p class="text-sm text-green-600 dark:text-green-400">{notice}</p>{/if}
 	{#if error}<p class="text-sm text-red-500">{error}</p>{/if}
-
-	{#if preview}
-		<div class="space-y-2">
-			<h2 class="text-sm font-semibold">{$_('dragon_store.dry_run.heading')}</h2>
-			<table class="w-full text-left text-sm">
-				<tbody>
-					{#each preview as p (p.external_id)}
-						<tr class="border-b border-slate-100 dark:border-slate-800/60">
-							<td class="py-1 pr-4"><ProductThumb src={p.image_url} /></td>
-							<td class="py-1 pr-4">
-								<ProductCell name={p.name} url={p.url} brand={p.brand} />
-								<ProductTags tags={p.tags} />
-							</td>
-							<td class="py-1 pr-4 font-medium">{money(p.price_current, p.currency)}</td>
-							<td class="py-1 pr-4 text-slate-500">
-								{p.is_available ? $_('dragon_store.available') : $_('dragon_store.unavailable')}
-							</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</div>
-	{/if}
 
 	<!-- Watched products list (3.F3) -->
 	<div class="mx-auto w-3/4 space-y-2">

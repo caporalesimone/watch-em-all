@@ -89,4 +89,4 @@ flowchart TD
 - **MON-R2** — Le statistiche e i trend sono consultabili per scraper; i dati di run seguono la retention configurata (default 90 giorni), i log di sistema idem.
 - **MON-R3** — Il conteggio delle richieste HTTP è automatico (instrumentazione del client del core), non dichiarato dal plugin.
 - **MON-R4** — Il worker emette un heartbeat periodico visibile in pagina; l'assenza oltre soglia è evidenziata come anomalia.
-- **MON-R5** — Run manuali (scrape-now degli utenti, dry-run esclusi perché non scrivono) compaiono nel monitoraggio con trigger `manual`.
+- **MON-R5** — Run manuali (scrape-now degli utenti) compaiono nel monitoraggio con trigger `manual`. Lo scrape singolo che risolve un watch all'aggiunta **non** apre una run: è una richiesta, non un'esecuzione dello scraper.

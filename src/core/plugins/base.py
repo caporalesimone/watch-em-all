@@ -8,9 +8,8 @@ Scrapers add the identity template-method (SCR-R10 / product.md): the plugin
 supplies only the SEED (``identity_seed``, abstract — a scraper without it does
 not load); normalisation and hashing are FINAL and identical for every scraper,
 so the same product always maps to the same ``external_id`` across processes
-(worker vs web). The runtime methods (``run_for_user`` / ``run_test``) arrive
-with the scraper runtime; their write path is the ``context.update_catalog``
-callback (the scraper never writes the catalog directly).
+(worker vs web). ``run_for_user`` is the runtime entry point; its write path is
+a ``context`` callback (the scraper never writes the catalog directly).
 """
 
 from __future__ import annotations
@@ -30,7 +29,7 @@ if TYPE_CHECKING:
     from sqlalchemy import MetaData
 
     from src.core.alert_engine import AlertEvent
-    from src.core.contracts import Adjustment, ConfigField, DeltaCounters, Product
+    from src.core.contracts import Adjustment, ConfigField, DeltaCounters
     from src.core.models import CatalogProduct
     from src.core.plugins.context import PluginContext
 
@@ -107,8 +106,8 @@ class ScraperPlugin(BasePlugin, ABC):
 
     Identity is a template method (SCR-R10): the plugin implements only
     ``identity_seed``; ``normalize_url`` / ``_stable_id`` / ``external_id_for``
-    are ``final`` and uniform for all scrapers. ``run_for_user`` / ``run_test``
-    are the runtime entry points (real scrapers override them).
+    are ``final`` and uniform for all scrapers. ``run_for_user`` is the runtime
+    entry point (real scrapers override it).
     """
 
     @abstractmethod
@@ -160,12 +159,6 @@ class ScraperPlugin(BasePlugin, ABC):
         counters. The default raises so a misconfigured scraper fails loudly;
         real scrapers override it."""
         raise NotImplementedError(f"{self.plugin_id}: run_for_user not implemented")
-
-    def run_test(self, context: PluginContext, params: dict[str, Any]) -> list[Product]:
-        """Dry-run (SCR-R11): produce the products for UI-provided ``params``
-        WITHOUT writing anything (neither catalog nor inputs). Real scrapers
-        override it."""
-        raise NotImplementedError(f"{self.plugin_id}: run_test not implemented")
 
     def configured_users(self, context: PluginContext) -> list[int]:
         """User ids that have configured this scraper — the users a SCHEDULED run
