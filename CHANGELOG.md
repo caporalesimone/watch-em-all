@@ -13,6 +13,8 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 ### Changed
 
 - **Administrators land on the system logs.** Signing in as an administrator used to open the user list. It now opens **System logs**, on the reasoning that the first thing you want to know is whether anything is failing right now.
+- **The system log is easier to watch.** Live tailing now lets you pick its rate (1s / 5s / 10s), and the green dot flashes on every check — so a quiet log looks different from a stuck one. Rows carry a **Date** column, not just a time. Refresh and rows-per-page grey out while tailing, since neither means anything then, and picking a level filter no longer resizes the search box. Rows per page are now 50 / 100 / 200.
+- **Price charts say when the product was last read.** A **Last seen** timestamp sits above the chart. A flat line used to be ambiguous — stable price, or nobody looking? — which is exactly what the Dragon Store outage would have looked like.
 
 ## [0.8.1] - 2026-07-26
 

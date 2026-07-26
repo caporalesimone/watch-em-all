@@ -275,6 +275,7 @@
 		"cart": "Carrello",
 		"noProducts": "Nessun prodotto",
 		"noCarts": "Nessun carrello",
+		"lastSeen": "Ultima lettura",
 		"empty": "Storico non ancora sufficiente",
 		"error": "Impossibile caricare lo storico prezzi.",
 		"outOfStock": "Non disponibile",

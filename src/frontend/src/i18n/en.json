@@ -374,6 +374,7 @@
 		"cart": "Cart",
 		"noProducts": "No products yet",
 		"noCarts": "No carts yet",
+		"lastSeen": "Last seen",
 		"empty": "Not enough history yet",
 		"error": "Could not load the price history.",
 		"outOfStock": "Out of stock",
