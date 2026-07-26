@@ -10,7 +10,7 @@
 	import PageTitle from '$lib/components/PageTitle.svelte';
 
 	type Level = 'info' | 'warning' | 'error';
-	const SIZES = [25, 50, 100];
+	const SIZES = [50, 100, 200];
 	const MAX_LIVE = 500; // cap rows kept while tailing
 	// How often the tail asks for new rows. Only `system_log` sources write here (worker,
 	// scraper, notifier, alert), so between scheduled runs there is genuinely nothing new —
