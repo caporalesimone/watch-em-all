@@ -122,11 +122,12 @@ def test_config_requires_admin(client: TestClient) -> None:
 
 def test_config_get_defaults_then_patch_subset(client: TestClient) -> None:
     h = _bearer(_admin_token(client))
-    # Defaults mirror the superseded constants.
+    # Defaults mirror the module constants: 11 s between requests (just above the slowest
+    # Crawl-delay we have met) and a 12-hour cache half-life.
     assert client.get(CFG, headers=h).json() == {
-        "politeness_delay_ms": 1500,
+        "politeness_delay_ms": 11000,
         "http_timeout_s": 15.0,
-        "cache_ttl_min": 60,
+        "cache_ttl_min": 720,
         "scrape_now_min_interval_s": 3600,
     }
     patched = client.patch(CFG, json={"cache_ttl_min": 0, "http_timeout_s": 20}, headers=h)
@@ -135,7 +136,7 @@ def test_config_get_defaults_then_patch_subset(client: TestClient) -> None:
     assert body["cache_ttl_min"] == 0  # 0 disables the cache
     assert body["http_timeout_s"] == 20.0
     # Untouched keys keep their defaults.
-    assert body["politeness_delay_ms"] == 1500
+    assert body["politeness_delay_ms"] == 11000
     assert body["scrape_now_min_interval_s"] == 3600
     # Persisted across reads.
     assert client.get(CFG, headers=h).json()["cache_ttl_min"] == 0

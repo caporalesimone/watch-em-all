@@ -294,9 +294,12 @@ def test_run_for_user_idempotent(client: TestClient) -> None:
         first = _run_for_user(client, uid)
         second = _run_for_user(client, uid)
 
-    assert first.new == 1
-    assert second.new == 0  # same product, stable identity -> no duplicate
-    assert second.price_changes == 0  # unchanged price -> no spurious history
+    # Adding the watch already stored the product, so even the *first* run is an update:
+    # stable identity, no duplicate, and no spurious history on an unchanged price.
+    assert first.new == 0
+    assert first.found == 1
+    assert second.new == 0
+    assert second.price_changes == 0
 
 
 def test_run_for_user_no_watches_writes_nothing(client: TestClient) -> None:
@@ -325,7 +328,7 @@ def test_run_for_user_brand_and_price_persisted(client: TestClient) -> None:
         client.post(f"{DS}/watches", json={"url": gp_url(base, "34602")}, headers=h)
         counters = _run_for_user(client, uid)
         page = client.get("/api/catalog", headers=h).json()
-    assert counters.new == 1
+    assert counters.found == 1  # already inserted when the watch was added
     assert page["total"] == 1
     item = page["items"][0]
     assert item["price_current"] == "89.99"  # full price
@@ -334,3 +337,125 @@ def test_run_for_user_brand_and_price_persisted(client: TestClient) -> None:
     assert "Edizione Limitata" in item["tags"]  # tag surfaced via the API
     assert "EDIZIONE LIMITATA" not in item["name"].upper()  # label stripped from the name
     assert len(item["category"]) >= 1  # category breadcrumb persisted (PROD-R7)
+
+
+# --- the anti-bot interstitial and the soft rate limit (site change of 2026-07-25) ---
+
+_CHALLENGE_BODY = (
+    b"<!DOCTYPE html><html><head><title>Verifica accesso / Security Check</title></head>"
+    b'<body><input type="checkbox" id="humanCheck">'
+    b'<script>fetch("/ajaxRequests.asp?cmd=captcha_check_ok")</script></body></html>'
+)
+_SOFT_429_BODY = (
+    b'<div id="pageNotFound"><p><strong>429</strong> <span>Too Many Requests</span>.</p></div>'
+)
+
+
+class GatedServer:
+    """Dragon Store as it behaves since 2026-07-25: the interstitial until the clear
+    endpoint is called, then the real fixtures. Everything is served with HTTP **200**,
+    which is the whole difficulty. ``state`` is mutable so a test can make the site start
+    rate-limiting halfway through.
+    """
+
+    def __init__(self, state: dict[str, bool] | None = None) -> None:
+        pages = {gid: (_FIX / name).read_bytes() for gid, name in _FIXTURES.items()}
+        self.state = state if state is not None else {"cleared": False, "rate_limited": False}
+        self.calls: list[str] = []
+        state_ref, calls = self.state, self.calls
+
+        class Handler(BaseHTTPRequestHandler):
+            def _send(self, status: int, body: bytes, ctype: str) -> None:
+                self.send_response(status)
+                self.send_header("Content-Type", ctype)
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_GET(self) -> None:
+                calls.append(self.path)
+                if self.path == "/robots.txt":
+                    self._send(200, b"User-agent: *\nCrawl-delay: 0\n", "text/plain")
+                    return
+                if "captcha_check_ok" in self.path:
+                    state_ref["cleared"] = True
+                    self._send(200, b"OK", "text/plain")
+                    return
+                if state_ref.get("rate_limited"):
+                    self._send(200, _SOFT_429_BODY, "text/html")
+                    return
+                if not state_ref.get("cleared"):
+                    self._send(200, _CHALLENGE_BODY, "text/html")
+                    return
+                match = _GP_RE.search(self.path)
+                body = pages.get(match.group(1)) if match else None
+                if body is None:
+                    self._send(404, b"", "text/html")
+                    return
+                self._send(200, body, "text/html; charset=iso-8859-1")
+
+            def log_message(self, fmt: str, *args: Any) -> None:
+                return
+
+        self._srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self._thread = threading.Thread(target=self._srv.serve_forever, daemon=True)
+
+    def __enter__(self) -> str:
+        self._thread.start()
+        return f"http://127.0.0.1:{self._srv.server_address[1]}"
+
+    def __exit__(self, *exc: object) -> None:
+        self._srv.shutdown()
+        self._srv.server_close()
+        self._thread.join(timeout=2)
+
+    def gp_calls(self, since: int = 0) -> list[str]:
+        return [c for c in self.calls[since:] if _GP_RE.search(c)]
+
+
+def test_interstitial_is_cleared_once_and_the_page_retried(client: TestClient) -> None:
+    uid, token = _user(client)
+    h = _bearer(token)
+    server = GatedServer()
+    with server as base:
+        added = client.post(f"{DS}/watches", json={"url": gp_url(base, "896")}, headers=h)
+
+    assert added.status_code == 201
+    assert added.json()["name"]  # resolved through the gate, not left as a bare URL
+    assert sum("captcha_check_ok" in c for c in server.calls) == 1  # cleared exactly once
+    assert len(server.gp_calls()) == 2  # the gated attempt, then the retry
+    # And the product landed in the catalogue straight away.
+    assert client.get("/api/catalog", headers=h).json()["total"] == 1
+
+
+def test_rate_limit_aborts_the_run_and_never_delists(client: TestClient) -> None:
+    """The failure that used to wipe a catalogue: every page fails, the delivery is empty,
+    and the delisting sweep must not run."""
+    uid, token = _user(client)
+    h = _bearer(token)
+    server = GatedServer({"cleared": True, "rate_limited": False})
+    with server as base:
+        client.post(f"{DS}/watches", json={"url": gp_url(base, "896")}, headers=h)
+        client.post(f"{DS}/watches", json={"url": gp_url(base, "36099")}, headers=h)
+        assert client.get("/api/catalog", headers=h).json()["total"] == 2
+
+        server.state["rate_limited"] = True
+        mark = len(server.calls)
+        counters = _run_for_user(client, uid)
+
+    assert counters.found == 0
+    assert counters.removed == 0  # nothing delisted: we could not read, that is not "gone"
+    # Aborted at the first rate-limited page instead of walking the second watch.
+    assert len(server.gp_calls(mark)) == 1
+    assert client.get("/api/catalog", headers=h).json()["total"] == 2
+
+
+def test_watch_survives_a_site_that_cannot_be_read(client: TestClient) -> None:
+    uid, token = _user(client)
+    h = _bearer(token)
+    server = GatedServer({"cleared": True, "rate_limited": True})
+    with server as base:
+        added = client.post(f"{DS}/watches", json={"url": gp_url(base, "896")}, headers=h)
+
+    assert added.status_code == 201  # the watch is kept even when nothing could be read
+    assert added.json()["name"] is None
+    assert client.get("/api/catalog", headers=h).json()["total"] == 0

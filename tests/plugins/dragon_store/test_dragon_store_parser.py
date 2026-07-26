@@ -13,7 +13,10 @@ from pathlib import Path
 import pytest
 
 from src.plugins.scrapers.dragon_store.backend.parser import (
+    DragonStoreChallenge,
     DragonStoreParseError,
+    DragonStoreRateLimited,
+    DragonStoreSoftError,
     parse_product,
 )
 from src.plugins.scrapers.dragon_store.backend.sanitizer import (
@@ -116,3 +119,51 @@ def test_load_title_labels_has_known_labels() -> None:
     labels = load_title_labels()
     assert "Offerta Raven Prime" in labels
     assert "Edizione Limitata" in labels
+
+
+# --- non-product pages: the site serves gates and errors with HTTP 200 (2026-07-25) ---
+
+_CHALLENGE = (
+    b'<!DOCTYPE html><html lang="it"><head>'
+    b"<title>Verifica accesso / Security Check</title></head>"
+    b'<body><input type="checkbox" id="humanCheck"><script>'
+    b'fetch("/ajaxRequests.asp?cmd=captcha_check_ok", '
+    b"{headers: {'ReadyAjaxAuth': 'readypro'}})"
+    b"</script></body></html>"
+)
+
+_SOFT_429 = (
+    b'<div style="text-align:center;"><div id="pageNotFound" style="background:#eee;">'
+    b"<p><strong>429</strong> <span>Too Many Requests</span>.</p></div></div>"
+)
+
+_SOFT_404 = (
+    b'<div style="text-align:center;"><div id="pageNotFound">'
+    b"<p><strong>404</strong> <span>Page Not Found</span>.</p></div></div>"
+)
+
+
+def test_interstitial_is_reported_as_a_challenge_not_a_parse_failure() -> None:
+    with pytest.raises(DragonStoreChallenge):
+        parse_product(_CHALLENGE, "https://www.dragonstore.it/x.gp.1.uw")
+
+
+def test_soft_429_is_reported_as_rate_limiting() -> None:
+    with pytest.raises(DragonStoreRateLimited) as excinfo:
+        parse_product(_SOFT_429, "https://www.dragonstore.it/x.gp.1.uw")
+    assert excinfo.value.status == 429
+
+
+def test_other_soft_error_pages_carry_their_status() -> None:
+    with pytest.raises(DragonStoreSoftError) as excinfo:
+        parse_product(_SOFT_404, "https://www.dragonstore.it/x.gp.1.uw")
+    assert excinfo.value.status == 404
+    assert not isinstance(excinfo.value, DragonStoreRateLimited)
+
+
+def test_every_non_product_page_stays_a_parse_error_for_old_callers() -> None:
+    """The subclasses exist to be *reacted* to differently, not to escape existing
+    handling: anything catching DragonStoreParseError must still catch them all."""
+    for body in (_CHALLENGE, _SOFT_429, _SOFT_404, b"<html>nothing useful</html>"):
+        with pytest.raises(DragonStoreParseError):
+            parse_product(body, "https://www.dragonstore.it/x.gp.1.uw")

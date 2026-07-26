@@ -30,6 +30,16 @@ _JSONLD_RE = re.compile(
     r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
     re.IGNORECASE | re.DOTALL,
 )
+# Since 2026-07-25 the site answers the first request of every session with an anti-bot
+# interstitial ("Verifica accesso / Security Check"), served as HTTP 200 — so the status
+# code tells us nothing and only the body can. Its checkbox calls this endpoint.
+_CHALLENGE_RE = re.compile(r"captcha_check_ok|id=[\"']humanCheck[\"']", re.IGNORECASE)
+# Their generic error page carries the real status *inside* a 200 body, e.g.
+# ``<div id="pageNotFound"…><strong>429</strong> <span>Too Many Requests</span>``.
+_SOFT_ERROR_RE = re.compile(
+    r"id=[\"']pageNotFound[\"'].*?<strong>\s*(\d{3})\s*</strong>",
+    re.IGNORECASE | re.DOTALL,
+)
 _LISTINO_ROW_RE = re.compile(r'<tr class="D1">(.*?)</tr>', re.IGNORECASE | re.DOTALL)
 _BRAND_ROW_RE = re.compile(r'<tr class="T9">(.*?)</tr>', re.IGNORECASE | re.DOTALL)
 _HREF_RE = re.compile(r'href="([^"]+)"', re.IGNORECASE)
@@ -37,7 +47,31 @@ _EU_PRICE_RE = re.compile(r"\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2}")
 
 
 class DragonStoreParseError(ValueError):
-    """The page is not a parseable Dragon Store product (no JSON-LD ``Product``)."""
+    """The page is not a parseable Dragon Store product (no JSON-LD ``Product``).
+
+    Base of the whole family, so an existing ``except DragonStoreParseError`` still
+    catches every case; the subclasses exist so the caller can *react* differently and so
+    the log says what actually happened instead of "no JSON-LD", which was true but
+    thoroughly misleading when the real answer was "we were served a gate".
+    """
+
+
+class DragonStoreChallenge(DragonStoreParseError):
+    """We got the anti-bot interstitial instead of the product: the session has not been
+    cleared yet. Recoverable — clear the session and ask again."""
+
+
+class DragonStoreSoftError(DragonStoreParseError):
+    """An error page served with HTTP 200, carrying its real status in the body."""
+
+    def __init__(self, status: int, url: str) -> None:
+        super().__init__(f"HTTP {status} error page (served as 200) for {url}")
+        self.status = status
+
+
+class DragonStoreRateLimited(DragonStoreSoftError):
+    """The site is refusing us for going too fast (429). Not recoverable inside this run:
+    the only correct answer is to stop asking."""
 
 
 @dataclass
@@ -164,10 +198,27 @@ def _brand_link(decoded: str, base_url: str) -> str | None:
     return urljoin(base_url, href.group(1).strip()) if href else None
 
 
+def classify_page(decoded: str, url: str) -> None:
+    """Raise the matching error if this is a known **non-product** page. Must run before
+    looking for the JSON-LD: the site serves gates and errors with HTTP 200, so the body is
+    the only evidence there is, and mistaking one for "malformed product page" costs an
+    afternoon of debugging."""
+    if _CHALLENGE_RE.search(decoded):
+        raise DragonStoreChallenge(f"anti-bot interstitial served for {url}")
+    soft = _SOFT_ERROR_RE.search(decoded)
+    if soft is not None:
+        status = int(soft.group(1))
+        if status == 429:
+            raise DragonStoreRateLimited(status, url)
+        raise DragonStoreSoftError(status, url)
+
+
 def parse_product(content: bytes, url: str) -> ParsedProduct:
-    """Parse a Dragon Store product page. Raises ``DragonStoreParseError`` if the
-    JSON-LD Product, the price or the name are missing."""
+    """Parse a Dragon Store product page. Raises a :class:`DragonStoreParseError` subclass
+    if the page is a gate or an error page, or if the JSON-LD Product, the price or the
+    name are missing."""
     decoded = content.decode("cp1252", errors="replace")
+    classify_page(decoded, url)
     product = _find_product_jsonld(decoded)
     if product is None:
         raise DragonStoreParseError(f"no JSON-LD Product in {url}")

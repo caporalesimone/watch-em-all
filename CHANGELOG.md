@@ -10,6 +10,25 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 **Phase 9 — Dragon Store, complete: paste a category URL, preview it with a dry-run, confirm — and dozens of products flow into your catalog on every run (with de-duplication and the site's own exclusions); delisted products grey out on their own and clear with a click. Entries land below as they ship.**
 
+## [0.8.1] - 2026-07-26
+
+**Fix — Dragon Store stopped being readable: the site added an anti-bot gate, and we discovered we had been crawling seven times faster than its `robots.txt` asks. Both sides are fixed, plus the worse bug this uncovered: a failed scrape used to wipe your catalogue.**
+
+### Fixed
+
+- **Dragon Store products are readable again.** Since 25 July the site answered the first request of every session with a "Verifica accesso / Security Check" page instead of the product, which reached the logs as the thoroughly misleading `no JSON-LD Product`. Watch 'Em All now recognises that page and gets past it once per run, the same way the page's own checkbox does.
+- **A failed scrape no longer empties your catalogue.** This was the serious one. When every product of a run failed to load, the run reported "nothing found" and everything that scraper had given you was marked **delisted**: carts flagged unhealthy, alerts silenced, prices gone. It repaired itself on the next good run, but meanwhile your catalogue looked wiped. A run that could not read the site now changes nothing.
+- **We were going too fast.** Dragon Store's `robots.txt` asks for 10 seconds between requests; we were leaving 1.5, and retries went out after half a second — almost certainly what earned the `429 Too Many Requests` the site had started returning. Watch 'Em All now reads `robots.txt` and obeys it.
+
+### Changed
+
+- **Adding a URL now fills your catalogue immediately.** Pasting a product URL already triggered a scrape, but only to fetch the title for display — a price appeared only after the next run, or after pressing *Scrape now*. That same scrape now stores the product: one intention, one round of requests to the site.
+- **Politer defaults.** Minimum delay between two requests to the same site: **11 seconds** (was 1.5). Cached page half-life: **12 hours** (was 1). Both remain per-scraper admin settings; an existing configuration is left untouched, so check *Admin → Sources* if yours was set by hand.
+- **Logs you can debug from.** A run now states what it read from `robots.txt`, which `Crawl-delay` it parsed and which interval won, when it hit the gate and got through, and when it gave up. Anything that stops a product from being read is logged as an **error**, not a warning.
+- **We stop misidentifying ourselves.** The User-Agent sent to every site was the literal `watch-em-all/0.3` — frozen since phase 3, five versions out of date. It is now built from the running build's version, so it can't drift again.
+
+_Under the hood:_ the fix lives in the core client, not in the scraper — a rule a plugin has to remember to apply is a rule a plugin will eventually forget. A new `src/core/robots.py` (pure, stdlib) turns a fetched `robots.txt` into a policy; `HttpClient` fetches it once per origin per run and enforces it (CTX-R10): `Disallow` via `urllib.robotparser` — a blocked URL raises `RobotsDenied` without opening a socket — and `Crawl-delay` as a **floor**, `max(politeness_delay_ms, Crawl-delay)`, so neither our config nor the site's request can be undercut. `Crawl-delay` is not in RFC 9309 (Google ignores it); we honour it anyway, and parse it ourselves so fractional values survive. Retrieval failures follow §2.3.1: `4xx` allows everything, `5xx` disallows the whole origin. `robots.txt` is exempt from the delay it declares and does not start the politeness clock, so a single-page scrape stays instant. The client also keeps a **cookie jar for the whole run** (the cleared session was being thrown away on every page, which is why the gate kept reappearing) and gained `forget(url)` (CTX-R11), since a `200` is not proof of a useful body and an interstitial must not be replayed from cache for twelve hours. Politeness is re-applied before **every** attempt, retries included. On the catalogue side `update_catalog` was split: `upsert_products` writes without the delisting sweep, `update_catalog` is that plus the sweep (CATSVC-R2b), and the choice belongs to whoever knows whether a delivery is complete — the scraper now tracks unread watches and downgrades to the non-delisting path, aborting the run outright on a rate limit rather than making it worse. Dragon Store's parser classifies the body into interstitial / soft error (their error pages carry the real status inside a `200`) / genuinely unparseable, and the paths that build their own context — adding a watch, the dry run — go through the shared `build_http_client` instead of a bare client that quietly ignored the admin config.
+
 ## [0.8.0] - 2026-07-23
 
 **Phase 8 — price-history charts: the price/availability series the system has been accumulating since phase 3 become visible — per product and per cart, with availability gaps shown (not interpolated).**

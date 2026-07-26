@@ -16,7 +16,7 @@ Due run successive (o due scraper) verso lo stesso sito partono con user-agent d
 
 ## Stato attuale (da cui si parte)
 
-- `src/core/http.py` usa un **`DEFAULT_USER_AGENT` costante** (CTX-R2): unico, fisso, uguale per tutti.
+- `src/core/http.py` usa un **unico user-agent per tutti** (CTX-R2), costruito da `default_user_agent()` come `watch-em-all/<versione> (+repo)`: la versione arriva dalla fonte di verità (il file generato a build da `git describe`) e viene letta on demand, quindi segue la build che gira. Resta comunque **uno solo**, identico per ogni scraper e ogni run — è questo il punto che la fase 13 vuole superare. Vincolo da rispettare: il token prima della `/` deve restare `watch-em-all`, perché è quello che le righe `User-agent:` di `robots.txt` matchano (CTX-R10).
 - La config riservata per-scraper esiste già (`scraper_admin_config`, 4.B10: `politeness_delay_ms`/`http_timeout_s`/`cache_ttl_min`/`scrape_now_min_interval_s`) ed è il punto naturale dove agganciare eventuali chiavi nuove.
 - `build_context` costruisce l'`HttpClient` per ogni run/scrape: è il seam dove il core può iniettare lo UA scelto.
 

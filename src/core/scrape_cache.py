@@ -22,7 +22,9 @@ from src.core.db import new_session
 from src.core.models import ScrapeCache as ScrapeCacheRow
 
 # Default half-life until the per-plugin admin config (4.B10, cache_ttl_min) overrides it.
-DEFAULT_CACHE_TTL_MIN = 60
+# 12 hours: with a once- or twice-daily schedule a scrape is the only reader, so a shorter
+# half-life buys nothing and costs the site a full round of requests.
+DEFAULT_CACHE_TTL_MIN = 720
 
 
 @dataclass(frozen=True)
@@ -125,6 +127,29 @@ class ScrapeCache:
                 session.close()
         except Exception:
             return None
+
+    def delete(self, method: str, url: str) -> bool:
+        """Remove a single entry (``HttpClient.forget``): a 200 that turned out to be an
+        interstitial or a soft error page must not be replayed for the whole half-life.
+        True when a row was actually removed."""
+        if not self.enabled:
+            return False
+        key = cache_key(self._plugin_id, method, url)
+        try:
+            session = new_session()
+            try:
+                res = session.execute(
+                    delete(ScrapeCacheRow).where(
+                        ScrapeCacheRow.plugin_id == self._plugin_id,
+                        ScrapeCacheRow.cache_key == key,
+                    )
+                )
+                session.commit()
+                return int(getattr(res, "rowcount", 0) or 0) > 0
+            finally:
+                session.close()
+        except Exception:
+            return False
 
     def put(
         self, method: str, url: str, status_code: int, content: bytes, content_type: str | None
