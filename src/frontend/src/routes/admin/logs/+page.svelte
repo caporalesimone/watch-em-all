@@ -182,10 +182,17 @@
 	});
 
 	// --- presentation helpers ---
+	const pad = (n: number, l = 2) => String(n).padStart(l, '0');
+
+	/** ISO 8601 date, in the reader's own timezone so it matches the time beside it. */
+	function fmtDate(iso: string): string {
+		const d = new Date(iso);
+		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+	}
+
 	function fmtTime(iso: string): string {
 		const d = new Date(iso);
-		const p = (n: number, l = 2) => String(n).padStart(l, '0');
-		return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`;
+		return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
 	}
 
 	const SOURCE_DOT: Record<string, string> = {
@@ -361,6 +368,7 @@
 		<table class="w-full table-fixed text-left text-sm">
 			<colgroup>
 				<col style="width: 7rem" />
+				<col style="width: 7rem" />
 				<col style="width: 6rem" />
 				<col style="width: 5rem" />
 				<col />
@@ -368,6 +376,7 @@
 			</colgroup>
 			<thead class="border-b border-slate-200 text-xs text-slate-500 dark:border-slate-800">
 				<tr>
+					<th class="py-2 text-center">{$_('admin.logs.colDate')}</th>
 					<th class="py-2 text-center">{$_('admin.logs.colTime')}</th>
 					<th class="py-2 text-center">{$_('admin.logs.colSource')}</th>
 					<th class="py-2 text-center">{$_('admin.logs.colLevel')}</th>
@@ -378,6 +387,9 @@
 			<tbody>
 				{#each entries as e (e.id)}
 					<tr class="border-b border-slate-100 dark:border-slate-800/60">
+						<td class="py-1.5 text-center font-mono text-xs whitespace-nowrap text-slate-500"
+							>{fmtDate(e.created_at)}</td
+						>
 						<td class="py-1.5 text-center font-mono text-xs whitespace-nowrap text-slate-500"
 							>{fmtTime(e.created_at)}</td
 						>

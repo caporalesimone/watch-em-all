@@ -213,6 +213,7 @@
 			"all": "All",
 			"sources": "Sources",
 			"perPage": "{n} / page",
+			"colDate": "Date",
 			"colTime": "Time",
 			"colSource": "Source",
 			"colLevel": "Level",
