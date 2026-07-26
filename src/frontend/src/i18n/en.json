@@ -206,6 +206,7 @@
 			"title": "System logs",
 			"subtitle": "Runtime events from scraper, worker, notifier, api and db.",
 			"live": "Live",
+			"tailError": "Live tail failed: {error}. Still retrying.",
 			"refresh": "Refresh",
 			"search": "Search messages or sources…",
 			"all": "All",

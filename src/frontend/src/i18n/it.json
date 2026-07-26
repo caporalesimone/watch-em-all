@@ -122,6 +122,7 @@
 			"title": "Log di sistema",
 			"subtitle": "Eventi runtime di scraper, worker, notifier, api e db.",
 			"live": "Live",
+			"tailError": "Aggiornamento live fallito: {error}. Riprovo comunque.",
 			"refresh": "Aggiorna",
 			"search": "Cerca nei messaggi o nelle sorgenti…",
 			"all": "Tutti",

@@ -12,6 +12,12 @@
 	type Level = 'info' | 'warning' | 'error';
 	const SIZES = [25, 50, 100];
 	const MAX_LIVE = 500; // cap rows kept while tailing
+	// How often the tail asks for new rows. Only `system_log` sources write here (worker,
+	// scraper, notifier, alert), so between scheduled runs there is genuinely nothing new —
+	// which is why the dot below blinks on every poll: "quiet" must look different from "stuck".
+	const LIVE_INTERVALS_S = [1, 5, 10];
+	const DEFAULT_LIVE_INTERVAL_S = 5;
+	const BLINK_MS = 350;
 
 	let entries = $state<SystemLogEntry[]>([]);
 	let total = $state(0);
@@ -29,8 +35,13 @@
 	let error = $state<string | null>(null);
 	let contextRow = $state<SystemLogEntry | null>(null);
 
+	let liveIntervalS = $state(DEFAULT_LIVE_INTERVAL_S);
+	let polling = $state(false); // drives the dot's blink: one flash per request
+	let tailError = $state<string | null>(null);
+
 	let liveTimer: ReturnType<typeof setInterval> | undefined;
 	let searchTimer: ReturnType<typeof setTimeout> | undefined;
+	let blinkTimer: ReturnType<typeof setTimeout> | undefined;
 
 	const pages = $derived(Math.max(1, Math.ceil(total / size)));
 	const fromIdx = $derived(total === 0 ? 0 : (page - 1) * size + 1);
@@ -71,9 +82,17 @@
 		return entries.reduce((m, e) => Math.max(m, e.id), 0);
 	}
 
+	function blink(): void {
+		polling = true;
+		if (blinkTimer) clearTimeout(blinkTimer);
+		blinkTimer = setTimeout(() => (polling = false), BLINK_MS);
+	}
+
 	async function pollLive(): Promise<void> {
+		blink(); // one flash per request, so an idle tail still looks alive
 		try {
 			const fresh = await tailLogs({ ...filters(), since: maxId(), limit: 200 });
+			tailError = null;
 			if (fresh.length === 0) return;
 			// tail returns ascending; show newest first and keep counts/total in sync client-side.
 			for (const r of fresh) {
@@ -82,26 +101,41 @@
 			}
 			total += fresh.length;
 			entries = [...[...fresh].reverse(), ...entries].slice(0, MAX_LIVE);
-		} catch {
-			/* transient: keep the current view, try again next tick */
+		} catch (err) {
+			// Transient: keep the current view and try again next tick — but say so. Swallowing
+			// this silently made a broken tail indistinguishable from a quiet one.
+			tailError = err instanceof Error ? err.message : String(err);
+			console.error('log tail failed', err);
 		}
 	}
 
 	function stopLive(): void {
 		if (liveTimer) clearInterval(liveTimer);
 		liveTimer = undefined;
+		if (blinkTimer) clearTimeout(blinkTimer);
+		blinkTimer = undefined;
+		polling = false;
 	}
 
 	function setLive(on: boolean): void {
 		live = on;
 		stopLive();
 		page = 1;
+		tailError = null;
 		if (on) {
 			void loadPage(); // seed latest page + stats, then tail from its max id
-			liveTimer = setInterval(pollLive, 5000);
+			liveTimer = setInterval(pollLive, liveIntervalS * 1000);
 		} else {
 			void loadPage();
 		}
+	}
+
+	function setLiveInterval(seconds: number): void {
+		liveIntervalS = seconds;
+		if (!live) return;
+		// Restart the timer so the new cadence applies now, not after the pending tick.
+		if (liveTimer) clearInterval(liveTimer);
+		liveTimer = setInterval(pollLive, seconds * 1000);
 	}
 
 	// Re-query after a filter/size/page change (live re-seeds, history reloads the page).
@@ -194,9 +228,25 @@
 					: 'border-slate-300 text-slate-500 dark:border-slate-700'}"
 				onclick={() => setLive(!live)}
 			>
-				<span class="h-2 w-2 rounded-full {live ? 'bg-emerald-500' : 'bg-slate-400'}"></span>
+				<span
+					class="h-2 w-2 rounded-full transition-opacity duration-150 {live
+						? 'bg-emerald-500'
+						: 'bg-slate-400'} {live && polling ? 'opacity-30' : 'opacity-100'}"
+				></span>
 				{$_('admin.logs.live')}
 			</button>
+			{#if live}
+				<!-- Cadence of the tail. Only shown while tailing: it means nothing otherwise. -->
+				<div class="flex items-center gap-1">
+					{#each LIVE_INTERVALS_S as s (s)}
+						<button
+							type="button"
+							class={tabClass(liveIntervalS === s)}
+							onclick={() => setLiveInterval(s)}>{s}s</button
+						>
+					{/each}
+				</div>
+			{/if}
 			<button
 				type="button"
 				class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
@@ -282,6 +332,12 @@
 				{@render pager()}
 			{/if}
 		</div>
+	{/if}
+
+	{#if tailError}
+		<p class="text-sm text-amber-600 dark:text-amber-400">
+			{$_('admin.logs.tailError', { values: { error: tailError } })}
+		</p>
 	{/if}
 
 	{#if loading && entries.length === 0}
