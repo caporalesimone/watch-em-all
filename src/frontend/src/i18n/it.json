@@ -123,6 +123,7 @@
 			"subtitle": "Eventi runtime di scraper, worker, notifier, api e db.",
 			"live": "Live",
 			"tailError": "Aggiornamento live fallito: {error}. Riprovo comunque.",
+			"disabledInLive": "Non disponibile mentre il Live è attivo.",
 			"refresh": "Aggiorna",
 			"search": "Cerca nei messaggi o nelle sorgenti…",
 			"all": "Tutti",

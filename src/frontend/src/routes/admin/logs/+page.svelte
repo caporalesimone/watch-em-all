@@ -247,9 +247,13 @@
 					{/each}
 				</div>
 			{/if}
+			<!-- Greyed rather than hidden while tailing: the tail already refreshes, and removing
+			     the button would shuffle the toolbar every time Live is toggled. -->
 			<button
 				type="button"
-				class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+				class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:border-slate-700 dark:hover:bg-slate-800 dark:disabled:hover:bg-transparent"
+				disabled={live}
+				title={live ? $_('admin.logs.disabledInLive') : undefined}
 				onclick={() => loadPage()}
 			>
 				↻ {$_('admin.logs.refresh')}
@@ -276,10 +280,13 @@
 				</button>
 			{/each}
 		</div>
+		<!-- Rows per page only governs the paged history; while tailing there are no pages. -->
 		<select
 			value={size}
+			disabled={live}
+			title={live ? $_('admin.logs.disabledInLive') : undefined}
 			onchange={(e) => setSize(Number(e.currentTarget.value))}
-			class="rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
+			class="rounded border border-slate-300 bg-white px-2 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900"
 		>
 			{#each SIZES as n (n)}
 				<option value={n}>{$_('admin.logs.perPage', { values: { n } })}</option>
