@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 from http.cookiejar import CookieJar
 from typing import TYPE_CHECKING
 
+from src.core.config import read_version
 from src.core.robots import (
     RobotsPolicy,
     origin_of,
@@ -44,7 +45,8 @@ from src.core.robots import (
 if TYPE_CHECKING:  # type-only: keeps this module free of runtime src.core imports
     from src.core.scrape_cache import ScrapeCache
 
-DEFAULT_USER_AGENT = "watch-em-all/0.3 (+https://github.com/caporalesimone/watch-em-all)"
+USER_AGENT_PRODUCT = "watch-em-all"
+USER_AGENT_CONTACT = "+https://github.com/caporalesimone/watch-em-all"
 DEFAULT_TIMEOUT_S = 15.0
 # Politeness floor between two requests to the same site. Sites state their own rate
 # in ``robots.txt`` (``Crawl-delay``); this default sits just above the slowest value
@@ -60,6 +62,21 @@ DEFAULT_BACKOFF_BASE_S = 11.0
 _RETRY_STATUSES = frozenset({502, 503, 504})
 
 _DEFAULT_LOGGER = logging.getLogger("wea.http")
+
+
+def default_user_agent() -> str:
+    """``watch-em-all/<version> (+repo)`` — who we tell a site we are (CTX-R2).
+
+    The version comes from the **single source of truth**, the file baked at build from
+    ``git describe`` (1.T4), and is read **on demand rather than at import**, so the string
+    follows the running build. It used to be a literal, and had been announcing ``0.3``
+    since phase 3 — five phases of claiming to be something we were not, to sites whose
+    operators may well read their logs.
+
+    The product token before the ``/`` is what a ``robots.txt`` ``User-agent:`` line is
+    matched against, so it stays ``watch-em-all`` no matter what the version does.
+    """
+    return f"{USER_AGENT_PRODUCT}/{read_version()} ({USER_AGENT_CONTACT})"
 
 
 class RobotsDenied(OSError):
@@ -96,7 +113,7 @@ class HttpClient:
     def __init__(
         self,
         *,
-        user_agent: str = DEFAULT_USER_AGENT,
+        user_agent: str | None = None,  # None -> default_user_agent(), resolved per client
         timeout_s: float = DEFAULT_TIMEOUT_S,
         min_interval_s: float = DEFAULT_MIN_INTERVAL_S,
         max_retries: int = DEFAULT_MAX_RETRIES,
@@ -107,7 +124,7 @@ class HttpClient:
         logger: logging.Logger | None = None,
         respect_robots: bool = True,
     ) -> None:
-        self._user_agent = user_agent
+        self._user_agent = user_agent or default_user_agent()
         self._timeout_s = timeout_s
         self._min_interval_s = min_interval_s
         self._max_retries = max_retries

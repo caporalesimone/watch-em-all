@@ -39,7 +39,7 @@ The default factory (`build_context`) wires the core engine, a fresh session, a 
 Not a detail: it is where the core **enforces** politeness and gathers the metrics. The plugin must never use its own HTTP libraries.
 
 - **CTX-R1** — Minimum delay between consecutive requests of the same plugin (admin-configurable per scraper via the reserved config `politeness_delay_ms`, default 11 s) enforced by the client: the plugin cannot go faster even if it wanted to.
-- **CTX-R2** — Default per-request timeout (configurable, `http_timeout_s`); identifiable user-agent by default.
+- **CTX-R2** — Default per-request timeout (configurable, `http_timeout_s`); identifiable user-agent by default: `watch-em-all/<version> (+repo url)`, where the version comes from the single source of truth (the file baked at build from `git describe`) and is read **on demand**, so it follows the running build instead of a literal that goes stale. The product token before the `/` stays `watch-em-all` — that is what a `robots.txt` `User-agent:` line matches against.
 - **CTX-R3** — **Per-run request counter** (for `scrape_run.http_requests`): instrumentation transparent to the plugin.
 - **CTX-R4** — Short retries on transient network errors, with backoff; never more than a few attempts. A retry is itself a request, so it is also held to the CTX-R1 floor: a retry never leaves sooner than the site allows.
 - **CTX-R5** — Cooperation with the runner's run timeout: the client refuses new requests after the job is cancelled.

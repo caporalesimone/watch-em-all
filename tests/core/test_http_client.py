@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -306,3 +307,48 @@ def test_session_cookies_survive_across_requests() -> None:
 
     assert sent == ["", "ASPSESSIONID=abc"]  # the second request carries the session
     assert held == 1
+
+
+def test_user_agent_follows_the_running_version(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """CTX-R2: the UA is built from the version file baked at build, not from a literal —
+    the literal it replaced had been announcing 0.3 since phase 3."""
+    from src.core import config as config_mod
+    from src.core.http import default_user_agent
+
+    contact = "+https://github.com/caporalesimone/watch-em-all"
+
+    version_file = tmp_path / "VERSION"
+    version_file.write_text("0.8.1-3-gabc1234\n", encoding="utf-8")
+    monkeypatch.setattr(config_mod, "VERSION_PATH", str(version_file))
+    assert default_user_agent() == f"watch-em-all/0.8.1-3-gabc1234 ({contact})"
+
+    # Read on demand, not frozen at import: a new build is reflected immediately.
+    version_file.write_text("0.9.0\n", encoding="utf-8")
+    assert default_user_agent() == f"watch-em-all/0.9.0 ({contact})"
+
+    # No version file (a stray local run) degrades honestly instead of lying.
+    monkeypatch.setattr(config_mod, "VERSION_PATH", str(tmp_path / "missing"))
+    assert default_user_agent() == f"watch-em-all/0.0.0-unknown ({contact})"
+
+    # The product token is what robots.txt User-agent lines match on: it must not move.
+    assert default_user_agent().split("/")[0] == "watch-em-all"
+
+
+def test_client_sends_the_derived_user_agent() -> None:
+    seen: list[str] = []
+
+    class Handler(_RobotsHandler):
+        def do_GET(self) -> None:
+            seen.append(self.headers.get("User-Agent") or "")
+            super().do_GET()
+
+    with _Server(Handler) as base:
+        client = HttpClient(min_interval_s=0.0, sleep=_noop)
+        client.get(base + "/p")
+
+    # Both the robots.txt fetch and the page itself identify us the same way.
+    assert len(seen) == 2
+    assert all(ua.startswith("watch-em-all/") for ua in seen)
+    assert all("github.com/caporalesimone/watch-em-all" in ua for ua in seen)
