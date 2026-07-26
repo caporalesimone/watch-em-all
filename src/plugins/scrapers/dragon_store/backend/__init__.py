@@ -7,15 +7,25 @@ the title is cleaned by :mod:`sanitizer` (marketing/edition labels become
 ``external_id`` through the base identity template-method (stable across runs).
 Categories, pagination and the "ammaccato" filter are phase 9.
 
-The write path is the ``context.update_catalog`` callback inside
-``run_for_user`` — the scraper never writes the catalog itself. ``run_test`` is a
-dry-run: it scrapes the same way but writes nothing (SCR-R11).
+The write path is a ``context`` callback — the scraper never writes the catalog itself —
+and *which* callback matters: ``update_catalog`` for a run that read every watch (it
+delists whatever it did not see), ``upsert_catalog`` for anything partial or failed.
+``run_test`` is a dry-run: it scrapes the same way but writes nothing (SCR-R11).
+
+Since 2026-07-25 the site gates the first request of every session behind an anti-bot
+interstitial served as **HTTP 200**, so the status code is no evidence and the body must be
+classified (see :mod:`parser`). Three answers, three reactions: the interstitial is cleared
+once per run and the page retried; a soft ``429`` aborts the run, because continuing is
+what earns the rate limit; anything else is logged as an error and skipped. Their
+``robots.txt`` publishes no ``Disallow`` and asks ``Crawl-delay: 10`` — the core client
+enforces both (CTX-R10), which is the actual fix for what looked like a parser bug.
 """
 
 from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -26,12 +36,21 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from src.core.contracts import Adjustment, BrandRef, CategoryRef, DeltaCounters, Product
 from src.core.errors import APIError
+from src.core.http import RobotsDenied
 from src.core.plugins.base import ScraperPlugin
-from src.core.plugins.context import PluginContext
+from src.core.plugins.context import PluginContext, bind_upsert_catalog, build_http_client
+from src.core.robots import origin_of
 from src.web.deps import SessionDep, UserDep
 
 from .adjustments import ADJUSTMENTS
-from .parser import DragonStoreParseError, ParsedProduct, parse_product
+from .parser import (
+    DragonStoreChallenge,
+    DragonStoreParseError,
+    DragonStoreRateLimited,
+    DragonStoreSoftError,
+    ParsedProduct,
+    parse_product,
+)
 from .sanitizer import load_title_labels, sanitize_title
 
 if TYPE_CHECKING:
@@ -46,6 +65,31 @@ _GP_ID_RE = re.compile(r"\.gp\.(\d+)\.uw")
 _AVAILABLE_STATES = frozenset({"InStock", "PreOrder"})
 _KNOWN_STATES = frozenset({"InStock", "OutOfStock", "PreOrder"})
 _PREORDER_TAG = "Pre Order"
+# The interstitial's own checkbox clears the session with this single GET (see the page's
+# inline JS); the cleared flag then rides the ASP session cookie the client keeps for the
+# run. robots.txt allows crawling here — it publishes no Disallow, only Crawl-delay: 10 —
+# so the honest way through is to obey that delay and identify ourselves, which we do.
+_SESSION_CLEAR_PATH = "/ajaxRequests.asp?cmd=captcha_check_ok"
+_SESSION_CLEAR_HEADERS = {"ReadyAjaxAuth": "readypro"}
+_SESSION_CLEAR_OK = "OK"
+
+
+@dataclass
+class _ScrapeOutcome:
+    """What a pass over the watches produced, and whether it can be trusted as complete.
+
+    ``complete`` is the whole point: only a run that read every watch may go through
+    ``update_catalog``, which delists what it does not see. Anything less goes through
+    ``upsert_catalog`` — see CATSVC-R2.
+    """
+
+    products: list[Product]
+    failed: int
+    aborted: bool  # stopped early (rate-limited): the remaining watches were never asked
+
+    @property
+    def complete(self) -> bool:
+        return not self.aborted and self.failed == 0
 
 
 class _Base(DeclarativeBase):
@@ -84,15 +128,27 @@ def _no_write(user_id: int, products: list[Product]) -> DeltaCounters:
     raise RuntimeError("run_test must not write to the catalog")
 
 
-def _dry_context(db: Session) -> PluginContext:
-    """A context for a read-only scrape (dry-run / add-time title resolution): a real
-    HTTP client, but writing to the catalog is a bug (``_no_write``)."""
+def _request_context(db: Session, *, upsert: bool) -> PluginContext:
+    """A context for a scrape driven by a web request, outside a scheduled run.
+
+    The HTTP client comes from :func:`build_http_client`, so these paths get the same
+    politeness, timeout, ``robots.txt`` compliance and scrape cache as a scheduled run —
+    a hand-rolled client here would quietly ignore the admin config, which is precisely
+    the sort of gap that gets a scraper rate-limited.
+
+    ``update_catalog`` is always refused: a single-product delivery must never trigger the
+    delisting sweep. ``upsert`` decides whether the product may be *stored* — true when a
+    user adds a watch (they asked for it in their catalog), false for the dry-run test.
+    """
+    logger = logging.getLogger(f"wea.plugin.{PLUGIN_ID}")
     return PluginContext(
         engine=db.get_bind(),  # type: ignore[arg-type]
         db=db,
-        logger=logging.getLogger(f"wea.plugin.{PLUGIN_ID}"),
+        logger=logger,
         config={},
         update_catalog=_no_write,
+        upsert_catalog=bind_upsert_catalog(db) if upsert else _no_write,
+        http=build_http_client(db, PLUGIN_ID, logger),
     )
 
 
@@ -166,29 +222,107 @@ class DragonStorePlugin(ScraperPlugin):
         return ADJUSTMENTS.compute(cart_total)
 
     # --- scraping (SCR-R4/R5/R6): one HTTP request per watch, via context.http ---
-    def _scrape_products(self, context: PluginContext, urls: list[str]) -> list[Product]:
+    def _scrape_products(self, context: PluginContext, urls: list[str]) -> _ScrapeOutcome:
         by_id: dict[str, Product] = {}  # dedup on external_id (PROD-R3)
-        for url in urls:
-            product = self._scrape_one(context, url)
-            if product is not None:
+        failed = 0
+        for index, url in enumerate(urls):
+            try:
+                product = self._scrape_one(context, url)
+            except DragonStoreRateLimited as exc:
+                # The site is explicitly telling us to slow down. Carrying on through the
+                # remaining watches is what got us throttled in the first place.
+                remaining = len(urls) - index
+                context.logger.error(
+                    "dragon_store: rate-limited by the site (%s) — aborting this run with "
+                    "%s of %s watch(es) unread; they are deliberately not attempted",
+                    exc,
+                    remaining,
+                    len(urls),
+                )
+                return _ScrapeOutcome(list(by_id.values()), failed + remaining, aborted=True)
+            if product is None:
+                failed += 1
+            else:
                 by_id[product.external_id] = product
-        return list(by_id.values())
+        return _ScrapeOutcome(list(by_id.values()), failed, aborted=False)
 
-    def _scrape_one(self, context: PluginContext, url: str) -> Product | None:
-        """Fetch + parse one product page; ``None`` (logged) on any failure, so a
-        single bad page never aborts the whole run."""
+    def _clear_session(self, context: PluginContext, url: str) -> bool:
+        """Tick the interstitial's "I am not a robot" box the way the page's own JS does:
+        one GET that flips a flag on our ASP session. Returns ``True`` when the site
+        confirmed with ``OK``."""
+        endpoint = origin_of(url) + _SESSION_CLEAR_PATH
+        context.logger.warning(
+            "dragon_store: anti-bot interstitial served for %s — clearing the session via %s",
+            url,
+            endpoint,
+        )
+        try:
+            response = context.http.get(endpoint, headers=_SESSION_CLEAR_HEADERS)
+        except OSError as exc:
+            context.logger.error("dragon_store: session clear request failed: %s", exc)
+            return False
+        finally:
+            # Never let this GET sit in the cache: a cached "OK" would make later runs
+            # believe the session was cleared when nothing was actually sent.
+            context.http.forget(endpoint)
+
+        body = response.text.strip()
+        if response.status_code != 200 or body != _SESSION_CLEAR_OK:
+            context.logger.error(
+                "dragon_store: session clear refused (HTTP %s, body %r) — cannot reach the "
+                "product pages",
+                response.status_code,
+                body[:80],
+            )
+            return False
+        context.logger.warning(
+            "dragon_store: session cleared (site answered %r) — retrying the page", body
+        )
+        return True
+
+    def _scrape_one(
+        self, context: PluginContext, url: str, *, may_clear_session: bool = True
+    ) -> Product | None:
+        """Fetch + parse one product page; ``None`` (logged as an error) on failure, so a
+        single bad page never aborts the whole run. Rate limiting is the one exception: it
+        propagates, because it is about the site as a whole, not about this page."""
         try:
             response = context.http.get(url)
+        except RobotsDenied as exc:
+            context.logger.error("dragon_store: not fetching %s — %s", url, exc)
+            return None
         except OSError as exc:  # network/timeout after retries
-            context.logger.warning("dragon_store: fetch failed for %s: %s", url, exc)
+            context.logger.error("dragon_store: fetch failed for %s: %s", url, exc)
             return None
         if response.status_code != 200:
-            context.logger.warning("dragon_store: %s returned HTTP %s", url, response.status_code)
+            context.logger.error("dragon_store: %s returned HTTP %s", url, response.status_code)
             return None
+
         try:
             parsed = parse_product(response.content, url)
+        except DragonStoreChallenge as exc:
+            # A 200 carrying a gate must not be replayed from cache for the next 12 hours.
+            context.http.forget(url)
+            if not may_clear_session:
+                context.logger.error(
+                    "dragon_store: still gated after clearing the session for %s (%s) — "
+                    "giving up on this page",
+                    url,
+                    exc,
+                )
+                return None
+            if not self._clear_session(context, url):
+                return None
+            return self._scrape_one(context, url, may_clear_session=False)
+        except DragonStoreRateLimited:
+            context.http.forget(url)
+            raise
+        except DragonStoreSoftError as exc:
+            context.http.forget(url)
+            context.logger.error("dragon_store: %s", exc)
+            return None
         except DragonStoreParseError as exc:
-            context.logger.warning("dragon_store: parse failed for %s: %s", url, exc)
+            context.logger.error("dragon_store: parse failed for %s: %s", url, exc)
             return None
         return self._to_product(context, url, parsed)
 
@@ -246,22 +380,55 @@ class DragonStorePlugin(ScraperPlugin):
         watches = _user_watches(context.db, user_id)
         if not watches:
             # No watches != "site returned nothing": deliver nothing, do NOT delist.
+            context.logger.info("dragon_store: user %s has no watches — nothing to do", user_id)
             return DeltaCounters()
-        products = self._scrape_products(context, [w.url for w in watches])
-        # Refresh each watch's display snapshot from this run; the update_catalog
-        # call below commits this session, persisting these too.
-        by_url = {p.url: p for p in products}
+
+        context.logger.info(
+            "dragon_store: starting run for user %s — %s watch(es)", user_id, len(watches)
+        )
+        outcome = self._scrape_products(context, [w.url for w in watches])
+        # Refresh each watch's display snapshot from this run; the catalog write below
+        # commits this session, persisting these too.
+        by_url = {p.url: p for p in outcome.products}
         for watch in watches:
             product = by_url.get(watch.url)
             if product is not None:
                 watch.snapshot_json = _snapshot(product)
-        return context.update_catalog(user_id, products)
+
+        context.logger.info(
+            "dragon_store: run for user %s read %s of %s watch(es) — %s HTTP request(s), "
+            "%s cache hit(s)",
+            user_id,
+            len(outcome.products),
+            len(watches),
+            context.http.request_count,
+            context.http.cache_hits,
+        )
+        if outcome.complete:
+            return context.update_catalog(user_id, outcome.products)
+
+        # Incomplete: we cannot tell "gone from the site" from "we could not read it", so
+        # the delisting sweep must not run (CATSVC-R2). Anything else would wipe the user's
+        # catalog for this scraper on any gate or outage.
+        context.logger.error(
+            "dragon_store: incomplete run for user %s (%s watch(es) unread%s) — delivering "
+            "%s product(s) WITHOUT delisting; the catalog keeps its current state",
+            user_id,
+            outcome.failed,
+            ", aborted early" if outcome.aborted else "",
+            len(outcome.products),
+        )
+        return context.upsert_catalog(user_id, outcome.products)
 
     def run_test(self, context: PluginContext, params: dict[str, Any]) -> list[Product]:
         url = str(params.get("url", "")).strip()
         if not url:
             return []
-        product = self._scrape_one(context, url)
+        try:
+            product = self._scrape_one(context, url)
+        except DragonStoreRateLimited as exc:
+            context.logger.error("dragon_store: test scrape of %s rate-limited (%s)", url, exc)
+            return []
         return [product] if product is not None else []
 
     # --- routes: watches CRUD + dry-run test (per-user) ---
@@ -280,9 +447,20 @@ class DragonStorePlugin(ScraperPlugin):
             already = db.scalar(select(Watch).where(Watch.user_id == user.sub, Watch.url == url))
             if already is not None:
                 raise APIError(409, "duplicate_watch", "this URL is already watched")
-            # The scraper intervenes once here to resolve the product title (best-effort,
-            # no catalog write); the watch stays valid even if the fetch fails.
-            product = self._scrape_one(_dry_context(db), url)
+            # One scrape, one purpose: adding a watch both resolves the product and puts it
+            # in the catalog. It used to fill only the display snapshot, so the user had to
+            # wait for a scheduled run — or press Scrape now — before seeing a price: two
+            # rounds of requests to the site for a single intention. The watch stays valid
+            # even when the scrape fails; the next run fills it in.
+            context = _request_context(db, upsert=True)
+            try:
+                product = self._scrape_one(context, url)
+            except DragonStoreRateLimited as exc:
+                context.logger.error(
+                    "dragon_store: could not resolve %s while adding the watch — %s", url, exc
+                )
+                product = None
+
             watch = Watch(
                 user_id=user.sub,
                 kind="product",
@@ -291,6 +469,21 @@ class DragonStorePlugin(ScraperPlugin):
             )
             db.add(watch)
             db.commit()
+            if product is not None:
+                # Never the delisting path: one product says nothing about the others.
+                context.upsert_catalog(user.sub, [product])
+                context.logger.info(
+                    "dragon_store: watch %s added for user %s and stored in the catalog",
+                    watch.id,
+                    user.sub,
+                )
+            else:
+                context.logger.warning(
+                    "dragon_store: watch %s added for user %s but the product could not be "
+                    "read now — it will be filled in by the next run",
+                    watch.id,
+                    user.sub,
+                )
             return _watch_out(watch)
 
         @router.delete("/watches/{watch_id}", status_code=204)
@@ -303,7 +496,8 @@ class DragonStorePlugin(ScraperPlugin):
 
         @router.post("/test", response_model=list[Product])
         def test(body: WatchIn, user: UserDep, db: SessionDep) -> list[Product]:
-            return self.run_test(_dry_context(db), {"url": body.url})
+            # Dry run (SCR-R11): scrapes exactly like a real run, writes nothing at all.
+            return self.run_test(_request_context(db, upsert=False), {"url": body.url})
 
         return router
 

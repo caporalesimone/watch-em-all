@@ -38,16 +38,20 @@ The default factory (`build_context`) wires the core engine, a fresh session, a 
 
 Not a detail: it is where the core **enforces** politeness and gathers the metrics. The plugin must never use its own HTTP libraries.
 
-- **CTX-R1** — Minimum delay between consecutive requests of the same plugin (admin-configurable per scraper via the reserved config `politeness_delay_ms`, default 1.5 s) enforced by the client: the plugin cannot go faster even if it wanted to.
+- **CTX-R1** — Minimum delay between consecutive requests of the same plugin (admin-configurable per scraper via the reserved config `politeness_delay_ms`, default 11 s) enforced by the client: the plugin cannot go faster even if it wanted to.
 - **CTX-R2** — Default per-request timeout (configurable, `http_timeout_s`); identifiable user-agent by default.
 - **CTX-R3** — **Per-run request counter** (for `scrape_run.http_requests`): instrumentation transparent to the plugin.
-- **CTX-R4** — Short retries on transient network errors, with backoff; never more than a few attempts.
+- **CTX-R4** — Short retries on transient network errors, with backoff; never more than a few attempts. A retry is itself a request, so it is also held to the CTX-R1 floor: a retry never leaves sooner than the site allows.
 - **CTX-R5** — Cooperation with the runner's run timeout: the client refuses new requests after the job is cancelled.
 - **CTX-R9** — **Scrape cache, transparent to the plugin**: before every `get` the client looks in the `scrape_cache` table for a result for the **same query** (key = hash of the normalised request: method, URL, sorted params, scoped to `plugin_id`). Within the **half-life** the admin configured for the plugin (`cache_ttl_min`) → it answers from the cache, **no HTTP, no politeness wait**, counted in `cache_hits`; expired or absent → a real request and the result is saved. Expired records are dropped at run start (POOL-R3); manual clear from the plugin's admin page (`DELETE /api/admin/scrapers/{id}/cache`). Half-life 0 = cache disabled; `post` is never cached. This is how the reuse pays off both across users of the same run and across close-together runs.
 
+- **CTX-R10** — **`robots.txt` compliance, transparent to the plugin**: fetched once per origin per run (exempt from the delay it declares, like every crawler treats it) and enforced by the client, so a plugin cannot request a forbidden path even by mistake. `Disallow`/`Allow` are matched per RFC 9309 and a blocked URL raises `RobotsDenied` **without opening a socket**. `Crawl-delay` — not in RFC 9309, a de-facto extension honoured by Bing and Yandex and ignored by Google — is honoured as a **floor**: the interval actually used is `max(politeness_delay_ms, Crawl-delay)`, so we are never faster than either our own config or the site's request. Retrieval failures follow RFC 9309 §2.3.1: a `4xx` means no policy is published and everything is allowed; a `5xx` or a network failure means the whole origin is treated as disallowed rather than guessed at. Every step is logged at `INFO` (what was read, what was parsed, which interval won) so the effective rate is never a mystery when reading a run's log.
+- **CTX-R11** — **`forget(url)`**: drops one entry from the scrape cache. A `200` is not proof of a useful body — an anti-bot interstitial or a soft error page arrives with `200` too — and without this such a page would be replayed from cache for the whole half-life.
+
 ```python
 class HttpClient:
-    def get(self, url, **kw) -> Response: ...     # scrape cache (CTX-R9), then paced, counted, with retry/timeout
+    def get(self, url, **kw) -> Response: ...     # robots (CTX-R10), cache (CTX-R9), then paced, counted, with retry/timeout
+    def forget(self, url) -> None: ...            # drop a worthless cached 200 (CTX-R11)
     def post(self, url, **kw) -> Response: ...    # never cached
 ```
 

@@ -74,6 +74,18 @@ The plugin's `get_adjustments(self, products, cart_total)` delegates to `ADJUSTM
 
 **Pre-analysis (see below)**: the site exposes a **native numeric ID** per product, present both in the listing URL (`...gp.<id>.uw`, e.g. `gp.35880.uw`) and in the listing card (`id="r_35880"`, `data-id="prod_35880"`), as well as an **article code** (`Cod. art.`, e.g. `XRDCT21`). Strategy: `identity_seed` returns the **native numeric ID** (stable and unique by construction), or `None` if not extractable in some context → the base applies the `normalize_url(url)` fallback and hashing (SCR-R10); `external_id` is never assigned by hand. The article code is kept in `extra` as informational data.
 
+## Anti-bot interstitial and rate limiting (site change, 25 July 2026)
+
+The site started answering the **first request of every session** with a "Verifica accesso / Security Check" page — a fake-Cloudflare "I am not a robot" checkbox, served with **HTTP 200** and roughly 13,200 bytes. The status code therefore carries no information and the body is the only evidence: the parser classifies it before looking for the JSON-LD (`DragonStoreChallenge`), because reporting `no JSON-LD Product` for it was true and useless.
+
+Their error pages behave the same way: a `<div id="pageNotFound">` carrying the real status inside a `200` body (`DragonStoreRateLimited` for 429, `DragonStoreSoftError` otherwise).
+
+**What the site actually permits.** `robots.txt` publishes `User-agent: *` and `Crawl-delay: 10`, with **no `Disallow`** — crawling these pages is allowed, and the only condition is the rate. We had been leaving 1.5 s between requests, and retries went out after 0.5 s: about seven times faster than asked, which is the likely cause of the `429` the site began returning. The core client now enforces both directives (CTX-R10), which was the real fix.
+
+**Getting past the gate.** The interstitial's checkbox clears the session with a single `GET /ajaxRequests.asp?cmd=captcha_check_ok` (header `ReadyAjaxAuth: readypro`, answer `OK`); the cleared flag then lives in the `ASPSESSIONID*` cookie, which is why the client keeps a cookie jar for the whole run. Done once per run, this is *fewer* requests than before, when every page fetched an interstitial and retried for nothing. Verified end-to-end on 26 July 2026 with our own User-Agent and the 10 s delay: 13,200-byte gate → `OK` → the real 135,781-byte page with its `"@type":"Product"`.
+
+Two lines we do not cross: we identify ourselves honestly (no browser impersonation — if Dragon Store does not want us, a `Disallow` in `robots.txt` is the clean instruction and it will be obeyed), and a rate limit **aborts the whole run** rather than pressing on.
+
 ## Product page (`.gp`): real parsing (ad-hoc study, June 2026)
 
 > Verified on 5 real pages (`gp.896`, `36099`, `27006`, `34602`, `30708`): discounted, full price, sold out, **preorder**, limited edition, different category. The page is server-rendered like the category → HTTP + parsing, no headless browser.
