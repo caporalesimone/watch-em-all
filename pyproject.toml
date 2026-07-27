@@ -25,6 +25,9 @@ mypy = ">=1.11"
 pytest = ">=8.0"
 httpx = ">=0.27"   # FastAPI TestClient transport
 types-pyyaml = ">=6.0"
+# Runs the suite across cores (`-n auto`, see addopts below). The test suite is the CI's
+# entire critical path, so this is the one dependency here that buys wall-clock time.
+pytest-xdist = "^3.8.0"
 
 [tool.ruff]
 line-length = 100
@@ -46,7 +49,14 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+# `-n auto`: one worker per core. The suite was the CI's whole critical path (247 s of a
+# 280 s job, with ruff+mypy costing 12 s between them) and it is dominated by bcrypt, which
+# is slow *by design* — nearly every test logs a user in, and each hash costs ~210 ms.
+# Nothing had to change to parallelise it: every worker is its own process, so the
+# module-level engine and the in-memory SQLite are already per-worker, the mock HTTP
+# servers bind port 0, and no fixture is session- or module-scoped.
+# Use `-n0` when debugging a single failure — with workers the output interleaves.
+addopts = "-q -n auto"
 
 [build-system]
 requires = ["poetry-core>=2.0"]

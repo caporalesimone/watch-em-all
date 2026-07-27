@@ -10,6 +10,8 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 **Phase 9 — Dragon Store, complete: paste a category URL and dozens of products flow into your catalog on every run (with de-duplication and the site's own exclusions); delisted products grey out on their own and clear with a click. Entries land below as they ship.**
 
+_Under the hood:_ the test suite now runs across cores (`pytest-xdist`, `-n auto`). It was the CI's entire critical path — 247 s of a 280 s job, with lint and typecheck costing 12 s between them — while every other job finished inside 50 s. Nothing had to be restructured: each worker is its own process, so the module-level engine and the in-memory SQLite were already isolated, the plugin tests' mock servers bind port 0, and no fixture is session-scoped. It did surface one real defect: `test_cart_series_empty_cart` built its own session from the global factory and only ever passed because an earlier test in the same process had initialised the engine. Locally the suite goes from 3m41s to ~25s.
+
 ### Removed
 
 - **The dry-run preview is gone.** Pasting a URL used to offer a *Preview* that scraped the page and showed what it found without saving it; you then pressed *Add*, which scraped the same page again. Since 0.8.1 adding a URL already stores the product, so the preview was asking a site that requests 10 seconds between requests to serve the same page twice for a single intention — and a preview that saves nothing looked exactly like an add that does. Now there is one button.

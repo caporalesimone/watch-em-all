@@ -116,14 +116,12 @@ def test_other_products_are_not_mixed_in(session: Session) -> None:
 # --------------------------------------------------------------------------- cart series (8.B2)
 
 
-def test_cart_series_empty_cart() -> None:
-    from src.core.db import new_session
-
-    s = new_session()
-    try:
-        assert cart_series(s, [], "all") == []
-    finally:
-        s.close()
+def test_cart_series_empty_cart(session: Session) -> None:
+    # Takes the fixture like every other test here. It used to build its own session from
+    # the global factory, which only worked because some earlier test in the same process
+    # had already called `init_engine()` — an order dependency that was invisible until
+    # the suite started running across workers.
+    assert cart_series(session, [], "all") == []
 
 
 def test_cart_series_sums_members_stepwise(session: Session) -> None:
