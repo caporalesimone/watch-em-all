@@ -23,7 +23,11 @@ pyjwt = ">=2.9,<3.0"
 ruff = ">=0.6"
 mypy = ">=1.11"
 pytest = ">=8.0"
-httpx = ">=0.27"   # FastAPI TestClient transport
+# FastAPI TestClient transport. `httpx2`, not `httpx`: since Starlette 1.3 the test client
+# imports `httpx2` and only falls back to `httpx` with a deprecation warning, and `httpx2` is
+# where the upstream line is maintained now. Nothing here imports it directly — Starlette
+# aliases it internally — so the two are interchangeable for us (#36).
+httpx2 = ">=2.0"
 types-pyyaml = ">=6.0"
 # Runs the suite across cores (`-n auto`, see addopts below). The test suite is the CI's
 # entire critical path, so this is the one dependency here that buys wall-clock time.
