@@ -247,3 +247,74 @@ def test_delisting_records_when_and_relisting_forgets_it(session: Session) -> No
     session.refresh(row)
     assert row.removed is False
     assert row.removed_at is None
+
+
+# --- per-product statistics (9.B6b) -----------------------------------------------------
+
+
+def test_a_first_sighting_starts_the_counters_without_inventing_a_change(
+    session: Session,
+) -> None:
+    update_catalog(session, USER, PLUGIN, [_product(price_current=Decimal("40.00"))])
+    row = session.scalars(select(CatalogProduct)).one()
+
+    assert row.observations == 1
+    assert row.cache_hits == 0
+    # Not a price change: there was nothing to change from, and counting it would add one to
+    # every product's volatility for ever.
+    assert row.price_changes == 0
+    assert row.availability_changes == 0
+    assert row.price_min == row.price_max == Decimal("40.00")
+    assert row.last_price_change_at is not None
+
+
+def test_a_fresh_read_counts_as_an_observation_and_a_replay_does_not(session: Session) -> None:
+    """The distinction 9.X4 established, as a counter: a delivery served from the scrape cache
+    carries the timestamp of the fetch that filled it, so an unchanged timestamp means we are
+    being handed the same page again. Counting that as an observation would make the number
+    mean "how many times we re-processed this", which says nothing about the product."""
+    first = datetime.now(UTC) - timedelta(hours=2)
+    update_catalog(session, USER, PLUGIN, [_product(scraped_at=first)])
+    row = session.scalars(select(CatalogProduct)).one()
+
+    update_catalog(session, USER, PLUGIN, [_product(scraped_at=first)])  # cache replay
+    session.refresh(row)
+    assert (row.observations, row.cache_hits) == (1, 1)
+
+    update_catalog(session, USER, PLUGIN, [_product(scraped_at=datetime.now(UTC))])
+    session.refresh(row)
+    assert (row.observations, row.cache_hits) == (2, 1)
+
+
+def test_price_and_availability_changes_are_counted_apart(session: Session) -> None:
+    """The run-level counter called price_changes increments on availability moves too, and on
+    the first history row: it counts history rows written. These two do not."""
+    update_catalog(session, USER, PLUGIN, [_product(price_current=Decimal("40.00"))])
+    row = session.scalars(select(CatalogProduct)).one()
+
+    update_catalog(session, USER, PLUGIN, [_product(price_current=Decimal("30.00"))])
+    session.refresh(row)
+    assert (row.price_changes, row.availability_changes) == (1, 0)
+
+    update_catalog(
+        session, USER, PLUGIN, [_product(price_current=Decimal("30.00"), is_available=False)]
+    )
+    session.refresh(row)
+    assert (row.price_changes, row.availability_changes) == (1, 1)
+
+
+def test_the_range_remembers_the_best_and_worst_price_seen(session: Session) -> None:
+    for price in ("40.00", "24.90", "44.00", "39.99"):
+        update_catalog(
+            session,
+            USER,
+            PLUGIN,
+            [_product(price_current=Decimal(price), scraped_at=datetime.now(UTC))],
+        )
+    row = session.scalars(select(CatalogProduct)).one()
+
+    assert row.price_min == Decimal("24.90")
+    assert row.price_max == Decimal("44.00")
+    assert row.price_min_at is not None and row.price_max_at is not None
+    # And "how long has this price held" moved with the last actual change.
+    assert row.last_price_change_at is not None

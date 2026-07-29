@@ -36,6 +36,7 @@ from src.core.schedule import due_slot, install_tz, set_last_slot
 from src.core.schema_drift import check_schema_drift
 from src.core.scrape import implements_scraping, stamp_cooldown
 from src.core.scrape_cache import purge_expired as purge_expired_cache
+from src.core.scraper_stats import bump, record_run
 from src.core.settings import get_system_settings
 from src.core.system_log import install_system_log_handler
 from src.worker.runner import Runner
@@ -203,6 +204,23 @@ def _run_scraper(
         run.status = _aggregate_status(outcomes, timed_out)
         run.finished_at = datetime.now(UTC)
         ctx.db.commit()
+        # Lifetime statistics (9.B6c): scrape_run has retention, so this row is the only
+        # memory of what this scraper has ever done. Never let it break a run.
+        try:
+            record_run(
+                ctx.db,
+                scraper_id,
+                ok=run.status == "ok",
+                seconds=(run.finished_at - run.started_at).total_seconds(),
+                http_requests=run.http_requests,
+                cache_hits=run.cache_hits,
+                bytes_downloaded=ctx.http.bytes_downloaded,
+                politeness_wait_s=ctx.http.waited_seconds,
+                robots_denied=ctx.http.robots_denied,
+                products_delivered=run.products_found,
+            )
+        except Exception:
+            log.exception("could not record the lifetime statistics of %s", scraper_id)
         set_last_slot(ctx.db, scraper_id, slot)
         log.info(
             "run %s (%s): %s — %d user(s), found=%d new=%d price_changes=%d removed=%d "
@@ -233,6 +251,13 @@ def scraper_job(scraper_id: str, slot: datetime, trigger: str = "scheduled") -> 
     with scraper_lock(get_engine(), scraper_id) as acquired:
         if not acquired:
             log.warning("runner: %s already running, slot %s skipped", scraper_id, slot)
+            session = new_session()
+            try:
+                bump(session, scraper_id, {"runs_skipped_locked": 1})
+            except Exception:
+                log.exception("could not record the skipped run of %s", scraper_id)
+            finally:
+                session.close()
             return
         log.info("running %s (slot %s, %s)", scraper_id, slot, trigger)
         ctx = build_context(lp.manifest, plugin)

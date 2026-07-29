@@ -54,6 +54,7 @@ from src.core.http import RobotsDenied
 from src.core.plugins.base import ScraperPlugin, Tags
 from src.core.plugins.context import PluginContext, bind_upsert_catalog, build_http_client
 from src.core.robots import origin_of
+from src.core.scraper_stats import bump
 from src.web.deps import SessionDep, UserDep
 from src.web.jobs import poke
 
@@ -126,6 +127,15 @@ class _CategoryOutcome:
     unpriced: list[ParsedCard]  # cards the listing showed without a price (9.B2b)
     excluded: int  # dented listings the watch asked not to see
     complete: bool
+
+
+def _note(context: PluginContext, **deltas: int) -> None:
+    """Record something only this plugin can see (9.B6c) — a gate, a rate limit, a page that
+    would not parse. Never allowed to break a scrape: a statistic is not worth a run."""
+    try:
+        bump(context.db, PLUGIN_ID, deltas)
+    except Exception:
+        context.logger.exception("dragon_store: could not record %s", sorted(deltas))
 
 
 def _mark_progress(
@@ -573,6 +583,9 @@ class DragonStorePlugin(ScraperPlugin):
             url,
             endpoint,
         )
+        # Counted, not just logged (9.B6c): during the July block the question was "since when
+        # and how often", and a log line cannot answer either.
+        _note(context, gate_hits_total=1)
         try:
             response = context.http.get(endpoint, headers=_SESSION_CLEAR_HEADERS)
         except OSError as exc:
@@ -595,6 +608,7 @@ class DragonStorePlugin(ScraperPlugin):
         context.logger.warning(
             "dragon_store: session cleared (site answered %r) — retrying the page", body
         )
+        _note(context, gate_cleared_total=1)
         return True
 
     def _scrape_one(
@@ -633,6 +647,7 @@ class DragonStorePlugin(ScraperPlugin):
             return self._scrape_one(context, url, may_clear_session=False)
         except DragonStoreRateLimited:
             context.http.forget(url)
+            _note(context, rate_limited_total=1)
             raise
         except DragonStoreSoftError as exc:
             context.http.forget(url)
@@ -821,9 +836,11 @@ class DragonStorePlugin(ScraperPlugin):
                 return None
         except DragonStoreRateLimited:
             context.http.forget(target)
+            _note(context, rate_limited_total=1)
             raise
         except DragonStoreParseError as exc:
             context.logger.error("dragon_store: %s is not a readable listing — %s", target, exc)
+            _note(context, parse_failures_total=1)
             return None
 
     def _scrape_category(self, context: PluginContext, watch: Watch) -> _CategoryOutcome:
@@ -855,6 +872,7 @@ class DragonStorePlugin(ScraperPlugin):
                     parsed.total_items,
                     total_pages,
                 )
+            _note(context, pages_fetched_total=1)
             for card in parsed.cards:
                 # The dented filter reads the sanitiser's tag, never a second search of its
                 # own: the sanitiser strips the label from the name, so a detector running

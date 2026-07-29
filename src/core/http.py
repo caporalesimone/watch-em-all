@@ -141,6 +141,12 @@ class HttpClient:
         self._request_count = 0
         self._cache = cache  # scrape cache (CTX-R9); None = no caching
         self._cache_hits = 0
+        # For the per-scraper statistics (9.B6c). Bytes say how much weight we put on a site;
+        # the waited seconds, next to a run's duration, say whether the bottleneck is us or the
+        # site's own Crawl-delay — which is the question behind every "why is this slow".
+        self._bytes_downloaded = 0
+        self._waited_s = 0.0
+        self._robots_denied = 0
         self._log = logger or _DEFAULT_LOGGER
         # One session for the whole run: some sites (Dragon Store) gate the first request
         # of a session behind an interstitial, and without a jar we would discard the
@@ -160,6 +166,21 @@ class HttpClient:
     def cache_hits(self) -> int:
         """GET requests served from the scrape cache (CTX-R9) — feeds monitoring."""
         return self._cache_hits
+
+    @property
+    def bytes_downloaded(self) -> int:
+        """Bytes of body actually fetched (cache hits cost none) — 9.B6c."""
+        return self._bytes_downloaded
+
+    @property
+    def waited_seconds(self) -> float:
+        """Seconds spent waiting out politeness and backoff — 9.B6c."""
+        return self._waited_s
+
+    @property
+    def robots_denied(self) -> int:
+        """Requests this client refused to make because ``robots.txt`` disallows them."""
+        return self._robots_denied
 
     @property
     def cookies(self) -> int:
@@ -290,6 +311,7 @@ class HttpClient:
             waits.append(self._backoff_base_s * (2 ** (attempt - 1)))
         wait = max(waits)
         if wait > 0:
+            self._waited_s += wait
             self._sleep(wait)
 
     def _note_cookies(self) -> None:
@@ -326,6 +348,7 @@ class HttpClient:
             policy = self.robots_for(url)
             if not policy.allows(url):
                 self._log.error("robots: %s is disallowed for us — not requesting it", url)
+                self._robots_denied += 1
                 raise RobotsDenied(f"robots.txt disallows {url}")
             interval_s = policy.interval_floor(self._min_interval_s)
 
@@ -349,6 +372,7 @@ class HttpClient:
                 req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
                 with self._opener.open(req, timeout=self._timeout_s) as resp:
                     body = resp.read()
+                    self._bytes_downloaded += len(body)
                     self._last_request_at = self._monotonic()
                     self._note_cookies()
                     resp_headers = {k.lower(): v for k, v in resp.headers.items()}

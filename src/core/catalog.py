@@ -82,6 +82,15 @@ def _insert_product(
         removed=False,
         first_seen_at=p.scraped_at,
         last_seen_at=p.scraped_at,
+        # Statistics start here (9.B6b). The first sighting is one observation and sets both
+        # ends of the range; it is deliberately NOT a price change — there was nothing to
+        # change from, and counting it would inflate every product's volatility by one.
+        observations=1,
+        price_min=p.price_current,
+        price_min_at=p.scraped_at,
+        price_max=p.price_current,
+        price_max_at=p.scraped_at,
+        last_price_change_at=p.scraped_at,
     )
     session.add(row)
     session.flush()  # assign row.id and make it visible to later finds in this delivery
@@ -113,6 +122,48 @@ def _update_mutable_fields(
     # we last re-served a page instead of when the site last answered — off by up to the
     # full half-life, in the one field whose entire job is to say how fresh this is.
     row.last_seen_at = p.scraped_at
+
+
+def _as_utc(value: datetime) -> datetime:
+    """A stored timestamp as an aware one. SQLite has no timezone type and hands back naive
+    values, so comparing one against a scraper's aware ``scraped_at`` raises — on SQLite only,
+    which is the test database, not production. Assuming UTC is safe: every timestamp this
+    application writes is UTC."""
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+
+def _update_statistics(row: CatalogProduct, p: Product, last: PriceHistory | None) -> None:
+    """Advance this row's own counters (9.B6b). Called **before** the mutable fields are
+    refreshed, because it needs the previous ``last_seen_at`` to tell a fresh read from a
+    replay.
+
+    ``observations`` counts only fresh reads: a delivery served from the scrape cache carries
+    the timestamp of the fetch that filled it (PROD-R8), so if it has not moved we are being
+    handed the same page again and ``cache_hits`` is what grew. Counting both as observations
+    would turn the number into "how many times we re-processed this", which says nothing about
+    the product.
+
+    Price and availability are counted apart: the run-level ``price_changes`` increments on
+    either, plus on the first history row, so it really counts "history rows written".
+    """
+    if p.scraped_at > _as_utc(row.last_seen_at):
+        row.observations += 1
+    else:
+        row.cache_hits += 1
+
+    if last is not None:
+        if last.price_current != p.price_current:
+            row.price_changes += 1
+            row.last_price_change_at = p.scraped_at
+        if last.is_available != p.is_available:
+            row.availability_changes += 1
+
+    if row.price_min is None or p.price_current < row.price_min:
+        row.price_min = p.price_current
+        row.price_min_at = p.scraped_at
+    if row.price_max is None or p.price_current > row.price_max:
+        row.price_max = p.price_current
+        row.price_max_at = p.scraped_at
 
 
 def _append_history(
@@ -154,6 +205,8 @@ def _apply_delivery(
             row = _insert_product(session, user_id, p, original, discount)
             counters.new += 1
         else:
+            # Order matters: the statistics read the *previous* last_seen_at.
+            _update_statistics(row, p, last)
             _update_mutable_fields(row, p, original, discount)
 
         # CATSVC-R4: a history entry only on a price OR availability change.
