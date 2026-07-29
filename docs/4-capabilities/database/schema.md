@@ -59,7 +59,7 @@ Engine **PostgreSQL 16**, accessed via SQLAlchemy, I/O validated with Pydantic v
 | `scrape_run` | run_id, scraper_id, trigger, slot, started_at, finished_at, status, users_processed, products_found, products_new, price_changes, products_removed, products_excluded, http_requests, cache_hits, error_message | one row per run; INDEX (scraper_id, started_at); retention |
 | `scrape_user_log` | run_id FK **CASCADE**, user_id, started_at, finished_at, products_found, products_new, price_changes, http_requests, cache_hits, status, error_message | per-user detail; http_requests/cache_hits attributed to the user in flight (single-threaded run); retention |
 | `scrape_cache` | id, plugin_id, cache_key, response_body, response_meta_json (status, content-type), fetched_at, expires_at | scrape response cache ([plugin-context](../core/plugin-context.md), CTX-R9): cache_key = hash of the normalised request; **UNIQUE (plugin_id, cache_key)**; INDEX (expires_at); expired rows dropped at run start, manual clear from the scraper's admin page |
-| `system_log` | id (incremental PK, polling cursor), created_at, level, source (`worker`\|`scraper`\|`notifier`\|`alert`\|`summary`), message, context_json | INDEX (id); retention; never users' operational content |
+| `system_log` | id (incremental PK, polling cursor), created_at, level, source (`worker`\|`scraper`\|`web`\|`notifier`\|`alert`\|`summary`), message, context_json | INDEX (id); retention; never users' operational content |
 
 ## Cross-cutting rules (implemented subset)
 

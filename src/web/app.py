@@ -46,7 +46,11 @@ from src.web.routers.scrape import make_scrape_now_router
 from src.web.spa import SpaStaticFiles
 
 logging.basicConfig(level=logging.INFO)
-log = logging.getLogger(__name__)
+# `wea.web`, not `__name__`: this module logs the process's lifecycle (startup, shutdown) and
+# its boot checks (feature flags, schema drift) — the same events the worker already persists
+# to `system_log` under `worker`. The name is what opts them in (system_log._source_for); the
+# rest of the web, per-request logs included, keeps `__name__` and stays on stdout (LOG-R1).
+log = logging.getLogger("wea.web")
 
 # Built SPA baked into the web image (build-system.md); absent in dev/tests.
 STATIC_DIR = Path(os.environ.get("WEA_STATIC_DIR", "/app/static"))
@@ -130,8 +134,14 @@ def create_app() -> FastAPI:
         # route — plugins included — takes precedence over the SPA fallback.
         if STATIC_DIR.is_dir():
             _app.mount("/", SpaStaticFiles(directory=STATIC_DIR, html=True), name="spa")
-        log.info("web app started, version %s", settings.version)
-        yield
+        log.info("web started, version %s", settings.version)
+        try:
+            yield
+        finally:
+            # Uvicorn runs the shutdown half of the lifespan on SIGTERM/SIGINT, so this is
+            # the line that says the container went down on purpose. In a `finally` because
+            # a crash on the way out is exactly when we want the record.
+            log.info("web stopped")
 
     app = FastAPI(
         title="Watch 'Em All",

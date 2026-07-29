@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 _CONFIG = (
@@ -16,7 +17,9 @@ _CONFIG = (
 
 
 @pytest.fixture()
-def client(tmp_path: object, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+def app(tmp_path: object, monkeypatch: pytest.MonkeyPatch) -> Iterator[FastAPI]:
+    """The configured application, **not** started: the lifespan has not run yet. Almost every
+    test wants `client` below instead; take this one only to drive startup/shutdown yourself."""
     cfg = tmp_path / "config.yaml"  # type: ignore[operator]
     cfg.write_text(_CONFIG, encoding="utf-8")
     ver = tmp_path / "VERSION"  # type: ignore[operator]
@@ -49,7 +52,13 @@ def client(tmp_path: object, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestCl
         auth_mod, "_login_limiter", RateLimiter(max_attempts=5, window_seconds=60.0)
     )
 
-    app = create_app()
+    yield create_app()
+    config_mod.get_settings.cache_clear()
+
+
+@pytest.fixture()
+def client(app: FastAPI) -> Iterator[TestClient]:
+    """The started application: entering the context runs the lifespan (schema, admin
+    bootstrap, plugins), leaving it runs the shutdown half."""
     with TestClient(app) as test_client:
         yield test_client
-    config_mod.get_settings.cache_clear()

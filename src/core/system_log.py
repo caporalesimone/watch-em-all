@@ -2,8 +2,9 @@
 read them back with a cursor.
 
 Capture is automatic: a :class:`SystemLogHandler` attached to the ``wea`` logger persists
-records from ``wea.worker.*`` (source ``worker``) and ``wea.plugin.*`` (source ``scraper``);
-everything else (the web's own logs, libraries) stays on stdout only. The incremental
+records from ``wea.worker.*`` (source ``worker``), ``wea.plugin.*`` (source ``scraper``) and
+``wea.web.*`` (source ``web``); everything else (the web's per-request logs, libraries) stays
+on stdout only — persisting is opt-in, by logger name. The incremental
 ``id`` is the polling cursor (LOG-R3). Messages must never carry user operational content
 (LOG-R4) — that discipline is on the caller. Writes use their own short-lived session so a
 log line never touches the caller's transaction and never breaks a run.
@@ -30,6 +31,8 @@ def _source_for(logger_name: str) -> str | None:
         return "notifier"  # channel delivery (phase 7)
     if logger_name == "wea.alert" or logger_name.startswith("wea.alert."):
         return "alert"  # alert engine / dispatch (phase 7)
+    if logger_name == "wea.web" or logger_name.startswith("wea.web."):
+        return "web"  # the API process's own lifecycle: startup, shutdown, boot checks
     return None
 
 

@@ -449,7 +449,7 @@ class ScrapeUserLog(Base):
 
 class SystemLog(Base):
     """Operational event log (LOG-R1..R4, 4.B7). The incremental ``id`` doubles as the
-    polling cursor (LOG-R3). ``source`` is one of worker | scraper | notifier | alert |
+    polling cursor (LOG-R3). ``source`` is one of worker | scraper | web | notifier | alert |
     summary; ``level`` info | warning | error. Messages never carry user operational
     content (LOG-R4) — only ids and metrics. Retention by MNT-R2 (worker daily purge)."""
 

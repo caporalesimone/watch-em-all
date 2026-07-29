@@ -344,5 +344,15 @@ def run() -> None:
     _boot()
     runner = Runner(scraper_job)
     runner.start()
-    log.info("worker started; heartbeat on %s (tick from feature flag)", HEARTBEAT_FILE)
-    _loop(runner.submit)
+    log.info(
+        "worker started, version %s; heartbeat on %s (tick from feature flag)",
+        get_settings().version,
+        HEARTBEAT_FILE,
+    )
+    try:
+        _loop(runner.submit)
+    finally:
+        # `_shutdown` announces the signal; this announces that the loop actually left. The
+        # pair is what tells a stop apart from a crash — and a `finally` catches both, since
+        # the signal handler stops the process by raising SystemExit through the loop.
+        log.info("worker stopped")

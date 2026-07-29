@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime, timedelta
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -54,10 +55,11 @@ def _user_token(client: TestClient, admin: str) -> str:
     return str(relogin.json()["access_token"])
 
 
-def test_handler_persists_only_worker_and_scraper(client: TestClient) -> None:
+def test_handler_persists_only_the_declared_sources(client: TestClient) -> None:
     logging.getLogger("wea.worker.test").info("worker-evt")
     logging.getLogger("wea.plugin.demo").warning("scraper-evt")
-    logging.getLogger("wea.web.test").info("web-evt")  # not a system source -> skipped
+    logging.getLogger("wea.web.test").info("web-evt")
+    logging.getLogger("wea.http").info("http-evt")  # a `wea` logger, but not a source -> skipped
     logging.getLogger("src.something").error("module-evt")  # skipped
     session = new_session()
     try:
@@ -69,8 +71,28 @@ def test_handler_persists_only_worker_and_scraper(client: TestClient) -> None:
     assert by_msg["worker-evt"].level == "info"
     assert by_msg["scraper-evt"].source == "scraper"
     assert by_msg["scraper-evt"].level == "warning"
-    assert "web-evt" not in by_msg
+    assert by_msg["web-evt"].source == "web"
+    assert "http-evt" not in by_msg
     assert "module-evt" not in by_msg
+
+
+def test_lifespan_logs_startup_and_shutdown(app: FastAPI) -> None:
+    """Issue #35: the log has to say when the process came up and when it went down —
+    read after the shutdown half of the lifespan has run, which is the point of `app`."""
+    with TestClient(app):
+        pass
+    session = new_session()
+    try:
+        rows = [r for r in session.scalars(select(SystemLog)) if r.source == "web"]
+    finally:
+        session.close()
+    messages = [r.message for r in rows]
+    assert any(m.startswith("web started") for m in messages)
+    assert "web stopped" in messages
+    assert messages.index("web stopped") > next(
+        i for i, m in enumerate(messages) if m.startswith("web started")
+    )
+    assert all(r.level == "info" for r in rows if r.message.startswith(("web started", "web stop")))
 
 
 def test_list_logs_cursor_and_filters(client: TestClient) -> None:

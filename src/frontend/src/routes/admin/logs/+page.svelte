@@ -198,8 +198,9 @@
 	const SOURCE_DOT: Record<string, string> = {
 		scraper: 'bg-emerald-500',
 		worker: 'bg-sky-500',
+		web: 'bg-teal-500',
 		notifier: 'bg-violet-500',
-		api: 'bg-teal-500',
+		alert: 'bg-amber-500',
 		db: 'bg-pink-500'
 	};
 	function sourceDot(s: string): string {
