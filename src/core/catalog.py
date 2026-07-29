@@ -13,6 +13,7 @@ to the plugin.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -106,6 +107,7 @@ def _update_mutable_fields(
     row.discount_pct = discount
     row.is_available = p.is_available
     row.removed = False
+    row.removed_at = None  # it is back: the delisting date would otherwise outlive the fact
     # The scraper's own observation time, NOT "now": a response replayed from the scrape
     # cache is old data, and stamping it with the clock made ``last_seen_at`` report when
     # we last re-served a page instead of when the site last answered — off by up to the
@@ -208,6 +210,10 @@ def update_catalog(
     for row in rows:
         if row.id not in seen and not row.removed:
             row.removed = True
+            # When, not just whether (9.B6): "delisted" with no date cannot answer "since
+            # when", which the catalog cleanups sort on and a delisting notification needs in
+            # order to fire once rather than on every run.
+            row.removed_at = datetime.now(UTC)
             counters.removed += 1
 
     session.commit()

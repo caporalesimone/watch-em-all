@@ -28,6 +28,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter
@@ -50,7 +51,7 @@ from src.core.contracts import Adjustment, BrandRef, CategoryRef, DeltaCounters,
 from src.core.db import new_session
 from src.core.errors import APIError
 from src.core.http import RobotsDenied
-from src.core.plugins.base import ScraperPlugin
+from src.core.plugins.base import ScraperPlugin, Tags
 from src.core.plugins.context import PluginContext, bind_upsert_catalog, build_http_client
 from src.core.robots import origin_of
 from src.web.deps import SessionDep, UserDep
@@ -62,15 +63,17 @@ from .parser import (
     DragonStoreParseError,
     DragonStoreRateLimited,
     DragonStoreSoftError,
+    ParsedCard,
+    ParsedCategory,
     ParsedProduct,
     classify_url,
+    page_url,
+    parse_category,
     parse_product,
 )
 from .sanitizer import load_title_labels, sanitize_title
 
 if TYPE_CHECKING:
-    from decimal import Decimal
-
     from src.core.models import CatalogProduct
 
 PLUGIN_ID = "dragon_store"
@@ -80,6 +83,13 @@ _GP_ID_RE = re.compile(r"\.gp\.(\d+)\.uw")
 _AVAILABLE_STATES = frozenset({"InStock", "PreOrder"})
 _KNOWN_STATES = frozenset({"InStock", "OutOfStock", "PreOrder"})
 _PREORDER_TAG = "Pre Order"
+# The canonical label the sanitiser produces for a damaged listing; the category filter reads
+# THIS, never a second search of the title (9.B5).
+_DENTED_TAG = "Ammaccato"
+# Ours, not the site's: a product the site offers with no price at all is a free download
+# (9.B2b). English like "Pre Order", the other tag we invent; the site's own labels stay
+# Italian because that is how they are printed.
+_FREE_TAG = "Free"
 # The interstitial's own checkbox clears the session with this single GET (see the page's
 # inline JS); the cleared flag then rides the ASP session cookie the client keeps for the
 # run. robots.txt allows crawling here — it publishes no Disallow, only Crawl-delay: 10 —
@@ -105,6 +115,37 @@ class _ScrapeOutcome:
     @property
     def complete(self) -> bool:
         return not self.aborted and self.failed == 0
+
+
+@dataclass
+class _CategoryOutcome:
+    """What one category walk produced. ``complete`` false means a page could not be read, and
+    the caller must then keep the delisting sweep away (CATSVC-R2b)."""
+
+    products: list[Product]
+    unpriced: list[ParsedCard]  # cards the listing showed without a price (9.B2b)
+    excluded: int  # dented listings the watch asked not to see
+    complete: bool
+
+
+def _mark_progress(
+    watch: Watch, *, done: int, total: int | None, detail: str | None = None
+) -> None:
+    """Progress is counted in **requests**, which is where the time goes: about eleven seconds
+    of politeness each. The total is known from page one, so the bar is a real fraction."""
+    watch.progress_done = done
+    watch.progress_total = total
+    if detail is not None:
+        watch.status_detail = detail
+
+
+def _record_scan(watch: Watch, *, included: int, excluded: int) -> None:
+    """What this scan of the watch yielded — a photograph on the row, which is what the UI reads
+    (9.F1/9.F3). Not a link from each product back here: a product can arrive from several
+    watches at once, so a foreign key would be wrong at the first overlap."""
+    watch.products_included = included
+    watch.products_excluded = excluded
+    watch.last_scanned_at = datetime.now(UTC)
 
 
 class _Base(DeclarativeBase):
@@ -340,11 +381,28 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
 
         context = _request_context(db, sleep=_cancellable_sleep(watch_id))
         product: Product | None = None
+        products: list[Product] = []
         detail: str | None = None
         try:
-            product = plugin._scrape_one(context, watch.url)
-            if product is None:
-                detail = "the site did not return a readable product"
+            if watch.kind == "category":
+                # A category resolves to many products over several pages; the walk keeps the
+                # row's progress up to date as it goes, which is what the page is polling.
+                outcome = plugin._scrape_category(context, watch)
+                plugin._resolve_unpriced(
+                    context, outcome.unpriced, {p.external_id: p for p in outcome.products}
+                )
+                products = outcome.products
+                if not products:
+                    detail = "the site returned no products for this category"
+                elif not outcome.complete:
+                    detail = "some pages could not be read; the next run will complete it"
+                _record_scan(watch, included=len(products), excluded=outcome.excluded)
+            else:
+                product = plugin._scrape_one(context, watch.url)
+                if product is None:
+                    detail = "the site did not return a readable product"
+                else:
+                    products = [product]
         except DragonStoreRateLimited as exc:
             detail = "the site is rate-limiting us; the next run will fill this in"
             logger.error("dragon_store: could not resolve %s while adding it — %s", watch.url, exc)
@@ -360,15 +418,18 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
             logger.info("dragon_store: watch %s cancelled by the user", watch.id)
             return
 
-        if product is not None:
-            # Never the delisting path: one product says nothing about the others.
-            context.upsert_catalog(watch.user_id, [product])
-            watch.snapshot_json = _snapshot(product)
-            watch.products_included = 1
+        if products:
+            # Never the delisting path: this delivery covers one input, and says nothing about
+            # the user's other products (CATSVC-R2b).
+            context.upsert_catalog(watch.user_id, products)
+            if product is not None:
+                watch.snapshot_json = _snapshot(product)
+                watch.products_included = 1
             logger.info(
-                "dragon_store: watch %s resolved for user %s and stored in the catalog",
+                "dragon_store: watch %s resolved for user %s — %s product(s) stored",
                 watch.id,
                 watch.user_id,
+                len(products),
             )
         else:
             logger.warning(
@@ -376,9 +437,9 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
             )
         # The watch is kept either way: "we could not read it" is not "it is not there",
         # and the next scheduled run will try again.
-        watch.status = "ready" if product is not None else "failed"
+        watch.status = "ready" if products else "failed"
         watch.status_detail = detail
-        watch.progress_done = 1
+        watch.progress_done = watch.progress_total or 1
         watch.finished_at = datetime.now(UTC)
         watch.last_scanned_at = watch.finished_at
         db.commit()
@@ -606,6 +667,13 @@ class DragonStorePlugin(ScraperPlugin):
         for crumb_name, crumb_url in parsed.breadcrumb:
             category.add_child(crumb_name, crumb_url)
 
+        price = self._resolve_price(
+            context,
+            url=url,
+            price_current=parsed.price_current,
+            price_original=parsed.price_original,
+            tags=tags,
+        )
         brand = (
             BrandRef(text=parsed.brand_text, link=parsed.brand_link) if parsed.brand_text else None
         )
@@ -628,7 +696,7 @@ class DragonStorePlugin(ScraperPlugin):
             brand=brand,
             tags=tags.get_tags(),
             category=category.get_path(),
-            price_current=parsed.price_current,
+            price_current=price,
             price_original=parsed.price_original,
             discount_pct=None,  # the core derives it from original/current (CATSVC)
             currency=parsed.currency,
@@ -639,50 +707,331 @@ class DragonStorePlugin(ScraperPlugin):
             extra=extra,
         )
 
-    # --- runtime (SCR-R4/R5) ---
+    # --- categories (9.B2/9.B3/9.B5/9.B2b) ---
+    def _resolve_price(
+        self,
+        context: PluginContext,
+        *,
+        url: str,
+        price_current: Decimal | None,
+        price_original: Decimal | None,
+        tags: Tags,
+    ) -> Decimal:
+        """The price to store when the site shows none (9.B2b).
+
+        Three cases, told apart because guessing gets them wrong in an expensive way. A price:
+        use it. No price but a list price — a product withheld from sale, `L'Isola Proibita` at
+        24,95 — use that. Neither: it is genuinely free (a digital download), so 0,00 plus a
+        tag that says so. Calling the middle case free would put a 25-euro game in the catalog
+        at zero and fire a price-drop alert on it.
+        """
+        if price_current is not None:
+            return price_current
+        if price_original is not None:
+            context.logger.info(
+                "dragon_store: %s has no current price; using its list price %s",
+                url,
+                price_original,
+            )
+            return price_original
+        tags.add_tag(_FREE_TAG)
+        return Decimal("0.00")
+
+    def _card_to_product(
+        self,
+        context: PluginContext,
+        card: ParsedCard,
+        breadcrumb: list[tuple[str, str | None]],
+        fetched_at: datetime | None,
+    ) -> Product:
+        """A listing card as a ``Product``. The breadcrumb comes from the category page: a card
+        does not carry one, and the page's own is the same one the product's detail page
+        publishes (verified on 36099)."""
+        clean_name, labels = sanitize_title(card.name, load_title_labels())
+        tags = self.new_tags()
+        for label in labels:
+            tags.add_tag(label)
+        if card.availability and card.availability not in _KNOWN_STATES:
+            context.logger.warning(
+                "dragon_store: unknown availability %r for %s", card.availability, card.url
+            )
+        if card.availability == "PreOrder":
+            tags.add_tag(_PREORDER_TAG)
+
+        category = self.new_category()
+        for crumb_name, crumb_url in breadcrumb:
+            category.add_child(crumb_name, crumb_url)
+
+        price = self._resolve_price(
+            context,
+            url=card.url,
+            price_current=card.price_current,
+            price_original=card.price_original,
+            tags=tags,
+        )
+        extra = {k: v for k, v in {"sku": card.code, "description": card.description}.items() if v}
+        return Product(
+            plugin_id=PLUGIN_ID,
+            external_id=self.external_id_for(raw=card.url, url=card.url),
+            url=card.url,
+            name=clean_name or card.name,
+            image_url=card.image_url,
+            brand=BrandRef(text=card.brand_text, link=card.brand_link) if card.brand_text else None,
+            tags=tags.get_tags(),
+            category=category.get_path(),
+            price_current=price,
+            price_original=card.price_original,
+            discount_pct=None,  # the core derives it (CATSVC)
+            currency=card.currency,
+            is_available=card.availability in _AVAILABLE_STATES,
+            scraped_at=fetched_at or datetime.now(UTC),
+            extra=extra,
+        )
+
+    def _fetch_category_page(
+        self, context: PluginContext, url: str, page: int
+    ) -> ParsedCategory | None:
+        """One page of a listing, clearing the session once if the gate answers instead."""
+        target = page_url(url, page)
+        try:
+            response = context.http.get(target)
+        except RobotsDenied as exc:
+            # Fail closed, and fail *quietly*: a run must never raise out of here, or the
+            # caller cannot report an incomplete delivery — and an exception escaping would
+            # take the whole user's run with it.
+            context.logger.error("dragon_store: not fetching %s — %s", target, exc)
+            return None
+        except OSError as exc:  # network/timeout after retries
+            context.logger.error("dragon_store: fetch failed for %s: %s", target, exc)
+            return None
+        if response.status_code != 200:
+            context.logger.error("dragon_store: %s returned HTTP %s", target, response.status_code)
+            return None
+        try:
+            return parse_category(response.content, target)
+        except DragonStoreChallenge:
+            context.http.forget(target)
+            if not self._clear_session(context, target):
+                return None
+            response = context.http.get(target)
+            try:
+                return parse_category(response.content, target)
+            except DragonStoreParseError as exc:
+                context.logger.error("dragon_store: %s unreadable after the gate — %s", target, exc)
+                return None
+        except DragonStoreRateLimited:
+            context.http.forget(target)
+            raise
+        except DragonStoreParseError as exc:
+            context.logger.error("dragon_store: %s is not a readable listing — %s", target, exc)
+            return None
+
+    def _scrape_category(self, context: PluginContext, watch: Watch) -> _CategoryOutcome:
+        """Walk one category and deliver its products (9.B3).
+
+        Pages come from the site's own ``&pg=N`` links, one request at a time; the page count
+        is printed on page one, so the progress the user sees is a real fraction from the first
+        request rather than a guess. A page that cannot be read makes the delivery
+        **incomplete**, which keeps the delisting sweep away from it (CATSVC-R2b): "we could
+        not read page 7" is not "those products are gone".
+        """
+        products: dict[str, Product] = {}
+        unpriced: list[ParsedCard] = []
+        excluded = 0
+        page = 1
+        total_pages = 1
+        complete = True
+        while page <= total_pages:
+            parsed = self._fetch_category_page(context, watch.url, page)
+            if parsed is None:
+                complete = False
+                break
+            if page == 1:
+                total_pages = parsed.total_pages or 1
+                _mark_progress(watch, done=0, total=total_pages)
+                context.logger.info(
+                    "dragon_store: category %s has %s product(s) over %s page(s)",
+                    watch.url,
+                    parsed.total_items,
+                    total_pages,
+                )
+            for card in parsed.cards:
+                # The dented filter reads the sanitiser's tag, never a second search of its
+                # own: the sanitiser strips the label from the name, so a detector running
+                # after it would find nothing, and one running before would be the same rule
+                # written twice, free to drift (DRG-R4, rewritten in 9.B5).
+                product = self._card_to_product(context, card, parsed.breadcrumb, None)
+                if _DENTED_TAG in product.tags and not watch.include_ammaccati:
+                    excluded += 1
+                    continue
+                if card.price_current is None:
+                    unpriced.append(card)
+                products[product.external_id] = product
+            _mark_progress(
+                watch, done=page, total=total_pages, detail=f"page {page} of {total_pages}"
+            )
+            context.db.commit()  # the page polls this row: an update it cannot see is no update
+            page += 1
+
+        return _CategoryOutcome(
+            products=list(products.values()),
+            unpriced=unpriced,
+            excluded=excluded,
+            complete=complete,
+        )
+
+    def _resolve_unpriced(
+        self, context: PluginContext, cards: list[ParsedCard], delivered: dict[str, Product]
+    ) -> None:
+        """The tail pass of 9.B2b: open the detail page of every product a listing showed
+        without a price and settle it there.
+
+        Runs **last**, after the categories and the single-product watches, so a product that
+        is also watched on its own has already been read and costs nothing here. On the sample
+        this is 2-4% of a category — 20-40 requests on a thousand-product one.
+        """
+        for card in cards:
+            external_id = self.external_id_for(raw=card.url, url=card.url)
+            existing = delivered.get(external_id)
+            if existing is not None and existing.price_current != Decimal("0.00"):
+                continue  # already resolved by a detail-page read in this same run
+            resolved = self._scrape_one(context, card.url)
+            if resolved is not None:
+                delivered[external_id] = resolved
+
+    # --- runtime (SCR-R4/R5, order and de-duplication: 9.B4) ---
     def run_for_user(self, context: PluginContext, user_id: int) -> DeltaCounters:
-        watches = _product_watches(context.db, user_id)
+        """Scrape everything this user watches, in the order that costs the site least.
+
+        **Categories first, then the single products they did not already deliver, then the
+        products no listing could price.** The saving is not the HTTP cache — a listing page and
+        a detail page are different URLs — but identity: a card yields the same ``external_id``
+        as the detail page, so a product a category already delivered needs no request of its
+        own (DRG-R3). Five single watches covered by one category go from 77 seconds to 22.
+        """
+        watches = _user_watches(context.db, user_id)
         if not watches:
             # No watches != "site returned nothing": deliver nothing, do NOT delist.
             context.logger.info("dragon_store: user %s has no watches — nothing to do", user_id)
             return DeltaCounters()
 
+        categories = [w for w in watches if w.kind == "category"]
+        singles = [w for w in watches if w.kind == "product"]
         context.logger.info(
-            "dragon_store: starting run for user %s — %s watch(es)", user_id, len(watches)
+            "dragon_store: starting run for user %s — %s category(ies), %s single product(s)",
+            user_id,
+            len(categories),
+            len(singles),
         )
-        outcome = self._scrape_products(context, [w.url for w in watches])
-        # Refresh each watch's display snapshot from this run; the catalog write below
-        # commits this session, persisting these too.
-        by_url = {p.url: p for p in outcome.products}
+
+        delivered: dict[str, Product] = {}
+        unpriced: list[ParsedCard] = []
+        failed = 0
+        aborted = False
+
+        # 1. Categories.
+        for watch in categories:
+            try:
+                outcome = self._scrape_category(context, watch)
+            except DragonStoreRateLimited as exc:
+                context.logger.error(
+                    "dragon_store: rate-limited by the site while reading %s (%s) — aborting "
+                    "this run; carrying on is what earns the rate limit",
+                    watch.url,
+                    exc,
+                )
+                aborted = True
+                break
+            for product in outcome.products:
+                delivered[product.external_id] = product
+            unpriced.extend(outcome.unpriced)
+            failed += 0 if outcome.complete else 1
+            _record_scan(watch, included=len(outcome.products), excluded=outcome.excluded)
+            context.logger.info(
+                "dragon_store: category %s delivered %s product(s), %s excluded as dented",
+                watch.url,
+                len(outcome.products),
+                outcome.excluded,
+            )
+
+        # 2. Single products a category has not already delivered.
+        if not aborted:
+            for index, watch in enumerate(singles):
+                external_id = self.external_id_for(raw=watch.url, url=watch.url)
+                if external_id in delivered:
+                    context.logger.info(
+                        "dragon_store: %s already came from a category this run — not asking "
+                        "the site again",
+                        watch.url,
+                    )
+                    _record_scan(watch, included=1, excluded=0)
+                    continue
+                try:
+                    resolved = self._scrape_one(context, watch.url)
+                except DragonStoreRateLimited as exc:
+                    remaining = len(singles) - index
+                    context.logger.error(
+                        "dragon_store: rate-limited by the site (%s) — aborting with %s of %s "
+                        "single watch(es) unread",
+                        exc,
+                        remaining,
+                        len(singles),
+                    )
+                    aborted = True
+                    failed += remaining
+                    break
+                if resolved is None:
+                    failed += 1
+                    continue
+                delivered[resolved.external_id] = resolved
+                _record_scan(watch, included=1, excluded=0)
+
+        # 3. The products no listing could price (9.B2b), last so the reads above count.
+        if not aborted and unpriced:
+            context.logger.info(
+                "dragon_store: resolving %s product(s) a listing showed without a price",
+                len(unpriced),
+            )
+            try:
+                self._resolve_unpriced(context, unpriced, delivered)
+            except DragonStoreRateLimited as exc:
+                context.logger.error(
+                    "dragon_store: rate-limited while resolving priceless products (%s)", exc
+                )
+                aborted = True
+
+        products = list(delivered.values())
+        # Refresh each watch's display snapshot from this run; the catalog write below commits
+        # this session, persisting these too.
+        by_url = {p.url: p for p in products}
         for watch in watches:
-            product = by_url.get(watch.url)
-            if product is not None:
-                watch.snapshot_json = _snapshot(product)
+            latest = by_url.get(watch.url)
+            if latest is not None:
+                watch.snapshot_json = _snapshot(latest)
 
         context.logger.info(
-            "dragon_store: run for user %s read %s of %s watch(es) — %s HTTP request(s), "
+            "dragon_store: run for user %s delivered %s product(s) — %s HTTP request(s), "
             "%s cache hit(s)",
             user_id,
-            len(outcome.products),
-            len(watches),
+            len(products),
             context.http.request_count,
             context.http.cache_hits,
         )
-        if outcome.complete:
-            return context.update_catalog(user_id, outcome.products)
+        if not aborted and failed == 0:
+            return context.update_catalog(user_id, products)
 
-        # Incomplete: we cannot tell "gone from the site" from "we could not read it", so
-        # the delisting sweep must not run (CATSVC-R2). Anything else would wipe the user's
-        # catalog for this scraper on any gate or outage.
+        # Incomplete: we cannot tell "gone from the site" from "we could not read it", so the
+        # delisting sweep must not run (CATSVC-R2). Anything else would wipe the user's catalog
+        # for this scraper on any gate or outage.
         context.logger.error(
-            "dragon_store: incomplete run for user %s (%s watch(es) unread%s) — delivering "
-            "%s product(s) WITHOUT delisting; the catalog keeps its current state",
+            "dragon_store: incomplete run for user %s (%s input(s) unread%s) — delivering %s "
+            "product(s) WITHOUT delisting; the catalog keeps its current state",
             user_id,
-            outcome.failed,
-            ", aborted early" if outcome.aborted else "",
-            len(outcome.products),
+            failed,
+            ", aborted early" if aborted else "",
+            len(products),
         )
-        return context.upsert_catalog(user_id, outcome.products)
+        return context.upsert_catalog(user_id, products)
 
     # --- routes: watches CRUD (per-user) ---
     def router(self) -> APIRouter:
@@ -726,10 +1075,6 @@ class DragonStorePlugin(ScraperPlugin):
                 raise APIError(
                     409, "add_in_progress", "another URL of yours is still being resolved"
                 )
-            if kind == "category":
-                # Recognised, and refused until 9.B2/9.B3 can read one: a queued category
-                # would be a job nothing is able to resolve.
-                raise APIError(422, "unsupported_url", "category watches are not available yet")
 
             watch = Watch(
                 user_id=user.sub,
@@ -737,7 +1082,8 @@ class DragonStorePlugin(ScraperPlugin):
                 url=url,
                 status="queued",
                 queued_at=datetime.now(UTC),
-                progress_total=1,  # one product page, one request
+                # One request for a product page; a category learns its own total from page one.
+                progress_total=1 if kind == "product" else None,
             )
             db.add(watch)
             try:

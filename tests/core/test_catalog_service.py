@@ -227,3 +227,23 @@ def test_upsert_products_inserts_and_updates_like_a_full_delivery(session: Sessi
     assert row.price_current == Decimal("30.00")
     # A price move is still a history event on this path (CATSVC-R4).
     assert session.scalar(select(func.count()).select_from(PriceHistory)) == 2
+
+
+def test_delisting_records_when_and_relisting_forgets_it(session: Session) -> None:
+    """9.B6: `removed` alone cannot answer "delisted since when" — which the catalog cleanups
+    sort on, and which a delisting notification needs in order to fire once instead of on every
+    run. And when a product comes back the date has to go, or it outlives the fact it records."""
+    product = _product()
+    update_catalog(session, USER, PLUGIN, [product])
+    row = session.scalars(select(CatalogProduct)).one()
+    assert row.removed_at is None
+
+    update_catalog(session, USER, PLUGIN, [])  # a complete delivery that no longer offers it
+    session.refresh(row)
+    assert row.removed is True
+    assert row.removed_at is not None
+
+    update_catalog(session, USER, PLUGIN, [product])  # back on the site
+    session.refresh(row)
+    assert row.removed is False
+    assert row.removed_at is None

@@ -535,75 +535,6 @@ def test_a_url_that_is_neither_a_product_nor_a_category_is_refused(client: TestC
     assert client.get(f"{DS}/watches", headers=h).json() == []
 
 
-def test_a_category_url_is_recognised_but_not_accepted_yet(client: TestClient) -> None:
-    """Recognised is not the same as supported: queueing a category before 9.B2/9.B3 can
-    read one would create a job nothing is able to resolve."""
-    _uid, token = _user(client)
-    h = _bearer(token)
-    refused = client.post(
-        f"{DS}/watches",
-        json={"url": "https://www.dragonstore.it/il-richiamo-di-cthulhu.1.1.192.sp.uw?idA=19"},
-        headers=h,
-    )
-    assert refused.status_code == 422
-    assert refused.json()["code"] == "unsupported_url"  # not "invalid_url": we know what it is
-    assert client.get(f"{DS}/watches", headers=h).json() == []
-
-
-# --- schema (9.X6a) --------------------------------------------------------------------
-
-
-def test_duplicate_watch_is_refused_by_the_database_not_only_by_the_check(
-    client: TestClient,
-) -> None:
-    """The 409 above is the polite path; this is the guarantee behind it.
-
-    The application check is a SELECT, and between it and the INSERT sits a scrape that
-    can run for minutes — a race with a window that wide is not a safeguard. Two rows for
-    one (user, url) must be impossible at the storage level.
-    """
-    from sqlalchemy.exc import IntegrityError
-
-    from src.plugins.scrapers.dragon_store.backend import Watch
-
-    uid, _token = _user(client)
-    session = new_session()
-    try:
-        session.add(Watch(user_id=uid, kind="product", url="https://x/a.gp.1.uw"))
-        session.commit()
-        session.add(Watch(user_id=uid, kind="product", url="https://x/a.gp.1.uw"))
-        with pytest.raises(IntegrityError):
-            session.commit()
-        session.rollback()
-        # The same URL for a *different* user is a different watch, not a duplicate.
-        session.add(Watch(user_id=uid + 1, kind="product", url="https://x/a.gp.1.uw"))
-        session.commit()
-    finally:
-        session.close()
-
-
-def test_a_fresh_watch_starts_as_a_queued_job_with_no_progress(client: TestClient) -> None:
-    """The row doubles as the job that resolves it (9.X6b): its defaults have to describe
-    "nothing has happened yet" without anyone writing them."""
-    from src.plugins.scrapers.dragon_store.backend import Watch
-
-    uid, _token = _user(client)
-    session = new_session()
-    try:
-        session.add(Watch(user_id=uid, kind="category", url="https://x/b.sp.uw"))
-        session.commit()
-        row = session.scalars(select(Watch).where(Watch.user_id == uid)).one()
-        assert row.status == "queued"
-        assert row.progress_done == 0
-        assert row.progress_total is None
-        assert row.cancel_requested is False
-        assert row.include_ammaccati is False  # dented excluded unless asked (DRG-R4)
-        assert row.products_included == row.products_excluded == 0
-        assert row.last_scanned_at is None
-    finally:
-        session.close()
-
-
 # --- job queue (9.X6c) -----------------------------------------------------------------
 
 
@@ -807,3 +738,208 @@ def test_a_running_job_stops_at_its_next_wait(client: TestClient) -> None:
     with pytest.raises(_JobCancelled):
         sleep(11.0)  # the real politeness interval
     assert time.monotonic() - started < 1.0  # gave up at once, not after eleven seconds
+
+
+# --- categories end to end (9.B2/9.B2b/9.B3/9.B4/9.B5) ----------------------------------
+
+
+class CategoryServer:
+    """Serves the saved **listing** fixtures, plus the detail pages their cards link to.
+
+    ``pg=N`` picks the page, the way the site does. The Cthulhu category is one real page and
+    happens to contain every awkward case at once: a preorder, one dented listing and two
+    products with no price. The two-page variant patches only the header of page 1 — the real
+    one claims 21 pages and we hold 2 — so the walk stops where the fixtures end instead of
+    re-reading page 2 nineteen times.
+    """
+
+    def __init__(self, *, paginated: bool = False) -> None:
+        cthulhu = (_FIX / "sp_192_cthulhu_one_page.html").read_bytes()
+        page1 = (_FIX / "sp_115_classici_page1.html").read_bytes()
+        page2 = (_FIX / "sp_115_classici_page2.html").read_bytes()
+        if paginated:
+            page1 = page1.replace(b"50 per pagina - 21 in totale", b"50 per pagina - 2 in totale")
+            page2 = page2.replace(b"50 per pagina - 21 in totale", b"50 per pagina - 2 in totale")
+        listing = {1: page1, 2: page2} if paginated else {1: cthulhu}
+        details = {
+            gid: (_FIX / name).read_bytes()
+            for gid, name in {
+                **_FIXTURES,
+                "28079": "gp_28079_free_no_price.html",
+                # The other priceless card of that page; we hold no capture of its own page, and
+                # a page with no price is exactly what it needs to be for this test.
+                "22992": "gp_28079_free_no_price.html",
+                "14415": "gp_14415_unavailable_no_price.html",
+            }.items()
+        }
+        calls: list[str] = []
+        self.calls = calls
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                calls.append(self.path)
+                gp = _GP_RE.search(self.path)
+                if ".sp.uw" in self.path:
+                    found = re.search(r"[?&]pg=(\d+)", self.path)
+                    body = listing.get(int(found.group(1)) if found else 1)
+                elif gp is not None:
+                    body = details.get(gp.group(1))
+                else:
+                    body = None
+                if body is None:
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=iso-8859-1")
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, fmt: str, *args: Any) -> None:
+                return
+
+        self._srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self._thread = threading.Thread(target=self._srv.serve_forever, daemon=True)
+
+    def __enter__(self) -> str:
+        self._thread.start()
+        return f"http://127.0.0.1:{self._srv.server_address[1]}"
+
+    def __exit__(self, *exc: object) -> None:
+        self._srv.shutdown()
+        self._srv.server_close()
+        self._thread.join(timeout=2)
+
+    def listing_calls(self) -> list[str]:
+        return [c for c in self.calls if ".sp.uw" in c]
+
+
+def sp_url(base: str) -> str:
+    return f"{base}/cthulhu.1.1.192.sp.uw?idA=19"
+
+
+def _set_include_dented(uid: int, value: bool) -> None:
+    from src.plugins.scrapers.dragon_store.backend import Watch
+
+    session = new_session()
+    try:
+        watch = session.scalars(select(Watch).where(Watch.user_id == uid)).one()
+        watch.include_ammaccati = value
+        session.commit()
+    finally:
+        session.close()
+
+
+def test_a_category_watch_is_accepted_and_queued(client: TestClient) -> None:
+    _uid, token = _user(client)
+    h = _bearer(token)
+    with CategoryServer() as base:
+        created = client.post(f"{DS}/watches", json={"url": sp_url(base)}, headers=h)
+        assert created.status_code == 201
+        assert created.json()["kind"] == "category"
+        # A category cannot know its size before page one; a product always costs one request.
+        assert created.json()["progress_total"] is None
+        _wait_resolved(client, h)
+
+
+def test_a_category_fills_the_catalog_from_its_cards(client: TestClient) -> None:
+    """The result the phase exists for: one URL, dozens of products, no request per product."""
+    uid, token = _user(client)
+    h = _bearer(token)
+    with CategoryServer() as base:
+        _add_watch(client, h, sp_url(base))
+        counters = _run_for_user(client, uid)
+
+    page = client.get("/api/catalog", headers=h).json()
+    # 39 cards on the page, one of them dented and excluded by default (DRG-R4).
+    assert page["total"] == 38
+    assert counters.found == 38
+    names = [item["name"] for item in page["items"]]
+    assert not any("AMMACCATO" in n.upper() for n in names)
+    # The breadcrumb of the listing page stands in for the one a card has not got.
+    assert all(len(item["category"]) == 3 for item in page["items"])
+
+
+def test_dented_listings_come_in_only_when_the_watch_asks(client: TestClient) -> None:
+    uid, token = _user(client)
+    h = _bearer(token)
+    with CategoryServer() as base:
+        _add_watch(client, h, sp_url(base))
+        _set_include_dented(uid, True)
+        _run_for_user(client, uid)
+
+    page = client.get("/api/catalog", params={"page_size": 100}, headers=h).json()
+    assert page["total"] == 39  # the dented one included this time
+    # The label is stripped from the name and kept as a tag, so the title reads normally.
+    dented = [i for i in page["items"] if "Ammaccato" in i["tags"]]
+    assert len(dented) == 1
+    assert "AMMACCATO" not in dented[0]["name"].upper()
+
+
+def test_a_product_the_listing_cannot_price_is_settled_on_its_own_page(
+    client: TestClient,
+) -> None:
+    """9.B2b: two cards on this page show no price. Neither may be guessed at — one is a free
+    download, and treating the other kind as free would put a priced product in the catalog at
+    zero and fire a price-drop alert on it."""
+    uid, token = _user(client)
+    h = _bearer(token)
+    with CategoryServer() as base:
+        _add_watch(client, h, sp_url(base))
+        _run_for_user(client, uid)
+
+    items = client.get("/api/catalog", headers=h).json()["items"]
+    free = [i for i in items if "Free" in i["tags"]]
+    assert len(free) == 2
+    assert all(i["price_current"] == "0.00" for i in free)
+
+
+def test_a_category_is_walked_page_by_page(client: TestClient) -> None:
+    uid, token = _user(client)
+    h = _bearer(token)
+    server = CategoryServer(paginated=True)
+    with server as base:
+        _add_watch(client, h, sp_url(base))
+        _run_for_user(client, uid)
+
+    # Two pages, read once each, with the second asked for by the site's own &pg=2.
+    listing = server.listing_calls()
+    assert sum("pg=2" in c for c in listing) >= 1
+    # 50 + 50 cards, minus the 13 dented listings on page 1 that the watch did not ask for.
+    assert client.get("/api/catalog", headers=h).json()["total"] == 87
+
+
+def test_a_single_watch_covered_by_a_category_costs_no_extra_request(client: TestClient) -> None:
+    """DRG-R3 and the reason the order is what it is (9.B4): the card and the detail page yield
+    the same external_id, so a product a category already delivered needs no request of its own.
+    """
+    uid, token = _user(client)
+    h = _bearer(token)
+    server = CategoryServer()
+    with server as base:
+        # 36099 is on that listing page; watch it on its own as well.
+        _add_watch(client, h, f"{base}/prod.1.1.1.gp.36099.uw")
+        _add_watch(client, h, sp_url(base))
+        mark = len(server.calls)
+        _run_for_user(client, uid)
+        gp_calls = [c for c in server.calls[mark:] if ".gp.36099.uw" in c]
+
+    assert gp_calls == []  # the category already delivered it
+    assert client.get("/api/catalog", headers=h).json()["total"] == 38
+
+
+def test_a_category_page_that_cannot_be_read_never_delists(client: TestClient) -> None:
+    """A half-read category is a partial delivery (CATSVC-R2b): "we could not read page 2" is
+    not "those products are gone". This is the failure that used to wipe a catalogue."""
+    uid, token = _user(client)
+    h = _bearer(token)
+    server = CategoryServer(paginated=True)
+    with server as base:
+        _add_watch(client, h, sp_url(base))
+        _run_for_user(client, uid)
+        before = client.get("/api/catalog", headers=h).json()["total"]
+
+    # The site is gone now: the next run reads nothing at all.
+    counters = _run_for_user(client, uid)
+    assert counters.removed == 0
+    assert client.get("/api/catalog", headers=h).json()["total"] == before
