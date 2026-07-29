@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import logging
 import re
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -173,20 +175,22 @@ class Watch(_Base):
 
 
 def _user_watches(db: Session, user_id: int) -> list[Watch]:
-    return list(
-        db.scalars(
-            select(Watch)
-            .where(Watch.user_id == user_id, Watch.kind == "product")
-            .order_by(Watch.id.asc())
-        )
-    )
+    """Every watch of this user, whatever its kind — this feeds the list the user reads, and
+    hiding a category from it would hide the thing they just asked for."""
+    return list(db.scalars(select(Watch).where(Watch.user_id == user_id).order_by(Watch.id.asc())))
+
+
+def _product_watches(db: Session, user_id: int) -> list[Watch]:
+    """The watches a run can currently resolve. Until 9.B3 teaches the run to walk a
+    category's pages, handing it one would scrape a listing page as if it were a product."""
+    return [w for w in _user_watches(db, user_id) if w.kind == "product"]
 
 
 def _refuse_delisting(user_id: int, products: list[Product]) -> DeltaCounters:
     raise RuntimeError("a single-product delivery must never run the delisting sweep")
 
 
-def _request_context(db: Session) -> PluginContext:
+def _request_context(db: Session, *, sleep: Callable[[float], None] | None = None) -> PluginContext:
     """A context for a scrape driven by a web request, outside a scheduled run.
 
     The HTTP client comes from :func:`build_http_client`, so these paths get the same
@@ -205,7 +209,7 @@ def _request_context(db: Session) -> PluginContext:
         config={},
         update_catalog=_refuse_delisting,
         upsert_catalog=bind_upsert_catalog(db),
-        http=build_http_client(db, PLUGIN_ID, logger),
+        http=build_http_client(db, PLUGIN_ID, logger, sleep=sleep),
     )
 
 
@@ -231,6 +235,26 @@ class WatchOut(BaseModel):
     progress_total: int | None = None
     # How many jobs of this scraper are ahead of this one; 0 while it is not queued.
     queue_position: int = 0
+
+
+class JobStatus(BaseModel):
+    """The user's in-flight add (9.X6d): what the progress bar reads, one small GET.
+
+    ``active`` false means there is nothing going on — the page shows a normal form. The
+    remaining fields describe the one operation the user has in flight, since only one is
+    allowed at a time.
+    """
+
+    active: bool
+    watch_id: int | None = None
+    kind: str | None = None
+    url: str | None = None
+    status: str | None = None
+    status_detail: str | None = None
+    progress_done: int = 0
+    progress_total: int | None = None
+    queue_position: int = 0
+    cancellable: bool = False
 
 
 def _snapshot(product: Product) -> dict[str, Any]:
@@ -262,6 +286,41 @@ def _watch_out(watch: Watch) -> WatchOut:
     )
 
 
+class _JobCancelled(Exception):
+    """The user asked this job to stop (9.X6f). Raised from the interruptible wait."""
+
+
+def _cancel_requested(watch_id: int) -> bool:
+    """Read the cancel flag on its own short session: the job's own session is in the middle
+    of a scrape, and this has to see what a *request* committed a moment ago."""
+    db = new_session()
+    try:
+        return bool(db.scalar(select(Watch.cancel_requested).where(Watch.id == watch_id)))
+    finally:
+        db.close()
+
+
+def _cancellable_sleep(watch_id: int) -> Callable[[float], None]:
+    """A politeness wait that notices a cancellation.
+
+    Almost all of a scrape's wall-clock is this wait — 11 seconds per request, by the site's
+    own request — so a cancellation that only took effect between requests would feel broken.
+    Checks four times a second and gives up the moment the flag is set.
+    """
+
+    def sleep(seconds: float) -> None:
+        deadline = time.monotonic() + seconds
+        while True:
+            if _cancel_requested(watch_id):
+                raise _JobCancelled
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            time.sleep(min(0.25, remaining))
+
+    return sleep
+
+
 def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
     """Resolve one freshly added watch, outside the request (9.X6b).
 
@@ -279,7 +338,7 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
         watch.started_at = datetime.now(UTC)
         db.commit()
 
-        context = _request_context(db)
+        context = _request_context(db, sleep=_cancellable_sleep(watch_id))
         product: Product | None = None
         detail: str | None = None
         try:
@@ -289,6 +348,17 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
         except DragonStoreRateLimited as exc:
             detail = "the site is rate-limiting us; the next run will fill this in"
             logger.error("dragon_store: could not resolve %s while adding it — %s", watch.url, exc)
+        except _JobCancelled:
+            # Whatever was already read stays in the catalog, and so does the watch: without
+            # it those products become orphans the next complete run delists, so "what was
+            # taken stays" would quietly stop being true.
+            watch.status = "cancelled"
+            watch.status_detail = "cancelled while it was running"
+            watch.cancel_requested = False
+            watch.finished_at = datetime.now(UTC)
+            db.commit()
+            logger.info("dragon_store: watch %s cancelled by the user", watch.id)
+            return
 
         if product is not None:
             # Never the delisting path: one product says nothing about the others.
@@ -571,7 +641,7 @@ class DragonStorePlugin(ScraperPlugin):
 
     # --- runtime (SCR-R4/R5) ---
     def run_for_user(self, context: PluginContext, user_id: int) -> DeltaCounters:
-        watches = _user_watches(context.db, user_id)
+        watches = _product_watches(context.db, user_id)
         if not watches:
             # No watches != "site returned nothing": deliver nothing, do NOT delist.
             context.logger.info("dragon_store: user %s has no watches — nothing to do", user_id)
@@ -644,6 +714,18 @@ class DragonStorePlugin(ScraperPlugin):
             kind = classify_url(url)
             if kind is None:
                 raise APIError(422, "invalid_url", "not a Dragon Store product or category URL")
+            # One in flight per user (9.X6d). The refusal lives HERE, not in the page: a
+            # disabled button stops nothing, and this is precisely the state a reload used to
+            # throw away — the user saw a usable form and submitted again.
+            in_flight = db.scalar(
+                select(Watch).where(
+                    Watch.user_id == user.sub, Watch.status.in_(("queued", "running"))
+                )
+            )
+            if in_flight is not None:
+                raise APIError(
+                    409, "add_in_progress", "another URL of yours is still being resolved"
+                )
             if kind == "category":
                 # Recognised, and refused until 9.B2/9.B3 can read one: a queued category
                 # would be a job nothing is able to resolve.
@@ -672,6 +754,64 @@ class DragonStorePlugin(ScraperPlugin):
             out = _watch_out(watch)
             out.queue_position = _queue_position(db, watch)
             return out
+
+        @router.get("/watches/job", response_model=JobStatus)
+        def job_status(user: UserDep, db: SessionDep) -> JobStatus:
+            """The user's in-flight add, if any (9.X6d) — what the progress bar polls.
+
+            Same shape as the ``scrape-now`` cooldown pair: one small GET the page can ask
+            repeatedly. It reads the row, so a reload finds the operation again instead of
+            losing it, and it answers *why* nothing is moving — waiting in the queue, or a
+            scheduled run holding this scraper.
+            """
+            watch = db.scalar(
+                select(Watch)
+                .where(Watch.user_id == user.sub, Watch.status.in_(("queued", "running")))
+                .order_by(Watch.id.asc())
+            )
+            if watch is None:
+                return JobStatus(active=False)
+            return JobStatus(
+                active=True,
+                watch_id=watch.id,
+                kind=watch.kind,
+                url=watch.url,
+                status=watch.status,
+                status_detail=watch.status_detail,
+                progress_done=watch.progress_done,
+                progress_total=watch.progress_total,
+                queue_position=_queue_position(db, watch) if watch.status == "queued" else 0,
+                cancellable=watch.kind == "category" and not watch.cancel_requested,
+            )
+
+        @router.post("/watches/{watch_id}/cancel", status_code=202)
+        def cancel_watch_job(watch_id: int, user: UserDep, db: SessionDep) -> dict[str, str]:
+            """Ask a running (or queued) job to stop (9.X6f).
+
+            Cooperative: a thread cannot be killed, and does not need to be — the job reads
+            this flag at the checkpoints that write its progress, and the politeness wait is
+            interruptible, so it stops within a second rather than at the end of the page it
+            was waiting for.
+
+            What was already read **stays in the catalog**, and for that to be true the watch
+            has to survive too: delete it and the products it brought in become orphans that
+            the next complete run delists — "what was taken" would disappear anyway, just
+            later and with nothing connecting the two events.
+            """
+            watch = db.scalar(select(Watch).where(Watch.id == watch_id, Watch.user_id == user.sub))
+            if watch is None:
+                raise APIError(404, "not_found", "watch not found")
+            if watch.status not in ("queued", "running"):
+                raise APIError(409, "not_running", "this watch is not being resolved")
+            if watch.status == "queued":
+                # Never started: nothing to stop, nothing was written.
+                watch.status = "cancelled"
+                watch.status_detail = "cancelled before it started"
+                watch.finished_at = datetime.now(UTC)
+            else:
+                watch.cancel_requested = True
+            db.commit()
+            return {"status": "cancelling" if watch.status == "running" else "cancelled"}
 
         @router.delete("/watches/{watch_id}", status_code=204)
         def remove_watch(watch_id: int, user: UserDep, db: SessionDep) -> None:

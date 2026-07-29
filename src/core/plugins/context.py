@@ -111,7 +111,13 @@ def build_context(manifest: Manifest, plugin: BasePlugin) -> PluginContext:
     )
 
 
-def build_http_client(session: Session, plugin_id: str, logger: Logger) -> HttpClient:
+def build_http_client(
+    session: Session,
+    plugin_id: str,
+    logger: Logger,
+    *,
+    sleep: Callable[[float], None] | None = None,
+) -> HttpClient:
     """The configured client for a scraper: politeness, timeout and cache half-life from
     the core reserved admin config (4.B10), plus the per-plugin scrape cache (CTX-R9) and
     ``robots.txt`` compliance (CTX-R10). Defaults mirror the module constants when no
@@ -122,8 +128,14 @@ def build_http_client(session: Session, plugin_id: str, logger: Logger) -> HttpC
     (resolving a watch as it is added). A hand-rolled ``HttpClient()`` in one of those
     would silently bypass the admin config and the cache, which is exactly how a scraper
     ends up hammering a site nobody configured it to hammer.
+
+    ``sleep`` replaces how the client waits out its politeness interval. A cancellable job
+    passes one that returns early (9.X6f): most of a scrape's wall-clock is that wait, so
+    without this a cancellation would only take effect after the 11 seconds it was already
+    sleeping through.
     """
     cfg = get_scraper_config(session, plugin_id)
+    extra: dict[str, Any] = {"sleep": sleep} if sleep is not None else {}
     return HttpClient(
         timeout_s=cfg.http_timeout_s,
         min_interval_s=cfg.politeness_delay_ms / 1000,
@@ -131,4 +143,5 @@ def build_http_client(session: Session, plugin_id: str, logger: Logger) -> HttpC
         # The client logs under the plugin's own namespace so one log stream tells the
         # whole story of a run: robots.txt, politeness, cache hits, failures.
         logger=logger,
+        **extra,
     )

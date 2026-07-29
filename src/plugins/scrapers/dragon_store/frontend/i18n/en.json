@@ -1,29 +1,38 @@
 {
-	"dragon_store": {
-		"title": "Dragon Store",
-		"blurb": "Watch Dragon Store product pages. Paste a product URL to start watching it; run a scrape to pull the latest into your catalog.",
-		"watches": {
-			"heading": "Watched products",
-			"url_placeholder": "https://…gp.35880.uw",
-			"add": "Add watch",
-			"empty": "No watched products yet. Paste a product URL above.",
-			"remove": "Remove",
-			"invalid": "Enter a product URL first.",
-			"duplicate": "You are already watching this URL.",
-			"scraping": "Reading the product from the site… it can take up to two minutes before it appears in your catalog."
-		},
-		"scrape_now": {
-			"action": "Scrape now",
-			"confirm_title": "Scrape Dragon Store now?",
-			"confirm_body": "This updates your catalog from this scraper. You can run it again {interval}.",
-			"started": "Scrape started — your catalog will update shortly.",
-			"cooldown_caption": "Next scrape available in {time}"
-		},
-		"adjustments": {
-			"threshold_discount": "Threshold discount {pct}%",
-			"shipping": "Shipping",
-			"free_shipping": "Free shipping"
-		},
-		"error": "Request failed."
-	}
+  "dragon_store": {
+    "title": "Dragon Store",
+    "blurb": "Watch Dragon Store product pages. Paste a product URL to start watching it; run a scrape to pull the latest into your catalog.",
+    "watches": {
+      "heading": "Watched products",
+      "url_placeholder": "https://…gp.35880.uw",
+      "add": "Add watch",
+      "empty": "No watched products yet. Paste a product URL above.",
+      "remove": "Remove",
+      "invalid": "Enter a product URL first.",
+      "duplicate": "You are already watching this URL.",
+      "scraping": "Reading it from the site — this can take a couple of minutes.",
+      "queued": "Waiting for its turn: {position} ahead of it.",
+      "queued_next": "Waiting for its turn — next up.",
+      "progress": "{done} of {total}",
+      "cancel": "Cancel",
+      "cancelled": "Cancelled. What had already been read stays in your catalog.",
+      "failed": "Could not be read: {reason}",
+      "add_in_progress": "One URL of yours is still being resolved. Wait for it to finish.",
+      "unsupported": "Category URLs are not available yet.",
+      "invalid_url": "That is not a Dragon Store product or category URL."
+    },
+    "scrape_now": {
+      "action": "Scrape now",
+      "confirm_title": "Scrape Dragon Store now?",
+      "confirm_body": "This updates your catalog from this scraper. You can run it again {interval}.",
+      "started": "Scrape started — your catalog will update shortly.",
+      "cooldown_caption": "Next scrape available in {time}"
+    },
+    "adjustments": {
+      "threshold_discount": "Threshold discount {pct}%",
+      "shipping": "Shipping",
+      "free_shipping": "Free shipping"
+    },
+    "error": "Request failed."
+  }
 }

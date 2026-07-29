@@ -660,3 +660,150 @@ def test_the_queue_reports_how_many_jobs_are_ahead(client: TestClient) -> None:
 
     rows = client.get(f"{DS}/watches", headers=_bearer(token)).json()
     assert [r["queue_position"] for r in rows] == [0, 1, 2]
+
+
+# --- job status and cancellation (9.X6d / 9.X6f) ----------------------------------------
+
+
+def test_only_one_add_can_be_in_flight_per_user(client: TestClient) -> None:
+    """The refusal has to come from the API, not the button: a disabled form stops nothing,
+    and that state is exactly what a reload used to throw away (9.X6d)."""
+    from src.plugins.scrapers.dragon_store.backend import Watch
+    from src.web.jobs import stop_drainers
+
+    stop_drainers()  # keep the first job in flight for the length of the assertion
+    uid, token = _user(client)
+    h = _bearer(token)
+    session = new_session()
+    try:
+        session.add(Watch(user_id=uid, kind="product", url="https://x/a.gp.1.uw", status="running"))
+        session.commit()
+    finally:
+        session.close()
+
+    refused = client.post(f"{DS}/watches", json={"url": "https://x/b.gp.2.uw"}, headers=h)
+    assert refused.status_code == 409
+    assert refused.json()["code"] == "add_in_progress"
+
+
+def test_the_job_endpoint_describes_what_is_happening(client: TestClient) -> None:
+    from src.plugins.scrapers.dragon_store.backend import Watch
+    from src.web.jobs import stop_drainers
+
+    stop_drainers()
+    uid, token = _user(client)
+    h = _bearer(token)
+    assert client.get(f"{DS}/watches/job", headers=h).json() == {
+        "active": False,
+        "watch_id": None,
+        "kind": None,
+        "url": None,
+        "status": None,
+        "status_detail": None,
+        "progress_done": 0,
+        "progress_total": None,
+        "queue_position": 0,
+        "cancellable": False,
+    }
+
+    session = new_session()
+    try:
+        session.add(
+            Watch(
+                user_id=uid,
+                kind="category",
+                url="https://x/c.sp.uw",
+                status="running",
+                progress_done=3,
+                progress_total=21,
+                status_detail="page 3 of 21",
+            )
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    job = client.get(f"{DS}/watches/job", headers=h).json()
+    assert job["active"] is True
+    assert (job["progress_done"], job["progress_total"]) == (3, 21)
+    assert job["status_detail"] == "page 3 of 21"
+    assert job["cancellable"] is True  # a category can be stopped; a single product cannot
+
+
+def test_cancelling_a_queued_job_stops_it_before_it_starts(client: TestClient) -> None:
+    from src.plugins.scrapers.dragon_store.backend import Watch
+    from src.web.jobs import stop_drainers
+
+    stop_drainers()
+    uid, token = _user(client)
+    h = _bearer(token)
+    session = new_session()
+    try:
+        watch = Watch(user_id=uid, kind="category", url="https://x/c.sp.uw", status="queued")
+        session.add(watch)
+        session.commit()
+        watch_id = watch.id
+    finally:
+        session.close()
+
+    accepted = client.post(f"{DS}/watches/{watch_id}/cancel", headers=h)
+    assert accepted.status_code == 202
+    assert accepted.json()["status"] == "cancelled"
+    row = client.get(f"{DS}/watches", headers=h).json()[0]
+    assert row["status"] == "cancelled"
+    # The watch itself survives: the products a partial scrape wrote must keep something
+    # delivering them, or the next complete run delists exactly those.
+    assert row["url"] == "https://x/c.sp.uw"
+
+
+def test_cancelling_something_that_is_not_running_is_refused(client: TestClient) -> None:
+    from src.plugins.scrapers.dragon_store.backend import Watch
+    from src.web.jobs import stop_drainers
+
+    stop_drainers()
+    uid, token = _user(client)
+    h = _bearer(token)
+    session = new_session()
+    try:
+        watch = Watch(user_id=uid, kind="product", url="https://x/d.gp.9.uw", status="ready")
+        session.add(watch)
+        session.commit()
+        watch_id = watch.id
+    finally:
+        session.close()
+
+    refused = client.post(f"{DS}/watches/{watch_id}/cancel", headers=h)
+    assert refused.status_code == 409
+    assert refused.json()["code"] == "not_running"
+
+
+def test_a_running_job_stops_at_its_next_wait(client: TestClient) -> None:
+    """Cancellation is cooperative and reaches into the politeness wait (9.X6f).
+
+    Almost all of a scrape is that wait — 11 seconds a request, by the site's own request —
+    so a flag only read between requests would feel broken. Here the wait is real (the
+    fixture's neutralised sleep is bypassed by passing our own) and the job has to notice.
+    """
+    from src.plugins.scrapers.dragon_store.backend import Watch, _cancellable_sleep, _JobCancelled
+
+    uid, _token = _user(client)
+    session = new_session()
+    try:
+        watch = Watch(
+            user_id=uid,
+            kind="category",
+            url="https://x/c.sp.uw",
+            status="running",
+            cancel_requested=True,
+        )
+        session.add(watch)
+        session.commit()
+        watch_id = watch.id
+    finally:
+        session.close()
+
+    sleep = _cancellable_sleep(watch_id)
+    started = time.monotonic()
+    with pytest.raises(_JobCancelled):
+        sleep(11.0)  # the real politeness interval
+    assert time.monotonic() - started < 1.0  # gave up at once, not after eleven seconds
