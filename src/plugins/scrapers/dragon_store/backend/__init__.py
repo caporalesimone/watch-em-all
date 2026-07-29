@@ -30,7 +30,17 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
-from sqlalchemy import JSON, DateTime, Integer, String, delete, func, select
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Integer,
+    String,
+    UniqueConstraint,
+    delete,
+    func,
+    select,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from src.core.contracts import Adjustment, BrandRef, CategoryRef, DeltaCounters, Product
@@ -96,9 +106,25 @@ class _Base(DeclarativeBase):
 
 
 class Watch(_Base):
-    """A user's product watch (its input — SCR-R1). Phase 3: kind=product only."""
+    """A user's watch — a single product page or a whole category (SCR-R1).
+
+    The row doubles as the **job** that resolves it (9.X6): adding a watch writes and
+    commits this row first and scrapes afterwards, so the state that describes a two-minute
+    (or, for a category, several-minute) wait lives where a page reload can find it again
+    instead of in a component that a refresh throws away.
+
+    A category stays **one row**: the run re-scrapes the category, never the hundred
+    products that came out of it, and the products carry no link back here — one product
+    can arrive from several watches at once, so the honest model is "the catalog is what a
+    complete delivery contains" (CATSVC-R2), not a foreign key. What the UI wants to show
+    is kept here as counters, which are a photograph and cannot fall out of sync.
+    """
 
     __tablename__ = "plugin_dragon_store_watches"
+    # The duplicate check used to be a SELECT before an INSERT with a two-minute scrape in
+    # between: a race with a window that wide, not a guarantee. Two quick submissions of the
+    # same URL wrote two rows.
+    __table_args__ = (UniqueConstraint("user_id", "url", name="uq_dragon_store_watch_user_url"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
@@ -111,6 +137,35 @@ class Watch(_Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+    # --- category options (9.B5) ---
+    # Dented items are separate listings whose title starts with the label; off by default,
+    # per category, and never applied to a single-product watch (DRG-R4/R7).
+    include_ammaccati: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    # --- job state (9.X6b/c/d/e/f) ---
+    # queued -> running -> ready | failed | cancelled. A fresh row starts queued; the drainer
+    # takes one scraper's oldest queued job at a time, holding the per-scraper lock.
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="queued")
+    # Either the current step ("page 3 of 21") or why it failed — one field, because to the
+    # user both answer "what is happening with this".
+    status_detail: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    # Progress in **requests**, which is where the time goes: 11s of politeness each. The
+    # total is known from the first page, which states "N risultati (50 per pagina - K in
+    # totale)"; NULL until then, and 1 for a single product.
+    progress_done: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    progress_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Cooperative cancellation (9.X6f): a running job reads this at the same checkpoints
+    # that write progress. A thread cannot be killed, and does not need to be.
+    cancel_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    queued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # --- what the last scan of this watch yielded (9.F1/9.F3) ---
+    products_included: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    products_excluded: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 def _user_watches(db: Session, user_id: int) -> list[Watch]:

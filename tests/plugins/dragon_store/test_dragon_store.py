@@ -15,8 +15,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from src.core.db import new_session
 from src.core.http import HttpClient
@@ -460,3 +462,57 @@ def test_watch_survives_a_site_that_cannot_be_read(client: TestClient) -> None:
     assert added.status_code == 201  # the watch is kept even when nothing could be read
     assert added.json()["name"] is None
     assert client.get("/api/catalog", headers=h).json()["total"] == 0
+
+
+# --- schema (9.X6a) --------------------------------------------------------------------
+
+
+def test_duplicate_watch_is_refused_by_the_database_not_only_by_the_check(
+    client: TestClient,
+) -> None:
+    """The 409 above is the polite path; this is the guarantee behind it.
+
+    The application check is a SELECT, and between it and the INSERT sits a scrape that
+    can run for minutes — a race with a window that wide is not a safeguard. Two rows for
+    one (user, url) must be impossible at the storage level.
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    from src.plugins.scrapers.dragon_store.backend import Watch
+
+    uid, _token = _user(client)
+    session = new_session()
+    try:
+        session.add(Watch(user_id=uid, kind="product", url="https://x/a.gp.1.uw"))
+        session.commit()
+        session.add(Watch(user_id=uid, kind="product", url="https://x/a.gp.1.uw"))
+        with pytest.raises(IntegrityError):
+            session.commit()
+        session.rollback()
+        # The same URL for a *different* user is a different watch, not a duplicate.
+        session.add(Watch(user_id=uid + 1, kind="product", url="https://x/a.gp.1.uw"))
+        session.commit()
+    finally:
+        session.close()
+
+
+def test_a_fresh_watch_starts_as_a_queued_job_with_no_progress(client: TestClient) -> None:
+    """The row doubles as the job that resolves it (9.X6b): its defaults have to describe
+    "nothing has happened yet" without anyone writing them."""
+    from src.plugins.scrapers.dragon_store.backend import Watch
+
+    uid, _token = _user(client)
+    session = new_session()
+    try:
+        session.add(Watch(user_id=uid, kind="category", url="https://x/b.sp.uw"))
+        session.commit()
+        row = session.scalars(select(Watch).where(Watch.user_id == uid)).one()
+        assert row.status == "queued"
+        assert row.progress_done == 0
+        assert row.progress_total is None
+        assert row.cancel_requested is False
+        assert row.include_ammaccati is False  # dented excluded unless asked (DRG-R4)
+        assert row.products_included == row.products_excluded == 0
+        assert row.last_scanned_at is None
+    finally:
+        session.close()

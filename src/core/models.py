@@ -13,6 +13,7 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     DateTime,
     ForeignKey,
@@ -100,6 +101,35 @@ class CatalogProduct(Base):
     )
     last_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    # When the delisting sweep dropped it (9.B6b). `removed` alone cannot say "delisted
+    # since when", which the catalog cleanups want to sort on and phase 15 needs to emit
+    # its event exactly once. NULL whenever `removed` is false.
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # --- per-product statistics (9.B6b) -------------------------------------------------
+    # Counted per catalog row, so per user: two users watching the same product keep their
+    # own numbers. Written by the catalog service; how they are shown is phase 9b.
+    #
+    # Fresh reads only: a delivery served from the scrape cache increments `cache_hits`
+    # instead, otherwise this would count "times we re-served a page" rather than times the
+    # site actually answered about this product (9.X4, as a counter).
+    observations: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Deliveries that came off a cached page. Careful reading it: for a category product a
+    # single HTTP cache hit serves up to 50 products, so this means "my data came from a
+    # cached page", not "one request saved for me".
+    cache_hits: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Kept apart on purpose: `scrape_run.price_changes` increments on availability moves and
+    # on the first history row too, so it counts "history rows written". These two do not.
+    price_changes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    availability_changes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    price_min: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    price_min_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    price_max: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    price_max_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # How long the current price has held — the companion of `last_seen_at`: a flat line
+    # reads differently at three days than at eight months.
+    last_price_change_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
 
@@ -486,3 +516,58 @@ class ScrapeCache(Base):
     response_meta_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ScraperStats(Base):
+    """Lifetime statistics for one scraper (9.B6c, phase 9b decides how to show them).
+
+    One row per ``plugin_id``, **global** (not per user), and **cumulative**. It exists
+    because ``scrape_run`` has retention: aggregating that table answers "recently", never
+    "ever". The health group is not a faster query but information nobody records today —
+    the 429s, the anti-bot gate and the ``robots.txt`` refusals live only as log lines,
+    which is exactly what was missing during the 25 July block, when the question was
+    "since when, and how often".
+
+    ``since`` is part of the contract, not decoration: a cumulative counter that never
+    resets misleads after a configuration change — politeness went from 1.5s to 11s in
+    0.8.1, and totals either side of that are not comparable.
+    """
+
+    __tablename__ = "scraper_stats"
+
+    plugin_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    since: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    # --- activity ---
+    runs_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    runs_ok: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    runs_failed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    runs_skipped_locked: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_failure_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Tells "it is failing right now" from "it failed once in March", which is the actual
+    # question in front of a monitoring page.
+    consecutive_failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    # --- traffic ---
+    http_requests_total: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    cache_hits_total: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    bytes_downloaded_total: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    # Kept apart from total run time on purpose: their ratio says whether the bottleneck is
+    # us or the site's Crawl-delay.
+    politeness_wait_s_total: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    run_seconds_total: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+
+    # --- health towards the site ---
+    rate_limited_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    gate_hits_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    gate_cleared_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    robots_denied_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    # --- yield ---
+    products_delivered_total: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    pages_fetched_total: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    parse_failures_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
