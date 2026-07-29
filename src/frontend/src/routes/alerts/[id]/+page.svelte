@@ -8,11 +8,10 @@
 		type AlertDetail,
 		type AlertDigestProduct
 	} from '$lib/api/client';
-	import DiscountBadge from '$lib/components/DiscountBadge.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import ProductCell from '$lib/components/ProductCell.svelte';
 	import SourceTag from '$lib/components/SourceTag.svelte';
-	import { money } from '$lib/format';
+	import { money, priceDifference } from '$lib/format';
 	import { refreshUnread } from '$lib/stores/alerts';
 
 	const alertId = $derived(Number($page.params.id));
@@ -138,6 +137,7 @@
 						{#if cart.products.length > 0}
 							<ul class="space-y-2">
 								{#each cart.products as p (p.product_id)}
+									{@const diff = priceDifference(p.price_previous, p.price_current)}
 									<li
 										class="flex flex-wrap items-start justify-between gap-2 border-t border-slate-100 pt-2 dark:border-slate-800/60"
 									>
@@ -160,7 +160,22 @@
 												<span class="mx-1 text-slate-400">→</span>
 											{/if}
 											<span class="font-medium">{money(p.price_current, p.currency)}</span>
-											<DiscountBadge discountPct={p.discount_pct} />
+											<!--
+												Difference, not the sale discount (9.F8): the same quantity the email
+												reports, so the two channels tell the same story. The DiscountBadge that
+												used to sit here answers a different question — how far below the list
+												price this is — which belongs to the catalogue, not to a digest of what
+												changed; and at 0 it printed nothing, so a price that had risen was silent.
+											-->
+											{#if diff !== null}
+												<span
+													class="ml-1 {diff.startsWith('+')
+														? 'text-rose-600 dark:text-rose-400'
+														: diff.startsWith('-')
+															? 'text-emerald-600 dark:text-emerald-400'
+															: 'text-slate-400'}">{diff}</span
+												>
+											{/if}
 										</div>
 									</li>
 								{/each}
