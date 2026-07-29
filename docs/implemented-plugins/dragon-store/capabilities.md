@@ -130,6 +130,8 @@ The site's title sometimes carries **commercial / edition labels** that are not 
 
 Besides the sanitizer, the **`PreOrder`** state adds the **"Pre Order"** tag (which does not come from the title). All tags end up in `tags` (PROD-R5); the UI shows them as a list. The list of labels in the JSON is **viewable by the admin** (read-only view; arrives with the admin pages).
 
+> **Anchoring, arriving in phase 9.** The match is currently made **anywhere** in the title. Counted over 139 real cards, all 28 label occurrences — `AMMACCATO` (13), `OFFERTA RAVEN PRIME` (9), `EDIZIONE LIMITATA` (3) — sit at the **start** of the title; none is internal, none trails. The match therefore becomes anchored to the start (or end) of the title, which loses nothing on real data and removes the one defect the free-form match carries: removing an internal label leaves a ` - - ` residue behind, since separator trimming only applies at the ends.
+
 ## Plugin routes
 
 Under `/api/plugins/dragon-store` ([convention](../../api/endpoints.md)), the plugin's own router implements `watches` (`GET` list, `POST` add → 201, `DELETE /watches/{watch_id}`). A `test` route (dry-run) existed until 0.9.0 and was removed with the concept. The `scrape-now` pair (`POST` immediate scrape for the user + `GET` cooldown status) is provided by the `ScraperPlugin` base (core convention, not rewritten by the plugin). The `config-schema/{admin|user}` and `admin-config` (GET/PUT) convention routes are **not implemented yet** — they arrive with the plugin admin config in a later phase. Swagger tag: `Plugin: Dragon Store`.
@@ -161,11 +163,17 @@ Under `/api/plugins/dragon-store` ([convention](../../api/endpoints.md)), the pl
 | List price | `del.grossPriceAmount` (e.g. `€ 59,99` — struck through, present only if discounted) |
 | Discount | `span.sDiscount` (e.g. `Sconto 25%`) |
 | Current price | `span.mainPriceAmount` (+ `span.mainPriceCurrency`) — **decimal comma** |
-| Availability | `li.availab > span.fullAV` ("Disponibile") / `span.noAV` ("Non Disponibile") |
+| Availability | `li.availab > span.fullAV` ("Disponibile") / `span.noAV` ("Non Disponibile") / **`span.inArrivalAV`** ("Prossimamente") — all three states appear on cards |
+| Short description | `p.description` — a one-line abstract, **not** the full description of the detail page |
+| Badges | `div.product-badges > span.badge-ribbon-title b2|b3` — empty CSS ribbons, also present on the detail page; meaning unknown, unused |
 
-**"Dented"**: damaged products are **separate listings** (own id and article code) with a title prefixed `AMMACCATO - …` → filter on the title prefix. *The dented filter arrives in phase 9.*
+Verified on 139 cards (2026-07-29): everything the catalog row needs is on the card, and the card's native id yields the **same `external_id`** as the product page. Only `priceValidUntil`, the long description and the detail-page image are missing — none of which any page of the app renders.
 
-**Pagination**: the observed category shows all 45 cards on one page, with no pagination/infinite-scroll marker in the HTML → to be verified on larger categories (remains in DRG-Q4). *Pagination arrives in phase 9.*
+**Cards with no price at all** (2-4% of the sample) omit the whole `li.price` block *and* the cart form. Two different situations look **identical on the card** and are told apart only by availability: a free digital download (available, and its detail page has no price either), and a product withheld from sale (`noAV`, whose detail page still carries a `P. Listino` row — `L'Isola Proibita`, 24,95 €, is one). *Their handling arrives in phase 9.*
+
+**"Dented"**: damaged products are **separate listings** (own id and article code) whose title starts with the label, in both the `AMMACCATO - ` and `AMMACCATO-` forms. Detection is the **title sanitizer's tag**, not a second search on the title (see § Title sanitizer). The word also occurs in some *descriptions*, which are deliberately not inspected. *The dented filter arrives in phase 9.*
+
+**Pagination** *(settled 2026-07-29 on a real 1040-product category, `classici-famiglia.1.1.115.sp.uw?idA=16`)*: page size is **50**, and both above and below the list the page states `1040 risultati trovati (50 per pagina - 21 in totale)` — the item count **and the page count**. Page links are ordinary `<a href>` with **`&pg=N`** (plus a `class="next"` link); `&pg=2` was fetched and returns 50 cards with **zero overlap** with page 1. No AJAX, no headless browser. Two consequences: the total is known from the **first** request, and a category costs `ceil(products / 50)` requests — a 100-product category is **2** requests, while a single-product watch costs 1 request *per product*. *Pagination arrives in phase 9.*
 
 **JSON-LD**: on the category page only `BreadcrumbList`; the product page (`.gp`) might expose a structured `Product` — to be verified in the ad-hoc study (since confirmed: see § Product page `.gp`).
 
@@ -176,7 +184,7 @@ Under `/api/plugins/dragon-store` ([convention](../../api/endpoints.md)), the pl
 | DRG-Q1 | Data in the initial DOM vs AJAX | ✅ **closed**: confirmed on the **product page** too (server-rendered, JSON-LD `Product` present) |
 | DRG-Q2 | Headless browser needed? | ✅ **closed (provisional)**: no — HTTP + HTML parsing is enough for categories |
 | DRG-Q3 | Stable SKU/native ID | ✅ **closed**: native numeric id (`gp.<id>`/`r_<id>`) + article code; see § Identity |
-| DRG-Q4 | Category pagination | 🔶 **reduced**: the sample category is single-page (45 cards); verify large categories |
+| DRG-Q4 | Category pagination | ✅ **closed** (2026-07-29): server-rendered `&pg=N` links, 50 per page, item and page counts printed on every page; verified on a 1040-product category |
 | DRG-Q5 | "Dented" flagging and availability | ✅ **closed**: title `AMMACCATO - …` (dedicated listings); **3-state** availability — `InStock`/`fullAV`, `OutOfStock`/`noAV`, **`PreOrder`/`inArrivalAV`** ("Prossimamente") |
 | DRG-Q6 | Shipping costs as an adjustment | to be decided (store rules to be read) |
 | DRG-Q7 | Does the product page (`.gp`) expose JSON-LD `Product`? | ✅ **closed**: **yes** — it is the **primary** source of the parsing (see § Product page `.gp`) |
