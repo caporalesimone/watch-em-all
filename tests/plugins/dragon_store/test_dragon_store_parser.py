@@ -17,6 +17,7 @@ from src.plugins.scrapers.dragon_store.backend.parser import (
     DragonStoreParseError,
     DragonStoreRateLimited,
     DragonStoreSoftError,
+    classify_url,
     parse_product,
 )
 from src.plugins.scrapers.dragon_store.backend.sanitizer import (
@@ -167,3 +168,63 @@ def test_every_non_product_page_stays_a_parse_error_for_old_callers() -> None:
     for body in (_CHALLENGE, _SOFT_429, _SOFT_404, b"<html>nothing useful</html>"):
         with pytest.raises(DragonStoreParseError):
             parse_product(body, "https://www.dragonstore.it/x.gp.1.uw")
+
+
+# --- URL classification (9.B1) ---------------------------------------------------------
+#
+# The two URLs below are the real ones behind the category fixtures; the relative forms are
+# copied from the site's own markup (card links and breadcrumbs), which is what the category
+# parser will feed this function from phase 9 on.
+
+_CTHULHU = "https://www.dragonstore.it/il-richiamo-di-cthulhu.1.1.192.sp.uw?idA=19"
+_CLASSICI = "https://www.dragonstore.it/classici-famiglia.1.1.115.sp.uw?idA=16"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.dragonstore.it/x.1.19.192.gp.35880.uw",
+        "https://www.dragonstore.it/x.1.19.192.gp.35880.uw?fd=1",
+        "classici-famiglia-l-isola-proibita.1.16.115.gp.14415.uw",  # relative, from a card
+        "WWW.DRAGONSTORE.IT/X.GP.1.UW",  # no scheme, shouting
+    ],
+)
+def test_product_urls_are_recognised(url: str) -> None:
+    assert classify_url(url) == "product"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        _CTHULHU,
+        _CLASSICI,
+        _CLASSICI + "&pg=2",  # a page of a paginated category is still the category
+        "gdr-italiano.1.19.33.sp.uw",  # relative, from a breadcrumb
+    ],
+)
+def test_category_urls_are_recognised(url: str) -> None:
+    assert classify_url(url) == "category"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.dragonstore.it/",
+        "https://www.dragonstore.it/raven-distribution.1.0.0.br.18.uw",  # a brand page
+        "giochi-di-ruolo.1.19.uw",  # department listing: sub-categories, no product cards
+        "https://example.com/x.1.19.192.gp.35880.uw",  # right shape, wrong site
+        "https://dragonstore.it.evil.example/x.gp.1.uw",  # host that merely starts alike
+        "",
+        "   ",
+    ],
+)
+def test_everything_else_is_not_a_watchable_url(url: str) -> None:
+    assert classify_url(url) is None
+
+
+def test_the_two_shapes_never_collide() -> None:
+    """A category URL must not read as a product one, or adding a category would scrape a
+    single page and silently deliver one product instead of the whole listing."""
+    assert classify_url(_CTHULHU) != classify_url(
+        "https://www.dragonstore.it/x.1.19.192.gp.35880.uw"
+    )

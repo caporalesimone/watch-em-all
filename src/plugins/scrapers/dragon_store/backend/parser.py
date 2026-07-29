@@ -23,8 +23,11 @@ import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import Any
-from urllib.parse import urljoin
+from typing import Any, Literal
+from urllib.parse import urljoin, urlsplit
+
+# What a watch can point at (the ``kind`` column of the plugin's watches table).
+WatchKind = Literal["product", "category"]
 
 _JSONLD_RE = re.compile(
     r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
@@ -44,6 +47,12 @@ _LISTINO_ROW_RE = re.compile(r'<tr class="D1">(.*?)</tr>', re.IGNORECASE | re.DO
 _BRAND_ROW_RE = re.compile(r'<tr class="T9">(.*?)</tr>', re.IGNORECASE | re.DOTALL)
 _HREF_RE = re.compile(r'href="([^"]+)"', re.IGNORECASE)
 _EU_PRICE_RE = re.compile(r"\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2}")
+# URL shapes (capabilities.md § URL patterns). Anchored at the end of the path so a
+# ``?pg=2`` or a fragment does not defeat them, and so ``.br.<id>.uw`` (brand) and
+# ``giochi-di-ruolo.1.19.uw`` (department listing) match neither.
+_PRODUCT_URL_RE = re.compile(r"\.gp\.\d+\.uw$", re.IGNORECASE)
+_CATEGORY_URL_RE = re.compile(r"\.sp\.uw$", re.IGNORECASE)
+_HOST = "dragonstore.it"
 
 
 class DragonStoreParseError(ValueError):
@@ -196,6 +205,34 @@ def _brand_link(decoded: str, base_url: str) -> str | None:
         return None
     href = _HREF_RE.search(row.group(1))
     return urljoin(base_url, href.group(1).strip()) if href else None
+
+
+def classify_url(url: str) -> WatchKind | None:
+    """Which kind of Dragon Store page this URL is, or ``None`` if it is neither.
+
+    The two shapes the site uses (capabilities.md § URL patterns):
+
+    - product ``<slug>.<l>.<idA>.<idC>.gp.<idProduct>.uw``
+    - category ``<slug>.<l>.<idA>.<idC>.sp.uw`` (paginated with ``?…&pg=N``)
+
+    Deliberately **not** categories: department pages such as ``giochi-di-ruolo.1.19.uw``,
+    which carry no ``.sp.`` and list sub-categories rather than products, and brand pages
+    (``.br.<id>.uw``). Both appear in the site's own breadcrumbs, so a looser rule would
+    make a category watch out of a page with no product cards on it.
+
+    A URL with a host must be Dragon Store's; one without (the site's own links are
+    relative) is judged on its shape alone, so this same function serves both the URL a
+    user pastes and the hrefs read off a category page.
+    """
+    parts = urlsplit(url.strip())
+    if parts.netloc and not parts.netloc.lower().split(":")[0].endswith(_HOST):
+        return None
+    path = parts.path
+    if _PRODUCT_URL_RE.search(path):
+        return "product"
+    if _CATEGORY_URL_RE.search(path):
+        return "category"
+    return None
 
 
 def classify_page(decoded: str, url: str) -> None:
