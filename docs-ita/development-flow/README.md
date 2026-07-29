@@ -36,6 +36,8 @@
   *Risultato: grafici interattivi per prodotto e carrello.*
 - [ ] **Fase 9 — Dragon Store completo** → [phase-09-dragonstore-complete.md](phase-09-dragonstore-complete.md) — *in corso (`0.9.x`)*
   *Risultato: monitoraggio per categorie, catalogo gestibile.*
+- [ ] **Fase 9b — Statistics** → [phase-09b-statistics.md](phase-09b-statistics.md)
+  *Risultato: le statistiche che la Fase 9 raccoglie nel database (per prodotto e per scraper) trovano una rappresentazione. La Fase 9 non ne mostra nessuna: si decide qui, guardando numeri veri già accumulati invece di immaginarseli su una tabella vuota.*
 - [ ] **Fase 10 — Governo admin** → [phase-10-admin-governance.md](phase-10-admin-governance.md)
   *Risultato: plancia admin completa — statistiche, limiti, utenti, manutenzione. (Creazione/elenco utenti **anticipati** come MVP prima della Fase 3; qui restano reset password, disabilita/riabilita, cancellazione differita + restore, filtri di stato, ultimo accesso, notifiche di cortesia, dashboard del carico.)*
 - [ ] **Fase 11 — Summary, analisi prezzi, export** → [phase-11-insights.md](phase-11-insights.md)
