@@ -150,13 +150,18 @@ def test_watches_crud(client: TestClient) -> None:
     watch_id = created.json()["id"]
     assert created.json()["url"] == url
     assert created.json()["kind"] == "product"
-    # the scraper resolved the product title on add (shown instead of the URL)
-    assert "Cthulhu" in created.json()["name"]
-    assert len(created.json()["category"]) >= 1  # snapshot includes the category
+    # The answer comes back before the scrape does (9.X6b): the row is the job, and it
+    # starts out queued with nothing resolved yet.
+    assert created.json()["status"] == "queued"
+    assert created.json()["name"] is None
 
+    # By the time the request has finished the background resolution has run, and the list
+    # — which reads the row, not the page's memory — shows the finished state.
     listed = client.get(f"{DS}/watches", headers=h).json()
     assert [w["url"] for w in listed] == [url]
+    assert listed[0]["status"] == "ready"
     assert "Cthulhu" in listed[0]["name"]
+    assert len(listed[0]["category"]) >= 1  # snapshot includes the category
 
     assert client.delete(f"{DS}/watches/{watch_id}", headers=h).status_code == 204
     assert client.get(f"{DS}/watches", headers=h).json() == []
@@ -423,7 +428,9 @@ def test_interstitial_is_cleared_once_and_the_page_retried(client: TestClient) -
         added = client.post(f"{DS}/watches", json={"url": gp_url(base, "896")}, headers=h)
 
     assert added.status_code == 201
-    assert added.json()["name"]  # resolved through the gate, not left as a bare URL
+    # Resolved through the gate, not left as a bare URL — read from the row, since the
+    # response is sent before the background resolution runs (9.X6b).
+    assert client.get(f"{DS}/watches", headers=h).json()[0]["name"]
     assert sum("captcha_check_ok" in c for c in server.calls) == 1  # cleared exactly once
     assert len(server.gp_calls()) == 2  # the gated attempt, then the retry
     # And the product landed in the catalogue straight away.
@@ -462,6 +469,36 @@ def test_watch_survives_a_site_that_cannot_be_read(client: TestClient) -> None:
     assert added.status_code == 201  # the watch is kept even when nothing could be read
     assert added.json()["name"] is None
     assert client.get("/api/catalog", headers=h).json()["total"] == 0
+    # And it says so, rather than sitting in "running" for ever: a job the page polls has
+    # to reach a terminal state whatever happened (9.X6b).
+    row = client.get(f"{DS}/watches", headers=h).json()[0]
+    assert row["status"] == "failed"
+    assert row["status_detail"]
+
+
+def test_a_url_that_is_neither_a_product_nor_a_category_is_refused(client: TestClient) -> None:
+    _uid, token = _user(client)
+    h = _bearer(token)
+    for url in ("", "https://www.dragonstore.it/", "https://x/raven.1.0.0.br.18.uw"):
+        refused = client.post(f"{DS}/watches", json={"url": url}, headers=h)
+        assert refused.status_code == 422
+        assert refused.json()["code"] == "invalid_url"
+    assert client.get(f"{DS}/watches", headers=h).json() == []
+
+
+def test_a_category_url_is_recognised_but_not_accepted_yet(client: TestClient) -> None:
+    """Recognised is not the same as supported: queueing a category before 9.B2/9.B3 can
+    read one would create a job nothing is able to resolve."""
+    _uid, token = _user(client)
+    h = _bearer(token)
+    refused = client.post(
+        f"{DS}/watches",
+        json={"url": "https://www.dragonstore.it/il-richiamo-di-cthulhu.1.1.192.sp.uw?idA=19"},
+        headers=h,
+    )
+    assert refused.status_code == 422
+    assert refused.json()["code"] == "unsupported_url"  # not "invalid_url": we know what it is
+    assert client.get(f"{DS}/watches", headers=h).json() == []
 
 
 # --- schema (9.X6a) --------------------------------------------------------------------

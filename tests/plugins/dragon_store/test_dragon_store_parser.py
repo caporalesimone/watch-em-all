@@ -212,14 +212,20 @@ def test_category_urls_are_recognised(url: str) -> None:
         "https://www.dragonstore.it/",
         "https://www.dragonstore.it/raven-distribution.1.0.0.br.18.uw",  # a brand page
         "giochi-di-ruolo.1.19.uw",  # department listing: sub-categories, no product cards
-        "https://example.com/x.1.19.192.gp.35880.uw",  # right shape, wrong site
-        "https://dragonstore.it.evil.example/x.gp.1.uw",  # host that merely starts alike
         "",
         "   ",
     ],
 )
 def test_everything_else_is_not_a_watchable_url(url: str) -> None:
     assert classify_url(url) is None
+
+
+def test_the_host_is_deliberately_not_checked() -> None:
+    """Shape alone decides. The site's own links are relative, so there is often no host
+    to check, and every fixture-driven test reaches this plugin through a local mock
+    server — pinning the hostname would refuse exactly that."""
+    assert classify_url("http://127.0.0.1:8931/x.1.19.192.gp.35880.uw") == "product"
+    assert classify_url("http://127.0.0.1:8931/x.1.1.192.sp.uw?idA=19") == "category"
 
 
 def test_the_two_shapes_never_collide() -> None:

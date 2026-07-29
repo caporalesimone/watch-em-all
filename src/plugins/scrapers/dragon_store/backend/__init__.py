@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel, Field
 from sqlalchemy import (
     JSON,
@@ -41,9 +41,11 @@ from sqlalchemy import (
     func,
     select,
 )
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from src.core.contracts import Adjustment, BrandRef, CategoryRef, DeltaCounters, Product
+from src.core.db import new_session
 from src.core.errors import APIError
 from src.core.http import RobotsDenied
 from src.core.plugins.base import ScraperPlugin
@@ -58,6 +60,7 @@ from .parser import (
     DragonStoreRateLimited,
     DragonStoreSoftError,
     ParsedProduct,
+    classify_url,
     parse_product,
 )
 from .sanitizer import load_title_labels, sanitize_title
@@ -219,6 +222,12 @@ class WatchOut(BaseModel):
     brand: BrandRef | None = None
     tags: list[str] = Field(default_factory=list)
     category: list[CategoryRef] = Field(default_factory=list)
+    # Job state (9.X6b): what is happening to this watch right now. It is read back from
+    # the database, so a page that reloads mid-resolution finds it again.
+    status: str = "ready"
+    status_detail: str | None = None
+    progress_done: int = 0
+    progress_total: int | None = None
 
 
 def _snapshot(product: Product) -> dict[str, Any]:
@@ -243,7 +252,82 @@ def _watch_out(watch: Watch) -> WatchOut:
         brand=snap.get("brand"),
         tags=snap.get("tags") or [],
         category=snap.get("category") or [],
+        status=watch.status,
+        status_detail=watch.status_detail,
+        progress_done=watch.progress_done,
+        progress_total=watch.progress_total,
     )
+
+
+def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
+    """Resolve one freshly added watch, outside the request (9.X6b).
+
+    Runs on its own session: the request's is closed by the time this starts. Every exit
+    — success, failure, a site that will not answer — has to leave the row in a terminal
+    state, or the page would poll a job that never ends.
+    """
+    logger = logging.getLogger(f"wea.plugin.{PLUGIN_ID}")
+    db = new_session()
+    try:
+        watch = db.get(Watch, watch_id)
+        if watch is None:  # removed while it sat in the queue
+            return
+        watch.status = "running"
+        watch.started_at = datetime.now(UTC)
+        db.commit()
+
+        context = _request_context(db)
+        product: Product | None = None
+        detail: str | None = None
+        try:
+            product = plugin._scrape_one(context, watch.url)
+            if product is None:
+                detail = "the site did not return a readable product"
+        except DragonStoreRateLimited as exc:
+            detail = "the site is rate-limiting us; the next run will fill this in"
+            logger.error("dragon_store: could not resolve %s while adding it — %s", watch.url, exc)
+
+        if product is not None:
+            # Never the delisting path: one product says nothing about the others.
+            context.upsert_catalog(watch.user_id, [product])
+            watch.snapshot_json = _snapshot(product)
+            watch.products_included = 1
+            logger.info(
+                "dragon_store: watch %s resolved for user %s and stored in the catalog",
+                watch.id,
+                watch.user_id,
+            )
+        else:
+            logger.warning(
+                "dragon_store: watch %s could not be resolved now — %s", watch.id, detail
+            )
+        # The watch is kept either way: "we could not read it" is not "it is not there",
+        # and the next scheduled run will try again.
+        watch.status = "ready" if product is not None else "failed"
+        watch.status_detail = detail
+        watch.progress_done = 1
+        watch.finished_at = datetime.now(UTC)
+        watch.last_scanned_at = watch.finished_at
+        db.commit()
+    except Exception:  # background task: log it, there is no response to fail
+        logger.exception("dragon_store: resolving watch %s crashed", watch_id)
+        db.rollback()
+        _mark_failed(db, watch_id, "an internal error stopped this; the next run will retry")
+    finally:
+        db.close()
+
+
+def _mark_failed(db: Session, watch_id: int, detail: str) -> None:
+    """Leave a terminal state behind even when the resolution crashed."""
+    try:
+        watch = db.get(Watch, watch_id)
+        if watch is not None and watch.status == "running":
+            watch.status = "failed"
+            watch.status_detail = detail
+            watch.finished_at = datetime.now(UTC)
+            db.commit()
+    except Exception:  # nothing left to do: the row stays as it is
+        db.rollback()
 
 
 class DragonStorePlugin(ScraperPlugin):
@@ -490,50 +574,45 @@ class DragonStorePlugin(ScraperPlugin):
             return [_watch_out(w) for w in _user_watches(db, user.sub)]
 
         @router.post("/watches", response_model=WatchOut, status_code=201)
-        def add_watch(body: WatchIn, user: UserDep, db: SessionDep) -> WatchOut:
+        def add_watch(
+            body: WatchIn, user: UserDep, db: SessionDep, background: BackgroundTasks
+        ) -> WatchOut:
+            """Write the row first, scrape afterwards (9.X6b).
+
+            It used to be the other way round, and the wait — the site's ``Crawl-delay``
+            plus its access check, up to a couple of minutes — sat inside the request, with
+            everything describing it living in the page. A reload wiped the spinner but not
+            the scrape: the work finished and wrote, invisibly, and the user, seeing
+            nothing, added the same URL again. Now the row is committed in milliseconds and
+            **is** the job: reloading re-reads it, and a process that dies mid-scrape leaves
+            a row the next scheduled run resolves by itself.
+            """
             url = body.url.strip()
-            if not url:
-                raise APIError(422, "invalid_url", "url must not be empty")
-            already = db.scalar(select(Watch).where(Watch.user_id == user.sub, Watch.url == url))
-            if already is not None:
-                raise APIError(409, "duplicate_watch", "this URL is already watched")
-            # One scrape, one purpose: adding a watch both resolves the product and puts it
-            # in the catalog. It used to fill only the display snapshot, so the user had to
-            # wait for a scheduled run — or press Scrape now — before seeing a price: two
-            # rounds of requests to the site for a single intention. The watch stays valid
-            # even when the scrape fails; the next run fills it in.
-            context = _request_context(db)
-            try:
-                product = self._scrape_one(context, url)
-            except DragonStoreRateLimited as exc:
-                context.logger.error(
-                    "dragon_store: could not resolve %s while adding the watch — %s", url, exc
-                )
-                product = None
+            kind = classify_url(url)
+            if kind is None:
+                raise APIError(422, "invalid_url", "not a Dragon Store product or category URL")
+            if kind == "category":
+                # Recognised, and refused until 9.B2/9.B3 can read one: a queued category
+                # would be a job nothing is able to resolve.
+                raise APIError(422, "unsupported_url", "category watches are not available yet")
 
             watch = Watch(
                 user_id=user.sub,
-                kind="product",
+                kind=kind,
                 url=url,
-                snapshot_json=_snapshot(product) if product else None,
+                status="queued",
+                queued_at=datetime.now(UTC),
+                progress_total=1,  # one product page, one request
             )
             db.add(watch)
-            db.commit()
-            if product is not None:
-                # Never the delisting path: one product says nothing about the others.
-                context.upsert_catalog(user.sub, [product])
-                context.logger.info(
-                    "dragon_store: watch %s added for user %s and stored in the catalog",
-                    watch.id,
-                    user.sub,
-                )
-            else:
-                context.logger.warning(
-                    "dragon_store: watch %s added for user %s but the product could not be "
-                    "read now — it will be filled in by the next run",
-                    watch.id,
-                    user.sub,
-                )
+            try:
+                db.commit()
+            except IntegrityError:
+                # The UNIQUE is the guarantee; this is just how it reaches the user.
+                db.rollback()
+                raise APIError(409, "duplicate_watch", "this URL is already watched") from None
+            db.refresh(watch)
+            background.add_task(_resolve_watch, self, watch.id)
             return _watch_out(watch)
 
         @router.delete("/watches/{watch_id}", status_code=204)

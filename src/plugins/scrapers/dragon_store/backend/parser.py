@@ -52,7 +52,6 @@ _EU_PRICE_RE = re.compile(r"\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2}")
 # ``giochi-di-ruolo.1.19.uw`` (department listing) match neither.
 _PRODUCT_URL_RE = re.compile(r"\.gp\.\d+\.uw$", re.IGNORECASE)
 _CATEGORY_URL_RE = re.compile(r"\.sp\.uw$", re.IGNORECASE)
-_HOST = "dragonstore.it"
 
 
 class DragonStoreParseError(ValueError):
@@ -220,14 +219,13 @@ def classify_url(url: str) -> WatchKind | None:
     (``.br.<id>.uw``). Both appear in the site's own breadcrumbs, so a looser rule would
     make a category watch out of a page with no product cards on it.
 
-    A URL with a host must be Dragon Store's; one without (the site's own links are
-    relative) is judged on its shape alone, so this same function serves both the URL a
-    user pastes and the hrefs read off a category page.
+    Judged on **shape alone**, host included: these path endings are distinctive enough to
+    be evidence on their own, the site's own links are relative (this same function
+    classifies the hrefs read off a category page, not just what a user pastes), and
+    pinning the host would refuse the mirrors the tests point at — which is how every
+    fixture-driven test reaches this plugin.
     """
-    parts = urlsplit(url.strip())
-    if parts.netloc and not parts.netloc.lower().split(":")[0].endswith(_HOST):
-        return None
-    path = parts.path
+    path = urlsplit(url.strip()).path
     if _PRODUCT_URL_RE.search(path):
         return "product"
     if _CATEGORY_URL_RE.search(path):
