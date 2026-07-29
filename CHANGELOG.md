@@ -16,8 +16,13 @@ _Under the hood:_ the test suite now runs across cores (`pytest-xdist`, `-n auto
 
 - **The dry-run preview is gone.** Pasting a URL used to offer a *Preview* that scraped the page and showed what it found without saving it; you then pressed *Add*, which scraped the same page again. Since 0.8.1 adding a URL already stores the product, so the preview was asking a site that requests 10 seconds between requests to serve the same page twice for a single intention — and a preview that saves nothing looked exactly like an add that does. Now there is one button.
 
+### Fixed
+
+- **The notification said a price had fallen when it had risen.** An email digest reported `Was €39.92 · Now €49.90 · Discount -0%` on a product that had just come *off* a sale and gone up in price. The column was showing the discount against the product's list price — a different quantity from the two columns beside it, and legitimately zero here — with a minus sign written into the template. It is now a **Difference** column: the signed change between the two prices in the row, `+25%` in red when the price rises, negative in green when it falls, an em dash when there is no earlier price to compare against.
+
 ### Changed
 
+- **The log says when the application starts and stops.** Both the web and the worker now record their own startup and shutdown, with the running version. Only the worker's startup used to appear, by accident of how its logger was named, and nothing at all announced a shutdown — so on a day with one scheduled scrape, a container restart and a quiet afternoon looked exactly alike. The web's boot checks (feature flags, schema drift) become visible on the same page, alongside the worker's.
 - **Administrators land on the system logs.** Signing in as an administrator used to open the user list. It now opens **System logs**, on the reasoning that the first thing you want to know is whether anything is failing right now.
 - **The system log is easier to watch.** Live tailing now lets you pick its rate (1s / 5s / 10s), and the green dot flashes on every check — so a quiet log looks different from a stuck one. Rows carry a **Date** column, not just a time. Refresh and rows-per-page grey out while tailing, since neither means anything then, and picking a level filter no longer resizes the search box. Rows per page are now 50 / 100 / 200.
 - **Price charts say when the product was last read.** A **Last seen** timestamp sits above the chart. A flat line used to be ambiguous — stable price, or nobody looking? — which is exactly what the Dragon Store outage would have looked like. It is the moment the **site** answered: a scrape served from the cache does not move it, and a caption underneath says so.

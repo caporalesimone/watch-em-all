@@ -16,7 +16,7 @@ import os
 import smtplib
 import ssl
 import time
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from email.message import EmailMessage
 from functools import lru_cache
 from html import escape
@@ -58,6 +58,27 @@ def _money(value: Decimal | None, currency: str) -> str:
         return "—"
     sym = _CURRENCY_SYMBOL.get(currency.upper(), currency + " ")
     return f"{sym}{value:.2f}"
+
+
+def _difference(previous: Decimal | None, current: Decimal) -> str | None:
+    """The signed percentage change from *Was* to *Now* — what the Difference column reports.
+
+    Returns ``None`` when there is nothing to compare against (no previous price), which the
+    digest renders as an em dash. A rise is positive, a drop negative. This is deliberately
+    **not** the product's sale discount: that is a different quantity (current vs. the list
+    price), and printing it under a `Was → Now` pair produced `-0%` on a product whose price
+    had just gone *up*. Rounded to one decimal, with the decimal dropped when it is zero, so a
+    real but sub-1% change never collapses into a misleading ``0%``.
+    """
+    if previous is None or previous == 0:
+        return None
+    pct = (current - previous) / previous * Decimal(100)
+    rounded = pct.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+    if rounded == 0:  # also catches -0.0, which would otherwise print as "-0%"
+        return "0%"
+    whole = rounded.to_integral_value()
+    text = f"{whole:.0f}" if rounded == whole else f"{rounded:.1f}"
+    return f"+{text}%" if rounded > 0 else f"{text}%"
 
 
 class EmailNotifierPlugin(NotifierPlugin):
@@ -163,7 +184,7 @@ class EmailNotifierPlugin(NotifierPlugin):
                 f'<td style="{_TD}">{escape(p.plugin_id)}</td>'
                 f'<td style="{_TD}">{escape(_money(p.price_previous, p.currency))}</td>'
                 f'<td style="{_TD}"><b>{escape(_money(p.price_current, p.currency))}</b></td>'
-                f'<td style="{_TD}">-{int(p.discount_pct)}%</td>'
+                f"{_difference_td(_difference(p.price_previous, p.price_current))}"
                 f'<td style="{_TD}"><a href="{escape(p.url)}">{escape(s["open"])}</a></td>'
                 "</tr>"
             )
@@ -173,7 +194,7 @@ class EmailNotifierPlugin(NotifierPlugin):
             f'<th style="{_TH}">{escape(s["source"])}</th>'
             f'<th style="{_TH}">{escape(s["was"])}</th>'
             f'<th style="{_TH}">{escape(s["now"])}</th>'
-            f'<th style="{_TH}">{escape(s["discount"])}</th>'
+            f'<th style="{_TH}">{escape(s["difference"])}</th>'
             f'<th style="{_TH}"></th>'
             f"</tr></thead><tbody>{''.join(rows)}</tbody></table>"
             if cart.products
@@ -203,10 +224,11 @@ class EmailNotifierPlugin(NotifierPlugin):
             lines.append(f"  * {s.get(f'event.{e}', e)}")
         for p in cart.products:
             tags = ", ".join(s.get(f"tag.{t}", str(t)) for t in p.tags)
+            diff = _difference(p.price_previous, p.price_current)
             lines.append(
                 f"  - {p.name} [{p.plugin_id}] "
                 f"{_money(p.price_previous, p.currency)} -> {_money(p.price_current, p.currency)} "
-                f"(-{int(p.discount_pct)}%) {tags} {p.url}"
+                f"({diff or '—'}) {tags} {p.url}"
             )
         lines.append(f"  {s['total']}: {_money(cart.totals.final, cur)}")
         return "\n".join(lines)
@@ -259,6 +281,19 @@ class EmailNotifierPlugin(NotifierPlugin):
 _TABLE = "border-collapse:collapse;width:100%;font-size:14px"
 _TH = "text-align:left;border-bottom:2px solid #e5e7eb;padding:6px 8px;color:#374151"
 _TD = "border-bottom:1px solid #f3f4f6;padding:6px 8px"
+# Direction colour for the Difference cell, keyed by the sign the text carries: a rise is
+# against the buyer (red), a drop in their favour (green); an unchanged price stays neutral.
+_DIFF_COLOR = {"+": ";color:#b91c1c", "-": ";color:#047857"}
+
+
+def _difference_td(text: str | None) -> str:
+    """One Difference cell: the signed percentage, coloured by direction; an em dash when
+    there is no previous price to compare against."""
+    if text is None:
+        return f'<td style="{_TD}">—</td>'
+    return f'<td style="{_TD}{_DIFF_COLOR.get(text[0], "")}">{escape(text)}</td>'
+
+
 _BADGE = (
     "display:inline-block;background:#eef2ff;color:#3730a3;border-radius:6px;"
     "padding:2px 8px;margin:0 4px 4px 0;font-size:12px"
