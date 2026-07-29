@@ -637,9 +637,16 @@ def test_a_job_left_running_by_a_dead_process_is_reclaimed(client: TestClient) -
 
 def test_the_queue_reports_how_many_jobs_are_ahead(client: TestClient) -> None:
     """ "First in the queue" and "nothing is happening" have to be distinguishable, or a wait
-    for the run lock reads as a fault (the ambiguity 9.X2 was about)."""
-    from src.plugins.scrapers.dragon_store.backend import Watch
+    for the run lock reads as a fault (the ambiguity 9.X2 was about).
 
+    The drainer is stopped first, deliberately: left running it empties the queue while the
+    assertion is being read, and the test would measure that race instead of the arithmetic.
+    A position only means anything while the job is still waiting.
+    """
+    from src.plugins.scrapers.dragon_store.backend import Watch
+    from src.web.jobs import stop_drainers
+
+    stop_drainers()
     uid, token = _user(client)
     session = new_session()
     try:
