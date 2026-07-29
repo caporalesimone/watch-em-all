@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, cast
@@ -36,6 +37,41 @@ _FIXTURES = {
     "30708": "gp_30708_other_category.html",
 }
 _GP_RE = re.compile(r"\.gp\.(\d+)\.uw")
+
+
+def _wait_resolved(client: TestClient, headers: dict[str, str], *, count: int = 1) -> list[Any]:
+    """Wait for the queued jobs to reach a terminal state (9.X6c).
+
+    Adding a watch no longer resolves it inside the request: the row is queued and this
+    scraper's drainer picks it up. Tests therefore have to wait for the same thing the page
+    waits for. Woken by a poke, so this is milliseconds — the timeout only guards against a
+    genuinely stuck drainer.
+    """
+    deadline = time.monotonic() + 10.0
+    while time.monotonic() < deadline:
+        rows = client.get(f"{DS}/watches", headers=headers).json()
+        if len(rows) >= count and all(r["status"] not in ("queued", "running") for r in rows):
+            return cast(list[Any], rows)
+        time.sleep(0.01)
+    raise AssertionError(
+        f"jobs did not finish: {client.get(f'{DS}/watches', headers=headers).json()}"
+    )
+
+
+def _add_watch(client: TestClient, headers: dict[str, str], url: str) -> Any:
+    """Add a watch and wait for its job to finish — what a user experiences as "added".
+
+    Since 9.X6b/c the POST only enqueues: the row comes back `queued` and this scraper's
+    drainer resolves it, holding the run lock while it does. Every test that goes on to touch
+    the same scraper (a manual scrape, a run, the catalog) has to wait for that, so the wait
+    lives here rather than in each test, where forgetting it makes the test flaky, not wrong.
+    """
+    added = client.post(f"{DS}/watches", json={"url": url}, headers=headers)
+    if added.status_code == 201:
+        _wait_resolved(
+            client, headers, count=len(client.get(f"{DS}/watches", headers=headers).json())
+        )
+    return added
 
 
 class DragonServer:
@@ -145,7 +181,9 @@ def test_watches_crud(client: TestClient) -> None:
 
     with DragonServer() as base:
         url = gp_url(base, "896")
-        created = client.post(f"{DS}/watches", json={"url": url}, headers=h)
+        created = _add_watch(client, h, url)
+        # The drainer resolves it after the response; the mock server has to still be up.
+        listed = _wait_resolved(client, h)
     assert created.status_code == 201
     watch_id = created.json()["id"]
     assert created.json()["url"] == url
@@ -155,9 +193,7 @@ def test_watches_crud(client: TestClient) -> None:
     assert created.json()["status"] == "queued"
     assert created.json()["name"] is None
 
-    # By the time the request has finished the background resolution has run, and the list
-    # — which reads the row, not the page's memory — shows the finished state.
-    listed = client.get(f"{DS}/watches", headers=h).json()
+    # The list reads the row, not the page's memory, so it shows the finished state.
     assert [w["url"] for w in listed] == [url]
     assert listed[0]["status"] == "ready"
     assert "Cthulhu" in listed[0]["name"]
@@ -172,7 +208,7 @@ def test_watches_are_per_user(client: TestClient) -> None:
     _uid_a, ta = _make_user(client, admin, "alice")
     _uid_b, tb = _make_user(client, admin, "bob")
     with DragonServer() as base:
-        client.post(f"{DS}/watches", json={"url": gp_url(base, "896")}, headers=_bearer(ta))
+        _add_watch(client, _bearer(ta), gp_url(base, "896"))
     assert client.get(f"{DS}/watches", headers=_bearer(tb)).json() == []
 
 
@@ -181,8 +217,8 @@ def test_add_duplicate_watch_rejected(client: TestClient) -> None:
     h = _bearer(token)
     with DragonServer() as base:
         url = gp_url(base, "896")
-        assert client.post(f"{DS}/watches", json={"url": url}, headers=h).status_code == 201
-        dup = client.post(f"{DS}/watches", json={"url": url}, headers=h)
+        assert _add_watch(client, h, url).status_code == 201
+        dup = _add_watch(client, h, url)
     assert dup.status_code == 409
     assert dup.json()["code"] == "duplicate_watch"
     assert len(client.get(f"{DS}/watches", headers=h).json()) == 1  # still one
@@ -198,7 +234,8 @@ def test_add_duplicate_watch_rejected(client: TestClient) -> None:
 
 def _added_product(client: TestClient, headers: dict[str, str], gp_id: str) -> dict[str, Any]:
     with DragonServer() as base:
-        added = client.post(f"{DS}/watches", json={"url": gp_url(base, gp_id)}, headers=headers)
+        added = _add_watch(client, headers, gp_url(base, gp_id))
+        _wait_resolved(client, headers)
     assert added.status_code == 201
     page = client.get("/api/catalog", headers=headers).json()
     assert page["total"] == 1
@@ -239,7 +276,10 @@ def test_scrape_now_populates_catalog(client: TestClient) -> None:
     _uid, token = _user(client)
     h = _bearer(token)
     with DragonServer() as base:
-        client.post(f"{DS}/watches", json={"url": gp_url(base, "896")}, headers=h)
+        _add_watch(client, h, gp_url(base, "896"))
+        # The add holds this scraper's run lock while the queue resolves it (9.X6c), so a
+        # manual scrape started right now is correctly refused with 409.
+        _wait_resolved(client, h)
         started = client.post(f"{DS}/scrape-now", headers=h)
         assert started.status_code == 202
         assert started.json()["status"] == "started"
@@ -253,7 +293,10 @@ def test_scrape_now_cooldown_blocks_second(client: TestClient) -> None:
     _uid, token = _user(client)
     h = _bearer(token)
     with DragonServer() as base:
-        client.post(f"{DS}/watches", json={"url": gp_url(base, "896")}, headers=h)
+        _add_watch(client, h, gp_url(base, "896"))
+        # The add is a job now, and it holds this scraper's run lock while it resolves
+        # (9.X6c): pressing Scrape now before it finishes is legitimately refused.
+        _wait_resolved(client, h)
         assert client.post(f"{DS}/scrape-now", headers=h).status_code == 202
         blocked = client.post(f"{DS}/scrape-now", headers=h)
     assert blocked.status_code == 429
@@ -283,7 +326,10 @@ def test_scrape_now_cooldown_interval_follows_admin_config(client: TestClient) -
     finally:
         session.close()
     with DragonServer() as base:
-        client.post(f"{DS}/watches", json={"url": gp_url(base, "896")}, headers=h)
+        _add_watch(client, h, gp_url(base, "896"))
+        # The add is a job now, and it holds this scraper's run lock while it resolves
+        # (9.X6c): pressing Scrape now before it finishes is legitimately refused.
+        _wait_resolved(client, h)
         assert client.post(f"{DS}/scrape-now", headers=h).status_code == 202
         blocked = client.post(f"{DS}/scrape-now", headers=h)
     assert blocked.status_code == 429
@@ -298,7 +344,8 @@ def test_scrape_now_cooldown_interval_follows_admin_config(client: TestClient) -
 def test_run_for_user_idempotent(client: TestClient) -> None:
     uid, token = _user(client)
     with DragonServer() as base:
-        client.post(f"{DS}/watches", json={"url": gp_url(base, "896")}, headers=_bearer(token))
+        _add_watch(client, _bearer(token), gp_url(base, "896"))
+        _wait_resolved(client, _bearer(token))  # the add resolves in the queue (9.X6c)
         first = _run_for_user(client, uid)
         second = _run_for_user(client, uid)
 
@@ -323,8 +370,8 @@ def test_identity_dedup_same_gp_id(client: TestClient) -> None:
     h = _bearer(token)
     with DragonServer() as base:
         # Two watches, same native gp id but different volatile URL -> one product.
-        client.post(f"{DS}/watches", json={"url": gp_url(base, "896")}, headers=h)
-        client.post(f"{DS}/watches", json={"url": gp_url(base, "896") + "?ref=promo"}, headers=h)
+        _add_watch(client, h, gp_url(base, "896"))
+        _add_watch(client, h, gp_url(base, "896") + "?ref=promo")
         counters = _run_for_user(client, uid)
     assert counters.found == 1  # deduped on external_id
 
@@ -333,7 +380,7 @@ def test_run_for_user_brand_and_price_persisted(client: TestClient) -> None:
     uid, token = _user(client)
     h = _bearer(token)
     with DragonServer() as base:
-        client.post(f"{DS}/watches", json={"url": gp_url(base, "34602")}, headers=h)
+        _add_watch(client, h, gp_url(base, "34602"))
         counters = _run_for_user(client, uid)
         page = client.get("/api/catalog", headers=h).json()
     assert counters.found == 1  # already inserted when the watch was added
@@ -425,12 +472,13 @@ def test_interstitial_is_cleared_once_and_the_page_retried(client: TestClient) -
     h = _bearer(token)
     server = GatedServer()
     with server as base:
-        added = client.post(f"{DS}/watches", json={"url": gp_url(base, "896")}, headers=h)
+        added = _add_watch(client, h, gp_url(base, "896"))
+        rows = _wait_resolved(client, h)
 
     assert added.status_code == 201
     # Resolved through the gate, not left as a bare URL — read from the row, since the
-    # response is sent before the background resolution runs (9.X6b).
-    assert client.get(f"{DS}/watches", headers=h).json()[0]["name"]
+    # response is sent before the job runs (9.X6b/c).
+    assert rows[0]["name"]
     assert sum("captcha_check_ok" in c for c in server.calls) == 1  # cleared exactly once
     assert len(server.gp_calls()) == 2  # the gated attempt, then the retry
     # And the product landed in the catalogue straight away.
@@ -444,8 +492,9 @@ def test_rate_limit_aborts_the_run_and_never_delists(client: TestClient) -> None
     h = _bearer(token)
     server = GatedServer({"cleared": True, "rate_limited": False})
     with server as base:
-        client.post(f"{DS}/watches", json={"url": gp_url(base, "896")}, headers=h)
-        client.post(f"{DS}/watches", json={"url": gp_url(base, "36099")}, headers=h)
+        _add_watch(client, h, gp_url(base, "896"))
+        _add_watch(client, h, gp_url(base, "36099"))
+        _wait_resolved(client, h, count=2)  # both adds go through the queue (9.X6c)
         assert client.get("/api/catalog", headers=h).json()["total"] == 2
 
         server.state["rate_limited"] = True
@@ -464,14 +513,14 @@ def test_watch_survives_a_site_that_cannot_be_read(client: TestClient) -> None:
     h = _bearer(token)
     server = GatedServer({"cleared": True, "rate_limited": True})
     with server as base:
-        added = client.post(f"{DS}/watches", json={"url": gp_url(base, "896")}, headers=h)
+        added = _add_watch(client, h, gp_url(base, "896"))
+        row = _wait_resolved(client, h)[0]
 
     assert added.status_code == 201  # the watch is kept even when nothing could be read
     assert added.json()["name"] is None
     assert client.get("/api/catalog", headers=h).json()["total"] == 0
     # And it says so, rather than sitting in "running" for ever: a job the page polls has
     # to reach a terminal state whatever happened (9.X6b).
-    row = client.get(f"{DS}/watches", headers=h).json()[0]
     assert row["status"] == "failed"
     assert row["status_detail"]
 
@@ -480,7 +529,7 @@ def test_a_url_that_is_neither_a_product_nor_a_category_is_refused(client: TestC
     _uid, token = _user(client)
     h = _bearer(token)
     for url in ("", "https://www.dragonstore.it/", "https://x/raven.1.0.0.br.18.uw"):
-        refused = client.post(f"{DS}/watches", json={"url": url}, headers=h)
+        refused = _add_watch(client, h, url)
         assert refused.status_code == 422
         assert refused.json()["code"] == "invalid_url"
     assert client.get(f"{DS}/watches", headers=h).json() == []
@@ -553,3 +602,54 @@ def test_a_fresh_watch_starts_as_a_queued_job_with_no_progress(client: TestClien
         assert row.last_scanned_at is None
     finally:
         session.close()
+
+
+# --- job queue (9.X6c) -----------------------------------------------------------------
+
+
+def test_a_job_left_running_by_a_dead_process_is_reclaimed(client: TestClient) -> None:
+    """Jobs live in the web process, so a row still marked running cannot be: it is what a
+    restart left behind. Leaving it would be worse than a lost scrape — that state blocks the
+    user's next submission, and a lock with no expiry shuts them out of their own plugin."""
+    from src.plugins.scrapers.dragon_store.backend import Watch
+
+    uid, token = _user(client)
+    session = new_session()
+    try:
+        session.add(
+            Watch(user_id=uid, kind="product", url="https://x/stuck.gp.1.uw", status="running")
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    lp = _dragon(client)
+    ctx = build_context(lp.manifest, lp.plugin)
+    try:
+        assert lp.plugin.reclaim_orphan_jobs(ctx) == 1
+    finally:
+        ctx.db.close()
+
+    row = client.get(f"{DS}/watches", headers=_bearer(token)).json()[0]
+    assert row["status"] == "failed"
+    assert "restart" in row["status_detail"]
+
+
+def test_the_queue_reports_how_many_jobs_are_ahead(client: TestClient) -> None:
+    """ "First in the queue" and "nothing is happening" have to be distinguishable, or a wait
+    for the run lock reads as a fault (the ambiguity 9.X2 was about)."""
+    from src.plugins.scrapers.dragon_store.backend import Watch
+
+    uid, token = _user(client)
+    session = new_session()
+    try:
+        for n in (1, 2, 3):
+            session.add(
+                Watch(user_id=uid, kind="product", url=f"https://x/q{n}.gp.{n}.uw", status="queued")
+            )
+        session.commit()
+    finally:
+        session.close()
+
+    rows = client.get(f"{DS}/watches", headers=_bearer(token)).json()
+    assert [r["queue_position"] for r in rows] == [0, 1, 2]

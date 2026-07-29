@@ -33,11 +33,15 @@ def init_engine(database_url: str) -> Engine:
     global _engine, _session_factory
     kwargs: dict[str, Any] = {"pool_pre_ping": True, "future": True}
     if database_url.startswith("sqlite"):
-        kwargs = {
-            "future": True,
-            "connect_args": {"check_same_thread": False},
-            "poolclass": StaticPool,
-        }
+        kwargs = {"future": True, "connect_args": {"check_same_thread": False, "timeout": 10}}
+        if ":memory:" in database_url:
+            # An in-memory database exists **per connection**, so the whole process has to
+            # share one (StaticPool). The catch, and it bit us in 9.X6c: sessions on one
+            # connection also share one transaction, so a background thread's rollback
+            # discards the request's uncommitted work. Tests that exercise concurrency use a
+            # file-backed SQLite instead, which gives each connection its own — the way
+            # PostgreSQL behaves in production.
+            kwargs["poolclass"] = StaticPool
     _engine = create_engine(database_url, **kwargs)
     _session_factory = sessionmaker(
         bind=_engine, autoflush=False, expire_on_commit=False, future=True

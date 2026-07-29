@@ -167,6 +167,41 @@ class ScraperPlugin(BasePlugin, ABC):
         scrape-now, which targets only the requesting user."""
         return []
 
+    # --- job queue (SCR-R17, 9.X6c) ------------------------------------------------------
+    # A scraper whose inputs take minutes to resolve (a site with a Crawl-delay, a category
+    # spread over pages) cannot resolve them inside a request. The core runs **one drainer
+    # per scraper** — different sites, different rules, so they may proceed in parallel while
+    # each stays serial with itself — and the plugin says what one unit of work is. The queue
+    # itself belongs to the plugin, in its own table: the core never learns its shape.
+
+    def has_queued_jobs(self, context: PluginContext) -> bool:
+        """Is there anything waiting? Asked **without** the run lock held.
+
+        The drainer looks before it locks: taking a scraper-wide lock only to discover there
+        is nothing to do would keep it churning, and a lock held for a peek is a lock a
+        scheduled run or a manual scrape cannot have. Default: no queue.
+        """
+        return False
+
+    def drain_next_job(self, context: PluginContext) -> bool:
+        """Take the oldest queued job and run it to completion. ``True`` if one was taken.
+
+        Called by the core's drainer, which holds this scraper's run lock for the whole call
+        — so a job never competes with a scheduled run or a manual scrape. Returning
+        ``False`` means "nothing to do" and the drainer goes back to sleep. Default: this
+        scraper has no queue.
+        """
+        return False
+
+    def reclaim_orphan_jobs(self, context: PluginContext) -> int:
+        """Mark jobs left mid-flight as failed at startup; returns how many.
+
+        Jobs run in the web process, so **none survives a restart**: a row still claiming to
+        be running is a leftover, and one that also blocks new submissions would shut the
+        user out of their own plugin with no way back. Default: no queue, nothing to reclaim.
+        """
+        return 0
+
     def get_adjustments(
         self, products: list[CatalogProduct], cart_total: Decimal
     ) -> list[Adjustment]:

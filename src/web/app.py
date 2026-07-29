@@ -27,6 +27,7 @@ from src.core.system_log import install_system_log_handler
 from src.web.adjust import register_notifiers, register_scrapers
 from src.web.deps import require_user
 from src.web.error_handlers import register_error_handlers
+from src.web.jobs import reclaim_orphans, start_drainers, stop_drainers
 from src.web.routers import (
     admin_notifiers,
     admin_scrapers,
@@ -134,10 +135,16 @@ def create_app() -> FastAPI:
         # route — plugins included — takes precedence over the SPA fallback.
         if STATIC_DIR.is_dir():
             _app.mount("/", SpaStaticFiles(directory=STATIC_DIR, html=True), name="spa")
+        # Jobs that resolve a newly added watch run here, one drainer per scraper (9.X6c).
+        # Reclaim first: they live in this process, so anything still marked running was
+        # left by the process that died, and that state blocks the user's next submission.
+        reclaim_orphans(_app.state.loaded_plugins)
+        start_drainers(_app.state.loaded_plugins)
         log.info("web started, version %s", settings.version)
         try:
             yield
         finally:
+            stop_drainers()
             # Uvicorn runs the shutdown half of the lifespan on SIGTERM/SIGINT, so this is
             # the line that says the container went down on purpose. In a `finally` because
             # a crash on the way out is exactly when we want the record.

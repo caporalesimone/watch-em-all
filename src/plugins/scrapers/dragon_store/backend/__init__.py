@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from sqlalchemy import (
     JSON,
@@ -52,6 +52,7 @@ from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.context import PluginContext, bind_upsert_catalog, build_http_client
 from src.core.robots import origin_of
 from src.web.deps import SessionDep, UserDep
+from src.web.jobs import poke
 
 from .adjustments import ADJUSTMENTS
 from .parser import (
@@ -228,6 +229,8 @@ class WatchOut(BaseModel):
     status_detail: str | None = None
     progress_done: int = 0
     progress_total: int | None = None
+    # How many jobs of this scraper are ahead of this one; 0 while it is not queued.
+    queue_position: int = 0
 
 
 def _snapshot(product: Product) -> dict[str, Any]:
@@ -317,6 +320,14 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
         db.close()
 
 
+def _queue_position(db: Session, watch: Watch) -> int:
+    """How many jobs of this scraper are queued ahead of this one (0 = next)."""
+    ahead = db.scalar(
+        select(func.count()).select_from(Watch).where(Watch.status == "queued", Watch.id < watch.id)
+    )
+    return int(ahead or 0)
+
+
 def _mark_failed(db: Session, watch_id: int, detail: str) -> None:
     """Leave a terminal state behind even when the resolution crashed."""
     try:
@@ -346,6 +357,44 @@ class DragonStorePlugin(ScraperPlugin):
     def delete_user_data(self, context: PluginContext, user_id: int) -> None:
         context.db.execute(delete(Watch).where(Watch.user_id == user_id))
         context.db.commit()
+
+    # --- job queue (9.X6c): the watches table *is* the queue ---
+    def has_queued_jobs(self, context: PluginContext) -> bool:
+        return (
+            context.db.scalar(select(Watch.id).where(Watch.status == "queued").limit(1))
+        ) is not None
+
+    def drain_next_job(self, context: PluginContext) -> bool:
+        """Resolve the oldest queued watch. The core's drainer holds the run lock for us.
+
+        One at a time on purpose: the site asks 10 seconds between requests, and a queue
+        that ran two jobs at once would honour that per job while breaking it in aggregate —
+        each ``HttpClient`` keeps its own politeness clock.
+        """
+        watch = context.db.scalars(
+            select(Watch).where(Watch.status == "queued").order_by(Watch.id.asc()).limit(1)
+        ).first()
+        if watch is None:
+            return False
+        _resolve_watch(self, watch.id)
+        return True
+
+    def reclaim_orphan_jobs(self, context: PluginContext) -> int:
+        """Fail whatever the previous process left running (9.X6c).
+
+        Jobs live in the web process, so a row still claiming to be running cannot be: it is
+        a leftover of a restart. Leaving it would be worse than a lost scrape, because that
+        state blocks the user's next submission — a lock with no expiry shuts them out of
+        their own plugin.
+        """
+        orphans = list(context.db.scalars(select(Watch).where(Watch.status == "running")))
+        for watch in orphans:
+            watch.status = "failed"
+            watch.status_detail = "interrupted by a restart; the next run will fill this in"
+            watch.finished_at = datetime.now(UTC)
+        if orphans:
+            context.db.commit()
+        return len(orphans)
 
     def configured_users(self, context: PluginContext) -> list[int]:
         # Users a scheduled run scrapes: everyone with at least one watch (SCR-R3).
@@ -571,12 +620,16 @@ class DragonStorePlugin(ScraperPlugin):
 
         @router.get("/watches", response_model=list[WatchOut])
         def list_watches(user: UserDep, db: SessionDep) -> list[WatchOut]:
-            return [_watch_out(w) for w in _user_watches(db, user.sub)]
+            out = []
+            for watch in _user_watches(db, user.sub):
+                item = _watch_out(watch)
+                if watch.status == "queued":
+                    item.queue_position = _queue_position(db, watch)
+                out.append(item)
+            return out
 
         @router.post("/watches", response_model=WatchOut, status_code=201)
-        def add_watch(
-            body: WatchIn, user: UserDep, db: SessionDep, background: BackgroundTasks
-        ) -> WatchOut:
+        def add_watch(body: WatchIn, user: UserDep, db: SessionDep) -> WatchOut:
             """Write the row first, scrape afterwards (9.X6b).
 
             It used to be the other way round, and the wait — the site's ``Crawl-delay``
@@ -612,8 +665,13 @@ class DragonStorePlugin(ScraperPlugin):
                 db.rollback()
                 raise APIError(409, "duplicate_watch", "this URL is already watched") from None
             db.refresh(watch)
-            background.add_task(_resolve_watch, self, watch.id)
-            return _watch_out(watch)
+            # The queue is drained by this scraper's own drainer, which holds the run lock
+            # (9.X6c) — so an add never competes with a scheduled run. Poking it just saves
+            # the wait until its next look.
+            poke(PLUGIN_ID)
+            out = _watch_out(watch)
+            out.queue_position = _queue_position(db, watch)
+            return out
 
         @router.delete("/watches/{watch_id}", status_code=204)
         def remove_watch(watch_id: int, user: UserDep, db: SessionDep) -> None:
