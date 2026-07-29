@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from src.core.catalog import update_catalog, upsert_products
 from src.core.contracts import Product
-from src.core.models import CatalogProduct, PriceHistory
+from src.core.models import CatalogProduct, PriceHistory, User
 
 PLUGIN = "dragon_store"
 USER = 1
@@ -30,6 +30,20 @@ def session() -> Iterator[Session]:
     init_engine("sqlite+pysqlite:///:memory:")
     create_schema()
     s = new_session()
+    # A catalog row belongs to a user, and since 9.B7 SQLite enforces that like PostgreSQL
+    # does: the foreign keys are switched on, so the owner has to exist.
+    s.add(
+        User(
+            id=USER,
+            username="owner",
+            first_name="O",
+            last_name="W",
+            password_hash="x",
+            role="user",
+            is_active=True,
+        )
+    )
+    s.commit()
     try:
         yield s
     finally:

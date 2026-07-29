@@ -127,14 +127,16 @@ def _admin_token(client: TestClient) -> str:
     return str(relogin.json()["access_token"])
 
 
-def _make_user(client: TestClient, admin_token: str, username: str) -> tuple[int, str]:
+def _make_user(
+    client: TestClient, admin_token: str, username: str, role: str = "user"
+) -> tuple[int, str]:
     resp = client.post(
         "/api/admin/users",
         json={
             "username": username,
             "first_name": "Test",
             "last_name": "User",
-            "role": "user",
+            "role": role,
             "temp_password": "temp-pass-123",
         },
         headers=_bearer(admin_token),
@@ -151,6 +153,12 @@ def _make_user(client: TestClient, admin_token: str, username: str) -> tuple[int
 
 def _user(client: TestClient, username: str = "alice") -> tuple[int, str]:
     return _make_user(client, _admin_token(client), username)
+
+
+def _super_user(client: TestClient, username: str = "sudo") -> tuple[int, str]:
+    """A super-user, which is what the manual scrape now needs (9.B8). A plain user does not
+    get it at all — the restriction is the API's, not a hidden button's."""
+    return _make_user(client, _admin_token(client), username, role="super_user")
 
 
 def _dragon(client: TestClient):  # type: ignore[no-untyped-def]  # test helper: returns the loaded plugin
@@ -273,7 +281,7 @@ def test_out_of_stock_is_unavailable(client: TestClient) -> None:
 
 
 def test_scrape_now_populates_catalog(client: TestClient) -> None:
-    _uid, token = _user(client)
+    _uid, token = _super_user(client)
     h = _bearer(token)
     with DragonServer() as base:
         _add_watch(client, h, gp_url(base, "896"))
@@ -290,7 +298,7 @@ def test_scrape_now_populates_catalog(client: TestClient) -> None:
 
 
 def test_scrape_now_cooldown_blocks_second(client: TestClient) -> None:
-    _uid, token = _user(client)
+    _uid, token = _super_user(client)
     h = _bearer(token)
     with DragonServer() as base:
         _add_watch(client, h, gp_url(base, "896"))
@@ -309,7 +317,7 @@ def test_scrape_now_cooldown_blocks_second(client: TestClient) -> None:
 
 
 def test_scrape_now_status_available_before_first_run(client: TestClient) -> None:
-    _uid, token = _user(client)
+    _uid, token = _super_user(client)
     status = client.get(f"{DS}/scrape-now", headers=_bearer(token)).json()
     assert status["available"] is True
     assert status["available_at"] is None
@@ -318,7 +326,7 @@ def test_scrape_now_status_available_before_first_run(client: TestClient) -> Non
 def test_scrape_now_cooldown_interval_follows_admin_config(client: TestClient) -> None:
     # The per-scraper reserved config (scrape_now_min_interval_s, 4.B10) drives the cooldown
     # the GET status reports (the UI countdown); a short interval reflects on the next read.
-    _uid, token = _user(client)
+    _uid, token = _super_user(client)
     h = _bearer(token)
     session = new_session()
     try:

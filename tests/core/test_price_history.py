@@ -13,7 +13,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.orm import Session
 
-from src.core.models import PriceHistory
+from src.core.models import CatalogProduct, PriceHistory, User
 from src.core.price_history import cart_series, product_series
 
 PRODUCT = 1
@@ -27,10 +27,53 @@ def session() -> Iterator[Session]:
     init_engine("sqlite+pysqlite:///:memory:")
     create_schema()
     s = new_session()
+    # A catalog row belongs to a user, and since 9.B7 SQLite enforces that like PostgreSQL
+    # does: the foreign keys are switched on, so the owner has to exist.
+    s.add(
+        User(
+            id=1,
+            username="owner",
+            first_name="O",
+            last_name="W",
+            password_hash="x",
+            role="user",
+            is_active=True,
+        )
+    )
+    s.commit()
+    _seed_products(s, 1, 2)
     try:
         yield s
     finally:
         s.close()
+
+
+def _seed_products(session: Session, *ids: int) -> None:
+    """History hangs off a product with ON DELETE CASCADE, and SQLite now enforces that like
+    PostgreSQL does (9.B7): these tests write history directly, so the products they refer to
+    have to exist. It also makes the fixtures describe a state production can actually reach."""
+    from decimal import Decimal
+
+    for pid in ids:
+        session.add(
+            CatalogProduct(
+                id=pid,
+                user_id=USER,
+                plugin_id="tp",
+                external_id=f"e{pid}",
+                url=f"https://x/{pid}",
+                name=f"P{pid}",
+                tags=[],
+                category=[],
+                extra_json={},
+                currency="EUR",
+                price_current=Decimal("10.00"),
+                price_original=Decimal("10.00"),
+                discount_pct=Decimal("0.00"),
+                is_available=True,
+            )
+        )
+    session.commit()
 
 
 def _hist(

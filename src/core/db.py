@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -43,6 +43,17 @@ def init_engine(database_url: str) -> Engine:
             # PostgreSQL behaves in production.
             kwargs["poolclass"] = StaticPool
     _engine = create_engine(database_url, **kwargs)
+    if database_url.startswith("sqlite"):
+        # SQLite ignores ON DELETE CASCADE unless foreign keys are switched on per connection,
+        # and it is off by default. Without this the test database quietly disagrees with
+        # production about what deleting a product does to its price history and its cart
+        # memberships (9.B7) — the tests would pass and the real cascade would be untested.
+        @event.listens_for(_engine, "connect")
+        def _enable_sqlite_foreign_keys(dbapi_connection: Any, _record: Any) -> None:
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
     _session_factory = sessionmaker(
         bind=_engine, autoflush=False, expire_on_commit=False, future=True
     )

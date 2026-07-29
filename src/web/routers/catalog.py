@@ -1,8 +1,16 @@
-"""Catalog read API (catalog-and-product-picker.md). Phase 3: GET /api/catalog.
+"""Catalog API (catalog-and-product-picker.md): read in phase 3, cleanups in phase 9.
 
-Returns the current user's catalog only (multi-tenancy DB-R1: scoped to the
-token's user), paginated, sortable and filterable. Writing the catalog is never
-done here — that is the Catalog Update Service's job, reached through a scrape.
+Returns the current user's catalog only (multi-tenancy DB-R1: scoped to the token's user),
+paginated, sortable and filterable. Products are never *written* here — that is the Catalog
+Update Service's job, reached through a scrape — but they can be **removed** (9.B7), which is a
+different thing: the user is throwing rows away, not describing what a site offers.
+
+Every removal cascades, and the cascade is the reason these endpoints have to be honest about
+what they do: ``price_history`` and ``cart_members`` both hang off ``products`` with
+``ON DELETE CASCADE``, so deleting a product also drops its price history and takes it out of
+every cart holding it (CART-R8/CAT-R8). Nothing here touches the **watches**: those are a
+separate list with their own Remove, and the visible consequence — deleting a product you still
+watch brings it back on the next run — is accepted rather than hidden (decision 2026-07-29).
 """
 
 from __future__ import annotations
@@ -14,9 +22,10 @@ from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import InstrumentedAttribute
 
 from src.core.contracts import BrandRef, CategoryRef
+from src.core.errors import APIError
 from src.core.models import CatalogProduct
 from src.web.deps import SessionDep, UserDep
-from src.web.schemas import CatalogItem, CatalogPage
+from src.web.schemas import CatalogItem, CatalogPage, RemovedCount
 
 router = APIRouter(prefix="/catalog", tags=["Catalog"])
 
@@ -95,3 +104,62 @@ def list_catalog(
     return CatalogPage(
         items=[_to_item(r) for r in rows], total=total, page=page, page_size=page_size
     )
+
+
+# --- cleanups (9.B7) -------------------------------------------------------------------
+#
+# Three shapes, because they answer three different intentions: "tidy up what the site no
+# longer offers", "I do not want this one", "start over". Each reports how many rows went, so
+# the page can say what happened instead of just refreshing.
+
+
+@router.delete(
+    "/delisted",
+    response_model=RemovedCount,
+    summary="Remove every delisted product from the current user's catalog.",
+)
+def remove_delisted(user: UserDep, db: SessionDep) -> RemovedCount:
+    """The routine tidy-up: products a complete delivery no longer offered (9.B6 marked them,
+    with the date). Their price history and cart memberships go with them."""
+    rows = db.scalars(
+        select(CatalogProduct).where(
+            CatalogProduct.user_id == user.sub, CatalogProduct.removed.is_(True)
+        )
+    ).all()
+    for row in rows:
+        db.delete(row)  # ORM delete, so the cart/history cascades run through the mapper too
+    db.commit()
+    return RemovedCount(removed=len(rows))
+
+
+@router.delete(
+    "/{product_id}",
+    response_model=RemovedCount,
+    summary="Remove one product from the current user's catalog.",
+)
+def remove_product(product_id: int, user: UserDep, db: SessionDep) -> RemovedCount:
+    row = db.scalar(
+        select(CatalogProduct).where(
+            CatalogProduct.id == product_id, CatalogProduct.user_id == user.sub
+        )
+    )
+    if row is None:
+        # Scoped to the user first: someone else's product must read as "not found", never as
+        # "forbidden", which would confirm that it exists.
+        raise APIError(404, "not_found", "product not found")
+    db.delete(row)
+    db.commit()
+    return RemovedCount(removed=1)
+
+
+@router.delete(
+    "", response_model=RemovedCount, summary="Empty the current user's catalog completely."
+)
+def empty_catalog(user: UserDep, db: SessionDep) -> RemovedCount:
+    """Start over. The watches survive, so the next run refills what is still watched — which
+    is why the confirmation in the UI has to say so (9.F4)."""
+    rows = db.scalars(select(CatalogProduct).where(CatalogProduct.user_id == user.sub)).all()
+    for row in rows:
+        db.delete(row)
+    db.commit()
+    return RemovedCount(removed=len(rows))

@@ -68,7 +68,9 @@ class UserCreate(BaseModel):
     username: str = Field(min_length=1, max_length=64)
     first_name: str = Field(min_length=1, max_length=64)
     last_name: str = Field(min_length=1, max_length=64)
-    role: Literal["admin", "user"]
+    # Three levels since 9.B8. A role is chosen at creation and not changed afterwards:
+    # promoting an existing account is phase 10, where the actions on accounts live.
+    role: Literal["admin", "super_user", "user"]
     temp_password: str = Field(min_length=8)  # AUTH-R6
 
 
@@ -338,3 +340,10 @@ class CartAlertTypesBody(BaseModel):
     # the endpoint stores exactly this set (presence = enabled). Values are validated
     # against the AlertType enum. Empty list = disable all (deletes the baseline).
     alert_types: list[str] = Field(default_factory=list)
+
+
+class RemovedCount(BaseModel):
+    """How many catalog rows a cleanup removed (9.B7). A count, not a bare 204: "nothing was
+    delisted" and "twelve products went" are different answers to the same click."""
+
+    removed: int
