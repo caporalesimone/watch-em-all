@@ -7,27 +7,18 @@ New items get appended over time.
 
 A read of the phase-9 code — plugin backend, parser, sanitiser, core catalog/alerts, worker, web
 routers, the three frontend components — looking for dead branches, simplifiable logic and logic
-errors. Nothing here is fixed yet.
+errors.
 
 Split into three groups, because "mechanical" can mean two different things: *no decision to take*,
-and *no change in behaviour*. Group A has both, group B only the first, group C neither. **C1, C2 and
+and *no change in behaviour*. Group A had both, group B only the first, group C neither. **C1, C2 and
 C3 change what the user sees**, and none of the three is covered by a test, for the same reason: the
 tests go through `run_for_user`, while C1/C2 live on the *add* path and C3 needs a warm cache.
 
-### Group A — mechanical: no decision, no change in behaviour
-
-Safe as one commit. The fix is stated with each finding because there is only one.
-
-| ID | Description, filename |
-|---|---|
-| **C4** | **Dead code**: `_scrape_products` (~23 lines) and the `_ScrapeOutcome` dataclass are called by nobody — leftovers of the `run_for_user` reordering in `9.B4`. *Fix: delete both.* — [backend/\_\_init\_\_.py](src/plugins/scrapers/dragon_store/backend/__init__.py) lines 104 and 608 |
-| **C11** | **The watch counters are kept twice**: the add path writes them by hand (`products_included = 1`, and `last_scanned_at` twice — in `_record_scan` and again at the end) while `run_for_user` uses `_record_scan`. Two routes for the same three fields. *Fix: the add path calls `_record_scan` too.* — [backend/\_\_init\_\_.py](src/plugins/scrapers/dragon_store/backend/__init__.py) |
-| **C12** | **Misleading comment**: `addWatch`'s describes the pre-`9.X6b` world ("scrapes the product there and then… could be submitted twice"); the POST now answers in milliseconds and the block is the server's. *Fix: rewrite the comment.* — [PluginRoot.svelte](src/plugins/scrapers/dragon_store/frontend/PluginRoot.svelte) |
-| **C13** | **Stale delisted count**: `delistedTotal` refreshes on mount and after a cleanup, never after `load()`. If a scrape delists while the page is open (or during the initial retry loop), the button stays *"Remove delisted (0)"* and disabled with delisted rows on screen. *Fix: refresh it from `load()`.* — [catalog/+page.svelte](src/frontend/src/routes/catalog/+page.svelte) |
-| **C16** | **Docstring contradicts the code**: `classify_url` says *"Judged on shape alone, host included"* but reads only `urlsplit(url).path` — the host is never checked. *Fix: say that.* — [backend/parser.py](src/plugins/scrapers/dragon_store/backend/parser.py) |
-| **C17** | **Dead data**: `ParsedCategory.page_size` is parsed off the header and never consumed. *Fix: drop the field and its assignment.* — [backend/parser.py](src/plugins/scrapers/dragon_store/backend/parser.py) |
-| **C18** | **The privileged-role set is hand-copied into two components** (`['super_user','admin']`), a third copy of the backend's `_SUPER_ROLES`; the next restricted page will make a fourth. *Fix: one exported helper, imported by both.* — [PluginRoot.svelte](src/plugins/scrapers/dragon_store/frontend/PluginRoot.svelte) + [Sidebar.svelte](src/frontend/src/lib/components/Sidebar.svelte) |
-| **C21** | **Redundant field**: `_Drainer.plugin` is the same object as `_Drainer.manifest_and_plugin.plugin`. *Fix: drop the field, read it off the loaded plugin.* — [web/jobs.py](src/web/jobs.py) |
+**Group A is done** (2026-07-30, one commit each): C4, C11, C12, C13, C16, C17, C18, C21 — see
+`git log --grep='(C'`. Two of them did not survive contact unchanged, and the commits say why: C17's
+field had two readers after all (the tests that proved it was parsed), and C21's obvious fix — drop
+the narrowed field — would have traded one duplicate reference for three casts, so the *other*
+reference went instead. **B and C are open.**
 
 ### Group B — mechanical edit, but behaviour changes: needs a test
 
