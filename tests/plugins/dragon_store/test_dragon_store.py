@@ -782,10 +782,18 @@ class CategoryServer:
     price. Both priceless cards of the real page turn out to be free, so with the shipped
     fixtures a run that reads their detail pages and a run that throws those reads away land
     the same catalog — which is how the bug in 9.B2b's tail pass stayed invisible.
+
+    ``unreadable`` makes those listing pages answer **404** while page one still announces the
+    full count: a walk that stops halfway, which is not the same failure as a site that is
+    gone — page one delivered, and the row has to say how far it got.
     """
 
     def __init__(
-        self, *, paginated: bool = False, priced_details: dict[str, str] | None = None
+        self,
+        *,
+        paginated: bool = False,
+        priced_details: dict[str, str] | None = None,
+        unreadable: set[int] | None = None,
     ) -> None:
         cthulhu = (_FIX / "sp_192_cthulhu_one_page.html").read_bytes()
         page1 = (_FIX / "sp_115_classici_page1.html").read_bytes()
@@ -794,6 +802,8 @@ class CategoryServer:
             page1 = page1.replace(b"50 per pagina - 21 in totale", b"50 per pagina - 2 in totale")
             page2 = page2.replace(b"50 per pagina - 21 in totale", b"50 per pagina - 2 in totale")
         listing = {1: page1, 2: page2} if paginated else {1: cthulhu}
+        for page in unreadable or ():
+            listing.pop(page, None)
         details = {
             gid: (_FIX / name).read_bytes()
             for gid, name in {
@@ -1309,3 +1319,37 @@ def test_a_category_page_that_cannot_be_read_never_delists(client: TestClient) -
     counters = _run_for_user(client, uid)
     assert counters.removed == 0
     assert client.get("/api/catalog", headers=h).json()["total"] == before
+
+
+def test_a_walk_stopped_by_an_unreadable_page_records_the_pages_it_read(
+    client: TestClient,
+) -> None:
+    """C20: progress is counted in **requests**, so a walk that stopped early has to say so.
+
+    The terminal transition used to fill the bar to its total unconditionally, so a category
+    that broke on page 2 of 2 left "2 of 2 read" on the row — next to a `status_detail` saying
+    some pages could not be read. Two fields of the same row contradicting each other, and the
+    contract (DRG-R2, features.md) promises the count of pages read.
+    """
+    _uid, token = _user(client)
+    h = _bearer(token)
+    with CategoryServer(paginated=True, unreadable={2}) as base:
+        _add_watch(client, h, sp_url(base))
+
+    row = client.get(f"{DS}/watches", headers=h).json()[0]
+    assert (row["progress_done"], row["progress_total"]) == (1, 2)
+    # Page one delivered, so the watch is usable; the detail is what says it is not whole.
+    assert row["status"] == "ready"
+    assert "could not be read" in (row["status_detail"] or "")
+
+
+def test_a_resolved_product_records_the_one_request_it_costs(client: TestClient) -> None:
+    """The other half of C20: nothing counts steps on the single-product path, so the step is
+    recorded where it happens. Inferring it at the end is what made the category lie."""
+    _uid, token = _user(client)
+    h = _bearer(token)
+    with DragonServer() as base:
+        _add_watch(client, h, gp_url(base, "896"))
+
+    row = client.get(f"{DS}/watches", headers=h).json()[0]
+    assert (row["progress_done"], row["progress_total"]) == (1, 1)

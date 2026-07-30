@@ -15,7 +15,8 @@ that changed what the user sees were C1, C2 and C3; none was covered by a test, 
 — the tests went through `run_for_user`, while C2 lived on the *add* path and C3 needed a warm
 cache. **C1 is still open**, in group C, because it is a decision and not a repair.
 
-**Groups A and B are done** (2026-07-30, one commit each) — see `git log --grep='(C'`.
+**Groups A and B are done, and group C has begun** (2026-07-30, one commit each) — see
+`git log --grep='(C'`.
 
 - **A**: C4, C11, C12, C13, C16, C17, C18, C21. Two did not survive contact unchanged, and the
   commits say why: C17's field had readers after all (the tests that proved it was parsed), and
@@ -28,8 +29,16 @@ cache. **C1 is still open**, in group C, because it is a decision and not a repa
   detail pages and discarding those reads produced the same catalog. C3 also sharpened PROD-R8 in
   [product.md](docs/4-capabilities/contracts/product.md): a page of many products carries the
   timestamp **per page**, not per run.
+- **C**: C20, the first one decided. The question was what `progress_done` *means* on a job that
+  stopped early, and the answer taken is **a measure, not a bar**: it counts the requests really
+  made, so a walk that broke on page 2 of 21 says so. The other reading ("finished = full") was
+  cheaper by one line but would have left a field that lies in `WatchOut`, and DRG-R2 already
+  promised the count of pages read. Two facts the fix turned up: the unconditional fill was
+  **not** on the cancel path (that returns earlier, which is C5's subject, so the two do not
+  touch), and the line was load-bearing for the single product — removing it alone left a
+  *successful* add reading `0 of 1`, so each path now records its own step.
 
-**Group C is open.**
+**The rest of group C is open.**
 
 ### Group C — not mechanical: a decision is inside
 
@@ -46,7 +55,6 @@ Each of these has more than one defensible answer, so it is Simone's call before
 | **C14** | **The single-product delete confirmation does not state `9.B7`'s accepted consequence**: a product still watched comes back on the next run. Only the empty-catalog confirmation says it. *Decision: the page does not know whether that product is watched, so the wording has to be honest without that.* — [catalog/+page.svelte](src/frontend/src/routes/catalog/+page.svelte) + [i18n/en.json](src/frontend/src/i18n/en.json) |
 | **C15** | **`removeWatch` swallows errors** (nothing is shown if the DELETE fails) and does not clear `outcome`: the outcome panel stays pinned to a watch that no longer exists. *Clearing `outcome` is trivial; the error message needs deciding — which one, and whether it wants a new key.* — [PluginRoot.svelte](src/plugins/scrapers/dragon_store/frontend/PluginRoot.svelte) |
 | **C19** | **A delisted product shows *Difference* `0%`** in the email and the in-app history: `price_previous == price_current` by construction, so a percentage is printed on a row nobody can buy. *The payload does not say a product is delisted: suppressing the column means adding that information or inferring it from the tag.* — [alerts/[id]/+page.svelte](src/frontend/src/routes/alerts/[id]/+page.svelte) + [notifiers/email](src/plugins/notifiers/email/backend/__init__.py) |
-| **C20** | **`progress_done = progress_total or 1` at the end of a job**: a category interrupted on page 3 of 21 records 21 pages read. *Decision: what `progress_done` should mean on an interrupted job — the pages really read, or leave it.* — [backend/\_\_init\_\_.py](src/plugins/scrapers/dragon_store/backend/__init__.py) `_resolve_watch` |
 | **C22** | **`fmt` and `fmtInterval` are two near-identical duration formatters** (they differ only in how they render seconds) — pre-existing duplication, now sitting next to a third date format. *Decision: merging them means choosing one rendering; the two call sites differ today on purpose.* — [PluginRoot.svelte](src/plugins/scrapers/dragon_store/frontend/PluginRoot.svelte) |
 
 ## Off topic

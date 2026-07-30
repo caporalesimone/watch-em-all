@@ -458,6 +458,10 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
                 # Through the same helper the scheduled run uses for a single watch: the
                 # counters had two authors, one of them writing them by hand below.
                 _record_scan(watch, included=len(products), excluded=0)
+                # A product costs exactly one request and it has just been made, readable page
+                # or not. Nothing counts steps on this path, so the step is recorded where it
+                # happens — inferring it at the end is what made a half-read category lie (C20).
+                _mark_progress(watch, done=1, total=1)
         except DragonStoreRateLimited as exc:
             detail = "the site is rate-limiting us; the next run will fill this in"
             logger.error("dragon_store: could not resolve %s while adding it — %s", watch.url, exc)
@@ -493,7 +497,12 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
         # and the next scheduled run will try again.
         watch.status = "ready" if products else "failed"
         watch.status_detail = detail
-        watch.progress_done = watch.progress_total or 1
+        # Nothing fills the bar to its total here, deliberately (C20): progress counts the
+        # requests actually made, and a walk stopped by an unreadable page or a rate limit made
+        # fewer than the total. Filling it left "21 of 21 read" on a row whose detail said some
+        # pages could not be read — and DRG-R2 promises the count of pages read, not a bar that
+        # always ends full. Each path records its own steps; a terminal job is terminal because
+        # of `status`, which is what the page reads.
         watch.finished_at = datetime.now(UTC)
         # Deliberately after `_record_scan`, and deliberately not conditional: this stamps the
         # **attempt**, so a resolution that read nothing at all — a rate limit, an unreadable
