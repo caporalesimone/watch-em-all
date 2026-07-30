@@ -219,11 +219,12 @@ def classify_url(url: str) -> WatchKind | None:
     (``.br.<id>.uw``). Both appear in the site's own breadcrumbs, so a looser rule would
     make a category watch out of a page with no product cards on it.
 
-    Judged on **shape alone**, host included: these path endings are distinctive enough to
-    be evidence on their own, the site's own links are relative (this same function
-    classifies the hrefs read off a category page, not just what a user pastes), and
-    pinning the host would refuse the mirrors the tests point at — which is how every
-    fixture-driven test reaches this plugin.
+    Judged on the **path alone**: the host is never looked at. Those path endings are
+    distinctive enough to be evidence on their own; the site's own links are relative (this
+    same function classifies hrefs read off a category page, not only what a user pastes);
+    and pinning the host would refuse the local mirrors every fixture-driven test points at.
+    The cost is accepted and small: a URL of the right shape on somebody else's host is
+    classified, and then fails at the first request.
     """
     path = urlsplit(url.strip()).path
     if _PRODUCT_URL_RE.search(path):
