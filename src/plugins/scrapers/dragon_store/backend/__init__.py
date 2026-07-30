@@ -451,6 +451,9 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
                     detail = "the site did not return a readable product"
                 else:
                     products = [product]
+                # Through the same helper the scheduled run uses for a single watch: the
+                # counters had two authors, one of them writing them by hand below.
+                _record_scan(watch, included=len(products), excluded=0)
         except DragonStoreRateLimited as exc:
             detail = "the site is rate-limiting us; the next run will fill this in"
             logger.error("dragon_store: could not resolve %s while adding it — %s", watch.url, exc)
@@ -472,7 +475,6 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
             context.upsert_catalog(watch.user_id, products)
             if product is not None:
                 watch.snapshot_json = _snapshot(product)
-                watch.products_included = 1
             logger.info(
                 "dragon_store: watch %s resolved for user %s — %s product(s) stored",
                 watch.id,
@@ -489,6 +491,10 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
         watch.status_detail = detail
         watch.progress_done = watch.progress_total or 1
         watch.finished_at = datetime.now(UTC)
+        # Deliberately after `_record_scan`, and deliberately not conditional: this stamps the
+        # **attempt**, so a resolution that read nothing at all — a rate limit, an unreadable
+        # page — still says when we last looked. `_record_scan` stamps what a scan *yielded*,
+        # which is why the scheduled run needs it there and this one overwrites it here.
         watch.last_scanned_at = watch.finished_at
         db.commit()
     except Exception:  # background task: log it, there is no response to fail
