@@ -101,24 +101,6 @@ _SESSION_CLEAR_OK = "OK"
 
 
 @dataclass
-class _ScrapeOutcome:
-    """What a pass over the watches produced, and whether it can be trusted as complete.
-
-    ``complete`` is the whole point: only a run that read every watch may go through
-    ``update_catalog``, which delists what it does not see. Anything less goes through
-    ``upsert_catalog`` — see CATSVC-R2.
-    """
-
-    products: list[Product]
-    failed: int
-    aborted: bool  # stopped early (rate-limited): the remaining watches were never asked
-
-    @property
-    def complete(self) -> bool:
-        return not self.aborted and self.failed == 0
-
-
-@dataclass
 class _CategoryOutcome:
     """What one category walk produced. ``complete`` false means a page could not be read, and
     the caller must then keep the delisting sweep away (CATSVC-R2b)."""
@@ -605,30 +587,6 @@ class DragonStorePlugin(ScraperPlugin):
         return ADJUSTMENTS.compute(cart_total)
 
     # --- scraping (SCR-R4/R5/R6): one HTTP request per watch, via context.http ---
-    def _scrape_products(self, context: PluginContext, urls: list[str]) -> _ScrapeOutcome:
-        by_id: dict[str, Product] = {}  # dedup on external_id (PROD-R3)
-        failed = 0
-        for index, url in enumerate(urls):
-            try:
-                product = self._scrape_one(context, url)
-            except DragonStoreRateLimited as exc:
-                # The site is explicitly telling us to slow down. Carrying on through the
-                # remaining watches is what got us throttled in the first place.
-                remaining = len(urls) - index
-                context.logger.error(
-                    "dragon_store: rate-limited by the site (%s) — aborting this run with "
-                    "%s of %s watch(es) unread; they are deliberately not attempted",
-                    exc,
-                    remaining,
-                    len(urls),
-                )
-                return _ScrapeOutcome(list(by_id.values()), failed + remaining, aborted=True)
-            if product is None:
-                failed += 1
-            else:
-                by_id[product.external_id] = product
-        return _ScrapeOutcome(list(by_id.values()), failed, aborted=False)
-
     def _clear_session(self, context: PluginContext, url: str) -> bool:
         """Tick the interstitial's "I am not a robot" box the way the page's own JS does:
         one GET that flips a flag on our ASP session. Returns ``True`` when the site
