@@ -47,20 +47,25 @@ AdjusterProvider = Callable[[Cart], "AdjustmentFn | None"]
 def snapshot_payload(products: list[CatalogProduct], state: CartState) -> dict[str, Any]:
     """Build the baseline payload for a cart from its member products and computed state.
 
-    Per-product ``{on_sale, available, price_current}`` keyed by the product id (as a
-    string, since JSON object keys are strings), plus the cart-level ``all_on_sale`` and
-    ``threshold_reached`` flags the cart-event diff compares against. Delisted members are
-    excluded (ALERT-R12); a member that appears later is seeded silently by the run that
-    meets it. ``Decimal`` is stored as a string (DB-R3)."""
+    Per-product ``{on_sale, available, price_current, removed}`` keyed by the product id (as
+    a string, since JSON object keys are strings), plus the cart-level ``all_on_sale`` and
+    ``threshold_reached`` flags the cart-event diff compares against. A member that appears
+    later is seeded silently by the run that meets it. ``Decimal`` is stored as a string
+    (DB-R3).
+
+    Delisted members are **in** the baseline since 9.B9: excluding them made delisting
+    invisible — the row vanished from the reference state, so the transition into it had
+    nothing to be a transition from. ``removed`` is what makes ``PRODUCT_DELISTED`` fire once
+    (ALERT-R12) instead of every run."""
     return {
         "products": {
             str(p.id): {
                 "on_sale": (p.discount_pct or 0) > 0,
                 "available": p.is_available,
                 "price_current": str(p.price_current),
+                "removed": p.removed,
             }
             for p in products
-            if not p.removed
         },
         "all_on_sale": state.all_on_sale,
         "threshold_reached": bool(state.threshold and state.threshold.reached),
@@ -85,8 +90,12 @@ def diff_products(
     """Diff each current member against the baseline and return the products that earned
     at least one **enabled** tag (alert-engine.md). Rules (ALERT-R9/R11/R12):
 
-    - delisted members are ignored; a member absent from the baseline is skipped (it was
-      seeded silently by the run that first met it), so it produces no event;
+    - a member absent from the baseline is skipped (it was seeded silently by the run that
+      first met it), so it produces no event;
+    - ``PRODUCT_DELISTED`` fires on the transition into delisting and **only** there; a
+      product that is already delisted produces nothing at all, price included — its row
+      keeps the last price the site showed, and that number stops being news the moment the
+      product stops being for sale (ALERT-R12);
     - ``PRODUCT_ON_SALE`` fires when a product enters a discount **or** drops further while
       already on sale (a price change in the buyer's favour);
     - ``PRODUCT_OFF_SALE`` when it leaves the discount; availability transitions give
@@ -98,12 +107,30 @@ def diff_products(
     baseline: dict[str, Any] = snapshot.get("products", {})
     out: list[ProductDiff] = []
     for m in products:
-        if m.removed:  # ALERT-R12: delisted products never produce a tag
-            continue
         prev = baseline.get(str(m.id))
         if prev is None:  # new in the cart since the baseline → silent, no event
             continue
         prev_price = Decimal(str(prev["price_current"]))
+        was_removed = bool(prev.get("removed", False))
+        if m.removed:
+            if was_removed:  # already delisted: no event of any kind (ALERT-R12)
+                continue
+            if AlertType.PRODUCT_DELISTED in enabled:
+                out.append(
+                    ProductDiff(
+                        product=m,
+                        tags=[AlertType.PRODUCT_DELISTED],
+                        price_previous=prev_price,
+                        price_current=m.price_current,
+                    )
+                )
+            continue
+        if was_removed:
+            # Back in the delivery. Its baseline describes the product as it was before it
+            # vanished, so diffing against it would report a price move nobody made; the run
+            # that meets it again re-seeds silently, like a member met for the first time.
+            # The re-listing event itself is phase 15 (catalog notifications).
+            continue
         now_sale = (m.discount_pct or 0) > 0
         tags: list[AlertType] = []
         if now_sale and (not prev["on_sale"] or m.price_current < prev_price):

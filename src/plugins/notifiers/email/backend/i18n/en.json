@@ -20,6 +20,7 @@
   "tag.PRODUCT_OFF_SALE": "Off sale",
   "tag.PRODUCT_UNAVAILABLE": "Unavailable",
   "tag.PRODUCT_AVAILABLE_AGAIN": "Available again",
+  "tag.PRODUCT_DELISTED": "No longer listed",
   "event.CART_ALL_ON_SALE": "All items on sale",
   "event.CART_THRESHOLD_REACHED": "Threshold reached",
   "event.CART_THRESHOLD_REACHED_PARTIAL": "Threshold reached (partial)"

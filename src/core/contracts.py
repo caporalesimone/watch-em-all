@@ -33,6 +33,9 @@ class AlertType(StrEnum):
     PRODUCT_OFF_SALE = "PRODUCT_OFF_SALE"
     PRODUCT_UNAVAILABLE = "PRODUCT_UNAVAILABLE"
     PRODUCT_AVAILABLE_AGAIN = "PRODUCT_AVAILABLE_AGAIN"
+    # Delisting is the end of the story, not an availability blip: the product left the
+    # site's delivery altogether (9.B9). Emitted once, at the transition (ALERT-R12).
+    PRODUCT_DELISTED = "PRODUCT_DELISTED"
     # Cart events (valid inside CartAlert.cart_events)
     CART_ALL_ON_SALE = "CART_ALL_ON_SALE"
     CART_THRESHOLD_REACHED = "CART_THRESHOLD_REACHED"

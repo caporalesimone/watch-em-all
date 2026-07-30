@@ -61,6 +61,7 @@ class AlertType(StrEnum):
     PRODUCT_OFF_SALE        = "PRODUCT_OFF_SALE"
     PRODUCT_UNAVAILABLE     = "PRODUCT_UNAVAILABLE"
     PRODUCT_AVAILABLE_AGAIN = "PRODUCT_AVAILABLE_AGAIN"
+    PRODUCT_DELISTED        = "PRODUCT_DELISTED"         # left the site's delivery (once)
     # Cart events (valid inside a cart's cart_events)
     CART_ALL_ON_SALE               = "CART_ALL_ON_SALE"
     CART_THRESHOLD_REACHED         = "CART_THRESHOLD_REACHED"
