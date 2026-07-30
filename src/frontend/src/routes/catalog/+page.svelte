@@ -158,8 +158,7 @@
 			selectedIds = [];
 			selectedPluginById = {};
 			if (target.kind !== 'one') pageNum = 1;
-			await load(true);
-			await loadDelistedTotal();
+			await load(true); // re-reads the delisted count too
 			await loadCarts(); // the totals on the cart cards moved with the memberships
 		} catch (e) {
 			cleanupErr = e instanceof ApiErr ? e.detail : $_('catalog.cleanupError');
@@ -180,6 +179,11 @@
 				order,
 				q: q.trim() || undefined
 			});
+			// Every time the table is re-read, so is the count beside the cleanup button. A
+			// scrape can delist while this page sits open — that is exactly when someone wants
+			// the button — and the retry loop below reloads the table without touching it.
+			// Not awaited: the table should not wait on a number in a button label.
+			void loadDelistedTotal();
 		} catch {
 			error = $_('catalog.error');
 		} finally {
@@ -190,7 +194,6 @@
 	onMount(() => {
 		void load();
 		void loadCarts();
-		void loadDelistedTotal();
 		// scrape-now writes the catalog asynchronously; if the page is opened while a
 		// scrape is still running it would show empty. Retry briefly so the products
 		// appear on their own, without a manual search.
