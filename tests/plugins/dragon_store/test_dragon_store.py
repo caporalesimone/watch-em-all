@@ -760,9 +760,16 @@ class CategoryServer:
     products with no price. The two-page variant patches only the header of page 1 — the real
     one claims 21 pages and we hold 2 — so the walk stops where the fixtures end instead of
     re-reading page 2 nineteen times.
+
+    ``priced_details`` re-points one card's **detail** page at a fixture that does carry a
+    price. Both priceless cards of the real page turn out to be free, so with the shipped
+    fixtures a run that reads their detail pages and a run that throws those reads away land
+    the same catalog — which is how the bug in 9.B2b's tail pass stayed invisible.
     """
 
-    def __init__(self, *, paginated: bool = False) -> None:
+    def __init__(
+        self, *, paginated: bool = False, priced_details: dict[str, str] | None = None
+    ) -> None:
         cthulhu = (_FIX / "sp_192_cthulhu_one_page.html").read_bytes()
         page1 = (_FIX / "sp_115_classici_page1.html").read_bytes()
         page2 = (_FIX / "sp_115_classici_page2.html").read_bytes()
@@ -779,6 +786,7 @@ class CategoryServer:
                 # a page with no price is exactly what it needs to be for this test.
                 "22992": "gp_28079_free_no_price.html",
                 "14415": "gp_14415_unavailable_no_price.html",
+                **(priced_details or {}),
             }.items()
         }
         calls: list[str] = []
@@ -898,6 +906,30 @@ def test_a_product_the_listing_cannot_price_is_settled_on_its_own_page(
     free = [i for i in items if "Free" in i["tags"]]
     assert len(free) == 2
     assert all(i["price_current"] == "0.00" for i in free)
+
+
+def test_adding_a_category_keeps_the_prices_its_tail_pass_settled(client: TestClient) -> None:
+    """C2: `_resolve_unpriced` writes into the dict it is given, and on the add path that dict
+    was built inline and thrown away — so the detail pages were fetched, politeness wait
+    included, and their prices went nowhere.
+
+    22992 is a card the listing shows with no price at all; here its detail page carries one.
+    Without the fix it lands at 0,00 with a Free tag, which is what an actual free download
+    looks like — a 9,90 product filed as free, and a price-drop alert waiting to happen.
+    """
+    _uid, token = _user(client)
+    h = _bearer(token)
+    with CategoryServer(priced_details={"22992": "gp_896_discounted.html"}) as base:
+        _add_watch(client, h, sp_url(base))  # the add only: no scheduled run to repair it
+
+    items = client.get("/api/catalog", params={"page_size": 100}, headers=h).json()["items"]
+    (settled,) = [i for i in items if ".gp.22992.uw" in i["url"]]
+    assert settled["price_current"] == "9.90"
+    assert "Free" not in settled["tags"]
+    # The genuinely priceless one is still free: the tail pass decides per product, and
+    # "no price on the detail page either" is the case that legitimately means zero.
+    (free,) = [i for i in items if ".gp.28079.uw" in i["url"]]
+    assert (free["price_current"], "Free" in free["tags"]) == ("0.00", True)
 
 
 def test_a_category_is_walked_page_by_page(client: TestClient) -> None:

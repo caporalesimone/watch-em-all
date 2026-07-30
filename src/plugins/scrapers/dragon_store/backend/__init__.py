@@ -435,10 +435,14 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
                 # A category resolves to many products over several pages; the walk keeps the
                 # row's progress up to date as it goes, which is what the page is polling.
                 outcome = plugin._scrape_category(context, watch)
-                plugin._resolve_unpriced(
-                    context, outcome.unpriced, {p.external_id: p for p in outcome.products}
-                )
-                products = outcome.products
+                # The tail pass settles the priceless cards **into this dict**, so it has to
+                # be the dict we then deliver. It used to be built inline, one throwaway
+                # argument: the detail pages were fetched — politeness wait included — and
+                # their prices dropped on the floor, leaving those products in the catalog at
+                # 0,00 with a Free tag until a scheduled run happened to fix them.
+                delivered = {p.external_id: p for p in outcome.products}
+                plugin._resolve_unpriced(context, outcome.unpriced, delivered)
+                products = list(delivered.values())
                 if not products:
                     detail = "the site returned no products for this category"
                 elif not outcome.complete:
