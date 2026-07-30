@@ -364,8 +364,10 @@ class ParsedCategory:
     """A listing page: its cards plus what it says about the set they belong to."""
 
     cards: list[ParsedCard]
+    # What the header declares about the whole set. The "N per page" it also prints is not
+    # kept: the walk paginates on `total_pages`, and a number nobody reads is a number nobody
+    # maintains. The pattern still has to match that text for the header to be recognised.
     total_items: int | None
-    page_size: int | None
     total_pages: int | None
     breadcrumb: list[tuple[str, str | None]]  # the page's own, shared by all its cards
 
@@ -429,7 +431,6 @@ def parse_category(content: bytes, url: str) -> ParsedCategory:
     return ParsedCategory(
         cards=cards,
         total_items=int(header.group("items")) if header else None,
-        page_size=int(header.group("size")) if header else None,
         total_pages=int(header.group("pages")) if header else None,
         breadcrumb=_breadcrumb(decoded, url),
     )

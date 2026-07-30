@@ -274,7 +274,7 @@ def test_category_cards_carry_everything_the_catalog_needs() -> None:
     page = parse_category(_read("sp_192_cthulhu_one_page.html"), _CTHULHU_URL)
 
     assert len(page.cards) == 39
-    assert (page.total_items, page.page_size, page.total_pages) == (39, 50, 1)
+    assert (page.total_items, page.total_pages) == (39, 1)
     # The page's own breadcrumb stands in for the one a card does not carry; on this product it
     # is identical to the one its detail page publishes.
     assert [name for name, _url in page.breadcrumb] == [
@@ -345,8 +345,9 @@ def test_a_paginated_category_declares_its_size_on_every_page() -> None:
     first = parse_category(_read("sp_115_classici_page1.html"), _CLASSICI_URL)
     second = parse_category(_read("sp_115_classici_page2.html"), page_url(_CLASSICI_URL, 2))
 
-    assert (first.total_items, first.page_size, first.total_pages) == (1040, 50, 21)
+    assert (first.total_items, first.total_pages) == (1040, 21)
     assert (second.total_items, second.total_pages) == (1040, 21)
+    # 50 cards each: the page size the header declares, proven rather than read back.
     assert len(first.cards) == len(second.cards) == 50
     # Different products on the two pages: the walk must not re-read the same ones.
     assert not {c.native_id for c in first.cards} & {c.native_id for c in second.cards}
