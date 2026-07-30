@@ -25,6 +25,7 @@ from src.core.db import get_engine
 from src.core.locks import acquire_scraper_lock
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.context import build_context
+from src.core.plugins.manifest import Manifest
 from src.core.plugins.registry import LoadedPlugin
 
 log = logging.getLogger("wea.web.jobs")
@@ -36,9 +37,13 @@ IDLE_WAIT_S = 5.0
 
 @dataclass
 class _Drainer:
+    # The plugin is held **narrowed** to ScraperPlugin, and its manifest beside it, rather than
+    # the LoadedPlugin that carries both: that one types its plugin as BasePlugin, so keeping it
+    # meant either a second field for the narrowed view — two names for one object — or a cast
+    # at each of the three uses. The manifest is here only because build_context asks for it.
     plugin_id: str
     plugin: ScraperPlugin
-    manifest_and_plugin: LoadedPlugin
+    manifest: Manifest
     wake: threading.Event = field(default_factory=threading.Event)
     stop: threading.Event = field(default_factory=threading.Event)
     thread: threading.Thread | None = None
@@ -57,7 +62,7 @@ def _run_one(drainer: _Drainer) -> bool:
     lock a scheduled run or a manual scrape cannot have — which is how an idle drainer ended
     up answering 409 to *Scrape now*.
     """
-    peek = build_context(drainer.manifest_and_plugin.manifest, drainer.plugin)
+    peek = build_context(drainer.manifest, drainer.plugin)
     try:
         if not drainer.plugin.has_queued_jobs(peek):
             return False
@@ -74,7 +79,7 @@ def _run_one(drainer: _Drainer) -> bool:
         # fault otherwise.
         return False
     # build_context owns its session; the caller closes it when the work ends.
-    context = build_context(drainer.manifest_and_plugin.manifest, drainer.plugin)
+    context = build_context(drainer.manifest, drainer.plugin)
     try:
         return drainer.plugin.drain_next_job(context)
     except Exception:
@@ -107,7 +112,7 @@ def start_drainers(loaded: list[LoadedPlugin]) -> None:
                 continue
             if type(plugin).has_queued_jobs is ScraperPlugin.has_queued_jobs:
                 continue  # no queue of its own
-            drainer = _Drainer(plugin_id=plugin.plugin_id, plugin=plugin, manifest_and_plugin=lp)
+            drainer = _Drainer(plugin_id=plugin.plugin_id, plugin=plugin, manifest=lp.manifest)
             drainer.thread = threading.Thread(
                 target=_loop, args=(drainer,), name=f"jobs-{plugin.plugin_id}", daemon=True
             )
