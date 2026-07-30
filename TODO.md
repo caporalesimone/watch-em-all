@@ -10,25 +10,26 @@ routers, the three frontend components — looking for dead branches, simplifiab
 errors.
 
 Split into three groups, because "mechanical" can mean two different things: *no decision to take*,
-and *no change in behaviour*. Group A had both, group B only the first, group C neither. **C1, C2 and
-C3 change what the user sees**, and none of the three is covered by a test, for the same reason: the
-tests go through `run_for_user`, while C1/C2 live on the *add* path and C3 needs a warm cache.
+and *no change in behaviour*. Group A had both, group B only the first, group C neither. The three
+that changed what the user sees were C1, C2 and C3; none was covered by a test, for the same reason
+— the tests went through `run_for_user`, while C2 lived on the *add* path and C3 needed a warm
+cache. **C1 is still open**, in group C, because it is a decision and not a repair.
 
-**Group A is done** (2026-07-30, one commit each): C4, C11, C12, C13, C16, C17, C18, C21 — see
-`git log --grep='(C'`. Two of them did not survive contact unchanged, and the commits say why: C17's
-field had two readers after all (the tests that proved it was parsed), and C21's obvious fix — drop
-the narrowed field — would have traded one duplicate reference for three casts, so the *other*
-reference went instead. **B and C are open.**
+**Groups A and B are done** (2026-07-30, one commit each) — see `git log --grep='(C'`.
 
-### Group B — mechanical edit, but behaviour changes: needs a test
+- **A**: C4, C11, C12, C13, C16, C17, C18, C21. Two did not survive contact unchanged, and the
+  commits say why: C17's field had readers after all (the tests that proved it was parsed), and
+  C21's obvious fix — drop the narrowed field — would have traded one duplicate reference for
+  three casts, so the *other* reference went instead.
+- **B**: C2, C3, C6, each with the test that was missing. Every one was checked against the
+  unfixed code first: C2 landed a 9,90 product at 0,00 with a Free tag, C3's counters read (2, 0)
+  where they should read (1, 1), C6's counter stayed at zero. C2 needed a fixture change to be
+  *able* to fail — both priceless cards of the real listing turn out to be free, so reading their
+  detail pages and discarding those reads produced the same catalog. C3 also sharpened PROD-R8 in
+  [product.md](docs/4-capabilities/contracts/product.md): a page of many products carries the
+  timestamp **per page**, not per run.
 
-The change is small and obvious; what is missing is the coverage that would have caught it.
-
-| ID | Description, filename |
-|---|---|
-| **C2** | **On the add path the work of `9.B2b` is done and discarded.** `_resolve_unpriced` is handed a **throwaway** dict built inline; it writes the detail-page-resolved products into it, then `products = outcome.products` uses the **unpriced** versions. The HTTP requests (with their politeness wait) go out and are wasted. The same code in `run_for_user` is correct — which is why no test sees it. *Fix: pass a real dict and deliver its values; two lines, plus the missing test on the add path.* — [backend/\_\_init\_\_.py](src/plugins/scrapers/dragon_store/backend/__init__.py) `_resolve_watch` |
-| **C3** | **Category products violate PROD-R8.** `_fetch_category_page` discards `response.fetched_at` and `_scrape_category` passes `None` to `_card_to_product`, so `scraped_at = now()` even off the cache. Twice harmful: `last_seen_at` lies for up to 12 h (the defect `9.X4` fixed for single products) and `_update_statistics` counts every cached delivery as `observations` instead of `cache_hits` — two `9.B6b` counters wrong by construction on the phase's main input. *Fix: carry `fetched_at` through the walk — plumbing, but it touches `ParsedCategory` and a signature.* — [backend/\_\_init\_\_.py](src/plugins/scrapers/dragon_store/backend/__init__.py) + [core/catalog.py](src/core/catalog.py) |
-| **C6** | **`parse_failures_total` counts half the failures**: bumped in `_fetch_category_page`, never in the `DragonStoreParseError`/`DragonStoreSoftError` branches of `_scrape_one`. The health statistic is asymmetric between listings and product pages. *Fix: bump it on the parse-error branch. The soft-error branch is a judgement — a site error page is not a parse failure.* — [backend/\_\_init\_\_.py](src/plugins/scrapers/dragon_store/backend/__init__.py) `_scrape_one` |
+**Group C is open.**
 
 ### Group C — not mechanical: a decision is inside
 
