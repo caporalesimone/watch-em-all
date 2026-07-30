@@ -7,7 +7,7 @@
 	import ProductThumb from '$lib/components/ProductThumb.svelte';
 	import { dateTime } from '$lib/format';
 	import { _ } from '$lib/i18n';
-	import { auth } from '$lib/stores/auth';
+	import { isPrivileged } from '$lib/stores/auth';
 
 	const BASE = '/api/plugins/dragon-store';
 	// The label the sanitiser puts on a damaged listing. Read, never re-derived: the title
@@ -17,7 +17,7 @@
 	// 9.F5: a manual scrape is the quickest way to send a site requests its Crawl-delay never
 	// asked for, so it belongs to the levels that answer for it. The API refuses it too — this
 	// only keeps the button (and its polling) out of a page that cannot use it.
-	const canScrapeNow = $derived(['super_user', 'admin'].includes($auth.user?.role ?? 'user'));
+	const canScrapeNow = $derived($isPrivileged);
 
 	interface BrandRef {
 		text: string;

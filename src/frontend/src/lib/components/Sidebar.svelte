@@ -4,17 +4,17 @@
 	import { _ } from 'svelte-i18n';
 
 	import { unreadCount, refreshUnread } from '$lib/stores/alerts';
-	import { auth, signOut } from '$lib/stores/auth';
+	import { isAdmin as isAdminStore, isPrivileged, signOut } from '$lib/stores/auth';
 	import { mountedPlugins } from '$lib/stores/plugins';
 	import { version } from '$lib/stores/version';
 
-	// Roles don't overlap (personas-and-roles.md): an admin governs (no personal
-	// catalog/carts), a user owns their data. The shell shows one or the other.
-	const isAdmin = $derived(($auth.user?.role ?? 'user') === 'admin');
+	// Which shell to draw (the reasoning lives with the store): an admin governs and owns no
+	// catalog or carts, a user owns their own data.
+	const isAdmin = $derived($isAdminStore);
 	// 9.F5: Debug links out to development tooling (Mailpit, Swagger, the DB browser). Those
 	// live outside our authentication, so the honest gate is not to advertise them: admin and
 	// super-user see the entry, a normal user has no such element in the page at all.
-	const canSeeDebug = $derived(['admin', 'super_user'].includes($auth.user?.role ?? 'user'));
+	const canSeeDebug = $derived($isPrivileged);
 
 	// Keep the unread-alerts badge live (users only; the endpoint is user-scoped). Alerts
 	// arrive event-driven after a scrape, so we poll every 20s in addition to the one-off

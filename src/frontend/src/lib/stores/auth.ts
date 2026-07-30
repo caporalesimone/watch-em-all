@@ -1,5 +1,5 @@
 // Shared auth state (FE-5). Actions do the I/O; the store only holds the result.
-import { writable } from 'svelte/store';
+import { derived, writable, type Readable } from 'svelte/store';
 
 import * as api from '$lib/api/client';
 import { clearTokens, hasRefresh } from '$lib/auth/manager';
@@ -10,6 +10,22 @@ export interface AuthState {
 }
 
 export const auth = writable<AuthState>({ status: 'loading', user: null });
+
+// Roles don't overlap (personas-and-roles.md): an admin governs and owns no catalog or carts,
+// a user owns their own data. `isAdmin` picks which shell to draw.
+export const isAdmin: Readable<boolean> = derived(
+	auth,
+	($auth) => ($auth.user?.role ?? 'user') === 'admin'
+);
+
+// The third level (9.B8): a user trusted with the tools that send unplanned traffic to a site
+// — the manual scrape, and the Debug page of links to development tooling. Derived once here
+// rather than spelled out in each component: the set is the backend's `_SUPER_ROLES`, and a
+// copy per page is a copy that will disagree with it one page at a time.
+const PRIVILEGED_ROLES = ['admin', 'super_user'];
+export const isPrivileged: Readable<boolean> = derived(auth, ($auth) =>
+	PRIVILEGED_ROLES.includes($auth.user?.role ?? 'user')
+);
 
 async function loadMe(): Promise<void> {
 	try {

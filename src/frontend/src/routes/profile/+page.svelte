@@ -5,12 +5,12 @@
 	import * as api from '$lib/api/client';
 	import NotifierChannels from '$lib/components/NotifierChannels.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
-	import { auth, forceAnon } from '$lib/stores/auth';
+	import { auth, forceAnon, isAdmin as isAdminStore } from '$lib/stores/auth';
 	import { theme } from '$lib/stores/theme';
 
 	// Roles don't overlap: an admin governs and owns no carts/alerts, so the personal
 	// notification channels have nothing to deliver — hide them from the admin profile.
-	const isAdmin = $derived(($auth.user?.role ?? 'user') === 'admin');
+	const isAdmin = $derived($isAdminStore);
 
 	let current = $state('');
 	let next = $state('');
