@@ -2,7 +2,7 @@
 
 > **Layer 3 — User feature** · Audience: architects, developers.
 >
-> Limited to what is implemented (DOC-12). Phase 3 ships the read-only catalog view (the per-user, searchable, sortable, paginated table); phase 5 adds the selection role — picking rows and **adding them to an existing cart** (5.F4). The cleanup/mutation actions (remove delisted, selective removal, empty) still arrive in a later phase.
+> Limited to what is implemented (DOC-12). Phase 3 ships the read-only catalog view (the per-user, searchable, sortable, paginated table); phase 5 adds the selection role — picking rows and **adding them to an existing cart** (5.F4); phase 9 adds the **cleanups** (remove delisted, delete mode, empty).
 
 ## Purpose
 
@@ -15,9 +15,9 @@ The catalog is the set of products extracted by the user's scrapers. The **Produ
 - **CAT-R3** — **Unavailable** products stay in the catalog (visual indicator); they are never excluded automatically.
 - **CAT-R4** — **Delisted** products (`removed`, absent from the last scrape) stay in the table greyed out, excluded from carts and alerts, until the user cleans them up. If they reappear in a scrape, they become active again.
 - **CAT-R5** — The table is **paginated server-side**, sortable (source, title, current price, list price, availability, last update), and **searchable by title** (the API also filters by availability and delisting). On open it populates itself (even right after a scrape, which writes asynchronously): no need to launch the search by hand.
-- **CAT-R6** — Cleanup actions: remove delisted, selective removal (delete mode), empty the catalog. All with confirmation; the confirmation **states the consequences** (removal from carts and loss of the price history of the affected products). _(Arrives in a later phase, with the picker's selection/cleanup role.)_
+- **CAT-R6** — Cleanup actions: remove delisted, selective removal (delete mode), empty the catalog. All with confirmation; the confirmation **states the consequences** (removal from carts and loss of the price history of the affected products), and each action reports **how many rows went** — "nothing was delisted" and "twelve products went" are different answers to the same click. Emptying the catalog says the other half too: the **watches are not touched**, so the next scheduled run brings back whatever is still watched.
 - **CAT-R7** — **Catalog empty-state**: when the catalog is empty the Product Picker offers no scraping actions, but **points to the scraper pages** to configure what to watch and start the first population. **Scrape now** is **per-scraper** and lives on the scraper's page, not here ([scraper-plugin](../plugins/scraper-plugin.md), SCR-R15).
-- **CAT-R8** — Deleting a product from the catalog removes it **in cascade** from carts and deletes its price history. _(Arrives in a later phase, together with the cart/picker selection role.)_
+- **CAT-R8** — Deleting a product from the catalog removes it **in cascade** from carts and deletes its price history. The cascade is the database's, and it is what the confirmation has to declare.
 
 ## The table
 

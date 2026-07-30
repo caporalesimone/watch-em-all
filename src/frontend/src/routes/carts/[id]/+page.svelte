@@ -192,7 +192,10 @@
 		{ label: 'alertTypes.productOnSale', types: ['PRODUCT_ON_SALE'] },
 		{ label: 'alertTypes.productOffSale', types: ['PRODUCT_OFF_SALE'] },
 		{ label: 'alertTypes.productUnavailable', types: ['PRODUCT_UNAVAILABLE'] },
-		{ label: 'alertTypes.productAvailableAgain', types: ['PRODUCT_AVAILABLE_AGAIN'] }
+		{ label: 'alertTypes.productAvailableAgain', types: ['PRODUCT_AVAILABLE_AGAIN'] },
+		// 9.F6: the store dropped it altogether. One event, at the transition — the engine
+		// never repeats it (ALERT-R12), so this toggle is not a source of noise.
+		{ label: 'alertTypes.productDelisted', types: ['PRODUCT_DELISTED'] }
 	];
 	const CART_TOGGLES: { label: string; types: string[] }[] = [
 		{ label: 'alertTypes.cartAllOnSale', types: ['CART_ALL_ON_SALE'] },

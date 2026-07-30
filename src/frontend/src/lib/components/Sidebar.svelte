@@ -11,6 +11,10 @@
 	// Roles don't overlap (personas-and-roles.md): an admin governs (no personal
 	// catalog/carts), a user owns their data. The shell shows one or the other.
 	const isAdmin = $derived(($auth.user?.role ?? 'user') === 'admin');
+	// 9.F5: Debug links out to development tooling (Mailpit, Swagger, the DB browser). Those
+	// live outside our authentication, so the honest gate is not to advertise them: admin and
+	// super-user see the entry, a normal user has no such element in the page at all.
+	const canSeeDebug = $derived(['admin', 'super_user'].includes($auth.user?.role ?? 'user'));
 
 	// Keep the unread-alerts badge live (users only; the endpoint is user-scoped). Alerts
 	// arrive event-driven after a scrape, so we poll every 20s in addition to the one-off
@@ -110,11 +114,13 @@
 			</details>
 		{/if}
 	</nav>
-	<!-- Debug: dev tooling links (Mailpit, Swagger, DB browser…), for user and admin alike.
-	     Temporary — to be hidden/removed before v1. -->
-	<a href="/debug" class="{itemClass('/debug')} text-slate-500 dark:text-slate-400"
-		>🛠 {$_('nav.debug')}</a
-	>
+	<!-- Debug: dev tooling links (Mailpit, Swagger, DB browser…), admin and super-user only
+	     (9.F5). Temporary — to be removed before v1. -->
+	{#if canSeeDebug}
+		<a href="/debug" class="{itemClass('/debug')} text-slate-500 dark:text-slate-400"
+			>🛠 {$_('nav.debug')}</a
+		>
+	{/if}
 	<button
 		class="mt-2 rounded px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800"
 		onclick={() => signOut()}

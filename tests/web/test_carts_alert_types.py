@@ -103,6 +103,20 @@ def test_set_replaces_and_persists(client: TestClient) -> None:
     assert cleared.json()["alert_types"] == []
 
 
+def test_delisting_is_an_enablable_type(client: TestClient) -> None:
+    """9.B9/9.F6: the fifth product tag is offered like the other four. The route validates
+    against the AlertType enum, so this is the whole of what "available to enable" means."""
+    token = _make_user(client, _admin_token(client), "alice")
+    cart_id = _make_cart(client, token)
+    resp = client.put(
+        f"/api/carts/{cart_id}/alert-types",
+        json={"alert_types": ["PRODUCT_DELISTED"]},
+        headers=_bearer(token),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["alert_types"] == ["PRODUCT_DELISTED"]
+
+
 def test_unknown_alert_type_rejected(client: TestClient) -> None:
     token = _make_user(client, _admin_token(client), "alice")
     cart_id = _make_cart(client, token)

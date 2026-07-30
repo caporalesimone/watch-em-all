@@ -34,10 +34,15 @@
 		PRODUCT_ON_SALE: 'alerts.tagOnSale',
 		PRODUCT_OFF_SALE: 'alerts.tagOffSale',
 		PRODUCT_UNAVAILABLE: 'alerts.tagUnavailable',
-		PRODUCT_AVAILABLE_AGAIN: 'alerts.tagAvailableAgain'
+		PRODUCT_AVAILABLE_AGAIN: 'alerts.tagAvailableAgain',
+		PRODUCT_DELISTED: 'alerts.tagDelisted'
 	};
 	const GOOD_TAGS = new Set(['PRODUCT_ON_SALE', 'PRODUCT_AVAILABLE_AGAIN']);
+	// Delisting is not "watch out", it is the end of the line: red, and told apart from the
+	// amber transitions that can still turn around on the next run (9.F6).
+	const FINAL_TAGS = new Set(['PRODUCT_DELISTED']);
 	function tagClass(tag: string): string {
+		if (FINAL_TAGS.has(tag)) return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
 		return GOOD_TAGS.has(tag)
 			? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
 			: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300';

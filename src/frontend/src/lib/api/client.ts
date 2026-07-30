@@ -332,6 +332,25 @@ export function listCatalog(query: CatalogQuery = {}): Promise<CatalogPage> {
 	return apiFetch(`/api/catalog${qs ? `?${qs}` : ''}`).then(asJson<CatalogPage>);
 }
 
+// Catalog cleanups (9.B7/9.F4). Each answers a different intention — tidy up what the site
+// no longer offers, drop this one, start over — and each returns how many rows went, because
+// "nothing was delisted" and "twelve products went" are different answers to the same click.
+export interface RemovedCount {
+	removed: number;
+}
+
+export function removeDelistedProducts(): Promise<RemovedCount> {
+	return apiFetch('/api/catalog/delisted', { method: 'DELETE' }).then(asJson<RemovedCount>);
+}
+
+export function removeCatalogProduct(productId: number): Promise<RemovedCount> {
+	return apiFetch(`/api/catalog/${productId}`, { method: 'DELETE' }).then(asJson<RemovedCount>);
+}
+
+export function emptyCatalog(): Promise<RemovedCount> {
+	return apiFetch('/api/catalog', { method: 'DELETE' }).then(asJson<RemovedCount>);
+}
+
 // Price history (HIST-*). Series are served ready for the chart (the SPA does not
 // aggregate). Money is Decimal serialised as a string; parse only for plotting.
 export type HistoryRange = 'week' | 'month' | 'all';

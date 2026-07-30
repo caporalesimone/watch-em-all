@@ -19,7 +19,6 @@ from typing import Any, cast
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import select
 
 from src.core.db import new_session
 from src.core.http import HttpClient
@@ -826,16 +825,13 @@ def sp_url(base: str) -> str:
     return f"{base}/cthulhu.1.1.192.sp.uw?idA=19"
 
 
-def _set_include_dented(uid: int, value: bool) -> None:
-    from src.plugins.scrapers.dragon_store.backend import Watch
-
-    session = new_session()
-    try:
-        watch = session.scalars(select(Watch).where(Watch.user_id == uid)).one()
-        watch.include_ammaccati = value
-        session.commit()
-    finally:
-        session.close()
+def _set_include_dented(client: TestClient, headers: dict[str, str], value: bool) -> Any:
+    """Flip the dented filter the way the page does (9.F1): through the API, on the user's only
+    watch. It used to write the column directly, which tested the walk and not the route."""
+    watch_id = client.get(f"{DS}/watches", headers=headers).json()[0]["id"]
+    return client.patch(
+        f"{DS}/watches/{watch_id}", json={"include_ammaccati": value}, headers=headers
+    )
 
 
 def test_a_category_watch_is_accepted_and_queued(client: TestClient) -> None:
@@ -873,7 +869,7 @@ def test_dented_listings_come_in_only_when_the_watch_asks(client: TestClient) ->
     h = _bearer(token)
     with CategoryServer() as base:
         _add_watch(client, h, sp_url(base))
-        _set_include_dented(uid, True)
+        assert _set_include_dented(client, h, True).json()["include_ammaccati"] is True
         _run_for_user(client, uid)
 
     page = client.get("/api/catalog", params={"page_size": 100}, headers=h).json()
@@ -934,6 +930,126 @@ def test_a_single_watch_covered_by_a_category_costs_no_extra_request(client: Tes
 
     assert gp_calls == []  # the category already delivered it
     assert client.get("/api/catalog", headers=h).json()["total"] == 38
+
+
+# --- what the page needs to describe a watch (9.F1/9.F2/9.F3) ---
+
+
+def test_the_backend_says_what_a_pasted_url_is(client: TestClient) -> None:
+    """9.F2: the page asks while the user is still pasting, so it can offer the dented toggle
+    for a category and not for a product. Answered here rather than by a second copy of the
+    URL grammar in TypeScript."""
+    _uid, token = _user(client)
+    h = _bearer(token)
+
+    def kind_of(url: str) -> Any:
+        return client.get(f"{DS}/classify", params={"url": url}, headers=h).json()["kind"]
+
+    assert kind_of("https://dragonstore.it/x.1.1.1.gp.35880.uw") == "product"
+    assert kind_of("https://dragonstore.it/cthulhu.1.1.192.sp.uw?idA=19") == "category"
+    assert kind_of("https://dragonstore.it/chi-siamo.asp") is None
+    assert kind_of("not a url at all") is None
+    # Unauthenticated it answers nothing, like every other route of this plugin.
+    assert client.get(f"{DS}/classify", params={"url": "https://x/y.gp.1.uw"}).status_code == 401
+
+
+def test_a_category_can_be_added_with_dented_items_included(client: TestClient) -> None:
+    """9.F2: the toggle is part of the add, not something to fix up afterwards — the first walk
+    is the expensive one, and doing it twice to change one flag is what we are avoiding."""
+    uid, token = _user(client)
+    h = _bearer(token)
+    with CategoryServer() as base:
+        created = client.post(
+            f"{DS}/watches",
+            json={"url": sp_url(base), "include_ammaccati": True},
+            headers=h,
+        )
+        assert created.status_code == 201
+        assert created.json()["include_ammaccati"] is True
+        _wait_resolved(client, h)
+        _run_for_user(client, uid)
+
+    page = client.get("/api/catalog", params={"page_size": 100}, headers=h).json()
+    assert page["total"] == 39  # nothing was left out
+    assert any("Ammaccato" in i["tags"] for i in page["items"])
+
+
+def test_a_product_watch_never_carries_the_dented_filter(client: TestClient) -> None:
+    """DRG-R7: the filter is a property of a listing. Asked for on a single product it would
+    mean refusing the very page the user pasted, so it is dropped, and the toggle that sends it
+    is not even offered."""
+    _uid, token = _user(client)
+    h = _bearer(token)
+    with DragonServer() as base:
+        created = client.post(
+            f"{DS}/watches",
+            json={"url": gp_url(base, "896"), "include_ammaccati": True},
+            headers=h,
+        )
+        _wait_resolved(client, h)
+    assert created.json()["include_ammaccati"] is False
+
+    # And it cannot be turned on later either: there is nothing for it to filter.
+    refused = _set_include_dented(client, h, True)
+    assert refused.status_code == 422
+    assert refused.json()["code"] == "not_a_category"
+
+
+def test_a_watch_reports_what_its_last_scan_took(client: TestClient) -> None:
+    """9.F1/9.F3: the counters are what the list and the add-outcome panel read. They are a
+    photograph of the scan, written on the row — not a count of the catalog, which several
+    watches can contribute to at once."""
+    uid, token = _user(client)
+    h = _bearer(token)
+    with CategoryServer() as base:
+        _add_watch(client, h, sp_url(base))
+        _run_for_user(client, uid)
+
+    (watch,) = client.get(f"{DS}/watches", headers=h).json()
+    assert watch["kind"] == "category"
+    assert watch["products_included"] == 38
+    assert watch["products_excluded"] == 1  # the dented listing the default filter left out
+    assert watch["last_scanned_at"] is not None
+    # And it is called what the site calls it: a listing URL is unreadable in a list (9.F1).
+    assert watch["name"] == "Il Richiamo di Cthulhu"
+    assert [c["text"] for c in watch["category"]] == ["Giochi di Ruolo", "GDR Italiano"]
+
+
+def test_the_dented_filter_cannot_be_changed_mid_scan(client: TestClient) -> None:
+    """The walk reads that column between pages: a change landing halfway through would apply
+    to the second half of a category and not the first.
+
+    The drainer is stopped so the row stays in flight for the length of the assertion —
+    otherwise the test measures that race instead of the rule (same reason as the queue tests).
+    """
+    from src.plugins.scrapers.dragon_store.backend import Watch
+    from src.web.jobs import stop_drainers
+
+    stop_drainers()
+    # One admin token for both users: taking a second one would log in with a password the
+    # first call already changed.
+    admin = _admin_token(client)
+    uid, token = _make_user(client, admin, "alice")
+    h = _bearer(token)
+    session = new_session()
+    try:
+        row = Watch(user_id=uid, kind="category", url="https://x/c.1.1.1.sp.uw", status="running")
+        session.add(row)
+        session.commit()
+        watch_id = row.id
+    finally:
+        session.close()
+
+    busy = client.patch(f"{DS}/watches/{watch_id}", json={"include_ammaccati": True}, headers=h)
+    assert busy.status_code == 409
+    assert busy.json()["code"] == "watch_busy"
+
+    # Somebody else's watch is not found, never forbidden — that would confirm it exists.
+    _uid_b, token_b = _make_user(client, admin, "bob")
+    other = client.patch(
+        f"{DS}/watches/{watch_id}", json={"include_ammaccati": True}, headers=_bearer(token_b)
+    )
+    assert other.status_code == 404
 
 
 def test_a_category_page_that_cannot_be_read_never_delists(client: TestClient) -> None:

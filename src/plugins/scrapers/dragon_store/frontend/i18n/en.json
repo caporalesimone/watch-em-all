@@ -1,12 +1,12 @@
 {
   "dragon_store": {
     "title": "Dragon Store",
-    "blurb": "Watch Dragon Store product pages. Paste a product URL to start watching it; run a scrape to pull the latest into your catalog.",
+    "blurb": "Watch Dragon Store. Paste a product page to watch that one product, or a category to watch everything in it; each scheduled run pulls the latest into your catalog.",
     "watches": {
-      "heading": "Watched products",
+      "heading": "What you watch",
       "url_placeholder": "https://…gp.35880.uw",
       "add": "Add watch",
-      "empty": "No watched products yet. Paste a product URL above.",
+      "empty": "Nothing watched yet. Paste a product page or a category URL above.",
       "remove": "Remove",
       "invalid": "Enter a product URL first.",
       "duplicate": "You are already watching this URL.",
@@ -18,8 +18,21 @@
       "cancelled": "Cancelled. What had already been read stays in your catalog.",
       "failed": "Could not be read: {reason}",
       "add_in_progress": "One URL of yours is still being resolved. Wait for it to finish.",
-      "unsupported": "Category URLs are not available yet.",
-      "invalid_url": "That is not a Dragon Store product or category URL."
+      "invalid_url": "That is not a Dragon Store product or category URL.",
+      "busy": "This one is being read right now. Try again when it finishes.",
+      "kind_product": "Product",
+      "kind_category": "Category",
+      "include_ammaccati": "Include dented items",
+      "include_ammaccati_hint": "Separate listings, cheaper because the box is damaged. Applies from the next read.",
+      "dented_warning": "This is a dented listing.",
+      "scan_counts": "{included} products, {excluded} dented ones left out",
+      "last_scanned": "last read {when}",
+      "never_scanned": "Not read yet.",
+      "outcome_title": "Added: {name}",
+      "outcome_counts": "{included} products went into your catalog, {excluded} dented listings were left out.",
+      "outcome_cancelled": "Stopped early. The {included} products already read stay in your catalog.",
+      "outcome_view": "See them in the catalog",
+      "outcome_dismiss": "Dismiss"
     },
     "scrape_now": {
       "action": "Scrape now",

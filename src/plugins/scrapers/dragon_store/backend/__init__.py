@@ -26,7 +26,7 @@ import logging
 import re
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
@@ -127,6 +127,9 @@ class _CategoryOutcome:
     unpriced: list[ParsedCard]  # cards the listing showed without a price (9.B2b)
     excluded: int  # dented listings the watch asked not to see
     complete: bool
+    # The category's own breadcrumb, read from page one: what the watch is *called*. Without
+    # it the list of watches can only show the URL of a listing, which is unreadable (9.F1).
+    breadcrumb: list[tuple[str, str | None]] = field(default_factory=list)
 
 
 def _note(context: PluginContext, **deltas: int) -> None:
@@ -266,6 +269,27 @@ def _request_context(db: Session, *, sleep: Callable[[float], None] | None = Non
 
 class WatchIn(BaseModel):
     url: str
+    # Only a category can carry it (DRG-R4/R7); on a product URL it is ignored rather than
+    # refused, because the page only offers the toggle when the URL is a category anyway.
+    include_ammaccati: bool = False
+
+
+class WatchPatch(BaseModel):
+    """What can be changed on an existing watch (9.F1): the dented filter, and nothing else.
+    The URL is the watch's identity — changing it would be a different watch."""
+
+    include_ammaccati: bool
+
+
+class WatchKindOut(BaseModel):
+    """What kind of URL this is, decided by the backend (9.F2).
+
+    The page asks while the user is still pasting, so it can offer the dented toggle for a
+    category and not for a product. It exists rather than a second copy of the rule in
+    TypeScript: the URL grammar is the plugin's, and two copies drift — the debt 9.F8 already
+    declared for the price-difference rule, not repeated here. Costs no HTTP request."""
+
+    kind: str | None
 
 
 class WatchOut(BaseModel):
@@ -286,6 +310,13 @@ class WatchOut(BaseModel):
     progress_total: int | None = None
     # How many jobs of this scraper are ahead of this one; 0 while it is not queued.
     queue_position: int = 0
+    # What the watch is set to, and what its last scan yielded (9.F1/9.F3). The counters are
+    # a photograph of that scan, not a live count of the catalog: a product can arrive from
+    # several watches, so "how many are mine" is not a question a watch can answer.
+    include_ammaccati: bool = False
+    products_included: int = 0
+    products_excluded: int = 0
+    last_scanned_at: datetime | None = None
 
 
 class JobStatus(BaseModel):
@@ -319,6 +350,26 @@ def _snapshot(product: Product) -> dict[str, Any]:
     }
 
 
+def _category_snapshot(breadcrumb: list[tuple[str, str | None]]) -> dict[str, Any] | None:
+    """The same display snapshot, for a **category** watch (9.F1).
+
+    A category never gets one from the products it delivers — none of them lives at the
+    watch's URL — so the list of watches could only print the listing URL, which says
+    nothing. The breadcrumb the site prints on the listing is its name: the leaf is the
+    category, what precedes it is where it sits. ``None`` when the page had no breadcrumb,
+    so the caller keeps whatever name it already had rather than replacing it with nothing."""
+    if not breadcrumb:
+        return None
+    leaf_text, _leaf_link = breadcrumb[-1]
+    return {
+        "name": leaf_text,
+        "image_url": None,
+        "brand": None,
+        "tags": [],
+        "category": [{"text": text, "link": link} for text, link in breadcrumb[:-1]],
+    }
+
+
 def _watch_out(watch: Watch) -> WatchOut:
     snap = watch.snapshot_json or {}
     return WatchOut(
@@ -334,6 +385,10 @@ def _watch_out(watch: Watch) -> WatchOut:
         status_detail=watch.status_detail,
         progress_done=watch.progress_done,
         progress_total=watch.progress_total,
+        include_ammaccati=watch.include_ammaccati,
+        products_included=watch.products_included,
+        products_excluded=watch.products_excluded,
+        last_scanned_at=watch.last_scanned_at,
     )
 
 
@@ -407,6 +462,7 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
                 elif not outcome.complete:
                     detail = "some pages could not be read; the next run will complete it"
                 _record_scan(watch, included=len(products), excluded=outcome.excluded)
+                watch.snapshot_json = _category_snapshot(outcome.breadcrumb) or watch.snapshot_json
             else:
                 product = plugin._scrape_one(context, watch.url)
                 if product is None:
@@ -854,6 +910,7 @@ class DragonStorePlugin(ScraperPlugin):
         """
         products: dict[str, Product] = {}
         unpriced: list[ParsedCard] = []
+        breadcrumb: list[tuple[str, str | None]] = []
         excluded = 0
         page = 1
         total_pages = 1
@@ -865,6 +922,7 @@ class DragonStorePlugin(ScraperPlugin):
                 break
             if page == 1:
                 total_pages = parsed.total_pages or 1
+                breadcrumb = parsed.breadcrumb
                 _mark_progress(watch, done=0, total=total_pages)
                 context.logger.info(
                     "dragon_store: category %s has %s product(s) over %s page(s)",
@@ -896,6 +954,7 @@ class DragonStorePlugin(ScraperPlugin):
             unpriced=unpriced,
             excluded=excluded,
             complete=complete,
+            breadcrumb=breadcrumb,
         )
 
     def _resolve_unpriced(
@@ -965,6 +1024,7 @@ class DragonStorePlugin(ScraperPlugin):
             unpriced.extend(outcome.unpriced)
             failed += 0 if outcome.complete else 1
             _record_scan(watch, included=len(outcome.products), excluded=outcome.excluded)
+            watch.snapshot_json = _category_snapshot(outcome.breadcrumb) or watch.snapshot_json
             context.logger.info(
                 "dragon_store: category %s delivered %s product(s), %s excluded as dented",
                 watch.url,
@@ -1055,6 +1115,16 @@ class DragonStorePlugin(ScraperPlugin):
     def router(self) -> APIRouter:
         router = APIRouter()
 
+        @router.get("/classify", response_model=WatchKindOut)
+        def classify(url: str, user: UserDep) -> WatchKindOut:
+            """What kind of URL this is — asked while the user is pasting (9.F2).
+
+            Authenticated but otherwise free: it reads a string and answers, so the page can
+            offer the dented toggle for a category and not for a product without shipping a
+            second copy of the URL grammar in TypeScript.
+            """
+            return WatchKindOut(kind=classify_url(url.strip()))
+
         @router.get("/watches", response_model=list[WatchOut])
         def list_watches(user: UserDep, db: SessionDep) -> list[WatchOut]:
             out = []
@@ -1098,6 +1168,10 @@ class DragonStorePlugin(ScraperPlugin):
                 user_id=user.sub,
                 kind=kind,
                 url=url,
+                # A single product is watched as it is, label and all: the filter is a
+                # property of a listing, and applying it here would silently refuse the
+                # product the user asked for (DRG-R7).
+                include_ammaccati=body.include_ammaccati and kind == "category",
                 status="queued",
                 queued_at=datetime.now(UTC),
                 # One request for a product page; a category learns its own total from page one.
@@ -1176,6 +1250,34 @@ class DragonStorePlugin(ScraperPlugin):
                 watch.cancel_requested = True
             db.commit()
             return {"status": "cancelling" if watch.status == "running" else "cancelled"}
+
+        @router.patch("/watches/{watch_id}", response_model=WatchOut)
+        def update_watch(
+            watch_id: int, body: WatchPatch, user: UserDep, db: SessionDep
+        ) -> WatchOut:
+            """Change the dented filter on an existing category watch (9.F1/9.F2).
+
+            It takes effect on the **next** scan, not retroactively: turning it off does not
+            remove the dented products already in the catalog (that is what the cleanups of
+            9.F4 are for), and turning it on does not fetch them now.
+
+            Refused while the watch is being resolved. The walk reads this very column between
+            pages, so a change landing mid-scan would apply to the second half of a category
+            and not the first — a state no one asked for and nothing records.
+            """
+            watch = db.scalar(select(Watch).where(Watch.id == watch_id, Watch.user_id == user.sub))
+            if watch is None:
+                raise APIError(404, "not_found", "watch not found")
+            if watch.kind != "category":
+                raise APIError(
+                    422, "not_a_category", "the dented filter only applies to a category"
+                )
+            if watch.status in ("queued", "running"):
+                raise APIError(409, "watch_busy", "this watch is being resolved; try again after")
+            watch.include_ammaccati = body.include_ammaccati
+            db.commit()
+            db.refresh(watch)
+            return _watch_out(watch)
 
         @router.delete("/watches/{watch_id}", status_code=204)
         def remove_watch(watch_id: int, user: UserDep, db: SessionDep) -> None:

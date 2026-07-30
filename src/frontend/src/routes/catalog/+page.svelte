@@ -5,8 +5,11 @@
 	import {
 		addCartItems,
 		ApiErr,
+		emptyCatalog,
 		listCarts,
 		listCatalog,
+		removeCatalogProduct,
+		removeDelistedProducts,
 		type CartCard,
 		type CatalogItem,
 		type CatalogPage,
@@ -108,6 +111,64 @@
 		}
 	}
 
+	// --- cleanups (9.F4) ---
+	//
+	// Deleting a product takes its price history and its cart memberships with it: the
+	// database cascades, and a confirmation that does not say so is asking for consent to
+	// something the user has not been told. Delete mode exists so that a row-level delete is a
+	// decision rather than a mis-click next to the "add to cart" checkbox.
+	// One member per kind, not `'delisted' | 'all'` on a shared one: a discriminant has to be a
+	// single literal per member or TypeScript cannot narrow to the one that carries the item.
+	type Pending = { kind: 'delisted' } | { kind: 'all' } | { kind: 'one'; item: CatalogItem };
+
+	let deleteMode = $state(false);
+	let pending = $state<Pending | null>(null);
+	let cleaning = $state(false);
+	let cleanupMsg = $state<string | null>(null);
+	let cleanupErr = $state<string | null>(null);
+
+	// The whole catalog's delisted count, not this page's: the button offers to remove all of
+	// them, so a number counted from twenty visible rows would understate what the click does.
+	let delistedTotal = $state(0);
+
+	async function loadDelistedTotal(): Promise<void> {
+		try {
+			delistedTotal = (await listCatalog({ page: 1, page_size: 1, removed: true })).total;
+		} catch {
+			delistedTotal = 0; // the button simply offers nothing
+		}
+	}
+
+	async function runCleanup(): Promise<void> {
+		if (pending === null) return;
+		const target = pending;
+		cleaning = true;
+		cleanupMsg = null;
+		cleanupErr = null;
+		try {
+			const res =
+				target.kind === 'delisted'
+					? await removeDelistedProducts()
+					: target.kind === 'all'
+						? await emptyCatalog()
+						: await removeCatalogProduct(target.item.id);
+			cleanupMsg = $_('catalog.cleanupDone', { values: { count: res.removed } });
+			// Anything removed cannot stay selected for a cart, and page 3 of a catalog that just
+			// lost most of its rows may no longer exist.
+			selectedIds = [];
+			selectedPluginById = {};
+			if (target.kind !== 'one') pageNum = 1;
+			await load(true);
+			await loadDelistedTotal();
+			await loadCarts(); // the totals on the cart cards moved with the memberships
+		} catch (e) {
+			cleanupErr = e instanceof ApiErr ? e.detail : $_('catalog.cleanupError');
+		} finally {
+			cleaning = false;
+			pending = null;
+		}
+	}
+
 	async function load(silent = false): Promise<void> {
 		if (!silent) loading = true;
 		error = null;
@@ -129,6 +190,7 @@
 	onMount(() => {
 		void load();
 		void loadCarts();
+		void loadDelistedTotal();
 		// scrape-now writes the catalog asynchronously; if the page is opened while a
 		// scrape is still running it would show empty. Retry briefly so the products
 		// appear on their own, without a manual search.
@@ -185,19 +247,54 @@
 <section class="space-y-6">
 	<PageTitle title={$_('catalog.title')} />
 
-	<form onsubmit={search} class="flex gap-2">
-		<input
-			class="w-64 rounded border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900"
-			placeholder={$_('catalog.search')}
-			bind:value={q}
-		/>
-		<button
-			type="submit"
-			class="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
-		>
-			{$_('catalog.searchAction')}
-		</button>
-	</form>
+	<div class="flex flex-wrap items-center justify-between gap-3">
+		<form onsubmit={search} class="flex gap-2">
+			<input
+				class="w-64 rounded border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900"
+				placeholder={$_('catalog.search')}
+				bind:value={q}
+			/>
+			<button
+				type="submit"
+				class="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+			>
+				{$_('catalog.searchAction')}
+			</button>
+		</form>
+
+		<!-- Cleanups (9.F4): three intentions, three buttons, each confirmed for what it takes. -->
+		<div class="flex flex-wrap items-center gap-2 text-sm">
+			<button
+				class="rounded border border-slate-300 px-3 py-1 hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-800"
+				disabled={cleaning || delistedTotal === 0}
+				onclick={() => (pending = { kind: 'delisted' })}
+			>
+				{$_('catalog.removeDelisted', { values: { count: delistedTotal } })}
+			</button>
+			<button
+				class="rounded border px-3 py-1 {deleteMode
+					? 'border-red-400 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-950/40 dark:text-red-300'
+					: 'border-slate-300 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800'}"
+				aria-pressed={deleteMode}
+				onclick={() => (deleteMode = !deleteMode)}
+			>
+				{deleteMode ? $_('catalog.deleteModeOn') : $_('catalog.deleteMode')}
+			</button>
+			<button
+				class="rounded border border-red-300 px-3 py-1 text-red-600 hover:bg-red-50 disabled:opacity-40 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/40"
+				disabled={cleaning || (data?.total ?? 0) === 0}
+				onclick={() => (pending = { kind: 'all' })}
+			>
+				{$_('catalog.emptyCatalog')}
+			</button>
+		</div>
+	</div>
+
+	{#if cleanupMsg}<p class="text-sm text-emerald-600">{cleanupMsg}</p>{/if}
+	{#if cleanupErr}<p class="text-sm text-red-500">{cleanupErr}</p>{/if}
+	{#if deleteMode}
+		<p class="text-xs text-slate-500">{$_('catalog.deleteModeHint')}</p>
+	{/if}
 
 	{#if addMsg}
 		<p class="text-sm text-emerald-600">{addMsg}</p>
@@ -296,6 +393,15 @@
 						</td>
 						<td class="py-2 pr-4 text-slate-500">{availability(item)}</td>
 						<td class="py-2 pr-2 text-right">
+							{#if deleteMode}
+								<button
+									class="mr-2 rounded border border-red-300 px-2 py-0.5 text-xs text-red-600 hover:bg-red-100 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/40"
+									disabled={cleaning}
+									onclick={() => (pending = { kind: 'one', item })}
+								>
+									{$_('catalog.deleteRow')}
+								</button>
+							{/if}
 							<a
 								href={`/price-history?product=${item.id}`}
 								title={$_('priceHistory.viewChart')}
@@ -343,3 +449,49 @@
 		</div>
 	{/if}
 </section>
+
+<!--
+	One dialog for the three cleanups, each stating what goes with the rows: the price history
+	and the cart memberships travel with the product (the database cascades), and emptying the
+	catalog leaves the watches alone — so the next scheduled run refills what is still watched.
+	Saying that here is the difference between a confirmation and a trap.
+-->
+{#if pending}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+		<div class="w-full max-w-md space-y-4 rounded-lg bg-white p-5 shadow-lg dark:bg-slate-900">
+			<h3 class="text-base font-semibold">
+				{pending.kind === 'delisted'
+					? $_('catalog.confirmDelistedTitle')
+					: pending.kind === 'all'
+						? $_('catalog.confirmEmptyTitle')
+						: $_('catalog.confirmOneTitle', { values: { name: pending.item.name } })}
+			</h3>
+			<p class="text-sm text-slate-500">
+				{pending.kind === 'delisted'
+					? $_('catalog.confirmDelistedBody', { values: { count: delistedTotal } })
+					: pending.kind === 'all'
+						? $_('catalog.confirmEmptyBody', { values: { count: data?.total ?? 0 } })
+						: $_('catalog.confirmOneBody')}
+			</p>
+			<p class="text-sm text-slate-500">{$_('catalog.confirmCascade')}</p>
+			{#if pending.kind === 'all'}
+				<p class="text-sm text-slate-500">{$_('catalog.confirmWatchesSurvive')}</p>
+			{/if}
+			<div class="flex justify-end gap-2">
+				<button
+					class="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+					onclick={() => (pending = null)}
+				>
+					{$_('common.cancel')}
+				</button>
+				<button
+					class="rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-500 disabled:opacity-50"
+					disabled={cleaning}
+					onclick={runCleanup}
+				>
+					{$_('catalog.confirmAction')}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}

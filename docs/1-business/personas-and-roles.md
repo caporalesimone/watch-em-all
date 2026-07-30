@@ -47,7 +47,9 @@ By design the administrator **does not access the users' operational data**: the
 
 ## Roles and accounts
 
-- An account has exactly one role: `admin` or `user`.
+- An account has exactly one role: `admin`, `super_user` or `user`.
+- The **super-user** is a user with one extra privilege: the operations that reach the observed sites outside the schedule. Today that is the **manual scrape** (and the Debug page, which links to development tooling). It exists because a manual scrape is the quickest way to send a site more requests than its `Crawl-delay` asks for, and the person who answers for that is not necessarily every user of the installation. Everything else — catalog, carts, alerts — is exactly a user's.
+- The role is chosen **when the account is created** and does not change afterwards; promoting an existing account arrives with the wider account lifecycle.
 - An admin who also wants to monitor prices for themselves uses **a second account** with the `user` role. This separation keeps both the permission model and the interface simple.
 - At first startup the system creates the initial administrator account; users are created by the admin with a temporary password, to be changed mandatorily at first login.
 
