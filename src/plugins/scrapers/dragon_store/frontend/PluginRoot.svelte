@@ -221,11 +221,10 @@
 			error = $_('dragon_store.watches.invalid');
 			return;
 		}
-		// Adding a watch scrapes the product there and then, and the site's own Crawl-delay
-		// makes that take tens of seconds — plus the anti-bot gate, which costs two extra
-		// waits. Without `busy` the form looked inert for all that time and could be
-		// submitted twice. The notice states the wait and nothing else: why it is slow is
-		// our problem, not something the user can act on.
+		// `busy` covers the POST itself, which is now a matter of milliseconds: since 9.X6b the
+		// server commits the row and scrapes afterwards. It is not what stops a second
+		// submission — the API does that, refusing with `add_in_progress` while one is in
+		// flight, because a disabled button is not a rule and a reload used to throw it away.
 		busy = true;
 		outcome = null; // a new add: the previous outcome is no longer what the page is about
 		try {
