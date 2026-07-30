@@ -978,6 +978,65 @@ def test_a_listing_served_from_the_cache_does_not_pretend_the_site_just_answered
     assert second_seen <= first_seen
 
 
+class UnreadableServer:
+    """A site that answers **200** with something that is not a product page at all: no
+    JSON-LD, no anti-bot gate, no error banner of its own. That is a parse failure — our
+    reading broke — as opposed to the site telling us, inside a 200, that it has no such page.
+    """
+
+    def __init__(self) -> None:
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=iso-8859-1")
+                self.end_headers()
+                self.wfile.write(b"<html><body><h1>Benvenuto</h1></body></html>")
+
+            def log_message(self, fmt: str, *args: Any) -> None:
+                return
+
+        self._srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self._thread = threading.Thread(target=self._srv.serve_forever, daemon=True)
+
+    def __enter__(self) -> str:
+        self._thread.start()
+        return f"http://127.0.0.1:{self._srv.server_address[1]}"
+
+    def __exit__(self, *exc: object) -> None:
+        self._srv.shutdown()
+        self._srv.server_close()
+        self._thread.join(timeout=2)
+
+
+def test_a_product_page_that_will_not_parse_is_counted_like_a_listing_that_will_not(
+    client: TestClient,
+) -> None:
+    """C6/9.B6c: `parse_failures_total` was bumped on a listing and never on a product page, so
+    the statistic could not show the breakage we have actually had — a page shape that stopped
+    parsing. `scrape_run` has retention; this counter is the only memory of "since when".
+    """
+    _uid, token = _user(client)
+    h = _bearer(token)
+    before = _parse_failures()
+    with UnreadableServer() as base:
+        added = _add_watch(client, h, gp_url(base, "896"))
+        row = _wait_resolved(client, h)[0]
+
+    assert added.status_code == 201  # the watch is kept: unreadable now is not gone
+    assert row["status"] == "failed"
+    assert _parse_failures() - before == 1
+
+
+def _parse_failures() -> int:
+    from src.core.scraper_stats import get_stats
+
+    session = new_session()
+    try:
+        return int(get_stats(session, "dragon_store").parse_failures_total)
+    finally:
+        session.close()
+
+
 def _seen_and_counters(uid: int) -> tuple[datetime, int, int]:
     """One product's `last_seen_at` and its two read counters. 36099 is on the listing page and
     is not one of the priceless cards, so it is only ever seen through the listing."""

@@ -674,11 +674,18 @@ class DragonStorePlugin(ScraperPlugin):
             _note(context, rate_limited_total=1)
             raise
         except DragonStoreSoftError as exc:
+            # Deliberately not a parse failure: the page parsed fine and *says* it is an error
+            # (their error pages carry the real status inside a 200). Counting it would put the
+            # site's own 404s in a statistic that is supposed to mean "our reading broke".
             context.http.forget(url)
             context.logger.error("dragon_store: %s", exc)
             return None
         except DragonStoreParseError as exc:
             context.logger.error("dragon_store: parse failed for %s: %s", url, exc)
+            # Counted here too, not only on a listing (9.B6c): the statistic was asymmetric, so
+            # "the product pages stopped parsing" — a site redesign, the shape of every
+            # breakage we have had — was the one thing it could not show.
+            _note(context, parse_failures_total=1)
             return None
         return self._to_product(context, url, parsed, response.fetched_at)
 
