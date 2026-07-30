@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 import threading
 import time
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, cast
@@ -169,10 +170,26 @@ def _dragon(client: TestClient):  # type: ignore[no-untyped-def]  # test helper:
 
 def _run_for_user(client: TestClient, uid: int):  # type: ignore[no-untyped-def]
     """Run the loaded plugin with a fast (no-politeness) HTTP client against the
-    local server; returns the delta counters."""
+    local server; returns the delta counters. **No scrape cache**, so every page in
+    these tests is a real fetch and request counting means what it says."""
     lp = _dragon(client)
     ctx = build_context(lp.manifest, lp.plugin)
     ctx.http = HttpClient(min_interval_s=0.0, sleep=lambda _s: None)
+    try:
+        return lp.plugin.run_for_user(ctx, uid)
+    finally:
+        ctx.db.close()
+
+
+def _run_for_user_cached(client: TestClient, uid: int):  # type: ignore[no-untyped-def]
+    """A run through the **production** HTTP wiring, scrape cache included.
+
+    `build_context` builds that client itself, so this is just the run with nothing swapped
+    out; the suite's fixture neutralises the politeness wait on the class, so it is still
+    fast. Needed to test what a cached page does to `last_seen_at` and the per-product
+    statistics — the one thing a cacheless client cannot show."""
+    lp = _dragon(client)
+    ctx = build_context(lp.manifest, lp.plugin)
     try:
         return lp.plugin.run_for_user(ctx, uid)
     finally:
@@ -930,6 +947,51 @@ def test_adding_a_category_keeps_the_prices_its_tail_pass_settled(client: TestCl
     # "no price on the detail page either" is the case that legitimately means zero.
     (free,) = [i for i in items if ".gp.28079.uw" in i["url"]]
     assert (free["price_current"], "Free" in free["tags"]) == ("0.00", True)
+
+
+def test_a_listing_served_from_the_cache_does_not_pretend_the_site_just_answered(
+    client: TestClient,
+) -> None:
+    """C3/PROD-R8: `last_seen_at` is when the **site** answered, and a page replayed from the
+    scrape cache carries the timestamp of the fetch that filled it.
+
+    The walk used to discard that timestamp, so fifty products off a twelve-hour-old page were
+    all dated "now" — the field whose entire job is to say how fresh this is, reporting when we
+    last re-served a listing. The same timestamp decides `observations` vs `cache_hits`, so both
+    per-product counters were wrong by construction on a category.
+
+    A live response carries no timestamp (a real fetch *is* now, give or take milliseconds), so
+    the assertion on the second read is that the field did not move **forward**: it is
+    re-stamped with the cache entry's own, marginally earlier, instant.
+    """
+    uid, token = _user(client)
+    h = _bearer(token)
+    with CategoryServer() as base:
+        _add_watch(client, h, sp_url(base))  # a real fetch, which fills the scrape cache
+        first_seen, observations, cache_hits = _seen_and_counters(uid)
+        _run_for_user_cached(client, uid)  # same page, served from the cache this time
+        second_seen, observations_after, cache_hits_after = _seen_and_counters(uid)
+
+    assert (observations, cache_hits) == (1, 0)
+    # The replay counted as a replay, and did not date the product to now.
+    assert (observations_after, cache_hits_after) == (1, 1)
+    assert second_seen <= first_seen
+
+
+def _seen_and_counters(uid: int) -> tuple[datetime, int, int]:
+    """One product's `last_seen_at` and its two read counters. 36099 is on the listing page and
+    is not one of the priceless cards, so it is only ever seen through the listing."""
+    session = new_session()
+    try:
+        # By URL, not by external_id: that one is a hash of the identity seed.
+        row = session.scalars(
+            select(CatalogProduct).where(
+                CatalogProduct.user_id == uid, CatalogProduct.url.like("%gp.36099.uw%")
+            )
+        ).one()
+        return row.last_seen_at, row.observations, row.cache_hits
+    finally:
+        session.close()
 
 
 def test_a_category_is_walked_page_by_page(client: TestClient) -> None:

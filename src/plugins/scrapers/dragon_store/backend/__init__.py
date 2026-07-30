@@ -829,8 +829,15 @@ class DragonStorePlugin(ScraperPlugin):
 
     def _fetch_category_page(
         self, context: PluginContext, url: str, page: int
-    ) -> ParsedCategory | None:
-        """One page of a listing, clearing the session once if the gate answers instead."""
+    ) -> tuple[ParsedCategory, datetime | None] | None:
+        """One page of a listing, clearing the session once if the gate answers instead.
+
+        Returns the page **and when the site answered** — the cache's own timestamp on a hit,
+        the clock on a real fetch (PROD-R8). Discarding it, as this used to, dated fifty
+        products to "now" off a page that might be twelve hours old: `last_seen_at` then
+        reported when we last re-served a listing instead of when the site last spoke, and the
+        per-product statistics counted a replay as a fresh observation.
+        """
         target = page_url(url, page)
         try:
             response = context.http.get(target)
@@ -847,14 +854,14 @@ class DragonStorePlugin(ScraperPlugin):
             context.logger.error("dragon_store: %s returned HTTP %s", target, response.status_code)
             return None
         try:
-            return parse_category(response.content, target)
+            return parse_category(response.content, target), response.fetched_at
         except DragonStoreChallenge:
             context.http.forget(target)
             if not self._clear_session(context, target):
                 return None
             response = context.http.get(target)
             try:
-                return parse_category(response.content, target)
+                return parse_category(response.content, target), response.fetched_at
             except DragonStoreParseError as exc:
                 context.logger.error("dragon_store: %s unreadable after the gate — %s", target, exc)
                 return None
@@ -884,10 +891,11 @@ class DragonStorePlugin(ScraperPlugin):
         total_pages = 1
         complete = True
         while page <= total_pages:
-            parsed = self._fetch_category_page(context, watch.url, page)
-            if parsed is None:
+            fetched = self._fetch_category_page(context, watch.url, page)
+            if fetched is None:
                 complete = False
                 break
+            parsed, fetched_at = fetched
             if page == 1:
                 total_pages = parsed.total_pages or 1
                 breadcrumb = parsed.breadcrumb
@@ -904,7 +912,9 @@ class DragonStorePlugin(ScraperPlugin):
                 # own: the sanitiser strips the label from the name, so a detector running
                 # after it would find nothing, and one running before would be the same rule
                 # written twice, free to drift (DRG-R4, rewritten in 9.B5).
-                product = self._card_to_product(context, card, parsed.breadcrumb, None)
+                # `fetched_at` is this page's, not the walk's: page 1 can come off the cache
+                # while page 2 is fetched for real, and each card belongs to its own page.
+                product = self._card_to_product(context, card, parsed.breadcrumb, fetched_at)
                 if _DENTED_TAG in product.tags and not watch.include_ammaccati:
                     excluded += 1
                     continue
