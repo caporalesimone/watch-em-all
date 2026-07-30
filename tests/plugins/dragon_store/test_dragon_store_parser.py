@@ -111,6 +111,28 @@ def test_sanitize_keeps_internal_separators_when_no_label() -> None:
     assert found == []
 
 
+def test_sanitize_takes_the_label_off_either_end() -> None:
+    # A trailing label is still a label; and a second one, after the first removal left its
+    # separator behind, is still at the edge of what remains.
+    clean, found = sanitize_title("Il Richiamo di Cthulhu - AMMACCATO", ["Ammaccato"])
+    assert (clean, found) == ("Il Richiamo di Cthulhu", ["Ammaccato"])
+
+    clean, found = sanitize_title(
+        "AMMACCATO - OFFERTA RAVEN PRIME - Il Richiamo di Cthulhu",
+        ["Ammaccato", "Offerta Raven Prime"],
+    )
+    assert clean == "Il Richiamo di Cthulhu"
+    assert found == ["Ammaccato", "Offerta Raven Prime"]
+
+
+def test_sanitize_leaves_a_label_word_inside_the_name_alone() -> None:
+    # Anchoring's whole point: cutting a label out of the middle would leave " - - " behind,
+    # because separator trimming only applies at the ends — and the name is not a label.
+    title = "La Guida del Custode alle Edizione Limitata di Arkham"
+    clean, found = sanitize_title(title, ["Edizione Limitata"])
+    assert (clean, found) == (title, [])
+
+
 def test_sanitize_limited_edition_keeps_rest_of_title() -> None:
     title = "EDIZIONE LIMITATA - Il Richiamo di Cthulhu - Cthulhu By Gaslight - Libro del Custode"
     clean, found = sanitize_title(title, ["Edizione Limitata"])

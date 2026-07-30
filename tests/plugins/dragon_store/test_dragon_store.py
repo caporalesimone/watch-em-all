@@ -19,9 +19,11 @@ from typing import Any, cast
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from src.core.db import new_session
 from src.core.http import HttpClient
+from src.core.models import CatalogProduct
 from src.core.plugins.context import build_context
 from src.core.scraper_config import set_scraper_config
 
@@ -1050,6 +1052,93 @@ def test_the_dented_filter_cannot_be_changed_mid_scan(client: TestClient) -> Non
         f"{DS}/watches/{watch_id}", json={"include_ammaccati": True}, headers=_bearer(token_b)
     )
     assert other.status_code == 404
+
+
+# --- what a run over a category reports (DoD: idempotency + coherent counters) ---
+
+
+def test_a_second_run_over_a_category_changes_nothing(client: TestClient) -> None:
+    """The phase's Definition of Done, and the one place a dedup or delisting mistake would
+    show as thirty-eight rows instead of one: run the same category twice with the site
+    unchanged and every delta has to be zero — including ``removed``, which is the dangerous
+    one, since the second delivery is complete and therefore *allowed* to delist."""
+    uid, token = _user(client)
+    h = _bearer(token)
+    with CategoryServer() as base:
+        _add_watch(client, h, sp_url(base))
+        first = _run_for_user(client, uid)
+        second = _run_for_user(client, uid)
+        third = _run_for_user(client, uid)  # a third, because "stable" is not "stable once"
+
+    assert first.found == second.found == third.found == 38
+    # Adding the watch already stored the products, so even the first run is an update.
+    assert (first.new, second.new, third.new) == (0, 0, 0)
+    assert (first.price_changes, second.price_changes, third.price_changes) == (0, 0, 0)
+    assert (first.removed, second.removed, third.removed) == (0, 0, 0)
+    assert client.get("/api/catalog", headers=h).json()["total"] == 38
+
+    # The other half of "nothing changed": the per-product statistics of 9.B6b. Every row was
+    # observed at least once and none recorded a price move — and there are 38 rows, not 38
+    # times three, which is what a broken identity would look like.
+    session = new_session()
+    try:
+        rows = session.scalars(select(CatalogProduct).where(CatalogProduct.user_id == uid)).all()
+        assert len(rows) == 38
+        assert {r.price_changes for r in rows} == {0}
+        assert {r.availability_changes for r in rows} == {0}
+        assert all(r.observations >= 1 for r in rows)
+        assert not any(r.removed for r in rows)
+    finally:
+        session.close()
+
+
+def test_a_run_reports_what_the_dented_filter_left_out(client: TestClient) -> None:
+    """`scrape_run.products_excluded` has existed since 4.B6 and nothing ever wrote it: a run
+    over a category of 39 reported 38 found and left the missing one unexplained. Only the
+    plugin can say — the catalog service is handed the survivors."""
+    admin = _admin_token(client)  # taken once: it changes the admin's own password
+    uid, token = _make_user(client, admin, "alice")
+    h = _bearer(token)
+    with CategoryServer() as base:
+        _add_watch(client, h, sp_url(base))
+        delta = _run_for_user(client, uid)
+
+    assert delta.found == 38
+    assert delta.excluded == 1  # the dented listing on that page
+
+    # A single product excludes nothing, and must not inherit the count.
+    uid_b, token_b = _make_user(client, admin, "bob")
+    with DragonServer() as base:
+        _add_watch(client, _bearer(token_b), gp_url(base, "896"))
+        assert _run_for_user(client, uid_b).excluded == 0
+
+
+def test_a_category_walk_counts_its_pages_in_the_lifetime_statistics(client: TestClient) -> None:
+    """9.B6c: `scrape_run` has retention, so the per-scraper row is the only memory of what
+    this scraper has ever done. A page read is where the time goes — eleven seconds of
+    politeness each — so it is counted per page, not per product."""
+    uid, token = _user(client)
+    h = _bearer(token)
+    server = CategoryServer(paginated=True)
+    with server as base:
+        _add_watch(client, h, sp_url(base))
+        before = _pages_fetched(client)
+        _run_for_user(client, uid)
+        after = _pages_fetched(client)
+
+    # Two listing pages in this run (the add read them too, which is what `before` absorbs).
+    assert after - before == 2
+    assert sum("pg=2" in c for c in server.listing_calls()) >= 1
+
+
+def _pages_fetched(client: TestClient) -> int:
+    from src.core.scraper_stats import get_stats
+
+    session = new_session()
+    try:
+        return int(get_stats(session, "dragon_store").pages_fetched_total)
+    finally:
+        session.close()
 
 
 def test_a_category_page_that_cannot_be_read_never_delists(client: TestClient) -> None:

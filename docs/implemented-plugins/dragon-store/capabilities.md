@@ -2,7 +2,7 @@
 
 > **Implemented plugin — Dragon Store (scraper)** · Audience: developer.
 >
-> Limited to what is implemented (DOC-12). It covers the phase-3/5 internals: the real `.gp` single-product parser via `context.http`, product identity, the availability map, the title sanitizer, the cart adjustments, the plugin routes and the watch snapshot. Files: `backend/__init__.py` (plugin class + routes), `adjustments.py`, `parser.py`, `sanitizer.py` (+ `title_labels.json`).
+> Limited to what is implemented (DOC-12). It covers the internals: the `.gp` product parser and the `.sp` listing walk via `context.http`, product identity, the availability map, the title sanitizer, the cart adjustments, the plugin tables (the watch row that doubles as a job) and the plugin routes. Files: `backend/__init__.py` (plugin class + routes), `adjustments.py`, `parser.py`, `sanitizer.py` (+ `title_labels.json`).
 
 ## Plugin tables
 
@@ -10,35 +10,56 @@ Created in `initialize()`, idempotent, naming `plugin_dragon_store_*`:
 
 | Table | Content |
 |---|---|
-| `plugin_dragon_store_watches` | id, user_id, kind (`product`\|`category` — phase 3 uses `product` only), url, **snapshot_json** (display snapshot of the last scraped product: name, image, brand, tags, category — null until the first successful scrape), created_at — the user's inputs |
+| `plugin_dragon_store_watches` | id, user_id, kind (`product`\|`category`), url, **snapshot_json** (display snapshot: for a product its name/image/brand/tags/category, for a category its breadcrumb — null until the first successful scrape), created_at, **include_ammaccati**, **status** + status_detail + progress_done + progress_total + cancel_requested + queued_at/started_at/finished_at, **products_included** + products_excluded + last_scanned_at — **UNIQUE (user_id, url)** |
 
-The per-category `include_ammaccati` flag arrives with categories in phase 9. There is **no config table yet**: the adjustment values live in code (`adjustments.py`); the admin discount-threshold editor (and its persistence) arrives with the plugin admin config in a later phase.
+Three groups of columns, three jobs:
+
+- **The input**: `kind` and `url`. A category stays **one row** — the run re-scrapes the category, never the hundred products that came out of it, and the products carry no link back here (one product can arrive from several watches at once).
+- **The job** (`status` and its neighbours): the row **is** the job that resolves it. Adding a watch commits this row first and scrapes afterwards, so the state describing a two-minute (or, for a category, several-minute) wait lives where a page reload can find it again instead of in a component a refresh throws away. `queued → running → ready | failed | cancelled`; `progress_*` counts **requests**, which is where the time goes. `cancel_requested` is cooperative: a thread cannot be killed, and does not need to be.
+- **The last scan** (`products_included`, `products_excluded`, `last_scanned_at`): a photograph the UI reads, not a live count — see the note on the absent foreign key above.
+
+The `UNIQUE (user_id, url)` is the duplicate guarantee. It used to be a `SELECT` before an `INSERT` with a two-minute scrape in between, which is a race with a window that wide, not a guarantee: two quick submissions of the same URL wrote two rows.
+
+There is **no config table yet**: the adjustment values live in code (`adjustments.py`); the admin discount-threshold editor (and its persistence) arrives with the plugin admin config in a later phase.
 
 ## `run_for_user` flow
 
 ```
 def run_for_user(context, user_id):
-    watches  = load_watches(user_id)
-    products = []
-    for w in watches where w.kind == "category":
-        found = scrape_category(context.http, w.url)         # all pages
-        if not w.include_ammaccati:                          # DRG-R4: PER-CATEGORY filter
-            found, excluded = partition(found, is_ammaccato) # is_ammaccato: title prefix
-            count_excluded(excluded)                         # → run's products_excluded
-        products += found
-    for w in watches where w.kind == "product":
-        if not any(p.external_id == expected_id(w.url) for p in products):
-            products += scrape_product(context.http, w.url)  # DRG-R3: category wins
-            # NO dented filter here: single input = explicit choice (DRG-R7)
-    products = dedup_by_external_id(products)
-    context.update_catalog(user_id, products)
+    watches = load_watches(user_id)
+    if not watches:
+        return DeltaCounters()          # no watches != "the site returned nothing": NEVER delist
+    delivered, unpriced, excluded, failed = {}, [], 0, 0
+
+    for w in categories(watches):                            # 1. categories FIRST
+        found = scrape_category(context.http, w)             # walks &pg=N, page 1 states the count
+        #   the dented filter reads the SANITISER's tag, never a second search of the title
+        #   (DRG-R4, per-category): the label is stripped from the name, so a detector running
+        #   after it would find nothing and one running before would be the rule written twice
+        excluded += found.excluded                           # → DeltaCounters.excluded → scrape_run
+        record_scan(w, found)                                # counters + breadcrumb on the row
+        delivered.update(found.products); unpriced += found.unpriced
+        failed += 0 if found.complete else 1
+
+    for w in singles(watches):                               # 2. then the singles
+        if expected_id(w.url) in delivered:
+            continue                                         # DRG-R3: the category already did it
+        delivered[...] = scrape_product(context.http, w.url)  # no dented filter here (DRG-R7)
+
+    resolve_unpriced(unpriced, delivered)                    # 3. last: 9.B2b, detail page each
+
+    if not aborted and failed == 0:
+        return context.update_catalog(user_id, delivered)     # complete → may delist
+    return context.upsert_catalog(user_id, delivered)         # partial → must NOT delist
 ```
 
-One request at a time via `context.http` (politeness enforced by the core); pagination handled internally.
+Categories first is not cosmetic (9.B4): a card yields the same `external_id` as the detail page, so a product a category already delivered needs **no request of its own** — five single watches covered by one category go from 77 seconds to 22. One request at a time via `context.http` (politeness enforced by the core).
+
+The last two lines are the phase's most consequential rule (CATSVC-R2/R2b): a page that could not be read makes the delivery **incomplete**, and an incomplete delivery must never run the delisting sweep. "We could not read page 7" is not "those products are gone" — that confusion is what used to wipe a catalog on any gate or outage.
 
 Note on DRG-R8 (inclusion wins): the dented filter runs **per-watch, before the merge** — a product filtered out of category A but included from category B (or added as a single product) survives the dedup naturally, with no special logic.
 
-> **Phase 3 (MVP)**: only the **`kind=product` branch** is implemented (single `.gp` listing via `scrape_product`); categories, the dented filter and pagination are **phase 9**. The real parsing of the product page is documented below (§ Product page `.gp`).
+**Idempotency**: with the site unchanged, a second (and third) run over the same category delivers the same set and reports **every delta at zero**, `removed` included — which matters most there, since a complete delivery is precisely the one *allowed* to delist.
 
 ## Adjustments (5.B5)
 
@@ -130,13 +151,17 @@ The site's title sometimes carries **commercial / edition labels** that are not 
 
 Besides the sanitizer, the **`PreOrder`** state adds the **"Pre Order"** tag (which does not come from the title). All tags end up in `tags` (PROD-R5); the UI shows them as a list. The list of labels in the JSON is **viewable by the admin** (read-only view; arrives with the admin pages).
 
-> **Anchoring, arriving in phase 9.** The match is currently made **anywhere** in the title. Counted over 139 real cards, all 28 label occurrences — `AMMACCATO` (13), `OFFERTA RAVEN PRIME` (9), `EDIZIONE LIMITATA` (3) — sit at the **start** of the title; none is internal, none trails. The match therefore becomes anchored to the start (or end) of the title, which loses nothing on real data and removes the one defect the free-form match carries: removing an internal label leaves a ` - - ` residue behind, since separator trimming only applies at the ends.
+> **Anchoring (done in 0.9.0).** The match used to be made **anywhere** in the title. Counted over 139 real cards, all 28 label occurrences — `AMMACCATO` (13), `OFFERTA RAVEN PRIME` (9), `EDIZIONE LIMITATA` (3) — sit at the **start**; none is internal, none trails. It is now anchored to the **start or the end** of what is left of the title (leading separators a previous removal left behind still count as an edge), which loses nothing on real data and removes the one defect the free-form match carried: cutting a label out of the middle leaves a ` - - ` residue behind, since separator trimming only applies at the ends — and a product whose *name* contains a label word is no longer mutilated.
 
 ## Plugin routes
 
-Under `/api/plugins/dragon-store` ([convention](../../api/endpoints.md)), the plugin's own router implements `watches` (`GET` list, `POST` add → 201, `DELETE /watches/{watch_id}`). A `test` route (dry-run) existed until 0.9.0 and was removed with the concept. The `scrape-now` pair (`POST` immediate scrape for the user + `GET` cooldown status) is provided by the `ScraperPlugin` base (core convention, not rewritten by the plugin). The `config-schema/{admin|user}` and `admin-config` (GET/PUT) convention routes are **not implemented yet** — they arrive with the plugin admin config in a later phase. Swagger tag: `Plugin: Dragon Store`.
+Under `/api/plugins/dragon-store` ([convention](../../api/endpoints.md)), the plugin's own router implements `classify` (`GET ?url=` → the kind, for the add form), `watches` (`GET` list, `POST` add → 201, `PATCH /watches/{id}` for the dented filter, `POST /watches/{id}/cancel`, `DELETE /watches/{id}`) and `watches/job` (`GET`, the in-flight add). A `test` route (dry-run) existed until 0.9.0 and was removed with the concept. The `scrape-now` pair (`POST` immediate scrape for the user + `GET` cooldown status) is provided by the `ScraperPlugin` base (core convention, not rewritten by the plugin) and since 0.9.0 answers **403** below super-user. The `config-schema/{admin|user}` and `admin-config` (GET/PUT) convention routes are **not implemented yet** — they arrive with the plugin admin config in a later phase. Swagger tag: `Plugin: Dragon Store`. Full signatures and error codes: [endpoints](../../api/endpoints.md#scraper-plugin-routes--dragon-store-implemented).
 
-**Watches**: `POST /watches` rejects a URL **already present** for the user (`409 duplicate_watch`) and performs a **one-off scrape** through the shared context (`_request_context`) that does two things with one visit to the site: it saves a **snapshot** of the product (title, image, brand, tags, category) on the watch row (column `snapshot_json`), refreshed on every scheduled/manual run, and it writes the product itself to the catalog via `upsert_catalog` — never `update_catalog`, since one product says nothing about the others. The user page therefore shows each watch with image, title (link), brand, category, tags and a Remove button, right from the moment it is added. The call is **slow by design** (the site's `Crawl-delay` plus its access check), so the form shows a spinner and states the wait; the watch is kept even when the scrape fails, and the next run fills it in.
+**Watches**: `POST /watches` **commits the row and returns in milliseconds**, then resolves it outside the request — the row *is* the job (see § Plugin tables). It used to be the other way round, with the wait (the site's `Crawl-delay` plus its access check, up to a couple of minutes) inside the request and everything describing it living in the page: a reload wiped the spinner but not the scrape, so the work finished and wrote invisibly, and the user, seeing nothing, added the same URL again. Refusals are the API's, not a disabled button's: a duplicate URL → `409 duplicate_watch` (the UNIQUE), another add already in flight → `409 add_in_progress`, an unrecognised URL → `422 invalid_url`.
+
+The queue is drained by **this scraper's own drainer**, which holds the same per-scraper run lock as a scheduled run (so an add never competes with one) and takes the oldest queued job at a time. A row still marked `running` at startup cannot be — that is what a restart left behind — so it is reclaimed as `failed`; leaving it would block the user's next submission, a lock with no expiry.
+
+Resolution writes through `upsert_catalog` — never `update_catalog`, since one input says nothing about the user's other products — and refreshes the watch's `snapshot_json`. The watch is **kept even when the scrape fails**: "we could not read it" is not "it is not there", and the next scheduled run tries again.
 
 ## Site pre-analysis (June 2026, one category page)
 
@@ -186,7 +211,7 @@ Verified on 139 cards (2026-07-29): everything the catalog row needs is on the c
 | DRG-Q3 | Stable SKU/native ID | ✅ **closed**: native numeric id (`gp.<id>`/`r_<id>`) + article code; see § Identity |
 | DRG-Q4 | Category pagination | ✅ **closed** (2026-07-29): server-rendered `&pg=N` links, 50 per page, item and page counts printed on every page; verified on a 1040-product category |
 | DRG-Q5 | "Dented" flagging and availability | ✅ **closed**: title `AMMACCATO - …` (dedicated listings); **3-state** availability — `InStock`/`fullAV`, `OutOfStock`/`noAV`, **`PreOrder`/`inArrivalAV`** ("Prossimamente") |
-| DRG-Q6 | Shipping costs as an adjustment | to be decided (store rules to be read) |
+| DRG-Q6 | Shipping costs as an adjustment | ✅ **closed** (2026-07-30): shipping **is** an adjustment and has been implemented since phase 5 — `adjustments.py` yields **−5.00 €** as a NEGATIVE entry, **free** from 100 € up, alongside the non-cumulative discount band. The question was answered by the code before it was answered in this table; nothing was left to decide |
 | DRG-Q7 | Does the product page (`.gp`) expose JSON-LD `Product`? | ✅ **closed**: **yes** — it is the **primary** source of the parsing (see § Product page `.gp`) |
 
 > "Closed (provisional)" = verified on one sample page: the pre-implementation ad-hoc study must confirm it across multiple categories and on the product page. Should a headless browser be needed, the dependency must be declared in an optional group of the single root `pyproject.toml` ([build-system](../../infrastructure/build-system.md)); the single-thread constraint remains.

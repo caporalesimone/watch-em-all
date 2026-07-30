@@ -22,6 +22,10 @@ from pathlib import Path
 
 _LABELS_PATH = Path(__file__).with_name("title_labels.json")
 _TRIM = " \t\r\n-–—:|·"
+# The same characters as a class, so a label can be recognised at the **edge** of what is left
+# of the title even when a previous removal left its separator behind ("AMMACCATO - OFFERTA
+# RAVEN PRIME - Name" → " - OFFERTA RAVEN PRIME - Name": still an edge, to a reader).
+_EDGE = f"[{re.escape(_TRIM)}]*"
 
 
 @lru_cache(maxsize=1)
@@ -38,11 +42,20 @@ def load_title_labels() -> tuple[str, ...]:
 def sanitize_title(title: str, labels: Iterable[str]) -> tuple[str, list[str]]:
     """Strip known labels from ``title`` (case-insensitive); return
     ``(clean_title, canonical labels found)``. The residual title is trimmed of
-    leftover separators/whitespace; internal separators are preserved."""
+    leftover separators/whitespace; internal separators are preserved.
+
+    The match is **anchored to the start or the end** of the title. Counted over 139 real
+    cards, all 28 label occurrences sat at the start and none was internal, so anchoring loses
+    nothing on real data — and it removes the one defect the free-form match carried: cutting a
+    label out of the middle leaves a ``" - - "`` residue behind, because separator trimming only
+    applies at the ends. A product whose *name* happens to contain a label word also stops
+    being mutilated, which is the case nobody would have noticed until it happened.
+    """
     found: list[str] = []
     clean = title
     for label in labels:
-        pattern = re.compile(re.escape(label), re.IGNORECASE)
+        escaped = re.escape(label)
+        pattern = re.compile(rf"^{_EDGE}{escaped}|{escaped}{_EDGE}$", re.IGNORECASE)
         if pattern.search(clean):
             clean = pattern.sub(" ", clean)
             if label not in found:

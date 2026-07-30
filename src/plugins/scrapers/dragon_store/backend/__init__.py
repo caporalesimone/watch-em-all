@@ -1003,6 +1003,7 @@ class DragonStorePlugin(ScraperPlugin):
 
         delivered: dict[str, Product] = {}
         unpriced: list[ParsedCard] = []
+        excluded = 0  # dented listings this run left out, for the run record (9.B5)
         failed = 0
         aborted = False
 
@@ -1022,6 +1023,7 @@ class DragonStorePlugin(ScraperPlugin):
             for product in outcome.products:
                 delivered[product.external_id] = product
             unpriced.extend(outcome.unpriced)
+            excluded += outcome.excluded
             failed += 0 if outcome.complete else 1
             _record_scan(watch, included=len(outcome.products), excluded=outcome.excluded)
             watch.snapshot_json = _category_snapshot(outcome.breadcrumb) or watch.snapshot_json
@@ -1096,7 +1098,9 @@ class DragonStorePlugin(ScraperPlugin):
             context.http.cache_hits,
         )
         if not aborted and failed == 0:
-            return context.update_catalog(user_id, products)
+            delta = context.update_catalog(user_id, products)
+            delta.excluded = excluded  # the service cannot know: it is handed the survivors
+            return delta
 
         # Incomplete: we cannot tell "gone from the site" from "we could not read it", so the
         # delisting sweep must not run (CATSVC-R2). Anything else would wipe the user's catalog
@@ -1109,7 +1113,9 @@ class DragonStorePlugin(ScraperPlugin):
             ", aborted early" if aborted else "",
             len(products),
         )
-        return context.upsert_catalog(user_id, products)
+        delta = context.upsert_catalog(user_id, products)
+        delta.excluded = excluded
+        return delta
 
     # --- routes: watches CRUD (per-user) ---
     def router(self) -> APIRouter:

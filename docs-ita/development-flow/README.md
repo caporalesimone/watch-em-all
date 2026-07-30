@@ -34,7 +34,7 @@
   *Risultato: **la mail col digest arriva in casella — il prodotto fa il suo mestiere (0.1)**.*
 - [x] **Fase 8 — Grafici dello storico** 📈 → [phase-08-price-charts.md](phase-08-price-charts.md) — completata (`0.8.0`)
   *Risultato: grafici interattivi per prodotto e carrello.*
-- [ ] **Fase 9 — Dragon Store completo** → [phase-09-dragonstore-complete.md](phase-09-dragonstore-complete.md) — *in corso (`0.9.x`)*
+- [ ] **Fase 9 — Dragon Store completo** → [phase-09-dragonstore-complete.md](phase-09-dragonstore-complete.md) — *implementata (`0.9.0`), in attesa della validazione manuale*
   *Risultato: monitoraggio per categorie, catalogo gestibile.*
 - [ ] **Fase 9b — Statistics** → [phase-09b-statistics.md](phase-09b-statistics.md)
   *Risultato: le statistiche che la Fase 9 raccoglie nel database (per prodotto e per scraper) trovano una rappresentazione. La Fase 9 non ne mostra nessuna: si decide qui, guardando numeri veri già accumulati invece di immaginarseli su una tabella vuota.*

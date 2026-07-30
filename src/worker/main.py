@@ -180,6 +180,11 @@ def _run_scraper(
                 ulog.products_new = delta.new
                 ulog.price_changes = delta.price_changes
                 run.products_removed += delta.removed
+                # What the scraper filtered out before delivering (9.B5): the column has been
+                # on scrape_run since 4.B6 and nothing wrote it, so a run over a category of 39
+                # reported 38 found and left the missing one unaccounted for. Only the plugin
+                # knows — the catalog service is handed the survivors.
+                run.products_excluded += delta.excluded
                 ulog.status = "ok"
                 outcomes.append("ok")
             except Exception as exc:

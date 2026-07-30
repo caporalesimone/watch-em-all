@@ -156,12 +156,20 @@ class Adjustment(BaseModel):
 class DeltaCounters(BaseModel):
     """What ``update_catalog`` returns for one delivery (CATSVC-R6).
 
-    Fed into the run record by the runner in later phases. ``found`` is the size
-    of the delivered list; ``new``/``price_changes``/``removed`` are the deltas
-    the service computed against the persisted catalog.
+    Fed into the run record by the runner. ``found`` is the size of the delivered
+    list; ``new``/``price_changes``/``removed`` are the deltas the service computed
+    against the persisted catalog.
+
+    ``excluded`` is the exception: the service never sets it, because an exclusion
+    happens **before** the delivery — it is what the scraper decided not to hand over
+    (Dragon Store's dented listings, 9.B5). A plugin that filters fills it on the way
+    out, and that is the only channel the run record has: without it `scrape_run`
+    reports "38 products found" for a page of 39 and nothing says where the other one
+    went (9.B6c/DoD).
     """
 
     found: int = 0
     new: int = 0
     price_changes: int = 0
     removed: int = 0
+    excluded: int = 0
