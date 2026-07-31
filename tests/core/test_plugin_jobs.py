@@ -27,7 +27,7 @@ JOB = "7"
 def _db(tmp_path: object) -> Iterator[None]:
     from src.core.db import create_schema, init_engine
 
-    init_engine(f"sqlite+pysqlite:///{tmp_path}/jobs.db")  # type: ignore[str-bytes-safe]
+    init_engine(f"sqlite+pysqlite:///{tmp_path}/jobs.db")
     create_schema()
     yield
 

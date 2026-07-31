@@ -747,7 +747,7 @@ def test_a_cancelled_job_records_no_scan(client: TestClient) -> None:
         assert created.status_code == 201
         cls = type(lp.plugin)
         original = cls._scrape_category
-        cls._scrape_category = cancelled_mid_walk  # type: ignore[assignment,method-assign]
+        cls._scrape_category = cancelled_mid_walk
         try:
             ctx = build_context(lp.manifest, lp.plugin)
             try:
@@ -755,7 +755,7 @@ def test_a_cancelled_job_records_no_scan(client: TestClient) -> None:
             finally:
                 ctx.db.close()
         finally:
-            cls._scrape_category = original  # type: ignore[method-assign]
+            cls._scrape_category = original
 
     row = client.get(f"{DS}/watches", headers=h).json()[0]
     assert row["status"] == "cancelled"
