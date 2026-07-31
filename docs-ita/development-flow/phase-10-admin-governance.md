@@ -12,6 +12,12 @@ L'admin apre il monitoraggio e capisce in un colpo d'occhio quanto lavorano gli 
 
 ## MVP
 
+### Catalogo (rifinitura, chiesta il 2026-07-31)
+
+> Non è governo admin: è una rifinitura di una pagina **utente** che Simone ha chiesto di fare all'inizio di questa fase. Sta qui per scelta di sequenza, non perché appartenga al tema.
+
+- [ ] **10.F0 — La colonna Source mostra l'icona, non il nome** (~30m): nella tabella del catalogo la provenienza occupa oggi una colonna di testo — icona **più** nome dello scraper ripetuti su ogni riga, per un'informazione che in un'installazione con un solo negozio è costante e in una con tre si riconosce a colpo d'occhio dal logo. Resta la **sola icona**, ingrandita fino alla dimensione del riquadro dell'anteprima prodotto (le due celle si allineano, e un logo a 16px non è riconoscibile), col nome dello scraper nel **tooltip** al passaggio del mouse. `SourceTag` è condiviso (catalogo, dettaglio carrello, pagine degli scraper): la variante "sola icona" va aggiunta come opzione del componente, non copiata, o le tre pagine divergeranno alla prima modifica. Il `title` non basta da solo per chi naviga da tastiera o con screen reader — serve comunque l'`alt`/`aria-label` col nome. *Verifica: la colonna mostra solo il logo alla stessa altezza dell'anteprima, l'hover ne dice il nome, e le altre pagine che usano `SourceTag` non cambiano aspetto.*
+
 ### Backend
 
 - [ ] **10.B1 — Utenti: create/reset/disable** (~1h): API con invalidazione token (`token_version`), login a credenziali corrette su disabilitato → codice `account_disabled` (AUTH-R10) ([user-management](../3-features/admin/user-management.md)). *Verifica: utente disabilitato → fuori entro la scadenza dell'access token.*
