@@ -143,8 +143,21 @@
 		return $mountedPlugins.find((m) => m.name === pluginId)?.display_name ?? pluginId;
 	}
 
+	// The names in the remedy below are shown in bold, which means the sentence is rendered as
+	// HTML — and those names come from a scraped page. The message templates are ours and carry
+	// the only markup; every interpolated value goes through here first, so a category called
+	// `<img onerror=…>` arrives as text. Without this the bolding would be an injection point.
+	function escapeHtml(value: string): string {
+		return value
+			.replaceAll('&', '&amp;')
+			.replaceAll('<', '&lt;')
+			.replaceAll('>', '&gt;')
+			.replaceAll('"', '&quot;')
+			.replaceAll("'", '&#39;');
+	}
+
 	// What has to be removed for a deletion to stick, as a sentence — or null when nothing
-	// delivers this product any more and the deletion is simply final.
+	// delivers this product any more and the deletion is simply final. HTML, for the bold names.
 	//
 	// Four cases, and each is its own string rather than one with a guess in it. The **kind**
 	// matters because "remove the category X" is false for a product watched on its own, and the
@@ -156,18 +169,18 @@
 		if (pending === null || pending.kind !== 'one') return null;
 		const sources = pending.item.sources;
 		if (sources.length === 0) return null;
-		const scraper = scraperName(pending.item.plugin_id);
+		const scraper = escapeHtml(scraperName(pending.item.plugin_id));
 		if (sources.length > 1) {
-			return $_('catalog.confirmComesBackFromMany', {
-				values: { inputs: sources.map((s) => s.label).join(', '), scraper }
-			});
+			// Each input bolded on its own, not the whole list as one run: the commas are ours.
+			const inputs = sources.map((s) => `<strong>${escapeHtml(s.label)}</strong>`).join(', ');
+			return $_('catalog.confirmComesBackFromMany', { values: { inputs, scraper } });
 		}
 		const [only] = sources;
 		const key =
 			only.kind === 'category'
 				? 'catalog.confirmComesBackFromCategory'
 				: 'catalog.confirmComesBackFromProduct';
-		return $_(key, { values: { input: only.label, scraper } });
+		return $_(key, { values: { input: escapeHtml(only.label), scraper } });
 	});
 
 	async function loadDelistedTotal(): Promise<void> {
@@ -559,19 +572,32 @@
 								<span>{$_('catalog.confirmOneInCarts')}</span>
 							</p>
 						{/if}
-						<p class="grid grid-cols-[1.1rem_1fr] gap-2">
-							<span aria-hidden="true">{sourceRemedy ? '⚠️' : 'ℹ️'}</span>
-							<span>
-								{#if sourceRemedy}
-									<!-- The consequence, then the remedy under it: two things to do
-									     with one warning, and a reader stops at the first. -->
-									<span class="mb-0.5 block">{$_('catalog.confirmComesBackLead')}</span>
-									{sourceRemedy}
-								{:else}
-									{$_('catalog.confirmNothingBringsItBack')}
-								{/if}
-							</span>
-						</p>
+						{#if sourceRemedy}
+							<!--
+								The consequence and the remedy each carry their own ⚠️: they are two
+								things to do about this deletion, and a reader scanning the marks
+								would skip a remedy tucked under the line above it.
+							-->
+							<p class="grid grid-cols-[1.1rem_1fr] gap-2">
+								<span aria-hidden="true">⚠️</span>
+								<span>{$_('catalog.confirmComesBackLead')}</span>
+							</p>
+							<p class="grid grid-cols-[1.1rem_1fr] gap-2">
+								<span aria-hidden="true">⚠️</span>
+								<!--
+									HTML because the input's and the scraper's names are bold. Safe
+									because the template is ours and both values are escaped where
+									the sentence is built (`escapeHtml`) — they come off a scraped
+									page.
+								-->
+								<span>{@html sourceRemedy}</span>
+							</p>
+						{:else}
+							<p class="grid grid-cols-[1.1rem_1fr] gap-2">
+								<span aria-hidden="true">ℹ️</span>
+								<span>{$_('catalog.confirmNothingBringsItBack')}</span>
+							</p>
+						{/if}
 						<!-- ℹ️, not ⚠️: a caution mark on "your data is safe" teaches the eye to
 						     stop reading the marks. Same colour as the rest — it is a fact of
 						     equal standing, just not a warning. -->
