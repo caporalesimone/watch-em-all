@@ -34,11 +34,11 @@
   *Risultato: **la mail col digest arriva in casella — il prodotto fa il suo mestiere (0.1)**.*
 - [x] **Fase 8 — Grafici dello storico** 📈 → [phase-08-price-charts.md](phase-08-price-charts.md) — completata (`0.8.0`)
   *Risultato: grafici interattivi per prodotto e carrello.*
-- [ ] **Fase 9 — Dragon Store completo** → [phase-09-dragonstore-complete.md](phase-09-dragonstore-complete.md) — *implementata (`0.9.0`), in attesa della validazione manuale*
+- [x] **Fase 9 — Dragon Store completo** → [phase-09-dragonstore-complete.md](phase-09-dragonstore-complete.md) — completata (`0.9.0`)
   *Risultato: monitoraggio per categorie, catalogo gestibile.*
 - [ ] **Fase 9b — Statistics** → [phase-09b-statistics.md](phase-09b-statistics.md)
   *Risultato: le statistiche che la Fase 9 raccoglie nel database (per prodotto e per scraper) trovano una rappresentazione. La Fase 9 non ne mostra nessuna: si decide qui, guardando numeri veri già accumulati invece di immaginarseli su una tabella vuota.*
-- [ ] **Fase 10 — Governo admin** → [phase-10-admin-governance.md](phase-10-admin-governance.md)
+- [ ] 🚧 **Fase 10 — Governo admin** (in corso, `0.10.x`) → [phase-10-admin-governance.md](phase-10-admin-governance.md)
   *Risultato: plancia admin completa — statistiche, limiti, utenti, manutenzione. (Creazione/elenco utenti **anticipati** come MVP prima della Fase 3; qui restano reset password, disabilita/riabilita, cancellazione differita + restore, filtri di stato, ultimo accesso, notifiche di cortesia, dashboard del carico.)*
 - [ ] **Fase 11 — Summary, analisi prezzi, export** → [phase-11-insights.md](phase-11-insights.md)
   *Risultato: report periodico, badge minimo storico e convenienza, export dei dati.*

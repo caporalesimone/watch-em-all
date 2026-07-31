@@ -1,6 +1,6 @@
 # Fase 10 — Governo admin
 
-> Stato: ☐ da iniziare · Prerequisiti: Fase 4 (Fase 9 consigliata: più dati da osservare) · [Indice del flusso](README.md)
+> Stato: 🚧 in corso (avviata 2026-08-01) · Prerequisiti: Fase 4 (Fase 9 consigliata: più dati da osservare) · [Indice del flusso](README.md)
 
 ## Obiettivo
 

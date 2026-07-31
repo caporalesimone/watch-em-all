@@ -6,6 +6,10 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 Each entry is **short** and reads as a user-facing story: first a **bullet list of what changed for you** (additions, removals and changes together, light on jargon), then a brief **_under the hood_** paragraph on the architectural/technical changes. Older entries predate this style and are left as they are.
 
+## [0.10.0] - Unreleased
+
+**Phase 10 — Admin governance: the administrator's console filled in — run statistics and drill-down, system limits editable while it runs, full user management (with deferred deletion and restore), messages to users, retention and purge. It opens with a catalog polish: the Source column shows the store's logo alone. Entries land below as they ship.**
+
 ## [0.9.0] - 2026-07-31
 
 **Phase 9 — Dragon Store, complete: paste a category URL and dozens of products flow into your catalog on every run (with de-duplication and the site's own exclusions); delisted products grey out on their own and clear with a click. A product's price history now belongs to the product, so it outlives your catalog and you inherit it when you start watching.**
