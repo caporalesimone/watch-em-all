@@ -122,6 +122,22 @@ class CatalogItem(BaseModel):
     # deleting it is final; non-empty is what lets the confirmation name what will bring it back
     # instead of hedging. Plural because two categories can deliver the same product.
     sources: list[CatalogItemSource] = Field(default_factory=list)
+    # How many of the user's carts hold it. Deleting a product removes it from all of them
+    # (CART-R8) and the cascade is silent, so the confirmation has to be able to count it.
+    in_carts: int = 0
+
+
+class DelistedSummary(BaseModel):
+    """What "remove the delisted products" is about to do, before it does it (C7).
+
+    ``total`` is every delisted row, not the ones visible on the current page — the button
+    removes them all, so a count taken from twenty visible rows would understate the click.
+    ``in_carts`` is how many of those are in at least one cart, which is the part the user
+    cannot see from the catalog table at all.
+    """
+
+    total: int
+    in_carts: int
 
 
 class CatalogPage(BaseModel):

@@ -68,6 +68,7 @@ Plugin-specific routes are registered by each plugin under `/api{route_base}` (e
 |---|---|---|---|---|
 | GET | `/api/catalog` | 👤 | `?page=&page_size=&sort=&order=&q=&available=&removed=` | the current user's catalog as the Product Picker table: paginated server-side, returns `{items, total, page, page_size}`. `sort` ∈ {`name`, `plugin_id`, `price_current`, `price_original`, `is_available`, `last_seen_at`} (default `last_seen_at`); `order` `asc`\|`desc`; `q` = case-insensitive name search; `available`/`removed` = optional boolean filters. Each item carries `sources: [{kind, label}]` — which of the user's inputs still deliver it (C14, PROD-R9), so the deletion confirmation can name what will bring it back; empty means nothing will |
 
+| GET | `/api/catalog/delisted` | 👤 | — | `{total, in_carts}` — what "remove the delisted" is about to do (C7): every delisted row of the user's catalog, and how many of them are in at least one cart. Counted server-side over the whole catalog, never the visible page |
 | DELETE | `/api/catalog/delisted` | 👤 | — | remove every delisted product of the current user → `{removed}`. The routine tidy-up |
 | DELETE | `/api/catalog/{product_id}` | 👤 | — | remove one product → `{removed: 1}`. Someone else's product answers **404**, never 403: a 403 would confirm the row exists |
 | DELETE | `/api/catalog` | 👤 | — | empty the catalog → `{removed}`. The **watches survive**, so the next run refills what is still watched — which is why the confirmation has to say so (CAT-R6) |

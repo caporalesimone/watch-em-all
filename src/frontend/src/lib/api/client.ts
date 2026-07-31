@@ -295,6 +295,9 @@ export interface CatalogItem {
 	// Which of the user's inputs still deliver this product (C14). Empty = nothing does, so a
 	// deletion is final; otherwise these are what will bring it back on the next scan.
 	sources: CatalogItemSource[];
+	// How many of the user's carts hold it: deleting it takes it out of all of them, silently
+	// (CART-R8), so a confirmation has to be able to count it (C7).
+	in_carts: number;
 }
 
 export interface CatalogItemSource {
@@ -349,6 +352,17 @@ export interface RemovedCount {
 
 export function removeDelistedProducts(): Promise<RemovedCount> {
 	return apiFetch('/api/catalog/delisted', { method: 'DELETE' }).then(asJson<RemovedCount>);
+}
+
+// What that removal is about to do, before it does it (C7): every delisted row, and how many of
+// them are in a cart. Counted server-side over the whole catalog, not the visible page.
+export interface DelistedSummary {
+	total: number;
+	in_carts: number;
+}
+
+export function getDelistedSummary(): Promise<DelistedSummary> {
+	return apiFetch('/api/catalog/delisted').then(asJson<DelistedSummary>);
 }
 
 export function removeCatalogProduct(productId: number): Promise<RemovedCount> {

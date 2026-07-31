@@ -119,6 +119,43 @@ def test_removing_delisted_products_leaves_the_live_ones(client: TestClient) -> 
     assert page["items"][0]["external_id"] == "a"
 
 
+def test_the_delisted_summary_counts_the_whole_catalog_and_the_carts(client: TestClient) -> None:
+    """C7: the confirmation has to say what the click is about to do, and the cart figure is the
+    part the table cannot show — the membership cascade is silent."""
+    uid, token = _account(client, "alice")
+    h = _bearer(token)
+    _seed(uid, "a", "b", "c")
+    # In the cart first and delisted afterwards, which is the only order this happens in: a
+    # delisted row is not selectable, so nobody puts one in a cart on purpose. That is exactly
+    # what makes the silent cascade worth announcing — the user chose it while it was on sale.
+    by_ext = {i["external_id"]: i for i in client.get("/api/catalog", headers=h).json()["items"]}
+    cart = client.post("/api/carts", json={"name": "C", "mode": "cross"}, headers=h).json()
+    client.post(
+        f"/api/carts/{cart['id']}/items",
+        json={"product_ids": [by_ext["b"]["id"]]},
+        headers=h,
+    )
+    _delist(uid, "a")  # b and c become delisted
+
+    summary = client.get("/api/catalog/delisted", headers=h).json()
+
+    assert summary == {"total": 2, "in_carts": 1}
+    # And the per-product figure the single-product confirmation reads.
+    again = {i["external_id"]: i for i in client.get("/api/catalog", headers=h).json()["items"]}
+    assert again["b"]["in_carts"] == 1
+    assert again["c"]["in_carts"] == 0
+
+
+def test_the_delisted_summary_is_zero_when_nothing_is_delisted(client: TestClient) -> None:
+    uid, token = _account(client, "alice")
+    _seed(uid, "a")
+
+    assert client.get("/api/catalog/delisted", headers=_bearer(token)).json() == {
+        "total": 0,
+        "in_carts": 0,
+    }
+
+
 def test_removing_delisted_when_there_are_none_says_zero(client: TestClient) -> None:
     """A count, not a bare 204: the page has to be able to say "there was nothing to tidy"."""
     uid, token = _account(client, "alice")

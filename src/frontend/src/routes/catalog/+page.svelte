@@ -6,6 +6,7 @@
 		addCartItems,
 		ApiErr,
 		emptyCatalog,
+		getDelistedSummary,
 		listCarts,
 		listCatalog,
 		removeCatalogProduct,
@@ -129,13 +130,19 @@
 
 	// The whole catalog's delisted count, not this page's: the button offers to remove all of
 	// them, so a number counted from twenty visible rows would understate what the click does.
+	// Counted by the backend, together with how many of them sit in a cart — that second number
+	// cannot be worked out from the table, and it is the one the cascade takes away silently.
 	let delistedTotal = $state(0);
+	let delistedInCarts = $state(0);
 
 	async function loadDelistedTotal(): Promise<void> {
 		try {
-			delistedTotal = (await listCatalog({ page: 1, page_size: 1, removed: true })).total;
+			const summary = await getDelistedSummary();
+			delistedTotal = summary.total;
+			delistedInCarts = summary.in_carts;
 		} catch {
 			delistedTotal = 0; // the button simply offers nothing
+			delistedInCarts = 0;
 		}
 	}
 
@@ -477,6 +484,21 @@
 						: $_('catalog.confirmOneBody')}
 			</p>
 			<p class="text-sm text-slate-500">{$_('catalog.confirmCascade')}</p>
+			<!--
+				How many carts are about to lose something (C7). The membership cascade is
+				silent, and this is the one number the catalog table cannot show: a delisted
+				product a user had put in a cart vanishes from it without a word otherwise.
+				Said only when it is true, so the dialog does not grow a line saying "0".
+			-->
+			{#if pending.kind === 'delisted' && delistedInCarts > 0}
+				<p class="text-sm text-amber-600 dark:text-amber-400">
+					{$_('catalog.confirmDelistedInCarts', { values: { count: delistedInCarts } })}
+				</p>
+			{:else if pending.kind === 'one' && pending.item.in_carts > 0}
+				<p class="text-sm text-amber-600 dark:text-amber-400">
+					{$_('catalog.confirmOneInCarts', { values: { count: pending.item.in_carts } })}
+				</p>
+			{/if}
 			{#if pending.kind === 'all'}
 				<p class="text-sm text-slate-500">{$_('catalog.confirmWatchesSurvive')}</p>
 			{:else if pending.kind === 'one'}

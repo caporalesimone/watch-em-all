@@ -26,9 +26,15 @@ from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from src.core.contracts import BrandRef, CategoryRef
 from src.core.errors import APIError
-from src.core.models import CatalogProduct, ProductSource
+from src.core.models import CartMember, CatalogProduct, ProductSource
 from src.web.deps import SessionDep, UserDep
-from src.web.schemas import CatalogItem, CatalogItemSource, CatalogPage, RemovedCount
+from src.web.schemas import (
+    CatalogItem,
+    CatalogItemSource,
+    CatalogPage,
+    DelistedSummary,
+    RemovedCount,
+)
 
 router = APIRouter(prefix="/catalog", tags=["Catalog"])
 
@@ -60,7 +66,21 @@ def _sources_for(db: Session, product_ids: list[int]) -> dict[int, list[CatalogI
     return out
 
 
-def _to_item(row: CatalogProduct, sources: list[CatalogItemSource]) -> CatalogItem:
+def _carts_holding(db: Session, product_ids: list[int]) -> dict[int, int]:
+    """How many carts hold each of these products — one query for the page (C7)."""
+    if not product_ids:
+        return {}
+    rows = db.execute(
+        select(CartMember.product_id, func.count())
+        .where(CartMember.product_id.in_(product_ids))
+        .group_by(CartMember.product_id)
+    ).all()
+    return {int(pid): int(count) for pid, count in rows}
+
+
+def _to_item(
+    row: CatalogProduct, sources: list[CatalogItemSource], in_carts: int = 0
+) -> CatalogItem:
     return CatalogItem(
         id=row.id,
         plugin_id=row.plugin_id,
@@ -81,6 +101,7 @@ def _to_item(row: CatalogProduct, sources: list[CatalogItemSource]) -> CatalogIt
         first_seen_at=row.first_seen_at,
         last_seen_at=row.last_seen_at,
         sources=sources,
+        in_carts=in_carts,
     )
 
 
@@ -123,13 +144,45 @@ def list_catalog(
         .limit(page_size)
     ).all()
 
-    sources = _sources_for(db, [r.id for r in rows])
+    ids = [r.id for r in rows]
+    sources = _sources_for(db, ids)
+    in_carts = _carts_holding(db, ids)
     return CatalogPage(
-        items=[_to_item(r, sources.get(r.id, [])) for r in rows],
+        items=[_to_item(r, sources.get(r.id, []), in_carts.get(r.id, 0)) for r in rows],
         total=total,
         page=page,
         page_size=page_size,
     )
+
+
+@router.get(
+    "/delisted",
+    response_model=DelistedSummary,
+    summary="How many delisted products there are, and how many of them are in a cart.",
+)
+def delisted_summary(user: UserDep, db: SessionDep) -> DelistedSummary:
+    """What the "remove the delisted" confirmation needs to be honest (C7).
+
+    Counted over **every** delisted row rather than the visible page, because that is what the
+    button removes. The cart figure is the one the user cannot work out from the table: the
+    membership cascade is silent, so a delisted product they had put in a cart disappears from
+    it without a word unless the confirmation says so first.
+    """
+    delisted = [
+        CatalogProduct.user_id == user.sub,
+        CatalogProduct.removed.is_(True),
+    ]
+    total = db.scalar(select(func.count()).select_from(CatalogProduct).where(*delisted)) or 0
+    in_carts = (
+        db.scalar(
+            select(func.count(func.distinct(CartMember.product_id)))
+            .select_from(CartMember)
+            .join(CatalogProduct, CatalogProduct.id == CartMember.product_id)
+            .where(*delisted)
+        )
+        or 0
+    )
+    return DelistedSummary(total=total, in_carts=in_carts)
 
 
 # --- cleanups (9.B7) -------------------------------------------------------------------
