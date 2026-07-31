@@ -16,15 +16,17 @@ from __future__ import annotations
 
 import hashlib
 from abc import ABC, abstractmethod
+from datetime import UTC, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, final
 from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter
 
-from src.core.contracts import CategoryRef
+from src.core.contracts import BrandRef, CategoryRef, Product, ProductSourceRef
 
 if TYPE_CHECKING:
-    from decimal import Decimal
+    from collections.abc import Iterable, Mapping
 
     from sqlalchemy import MetaData
 
@@ -32,6 +34,14 @@ if TYPE_CHECKING:
     from src.core.contracts import Adjustment, ConfigField, DeltaCounters
     from src.core.models import CatalogProduct
     from src.core.plugins.context import PluginContext
+
+# schema.org availability vocabulary (SCR-R18). A web standard, not one site's invention, so
+# reading it belongs here rather than in each scraper. `PreOrder` counts as orderable: it is
+# something the user can buy today.
+AVAILABLE_AVAILABILITY = frozenset({"InStock", "PreOrder"})
+KNOWN_AVAILABILITY = frozenset({"InStock", "OutOfStock", "PreOrder"})
+# Ours, not any site's: English like the other tag the system invents (product.md PROD-R5).
+PREORDER_TAG = "Pre Order"
 
 
 class Tags:
@@ -152,6 +162,86 @@ class ScraperPlugin(BasePlugin, ABC):
         """A fresh per-product category breadcrumb builder (SCR-R17). Use one per
         product; ``add_child(name, url)`` root → leaf, then ``get_path()``."""
         return CategoryPath()
+
+    @final
+    def build_product(
+        self,
+        context: PluginContext,
+        *,
+        raw: Any,
+        url: str,
+        name: str,
+        price_current: Decimal,
+        price_original: Decimal | None = None,
+        availability: str | None = None,
+        brand_text: str | None = None,
+        brand_link: str | None = None,
+        image_url: str | None = None,
+        currency: str = "EUR",
+        breadcrumb: Iterable[tuple[str, str | None]] = (),
+        tags: Tags | None = None,
+        extra: Mapping[str, Any] | None = None,
+        fetched_at: datetime | None = None,
+        sources: Iterable[ProductSourceRef] = (),
+    ) -> Product:
+        """Assemble one ``Product`` from what the **site** said (SCR-R18).
+
+        The plugin supplies site facts; this enforces the parts of the contract that are the
+        same everywhere and are exactly what a hand-written assembly gets wrong. Before it
+        existed the same forty lines lived in three places across two scrapers — the second
+        Dragon Store copy is the crack C3 slipped through, and the ``tp_scraper`` copy carries
+        ``scraped_at=now()``, the one line PROD-R8 forbids.
+
+        What is imposed here, and why each one is not left to a caller:
+
+        - ``external_id`` always through :meth:`external_id_for` (SCR-R10) — the identity is
+          the history's anchor, and a hand-filled one breaks it silently.
+        - ``discount_pct`` is always ``None``: the core derives it from original/current
+          (CATSVC-R3). A plugin that computes its own answers a different question.
+        - ``scraped_at`` is ``fetched_at`` when the caller has it and the clock only otherwise
+          (PROD-R8) — a cached page is old data, and a scraper that stamps "now" makes it look
+          fresh.
+        - ``extra`` drops ``None`` values and **only** ``None`` values: the two Dragon Store
+          copies had drifted to different predicates, so an empty description survived from a
+          detail page and was thrown away from a listing card, which nobody decided.
+        - ``availability`` is read as schema.org (``InStock`` / ``OutOfStock`` / ``PreOrder``,
+          :data:`PREORDER_TAG` added for the last): a web vocabulary, not one site's.
+
+        What stays the plugin's: the URL grammar, the pagination, how to read a price the site
+        does not print, and which labels its sanitiser strips. ``tags`` is passed in already
+        accumulated because those labels are site knowledge — pass the same ``Tags`` the
+        price resolution added to, so a "Free" tag is not lost here.
+        """
+        product_tags = tags if tags is not None else self.new_tags()
+        if availability is not None and availability not in KNOWN_AVAILABILITY:
+            context.logger.warning(
+                "%s: unknown availability %r for %s", self.plugin_id, availability, url
+            )
+        if availability == "PreOrder":
+            product_tags.add_tag(PREORDER_TAG)
+
+        category = self.new_category()
+        for crumb_name, crumb_url in breadcrumb:
+            category.add_child(crumb_name, crumb_url)
+
+        return Product(
+            plugin_id=self.plugin_id,
+            external_id=self.external_id_for(raw=raw, url=url),
+            url=url,
+            name=name,
+            image_url=image_url,
+            brand=BrandRef(text=brand_text, link=brand_link) if brand_text else None,
+            tags=product_tags.get_tags(),
+            category=category.get_path(),
+            price_current=price_current,
+            price_original=price_original,
+            discount_pct=None,
+            currency=currency,
+            is_available=availability in AVAILABLE_AVAILABILITY,
+            scraped_at=fetched_at or datetime.now(UTC),
+            extra={k: v for k, v in (extra or {}).items() if v is not None},
+            sources=list(sources),
+        )
 
     def run_for_user(self, context: PluginContext, user_id: int) -> DeltaCounters:
         """Scrape this user's inputs and deliver the current products through

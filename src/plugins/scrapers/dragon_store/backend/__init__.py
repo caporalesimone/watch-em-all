@@ -92,10 +92,9 @@ if TYPE_CHECKING:
 PLUGIN_ID = "dragon_store"
 # Native product id in a Dragon Store product URL, e.g. ".../...gp.35880.uw".
 _GP_ID_RE = re.compile(r"\.gp\.(\d+)\.uw")
-# schema.org availability tokens treated as "orderable now" (PreOrder is buyable).
-_AVAILABLE_STATES = frozenset({"InStock", "PreOrder"})
-_KNOWN_STATES = frozenset({"InStock", "OutOfStock", "PreOrder"})
-_PREORDER_TAG = "Pre Order"
+# The schema.org availability vocabulary moved to the scraper base (SCR-R18): those tokens are
+# a web standard rather than this site's, and reading them per scraper was three copies of one
+# rule. What stays here is what Dragon Store actually invented.
 # The canonical label the sanitiser produces for a damaged listing; the category filter reads
 # THIS, never a second search of the title (9.B5).
 _DENTED_TAG = "Ammaccato"
@@ -740,62 +739,49 @@ class DragonStorePlugin(ScraperPlugin):
         parsed: ParsedProduct,
         fetched_at: datetime | None = None,
     ) -> Product:
-        clean_name, labels = sanitize_title(parsed.name, load_title_labels())
-        tags = self.new_tags()
-        for label in labels:
-            tags.add_tag(label)
-
-        if parsed.availability and parsed.availability not in _KNOWN_STATES:
-            context.logger.warning(
-                "dragon_store: unknown availability %r for %s", parsed.availability, url
-            )
-        is_available = parsed.availability in _AVAILABLE_STATES
-        if parsed.availability == "PreOrder":
-            tags.add_tag(_PREORDER_TAG)
-
-        category = self.new_category()
-        for crumb_name, crumb_url in parsed.breadcrumb:
-            category.add_child(crumb_name, crumb_url)
-
-        price = self._resolve_price(
+        """A product **detail page** as a ``Product``: site knowledge only, the contract is the
+        base's (SCR-R18). What is Dragon Store's here is the sanitiser's labels, the price the
+        site does not always print, and the four keys worth keeping in ``extra``."""
+        tags = self._tags_from_title(parsed.name)
+        return self.build_product(
             context,
+            raw=url,
             url=url,
-            price_current=parsed.price_current,
+            name=sanitize_title(parsed.name, load_title_labels())[0] or parsed.name,
+            price_current=self._resolve_price(
+                context,
+                url=url,
+                price_current=parsed.price_current,
+                price_original=parsed.price_original,
+                tags=tags,
+            ),
             price_original=parsed.price_original,
+            availability=parsed.availability,
+            brand_text=parsed.brand_text,
+            brand_link=parsed.brand_link,
+            image_url=parsed.image_url,
+            currency=parsed.currency,
+            breadcrumb=parsed.breadcrumb,
             tags=tags,
-        )
-        brand = (
-            BrandRef(text=parsed.brand_text, link=parsed.brand_link) if parsed.brand_text else None
-        )
-        extra = {
-            key: value
-            for key, value in {
+            extra={
                 "sku": parsed.sku,
                 "price_valid_until": parsed.price_valid_until,
                 "category": parsed.category,
                 "description": parsed.description,
-            }.items()
-            if value is not None
-        }
-        return Product(
-            plugin_id=PLUGIN_ID,
-            external_id=self.external_id_for(raw=url, url=url),
-            url=url,
-            name=clean_name or parsed.name,  # fall back if the title was all label
-            image_url=parsed.image_url,
-            brand=brand,
-            tags=tags.get_tags(),
-            category=category.get_path(),
-            price_current=price,
-            price_original=parsed.price_original,
-            discount_pct=None,  # the core derives it from original/current (CATSVC)
-            currency=parsed.currency,
-            is_available=is_available,
-            # When the *site* answered: the cache's own timestamp on a hit, the clock on a
-            # real fetch. Stamping "now" either way would date a 12-hour-old page to today.
-            scraped_at=fetched_at or datetime.now(UTC),
-            extra=extra,
+            },
+            fetched_at=fetched_at,
         )
+
+    def _tags_from_title(self, name: str) -> Tags:
+        """The labels the site prints in a title, as tags (DRG-R4/9.B5).
+
+        The one piece both conversions genuinely share and that is genuinely ours: which words
+        are labels is Dragon Store's knowledge, and the sanitiser is the only reader of it.
+        """
+        tags = self.new_tags()
+        for label in sanitize_title(name, load_title_labels())[1]:
+            tags.add_tag(label)
+        return tags
 
     # --- categories (9.B2/9.B3/9.B5/9.B2b) ---
     def _resolve_price(
@@ -836,46 +822,38 @@ class DragonStorePlugin(ScraperPlugin):
     ) -> Product:
         """A listing card as a ``Product``. The breadcrumb comes from the category page: a card
         does not carry one, and the page's own is the same one the product's detail page
-        publishes (verified on 36099)."""
-        clean_name, labels = sanitize_title(card.name, load_title_labels())
-        tags = self.new_tags()
-        for label in labels:
-            tags.add_tag(label)
-        if card.availability and card.availability not in _KNOWN_STATES:
-            context.logger.warning(
-                "dragon_store: unknown availability %r for %s", card.availability, card.url
-            )
-        if card.availability == "PreOrder":
-            tags.add_tag(_PREORDER_TAG)
+        publishes (verified on 36099).
 
-        category = self.new_category()
-        for crumb_name, crumb_url in breadcrumb:
-            category.add_child(crumb_name, crumb_url)
-
-        price = self._resolve_price(
+        The two conversions differ in exactly what a card and a detail page differ in — where
+        the breadcrumb comes from, and that a card carries two of the four ``extra`` keys. Every
+        other line was the same, which is how they drifted: the discarded ``fetched_at`` of C3,
+        and an ``extra`` filter that had become truthiness here and ``is not None`` there, so an
+        empty description survived one path and was dropped by the other. The shared part now
+        lives once, in the base (SCR-R18), and cannot drift again.
+        """
+        tags = self._tags_from_title(card.name)
+        return self.build_product(
             context,
+            raw=card.url,
             url=card.url,
-            price_current=card.price_current,
+            name=sanitize_title(card.name, load_title_labels())[0] or card.name,
+            price_current=self._resolve_price(
+                context,
+                url=card.url,
+                price_current=card.price_current,
+                price_original=card.price_original,
+                tags=tags,
+            ),
             price_original=card.price_original,
-            tags=tags,
-        )
-        extra = {k: v for k, v in {"sku": card.code, "description": card.description}.items() if v}
-        return Product(
-            plugin_id=PLUGIN_ID,
-            external_id=self.external_id_for(raw=card.url, url=card.url),
-            url=card.url,
-            name=clean_name or card.name,
+            availability=card.availability,
+            brand_text=card.brand_text,
+            brand_link=card.brand_link,
             image_url=card.image_url,
-            brand=BrandRef(text=card.brand_text, link=card.brand_link) if card.brand_text else None,
-            tags=tags.get_tags(),
-            category=category.get_path(),
-            price_current=price,
-            price_original=card.price_original,
-            discount_pct=None,  # the core derives it (CATSVC)
             currency=card.currency,
-            is_available=card.availability in _AVAILABLE_STATES,
-            scraped_at=fetched_at or datetime.now(UTC),
-            extra=extra,
+            breadcrumb=breadcrumb,
+            tags=tags,
+            extra={"sku": card.code, "description": card.description},
+            fetched_at=fetched_at,
         )
 
     def _fetch_category_page(
