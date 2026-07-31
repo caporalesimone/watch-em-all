@@ -494,9 +494,17 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
             detail = "the site is rate-limiting us; the next run will fill this in"
             logger.error("dragon_store: could not resolve %s while adding it — %s", watch.url, exc)
         except _JobCancelled:
-            # Whatever was already read stays in the catalog, and so does the watch: without
-            # it those products become orphans the next complete run delists, so "what was
-            # taken stays" would quietly stop being true.
+            # **Nothing is delivered.** Cancelling means "I did not want this", so the products
+            # read so far are dropped with the exception rather than half-filling a catalog the
+            # user just said no to (C1). The comment here used to claim the opposite, along with
+            # the message on the page and the phase doc — the code was the honest one.
+            #
+            # No work is wasted by that: every page fetched is already in the scrape cache,
+            # committed at fetch time and independent of this transaction (CTX-R9), so a later
+            # run of the same category gets those pages free for the rest of the half-life.
+            #
+            # The watch survives, and the next scheduled run reads it — a cancelled *add* is
+            # not a removed input.
             watch.status = "cancelled"
             watch.status_detail = "cancelled while it was running"
             watch.finished_at = datetime.now(UTC)
@@ -1291,10 +1299,11 @@ class DragonStorePlugin(ScraperPlugin):
             interruptible, so it stops within a second rather than at the end of the page it
             was waiting for.
 
-            What was already read **stays in the catalog**, and for that to be true the watch
-            has to survive too: delete it and the products it brought in become orphans that
-            the next complete run delists — "what was taken" would disappear anyway, just
-            later and with nothing connecting the two events.
+            **Nothing read so far is delivered** (C1): cancelling an add means the user did not
+            want it, and half a category is not what they asked for either. The requests are not
+            wasted — the pages sit in the scrape cache (CTX-R9), so a later run of the same
+            category has them for free. The watch itself stays, and the next scheduled run reads
+            it: stopping an add is not removing an input.
             """
             watch = db.scalar(select(Watch).where(Watch.id == watch_id, Watch.user_id == user.sub))
             if watch is None:

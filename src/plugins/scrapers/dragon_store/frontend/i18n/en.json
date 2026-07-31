@@ -15,7 +15,7 @@
       "queued_next": "Waiting for its turn — next up.",
       "progress": "{done} of {total}",
       "cancel": "Cancel",
-      "cancelled": "Cancelled. What had already been read stays in your catalog.",
+      "cancelled": "Cancelled. Nothing was added to your catalog.",
       "failed": "Could not be read: {reason}",
       "add_in_progress": "One URL of yours is still being resolved. Wait for it to finish.",
       "invalid_url": "That is not a Dragon Store product or category URL.",
@@ -30,7 +30,7 @@
       "never_scanned": "Not read yet.",
       "outcome_title": "Added: {name}",
       "outcome_counts": "{included} products went into your catalog, {excluded} dented listings were left out.",
-      "outcome_cancelled": "Stopped early. The {included} products already read stay in your catalog.",
+      "outcome_cancelled": "Stopped before it finished, so nothing was added. The input is still in your list — the next scheduled run will read it.",
       "outcome_view": "See them in the catalog",
       "outcome_dismiss": "Dismiss"
     },
