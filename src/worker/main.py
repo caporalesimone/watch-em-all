@@ -32,6 +32,7 @@ from src.core.notify import drain_deliveries, enqueue_deliveries
 from src.core.plugins.base import NotifierPlugin, ScraperPlugin
 from src.core.plugins.context import PluginContext, build_context
 from src.core.plugins.registry import LoadedPlugin, load_plugins
+from src.core.process_status import report
 from src.core.schedule import due_slot, install_tz, set_last_slot
 from src.core.schema_drift import check_schema_drift
 from src.core.scrape import implements_scraping, stamp_cooldown
@@ -70,9 +71,32 @@ def _shutdown(signum: int, _frame: FrameType | None) -> None:
 
 
 def _heartbeat(now: datetime) -> None:
-    """Touch the heartbeat file with ``now`` (epoch seconds) — CRON-R7."""
+    """Say that this worker is alive, twice over — CRON-R7 and PST-R1.
+
+    The **file** is what the container's own healthcheck reads (``unhealthy`` past 180s), and it
+    can only be that: it lives in the worker's own tmpfs, so nothing outside this container can
+    see it. That is why `/api/health` reported `worker_heartbeat_age_s: null` from phase 1 until
+    now — not because the worker was silent, but because the one place it spoke was unreachable.
+
+    The **row** is the half the web can read. Rate-limited by `report` itself (PST-R2), so a tick
+    lowered to its 1s floor for debugging does not become a write per second.
+    """
     with open(HEARTBEAT_FILE, "w") as fh:
         fh.write(str(int(now.timestamp())))
+    session = new_session()
+    try:
+        report(
+            session,
+            "worker",
+            state="suspended" if _incompatible else "running",
+            detail=(
+                "the database schema does not match this version; scheduled work is suspended"
+                if _incompatible
+                else None
+            ),
+        )
+    finally:
+        session.close()
 
 
 def _boot() -> None:
@@ -108,6 +132,20 @@ def _boot() -> None:
             # process does not agree with would fail halfway through a run, on a database
             # somebody may still be able to salvage.
             _incompatible = True
+            # Forced past the rate limit: a change of state is news, not a repetition, and the
+            # admin's errors feed should not have to wait half a minute to learn it (PST-R2).
+            session = new_session()
+            try:
+                report(
+                    session,
+                    "worker",
+                    state="suspended",
+                    detail="the database schema does not match this version; "
+                    "scheduled work is suspended",
+                    force=True,
+                )
+            finally:
+                session.close()
             log.error(
                 "database incompatible with this version — scheduled work is suspended "
                 "(no scrapes, no deliveries); the heartbeat continues so the web can see "

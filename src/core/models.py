@@ -495,6 +495,38 @@ class ScraperAdminConfig(Base):
     )
 
 
+class ProcessStatus(Base):
+    """What one of this installation's processes is doing, and when it last said so (PST-R1).
+
+    Named for the question rather than for its first answer. The database is the only thing
+    the web and the worker share, so it is the only place either can report on itself to the
+    other; a table called ``worker_heartbeat`` would have had to be replaced the first time
+    something else needed reporting, and there is no reason to make that mistake on purpose.
+
+    One row per process, **updated in place** — a heartbeat is a state, not an event. Appended
+    it would be ~525.000 rows a year at the default tick to answer a question that only ever
+    reads the latest one, and those rows would then need a retention policy of their own.
+
+    Kept deliberately small: ``state`` and ``detail`` are here because the worker already has
+    something true to put in them (it suspends itself on an incompatible schema, INC-R4) and
+    the admin errors feed reads them. A column nothing writes and nobody reads is the mistake
+    C7 was about; the room for growth is in the **name and the key**, not in empty columns.
+    """
+
+    __tablename__ = "process_status"
+
+    # "worker", "web" — whoever reports. Not an enum: a second worker is a name, not a schema
+    # change.
+    process: Mapped[str] = mapped_column(String(32), primary_key=True)
+    # When this process last said it was alive. The writer rate-limits itself (PST-R2), so this
+    # is never more precise than the floor — and does not need to be.
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # What it is doing: "running" | "suspended". Free-form on purpose, same reason as `process`.
+    state: Mapped[str] = mapped_column(String(32), nullable=False, default="running")
+    # Why, when the state calls for it (a suspended worker says what suspended it).
+    detail: Mapped[str | None] = mapped_column(String(256), nullable=True)
+
+
 class SystemSetting(Base):
     """Global system settings (MNT-R3), key → JSON value, editable at runtime and
     **persistent** (unlike feature_flags). Typed access via

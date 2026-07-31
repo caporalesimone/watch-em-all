@@ -6,6 +6,8 @@ Admin-facing errors/warnings are admin-only by contract: never on the public
 
 from __future__ import annotations
 
+import re
+
 from fastapi.testclient import TestClient
 
 
@@ -61,8 +63,86 @@ def test_admin_errors_is_admin_only(client: TestClient) -> None:
 
 
 def test_admin_errors_clean_is_empty(client: TestClient) -> None:
+    """Clean means: schema matches, and the worker is reporting. The second half is new — there
+    is no worker process in these tests, so one has to be stood in for; without that this feed
+    correctly says nobody is scraping anything."""
+    from src.core.db import new_session
+    from src.core.process_status import report, reset_rate_limit
+
+    session = new_session()
+    try:
+        reset_rate_limit()
+        report(session, "worker")
+    finally:
+        session.close()
+
     admin = _admin_token(client)
     resp = client.get("/api/admin/errors", headers=_bearer(admin))
     assert resp.status_code == 200
     # Fresh test DB matches the models, and the conftest leaves the flag off → empty list.
     assert resp.json() == []
+
+
+def test_a_worker_that_never_reported_is_a_warning(client: TestClient) -> None:
+    """The state of a fresh installation whose worker never came up: nothing is being scraped and
+    nothing is being delivered, and the symptom on its own ("my prices are stale") points
+    nowhere. Not behind a flag, unlike schema drift — this is a fault of the installation."""
+    admin = _admin_token(client)
+
+    (error,) = client.get("/api/admin/errors", headers=_bearer(admin)).json()
+
+    assert error["source"] == "worker_status"
+    assert error["type"] == "warning"
+    assert "never reported" in error["title"]
+
+
+def test_a_worker_that_stopped_reporting_is_an_error(client: TestClient) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import select
+
+    from src.core.db import new_session
+    from src.core.models import ProcessStatus
+    from src.core.process_status import report, reset_rate_limit
+
+    session = new_session()
+    try:
+        reset_rate_limit()
+        report(session, "worker")
+        row = session.scalars(select(ProcessStatus)).one()
+        row.last_seen_at = datetime.now(UTC) - timedelta(seconds=600)
+        session.commit()
+    finally:
+        session.close()
+
+    admin = _admin_token(client)
+    (error,) = client.get("/api/admin/errors", headers=_bearer(admin)).json()
+
+    assert error["type"] == "error"
+    assert "stopped reporting" in error["title"]
+    # The age, not a fixed string: the seconds keep passing while the test runs, and asserting
+    # "600s" made this fail the moment the suite was busy enough to reach 601.
+    (seconds,) = re.findall(r"Last seen (\d+)s ago", error["description"])
+    assert int(seconds) >= 600
+    assert "not running" in error["description"]  # says the consequence, not just the fact
+
+
+def test_a_suspended_worker_reports_why(client: TestClient) -> None:
+    """A worker that stopped itself is a different fault from one that died, and the reason it
+    recorded is the whole value — an admin should not have to read container logs for it."""
+    from src.core.db import new_session
+    from src.core.process_status import report, reset_rate_limit
+
+    session = new_session()
+    try:
+        reset_rate_limit()
+        report(session, "worker", state="suspended", detail="the schema does not match", force=True)
+    finally:
+        session.close()
+
+    admin = _admin_token(client)
+    (error,) = client.get("/api/admin/errors", headers=_bearer(admin)).json()
+
+    assert error["type"] == "error"
+    assert "suspended itself" in error["title"]
+    assert error["description"] == "the schema does not match"

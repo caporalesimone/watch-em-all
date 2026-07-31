@@ -33,7 +33,7 @@ Role legend: 🌐 public · 👤 user · ⚡ super-user (and admin) · 🛡 admi
 
 | Method | Path | Role | Response | Notes |
 |---|---|---|---|---|
-| GET | `/api/admin/errors` | 🛡 | `[{source, type, title, description}]` | **admin-only** feed of errors/warnings (admin diagnostics), kept off the public `/api/health` probe. First source: schema drift (4.B0), behind `WEA_SCHEMA_DRIFT_ALERT` |
+| GET | `/api/admin/errors` | 🛡 | `[{source, type, title, description}]` | **admin-only** feed of errors/warnings (admin diagnostics), kept off the public `/api/health` probe. Sources: schema drift (4.B0, behind `WEA_SCHEMA_DRIFT_ALERT`) and the **worker's status** (PST-R4, never behind a flag — never reported / stopped reporting / suspended itself, each with what it means for scrapes and deliveries) |
 | GET | `/api/admin/logs` | 🛡 | `[{id, created_at, level, source, message, context}]` | **admin-only** system log **live tail** (4.B7/4.F3). Cursor by `id`: no `since` → latest `limit`; `since=<id>` → rows with `id > since` (ascending). Filters `level` (info/warning/error), `sources` (repeatable, multi), `q` (case-insensitive message search); `limit` 1–1000 (default 200) |
 | GET | `/api/admin/logs/page` | 🛡 | `{items, total, counts:{info,warning,error}, sources}` | **admin-only** system log **paged history** (4.F4): `page`+`size` (newest-first window) + `total` + per-level `counts` (over the source/search filters) + distinct `sources` (filter chips). Same `level`/`sources`/`q` filters |
 | GET | `/api/admin/feature-flags` | 🛡 | `{key: {…}}` | dev feature flags, effective values (defaults + overrides). Admin-only (4.B1a) |
@@ -147,4 +147,4 @@ Registered under `/api/plugins/dragon-store` (the generic convention above); the
 
 | Method | Path | Role | Response | Notes |
 |---|---|---|---|---|
-| GET | `/api/health` | 🌐 | `200 {status, db, version, server_time, worker_heartbeat_age_s}` / `503` | app alive + DB reachable; `version` is the baked product version; `server_time` is ISO8601 with the installation-TZ offset (the UI clock source, 4.F1); `worker_heartbeat_age_s` is `null` until the worker persists its heartbeat (phase 4) |
+| GET | `/api/health` | 🌐 | `200 {status, db, version, server_time, worker_heartbeat_age_s}` / `503` | app alive + DB reachable; `version` is the baked product version; `server_time` is ISO8601 with the installation-TZ offset (the UI clock source, 4.F1); `worker_heartbeat_age_s` is the seconds since the worker last reported ([process-status](../4-capabilities/core/process-status.md), PST-R3) — `null` means it has not reported since this database was created, and nothing else |
