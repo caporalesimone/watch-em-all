@@ -11,7 +11,7 @@
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import ProductCell from '$lib/components/ProductCell.svelte';
 	import SourceTag from '$lib/components/SourceTag.svelte';
-	import { money, priceDifference } from '$lib/format';
+	import { money } from '$lib/format';
 	import { refreshUnread } from '$lib/stores/alerts';
 
 	const alertId = $derived(Number($page.params.id));
@@ -142,7 +142,14 @@
 						{#if cart.products.length > 0}
 							<ul class="space-y-2">
 								{#each cart.products as p (p.product_id)}
-									{@const diff = priceDifference(p.price_previous, p.price_current)}
+									<!--
+										The Difference arrives already rendered in the payload (C19). It used to
+										be recomputed here, in TypeScript, beside the same rule in Python for the
+										email — the debt 9.F8 declared. A delisted product now reads as an em
+										dash rather than `0%`: its two prices are equal by construction, so a
+										percentage said "the price held" about a row nobody can buy.
+									-->
+									{@const diff = p.difference}
 									<li
 										class="flex flex-wrap items-start justify-between gap-2 border-t border-slate-100 pt-2 dark:border-slate-800/60"
 									>

@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections.abc import Callable, Container
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
@@ -232,6 +232,34 @@ class CartTotals(BaseModel):
     final: Decimal
 
 
+def price_difference(
+    previous: Decimal | None, current: Decimal, *, delisted: bool = False
+) -> str | None:
+    """The signed percentage change from *Was* to *Now* — the digest's **Difference** column
+    (9.X10), rendered once here so the email and the in-app history cannot disagree (C19).
+
+    ``None`` means "there is nothing to report", which both renderers show as an em dash. Two
+    cases produce it. Without a previous price there is nothing to compare against. And a
+    **delisted** product has ``price_previous == price_current`` by construction — nothing moved,
+    the product left the site — so a percentage there prints ``0%`` on a row nobody can buy,
+    which reads as "the price held" instead of "this is gone".
+
+    Deliberately **not** the product's sale discount: that compares against the list price, a
+    different quantity, and printing it under a `Was → Now` pair produced `-0%` on a product
+    whose price had just gone *up*. One decimal, dropped when it is zero, so a real but sub-1%
+    change never collapses into a misleading ``0%``.
+    """
+    if delisted or previous is None or previous == 0:
+        return None
+    pct = (current - previous) / previous * Decimal(100)
+    rounded = pct.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+    if rounded == 0:  # also catches -0.0, which would otherwise print as "-0%"
+        return "0%"
+    whole = rounded.to_integral_value()
+    text = f"{whole:.0f}" if rounded == whole else f"{rounded:.1f}"
+    return f"+{text}%" if rounded > 0 else f"{text}%"
+
+
 class ProductAlertPayload(BaseModel):
     product_id: int
     name: str
@@ -242,6 +270,11 @@ class ProductAlertPayload(BaseModel):
     price_current: Decimal
     discount_pct: Decimal
     currency: str = "EUR"
+    # The Difference column, already rendered (C19). It travels in the payload because the rule
+    # existed twice — Python for the email, TypeScript for the page — and 9.F8 declared that
+    # debt rather than paying it: the payload is stored, so digests already written would not
+    # have carried the field. The 0.9.0 schema reset removes that obstacle.
+    difference: str | None = None
 
 
 class CartAlertPayload(BaseModel):
@@ -314,6 +347,14 @@ def _build_cart_alert(
             price_current=d.price_current,
             discount_pct=d.product.discount_pct or Decimal(0),
             currency=d.product.currency,
+            difference=price_difference(
+                d.price_previous,
+                d.price_current,
+                # A delisted product's two prices are equal by construction, so a percentage
+                # would print 0% on a row nobody can buy. The tag is already in the payload
+                # and comes out on its own (9.B9), so nothing new has to be inferred.
+                delisted=AlertType.PRODUCT_DELISTED in d.tags,
+            ),
         )
         for d in pdiffs
     ]

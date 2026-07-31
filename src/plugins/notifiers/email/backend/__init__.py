@@ -16,7 +16,7 @@ import os
 import smtplib
 import ssl
 import time
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 from email.message import EmailMessage
 from functools import lru_cache
 from html import escape
@@ -60,25 +60,9 @@ def _money(value: Decimal | None, currency: str) -> str:
     return f"{sym}{value:.2f}"
 
 
-def _difference(previous: Decimal | None, current: Decimal) -> str | None:
-    """The signed percentage change from *Was* to *Now* — what the Difference column reports.
-
-    Returns ``None`` when there is nothing to compare against (no previous price), which the
-    digest renders as an em dash. A rise is positive, a drop negative. This is deliberately
-    **not** the product's sale discount: that is a different quantity (current vs. the list
-    price), and printing it under a `Was → Now` pair produced `-0%` on a product whose price
-    had just gone *up*. Rounded to one decimal, with the decimal dropped when it is zero, so a
-    real but sub-1% change never collapses into a misleading ``0%``.
-    """
-    if previous is None or previous == 0:
-        return None
-    pct = (current - previous) / previous * Decimal(100)
-    rounded = pct.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
-    if rounded == 0:  # also catches -0.0, which would otherwise print as "-0%"
-        return "0%"
-    whole = rounded.to_integral_value()
-    text = f"{whole:.0f}" if rounded == whole else f"{rounded:.1f}"
-    return f"+{text}%" if rounded > 0 else f"{text}%"
+# The Difference rule itself is **not** here any more (C19): it lives in the core and arrives
+# already rendered in the payload, so this notifier and the in-app history cannot say different
+# numbers about the same digest. A notifier's job is presentation.
 
 
 class EmailNotifierPlugin(NotifierPlugin):
@@ -184,7 +168,9 @@ class EmailNotifierPlugin(NotifierPlugin):
                 f'<td style="{_TD}">{escape(p.plugin_id)}</td>'
                 f'<td style="{_TD}">{escape(_money(p.price_previous, p.currency))}</td>'
                 f'<td style="{_TD}"><b>{escape(_money(p.price_current, p.currency))}</b></td>'
-                f"{_difference_td(_difference(p.price_previous, p.price_current))}"
+                # Rendered, not computed: the rule lives in the core and travels in the payload
+                # (C19), so this table and the in-app history cannot drift apart.
+                f"{_difference_td(p.difference)}"
                 f'<td style="{_TD}"><a href="{escape(p.url)}">{escape(s["open"])}</a></td>'
                 "</tr>"
             )
@@ -224,7 +210,7 @@ class EmailNotifierPlugin(NotifierPlugin):
             lines.append(f"  * {s.get(f'event.{e}', e)}")
         for p in cart.products:
             tags = ", ".join(s.get(f"tag.{t}", str(t)) for t in p.tags)
-            diff = _difference(p.price_previous, p.price_current)
+            diff = p.difference
             lines.append(
                 f"  - {p.name} [{p.plugin_id}] "
                 f"{_money(p.price_previous, p.currency)} -> {_money(p.price_current, p.currency)} "

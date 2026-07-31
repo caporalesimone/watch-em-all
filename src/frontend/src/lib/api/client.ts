@@ -605,6 +605,10 @@ export interface AlertDigestProduct {
 	price_current: string;
 	discount_pct: string;
 	currency: string;
+	// The Difference column, already rendered by the backend (C19), so the email and this page
+	// cannot disagree. `null` = nothing to report (no previous price, or the product is
+	// delisted), which both render as an em dash.
+	difference: string | null;
 }
 
 export interface AlertDigestThreshold {
