@@ -57,6 +57,7 @@ Known flags (params shown with their defaults): `worker_tick` `{seconds: 60}` (w
 
 | Method | Path | Role | Response | Notes |
 |---|---|---|---|---|
+| GET | `/api/plugin-assets/{name}/assets/{filename}` | 🌐 | — | an image from that plugin's `frontend/assets` (REG-R6b): bare filename only, resolved inside the folder, image extensions only. Public, like the icon — an `<img>` carries no token |
 | GET | `/api/plugins` | 👤🛡 | `[{name, type, route_base, icon, display_name, version}]` | only enabled + loaded plugins; no internal paths. `route_base`/`icon` are `null` for a plugin without a frontend (notifiers); `version` is the plugin's own manifest version (4.B0a) |
 | GET | `/api/plugin-assets/{name}/icon` | 🌐 | image | the plugin's manifest `icon`, served as a static asset (path-traversal guarded); 404 if absent. Public like the SPA bundle — the browser loads it as an `<img>`, which cannot carry the bearer token |
 

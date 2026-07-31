@@ -13,6 +13,17 @@
 	// The label the sanitiser puts on a damaged listing. Read, never re-derived: the title
 	// arrives with the label already stripped, so searching it again would find nothing.
 	const DENTED_TAG = 'Ammaccato';
+	// A category has no picture of its own: no product lives at a listing's URL, so its snapshot
+	// carries no image and the row showed an empty grey square. This is the plugin's own asset,
+	// served from its assets folder (REG-R6b) — a stand-in for "this is a category", not a
+	// pretend product photo.
+	const CATEGORY_IMAGE = '/api/plugin-assets/dragon_store/assets/category.png';
+
+	function thumb(w: Watch): string | null {
+		// A product that has not been read yet also has no image; it stays empty, because there
+		// a missing picture means "not read", which is true and worth seeing.
+		return w.image_url ?? (w.kind === 'category' ? CATEGORY_IMAGE : null);
+	}
 
 	// 9.F5: a manual scrape is the quickest way to send a site requests its Crawl-delay never
 	// asked for, so it belongs to the levels that answer for it. The API refuses it too — this
@@ -499,7 +510,7 @@
 				<tbody>
 					{#each watches as w (w.id)}
 						<tr class="border-b border-slate-100 align-top dark:border-slate-800/60">
-							<td class="py-2 pr-4"><ProductThumb src={w.image_url} /></td>
+							<td class="py-2 pr-4"><ProductThumb src={thumb(w)} alt="" /></td>
 							<td class="py-2 pr-4">
 								<div class="mb-1 flex items-center gap-2">
 									<span class={kindChip(w.kind)}>
