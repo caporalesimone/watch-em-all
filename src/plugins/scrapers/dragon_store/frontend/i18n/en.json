@@ -1,35 +1,51 @@
 {
-	"dragon_store": {
-		"title": "Dragon Store",
-		"blurb": "Watch Dragon Store product pages. Paste a product URL to start watching it; run a scrape to pull the latest into your catalog.",
-		"watches": {
-			"heading": "Watched products",
-			"url_placeholder": "https://…gp.35880.uw",
-			"add": "Add watch",
-			"empty": "No watched products yet. Paste a product URL above.",
-			"remove": "Remove",
-			"invalid": "Enter a product URL first.",
-			"duplicate": "You are already watching this URL."
-		},
-		"dry_run": {
-			"action": "Preview (dry-run)",
-			"heading": "Preview",
-			"hint": "A dry-run scrapes without saving anything."
-		},
-		"scrape_now": {
-			"action": "Scrape now",
-			"confirm_title": "Scrape Dragon Store now?",
-			"confirm_body": "This updates your catalog from this scraper. You can run it again {interval}.",
-			"started": "Scrape started — your catalog will update shortly.",
-			"cooldown_caption": "Next scrape available in {time}"
-		},
-		"adjustments": {
-			"threshold_discount": "Threshold discount {pct}%",
-			"shipping": "Shipping",
-			"free_shipping": "Free shipping"
-		},
-		"available": "Available",
-		"unavailable": "Out of stock",
-		"error": "Request failed."
-	}
+  "dragon_store": {
+    "title": "Dragon Store",
+    "blurb": "Watch Dragon Store. Paste a product page to watch that one product, or a category to watch everything in it; each scheduled run pulls the latest into your catalog.",
+    "watches": {
+      "heading": "What you watch",
+      "url_placeholder": "https://…gp.35880.uw",
+      "add": "Add watch",
+      "empty": "Nothing watched yet. Paste a product page or a category URL above.",
+      "remove": "Remove",
+      "invalid": "Enter a product URL first.",
+      "duplicate": "You are already watching this URL.",
+      "scraping": "Reading it from the site — this can take a couple of minutes.",
+      "queued": "Waiting for its turn: {position} ahead of it.",
+      "queued_next": "Waiting for its turn — next up.",
+      "progress": "{done} of {total}",
+      "cancel": "Cancel",
+      "cancelled": "Cancelled. Nothing was added to your catalog.",
+      "failed": "Could not be read: {reason}",
+      "add_in_progress": "One URL of yours is still being resolved. Wait for it to finish.",
+      "invalid_url": "That is not a Dragon Store product or category URL.",
+      "busy": "This one is being read right now. Try again when it finishes.",
+      "kind_product": "Product",
+      "kind_category": "Category",
+      "include_ammaccati": "Also include damaged-box copies",
+      "include_ammaccati_hint": "Dragon Store sells some items a second time, cheaper, when the box is damaged — a separate entry in its catalogue, labelled “Ammaccato”. Those entries are skipped by default. Turn this on and the next scan will bring them in as well, keeping that label as a tag so you can tell them apart.",
+      "dented_warning": "This one is a damaged-box copy. Its title arrives with the “Ammaccato” label removed, so nothing else would tell you.",
+      "scan_counts": "{included} products, {excluded} damaged-box copies skipped",
+      "last_scanned": "last read {when}",
+      "never_scanned": "Not read yet.",
+      "outcome_title": "Added: {name}",
+      "outcome_counts": "{included} products went into your catalog; {excluded} damaged-box copies were skipped.",
+      "outcome_cancelled": "Stopped before it finished, so nothing was added. The input is still in your list — the next scheduled run will read it.",
+      "outcome_view": "See them in the catalog",
+      "outcome_dismiss": "Dismiss"
+    },
+    "scrape_now": {
+      "action": "Scrape now",
+      "confirm_title": "Scrape Dragon Store now?",
+      "confirm_body": "This updates your catalog from this scraper. You can run it again {interval}.",
+      "started": "Scrape started — your catalog will update shortly.",
+      "cooldown_caption": "Next scrape available in {time}"
+    },
+    "adjustments": {
+      "threshold_discount": "Threshold discount {pct}%",
+      "shipping": "Shipping",
+      "free_shipping": "Free shipping"
+    },
+    "error": "Request failed."
+  }
 }

@@ -108,6 +108,44 @@ def test_run_scraper_iterates_users_stamps_cooldown_and_marks_slot() -> None:
     engine.dispose()
 
 
+class _FilteringScraper(_FakeScraper):
+    """A scraper that leaves something out of its delivery, the way the dented filter does."""
+
+    def configured_users(self, context: PluginContext) -> list[int]:
+        return [1, 2]
+
+    def run_for_user(self, context: PluginContext, user_id: int) -> DeltaCounters:
+        self.users_run.append(user_id)
+        return DeltaCounters(found=38, excluded=1)
+
+
+def test_run_record_accounts_for_what_the_scraper_left_out() -> None:
+    """`scrape_run.products_excluded` was written by nobody until 9.B9's neighbours: a run over
+    a category of 39 recorded 38 found, and the missing one was unaccounted for. It sums across
+    users, like every other counter on the row."""
+    engine, session = _mem()
+    session.add(ScraperSchedule(scraper_id="fake", times=["00:00"], enabled=True, last_slot=None))
+    session.commit()
+
+    def _update_catalog(user_id: int, products: list[Product]) -> DeltaCounters:
+        return DeltaCounters()
+
+    ctx = PluginContext(
+        engine=engine,
+        db=session,
+        logger=logging.getLogger("test.worker"),
+        config={},
+        update_catalog=_update_catalog,
+    )
+    worker._run_scraper(_FilteringScraper(), ctx, "fake", datetime(2026, 7, 30, 6, 0, tzinfo=UTC))
+
+    run = session.scalars(select(ScrapeRun)).one()
+    assert run.products_found == 76  # two users
+    assert run.products_excluded == 2
+    session.close()
+    engine.dispose()
+
+
 def test_boot_and_loop_runs_one_tick(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     cfg = tmp_path / "config.yaml"
     cfg.write_text(

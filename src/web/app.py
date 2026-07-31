@@ -27,6 +27,8 @@ from src.core.system_log import install_system_log_handler
 from src.web.adjust import register_notifiers, register_scrapers
 from src.web.deps import require_user
 from src.web.error_handlers import register_error_handlers
+from src.web.incompatible import install_incompatibility_gate
+from src.web.jobs import reclaim_orphans, start_drainers, stop_drainers
 from src.web.routers import (
     admin_notifiers,
     admin_scrapers,
@@ -46,7 +48,11 @@ from src.web.routers.scrape import make_scrape_now_router
 from src.web.spa import SpaStaticFiles
 
 logging.basicConfig(level=logging.INFO)
-log = logging.getLogger(__name__)
+# `wea.web`, not `__name__`: this module logs the process's lifecycle (startup, shutdown) and
+# its boot checks (feature flags, schema drift) — the same events the worker already persists
+# to `system_log` under `worker`. The name is what opts them in (system_log._source_for); the
+# rest of the web, per-request logs included, keeps `__name__` and stays on stdout (LOG-R1).
+log = logging.getLogger("wea.web")
 
 # Built SPA baked into the web image (build-system.md); absent in dev/tests.
 STATIC_DIR = Path(os.environ.get("WEA_STATIC_DIR", "/app/static"))
@@ -100,14 +106,18 @@ def create_app() -> FastAPI:
         except Exception:
             log.exception("schema-drift check failed")
         for item in drift:
-            if item.missing_table:
-                log.warning("schema drift: table %r is missing from the database", item.table)
-            else:
-                log.warning(
-                    "schema drift: table %r is missing column(s): %s",
-                    item.table,
-                    ", ".join(item.missing_columns),
-                )
+            log.error("schema drift: %s", item.summary())
+        if drift:
+            # Logged as an error, not a warning, and said once in one line: from here on
+            # every page and every API route answers with the incompatibility instead of
+            # the application (INC-R1), so this is the only place the reason is written.
+            log.error(
+                "database incompatible with version %s — serving the incompatibility page "
+                "on every route except /api/health; nothing will be read or written",
+                settings.version,
+            )
+        # Filled before the first request is served, which is what makes the gate
+        # airtight: there is no window in which a mismatched database is reachable.
         _app.state.schema_drift = drift
         # Standard per-scraper scrape-now routes (SCR-R15): mounted here in the web
         # (they need the authenticated user + a request session, so they cannot
@@ -130,8 +140,20 @@ def create_app() -> FastAPI:
         # route — plugins included — takes precedence over the SPA fallback.
         if STATIC_DIR.is_dir():
             _app.mount("/", SpaStaticFiles(directory=STATIC_DIR, html=True), name="spa")
-        log.info("web app started, version %s", settings.version)
-        yield
+        # Jobs that resolve a newly added watch run here, one drainer per scraper (9.X6c).
+        # Reclaim first: they live in this process, so anything still marked running was
+        # left by the process that died, and that state blocks the user's next submission.
+        reclaim_orphans(_app.state.loaded_plugins)
+        start_drainers(_app.state.loaded_plugins)
+        log.info("web started, version %s", settings.version)
+        try:
+            yield
+        finally:
+            stop_drainers()
+            # Uvicorn runs the shutdown half of the lifespan on SIGTERM/SIGINT, so this is
+            # the line that says the container went down on purpose. In a `finally` because
+            # a crash on the way out is exactly when we want the record.
+            log.info("web stopped")
 
     app = FastAPI(
         title="Watch 'Em All",
@@ -143,6 +165,10 @@ def create_app() -> FastAPI:
     )
 
     register_error_handlers(app)
+    # Before every route, including the SPA's catch-all: while the database does not match
+    # this version, the answer is the incompatibility page rather than a scattering of 500s
+    # from whichever page touches the wrong table first (INC-R1).
+    install_incompatibility_gate(app, settings.version)
 
     app.include_router(health.router, prefix="/api")
     app.include_router(auth.router, prefix="/api/auth")

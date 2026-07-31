@@ -20,16 +20,21 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.core.contracts import DeltaCounters, Product
-from src.core.models import CatalogProduct, PriceHistory
+from src.core.models import CatalogProduct, PriceHistory, ProductSource
 
 
-def _last_history_entry(session: Session, product_id: int) -> PriceHistory | None:
-    """The most recent history entry for a product. Append-only with a
-    monotonic id, so the max id is the latest — robust even when several
-    entries share a coarse ``recorded_at`` (e.g. SQLite's 1-second clock)."""
+def _last_history_entry(session: Session, plugin_id: str, external_id: str) -> PriceHistory | None:
+    """The most recent history entry for a **product identity**, whoever is watching it.
+
+    The chain is shared (one per product, not per user): a user who has just added a product
+    already inherits its past, and a run that delivers the same product for five users records
+    one entry instead of five. Append-only with a monotonic id, so the max id is the latest —
+    robust even when several entries share a coarse ``recorded_at`` (e.g. SQLite's 1-second
+    clock).
+    """
     return session.scalar(
         select(PriceHistory)
-        .where(PriceHistory.product_id == product_id)
+        .where(PriceHistory.plugin_id == plugin_id, PriceHistory.external_id == external_id)
         .order_by(PriceHistory.id.desc())
         .limit(1)
     )
@@ -80,6 +85,17 @@ def _insert_product(
         discount_pct=discount,
         is_available=p.is_available,
         removed=False,
+        first_seen_at=p.scraped_at,
+        last_seen_at=p.scraped_at,
+        # Statistics start here (9.B6b). The first sighting is one observation and sets both
+        # ends of the range; it is deliberately NOT a price change — there was nothing to
+        # change from, and counting it would inflate every product's volatility by one.
+        observations=1,
+        price_min=p.price_current,
+        price_min_at=p.scraped_at,
+        price_max=p.price_current,
+        price_max_at=p.scraped_at,
+        last_price_change_at=p.scraped_at,
     )
     session.add(row)
     session.flush()  # assign row.id and make it visible to later finds in this delivery
@@ -105,16 +121,71 @@ def _update_mutable_fields(
     row.discount_pct = discount
     row.is_available = p.is_available
     row.removed = False
-    row.last_seen_at = datetime.now(UTC)
+    row.removed_at = None  # it is back: the delisting date would otherwise outlive the fact
+    # The scraper's own observation time, NOT "now": a response replayed from the scrape
+    # cache is old data, and stamping it with the clock made ``last_seen_at`` report when
+    # we last re-served a page instead of when the site last answered — off by up to the
+    # full half-life, in the one field whose entire job is to say how fresh this is.
+    row.last_seen_at = p.scraped_at
 
 
-def _append_history(
-    session: Session, row: CatalogProduct, p: Product, original: Decimal, discount: Decimal
-) -> None:
+def _as_utc(value: datetime) -> datetime:
+    """A stored timestamp as an aware one. SQLite has no timezone type and hands back naive
+    values, so comparing one against a scraper's aware ``scraped_at`` raises — on SQLite only,
+    which is the test database, not production. Assuming UTC is safe: every timestamp this
+    application writes is UTC."""
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+
+def _update_statistics(row: CatalogProduct, p: Product) -> bool:
+    """Advance this row's own counters (9.B6b) and say whether **this user's** product moved.
+
+    Called **before** the mutable fields are refreshed, because every comparison here is
+    against what this row held until now.
+
+    It deliberately does not consult the price history any more: that chain is shared between
+    everyone watching the product, so asking it "did this change?" answers for whoever was
+    delivered first — and the second user of the same run would be told their product had not
+    moved when it plainly had. The row's own previous values are per-user by construction and
+    give the same answer they always did (a row's price is refreshed on every delivery, so it
+    only ever differs when the price really moved).
+
+    ``observations`` counts only fresh reads: a delivery served from the scrape cache carries
+    the timestamp of the fetch that filled it (PROD-R8), so if it has not moved we are being
+    handed the same page again and ``cache_hits`` is what grew. Counting both as observations
+    would turn the number into "how many times we re-processed this", which says nothing about
+    the product.
+    """
+    if p.scraped_at > _as_utc(row.last_seen_at):
+        row.observations += 1
+    else:
+        row.cache_hits += 1
+
+    price_moved = row.price_current != p.price_current
+    availability_moved = row.is_available != p.is_available
+    if price_moved:
+        row.price_changes += 1
+        row.last_price_change_at = p.scraped_at
+    if availability_moved:
+        row.availability_changes += 1
+
+    if row.price_min is None or p.price_current < row.price_min:
+        row.price_min = p.price_current
+        row.price_min_at = p.scraped_at
+    if row.price_max is None or p.price_current > row.price_max:
+        row.price_max = p.price_current
+        row.price_max_at = p.scraped_at
+
+    return price_moved or availability_moved
+
+
+def _append_history(session: Session, p: Product, original: Decimal, discount: Decimal) -> None:
+    """One entry on the product's shared chain. Keyed on identity, so it belongs to the
+    product and not to the catalog row that happened to carry this delivery."""
     session.add(
         PriceHistory(
-            product_id=row.id,
-            user_id=row.user_id,
+            plugin_id=p.plugin_id,
+            external_id=p.external_id,
             price_current=p.price_current,
             price_original=original,
             discount_pct=discount,
@@ -123,12 +194,78 @@ def _append_history(
     )
 
 
+def _record_sources(session: Session, row: CatalogProduct, p: Product) -> None:
+    """Remember which inputs delivered this product (C14), or refresh what we knew of them.
+
+    Additive on purpose: a product delivered by two categories keeps both rows, because the
+    honest answer to "will this come back if I delete it?" is "yes, from either of these". The
+    label is rewritten every time, so an input the user renamed never shows its old name in
+    somebody's confirmation dialog.
+
+    A delivery that names no source leaves the existing provenance alone rather than clearing
+    it: a single-product read of something a category also delivers says nothing about the
+    category, and forgetting that would answer the deletion question wrongly. Provenance is
+    dropped when the plugin says the input is gone (:func:`forget_source`).
+    """
+    if not p.sources:
+        return
+    known = {
+        r.source_key: r
+        for r in session.scalars(
+            select(ProductSource).where(ProductSource.product_id == row.id)
+        ).all()
+    }
+    for source in p.sources:
+        existing = known.get(source.key)
+        if existing is None:
+            session.add(
+                ProductSource(
+                    product_id=row.id,
+                    source_key=source.key,
+                    source_kind=source.kind,
+                    source_label=source.label,
+                )
+            )
+        else:
+            existing.source_kind = source.kind
+            existing.source_label = source.label
+
+
+def forget_source(session: Session, user_id: int, plugin_id: str, source_key: str) -> int:
+    """Drop the provenance of an input that no longer exists, and commit. Returns the rows hit.
+
+    The **products stay**: they are in the user's catalog, and removing a watch has never
+    removed what it delivered. What has to go is the claim that they still come from somewhere
+    — otherwise a deletion confirmation would keep promising a return that nothing will cause.
+    """
+    rows = session.scalars(
+        select(ProductSource)
+        .join(CatalogProduct, CatalogProduct.id == ProductSource.product_id)
+        .where(
+            CatalogProduct.user_id == user_id,
+            CatalogProduct.plugin_id == plugin_id,
+            ProductSource.source_key == source_key,
+        )
+    ).all()
+    for row in rows:
+        session.delete(row)
+    session.commit()
+    return len(rows)
+
+
 def _apply_delivery(
     session: Session, user_id: int, products: list[Product]
 ) -> tuple[DeltaCounters, set[int]]:
     """Insert/refresh every delivered product (and its history entry when the price or
     availability moved). Returns the counters and the touched row ids — the caller decides
-    whether the absence of a row means "delisted" or "we simply were not told". No commit."""
+    whether the absence of a row means "delisted" or "we simply were not told". No commit.
+
+    Two questions are asked separately here, because the history is shared and the catalog is
+    not. *Has this product moved?* is asked of the shared chain, and decides whether an entry
+    is appended — five users delivered the same product in one run record one entry between
+    them. *Has this user's product moved?* is asked of the user's own row, and is what the
+    counters report: it must stay true for the fifth user as much as for the first.
+    """
     counters = DeltaCounters(found=len(products))
     seen: set[int] = set()
 
@@ -140,23 +277,29 @@ def _apply_delivery(
                 CatalogProduct.external_id == p.external_id,
             )
         )
-        last = _last_history_entry(session, row.id) if row is not None else None
+        # The product's own chain, whoever is watching it: a product this user has never seen
+        # can still have a past, and its last known list price is worth more than a guess.
+        last = _last_history_entry(session, p.plugin_id, p.external_id)
         original, discount = _resolve_prices(p, last)
 
         if row is None:
             row = _insert_product(session, user_id, p, original, discount)
             counters.new += 1
         else:
+            # Order matters: the statistics read the row's values from before this delivery.
+            if _update_statistics(row, p):
+                counters.price_changes += 1
             _update_mutable_fields(row, p, original, discount)
 
-        # CATSVC-R4: a history entry only on a price OR availability change.
+        _record_sources(session, row, p)
+
+        # CATSVC-R4: a history entry only on a price OR availability change of the product.
         if (
             last is None
             or last.price_current != p.price_current
             or last.is_available != p.is_available
         ):
-            _append_history(session, row, p, original, discount)
-            counters.price_changes += 1
+            _append_history(session, p, original, discount)
         seen.add(row.id)
 
     return counters, seen
@@ -203,6 +346,10 @@ def update_catalog(
     for row in rows:
         if row.id not in seen and not row.removed:
             row.removed = True
+            # When, not just whether (9.B6): "delisted" with no date cannot answer "since
+            # when", which the catalog cleanups sort on and a delisting notification needs in
+            # order to fire once rather than on every run.
+            row.removed_at = datetime.now(UTC)
             counters.removed += 1
 
     session.commit()

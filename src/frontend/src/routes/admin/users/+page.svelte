@@ -62,6 +62,21 @@
 		return $_('admin.users.statusActive');
 	}
 
+	// The table printed the raw value, so a row read `super_user` — an identifier with an
+	// underscore, shown where the form beside it uses proper labels. Same names in both places.
+	const ROLE_LABEL: Record<string, string> = {
+		user: 'admin.users.roleUser',
+		super_user: 'admin.users.roleSuperUser',
+		admin: 'admin.users.roleAdmin'
+	};
+
+	function roleLabel(role: string): string {
+		// A role the frontend does not know about shows as-is rather than as an empty cell:
+		// wrong is better than blank when the question is "what is this account".
+		const key = ROLE_LABEL[role];
+		return key ? $_(key) : role;
+	}
+
 	function lastLogin(user: AdminUser): string {
 		return user.last_login_at
 			? new Date(user.last_login_at).toLocaleString()
@@ -84,8 +99,16 @@
 			</label>
 			<label class={fieldClass}>
 				{$_('admin.users.role')}
+				<!--
+					All three levels the API accepts (9.B8). Super-user was missing here, which
+					made it unreachable: the role is chosen at creation and not changed afterwards
+					(promoting an existing account is phase 10), so a level absent from this list
+					was a level nobody could ever hold — and 9.F5, which restricts the manual
+					scrape and the Debug entry to it, had no way to be exercised.
+				-->
 				<select class={inputClass} bind:value={form.role}>
 					<option value="user">{$_('admin.users.roleUser')}</option>
+					<option value="super_user">{$_('admin.users.roleSuperUser')}</option>
 					<option value="admin">{$_('admin.users.roleAdmin')}</option>
 				</select>
 			</label>
@@ -149,7 +172,7 @@
 					<tr class="border-b border-slate-100 dark:border-slate-800/60">
 						<td class="py-2 pr-4 font-medium">{user.username}</td>
 						<td class="py-2 pr-4">{user.first_name} {user.last_name}</td>
-						<td class="py-2 pr-4">{user.role}</td>
+						<td class="py-2 pr-4">{roleLabel(user.role)}</td>
 						<td class="py-2 pr-4">{status(user)}</td>
 						<td class="py-2 pr-4 text-slate-500">{lastLogin(user)}</td>
 					</tr>

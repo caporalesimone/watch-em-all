@@ -1,7 +1,9 @@
 # TODO
 
 Running list of issues / polish noted by Simone, to address in a future pass.
-New items get appended over time.
+New items get appended over time. **Done items are removed from here** — the record of what was
+decided and why lives in the commits (`git log`), in the CHANGELOG entry of the version that
+shipped it, and in the phase document.
 
 ## Off topic
 

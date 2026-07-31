@@ -33,11 +33,6 @@ class MioScraper(ScraperPlugin):
         products = self._scrape(context, inputs_of(user_id))
         context.update_catalog(user_id, products)     # UNICA via di scrittura del catalogo
 
-    def run_test(self, context, params: dict | None = None) -> list[Product]:
-        # Dry-run: scrape on-demand SENZA alcuna scrittura (né catalogo né input).
-        # params arriva dalla tua UI; il risultato è mostrato dalla tabella condivisa.
-        ...
-
     def get_adjustments(self, cart_total: Decimal) -> list[Adjustment]:
         # le regole economiche del tuo sito (sconti a soglia, spedizione); [] se nessuna
         ...
@@ -96,12 +91,12 @@ Se lo stesso prodotto emerge da più input (un URL singolo + una categoria che l
 
 ## La tua UI
 
-- **Pagina utente** (la tua route): qui l'utente sceglie *cosa osservare*. Sei libero sul come (categorie navigabili, inserimento URL, ricerca) con tre obblighi: design system del core, **dry-run di anteprima** (via la tua route di test, nessuna scrittura), selezione confermata → entry nelle tue tabelle.
-- **Pagina admin**: generata dal tuo `get_admin_config_schema()` + bottone **Test Scraper** (tabella condivisa). Qui niente selezione di contenuti: solo parametri.
+- **Pagina utente** (la tua route): qui l'utente sceglie *cosa osservare*. Sei libero sul come (categorie navigabili, inserimento URL, ricerca) con due obblighi: design system del core, e selezione confermata → entry nelle tue tabelle **più uno scrape immediato** che mette già i prodotti nel catalogo. Nessuna anteprima: il dry-run è stato tolto in `0.9.0` (SCR-R11/R12 ritirate) perché chiedeva al sito la stessa pagina due volte per una sola intenzione dell'utente.
+- **Pagina admin**: generata dal tuo `get_admin_config_schema()`. Qui niente selezione di contenuti: solo parametri.
 
 ## Route tipiche del tuo backend
 
-Segui la [convenzione](../api/endpoints.md#rotte-plugin-specific): `config-schema/{admin|user}`, `test` (dry-run), `watches` (CRUD degli input utente). Dichiara `tags=["Plugin: Mio Scraper"]` sulle route: finiscono nello Swagger.
+Segui la [convenzione](../api/endpoints.md#rotte-plugin-specific): `config-schema/{admin|user}`, `watches` (CRUD degli input utente). Dichiara `tags=["Plugin: Mio Scraper"]` sulle route: finiscono nello Swagger.
 
 ## Schema admin tipico
 
@@ -116,4 +111,4 @@ def get_admin_config_schema(self):
 
 ## Prima del rilascio
 
-Passa la [checklist](checklist-and-testing.md): stabilità dell'`external_id` su run ripetute, inclusione degli out-of-stock, dedup, dry-run senza scritture, schema config valido, icona presente.
+Passa la [checklist](checklist-and-testing.md): stabilità dell'`external_id` su run ripetute, inclusione degli out-of-stock, dedup, schema config valido, icona presente.

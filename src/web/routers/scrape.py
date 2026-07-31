@@ -1,4 +1,4 @@
-"""Per-scraper scrape-now routes (SCR-R15).
+"""Per-scraper scrape-now routes (SCR-R15), restricted to super-users from 9.B8.
 
 The web mounts a standard ``POST``/``GET`` ``…/scrape-now`` pair for every
 scraper that implements ``run_for_user`` (``implements_scraping``), so the
@@ -29,7 +29,7 @@ from src.core.plugins.registry import LoadedPlugin
 from src.core.scrape import CooldownStatus, claim_scrape, cooldown_status
 from src.core.scraper_config import get_scraper_config
 from src.web.adjust import run_user_alerts
-from src.web.deps import SessionDep, UserDep
+from src.web.deps import SessionDep, SuperUserDep
 
 log = logging.getLogger(__name__)
 
@@ -96,7 +96,9 @@ def make_scrape_now_router(loaded: LoadedPlugin) -> APIRouter:
         operation_id=f"{plugin.plugin_id}_scrape_now",
         summary="Run this scraper now for the current user (cooldown-limited).",
     )
-    def scrape_now(user: UserDep, db: SessionDep, background: BackgroundTasks) -> ScrapeNowStarted:
+    def scrape_now(
+        user: SuperUserDep, db: SessionDep, background: BackgroundTasks
+    ) -> ScrapeNowStarted:
         # SCHED-R4: refuse if a run (scheduled or manual) is already in progress; the lock
         # is held from here through the background task, which releases it when done.
         lock = acquire_scraper_lock(get_engine(), plugin.plugin_id)
@@ -121,7 +123,7 @@ def make_scrape_now_router(loaded: LoadedPlugin) -> APIRouter:
         operation_id=f"{plugin.plugin_id}_scrape_now_status",
         summary="Cooldown status for the current user (drives the UI countdown).",
     )
-    def scrape_now_status(user: UserDep, db: SessionDep) -> ScrapeNowStatus:
+    def scrape_now_status(user: SuperUserDep, db: SessionDep) -> ScrapeNowStatus:
         interval = get_scraper_config(db, plugin.plugin_id).scrape_now_min_interval_s
         return _to_model(cooldown_status(db, plugin.plugin_id, user.sub, interval))
 

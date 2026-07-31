@@ -60,6 +60,11 @@ def _money(value: Decimal | None, currency: str) -> str:
     return f"{sym}{value:.2f}"
 
 
+# The Difference rule itself is **not** here any more (C19): it lives in the core and arrives
+# already rendered in the payload, so this notifier and the in-app history cannot say different
+# numbers about the same digest. A notifier's job is presentation.
+
+
 class EmailNotifierPlugin(NotifierPlugin):
     plugin_id = "email"
     display_name = "Email"
@@ -163,7 +168,9 @@ class EmailNotifierPlugin(NotifierPlugin):
                 f'<td style="{_TD}">{escape(p.plugin_id)}</td>'
                 f'<td style="{_TD}">{escape(_money(p.price_previous, p.currency))}</td>'
                 f'<td style="{_TD}"><b>{escape(_money(p.price_current, p.currency))}</b></td>'
-                f'<td style="{_TD}">-{int(p.discount_pct)}%</td>'
+                # Rendered, not computed: the rule lives in the core and travels in the payload
+                # (C19), so this table and the in-app history cannot drift apart.
+                f"{_difference_td(p.difference)}"
                 f'<td style="{_TD}"><a href="{escape(p.url)}">{escape(s["open"])}</a></td>'
                 "</tr>"
             )
@@ -173,7 +180,7 @@ class EmailNotifierPlugin(NotifierPlugin):
             f'<th style="{_TH}">{escape(s["source"])}</th>'
             f'<th style="{_TH}">{escape(s["was"])}</th>'
             f'<th style="{_TH}">{escape(s["now"])}</th>'
-            f'<th style="{_TH}">{escape(s["discount"])}</th>'
+            f'<th style="{_TH}">{escape(s["difference"])}</th>'
             f'<th style="{_TH}"></th>'
             f"</tr></thead><tbody>{''.join(rows)}</tbody></table>"
             if cart.products
@@ -203,10 +210,11 @@ class EmailNotifierPlugin(NotifierPlugin):
             lines.append(f"  * {s.get(f'event.{e}', e)}")
         for p in cart.products:
             tags = ", ".join(s.get(f"tag.{t}", str(t)) for t in p.tags)
+            diff = p.difference
             lines.append(
                 f"  - {p.name} [{p.plugin_id}] "
                 f"{_money(p.price_previous, p.currency)} -> {_money(p.price_current, p.currency)} "
-                f"(-{int(p.discount_pct)}%) {tags} {p.url}"
+                f"({diff or '—'}) {tags} {p.url}"
             )
         lines.append(f"  {s['total']}: {_money(cart.totals.final, cur)}")
         return "\n".join(lines)
@@ -259,6 +267,19 @@ class EmailNotifierPlugin(NotifierPlugin):
 _TABLE = "border-collapse:collapse;width:100%;font-size:14px"
 _TH = "text-align:left;border-bottom:2px solid #e5e7eb;padding:6px 8px;color:#374151"
 _TD = "border-bottom:1px solid #f3f4f6;padding:6px 8px"
+# Direction colour for the Difference cell, keyed by the sign the text carries: a rise is
+# against the buyer (red), a drop in their favour (green); an unchanged price stays neutral.
+_DIFF_COLOR = {"+": ";color:#b91c1c", "-": ";color:#047857"}
+
+
+def _difference_td(text: str | None) -> str:
+    """One Difference cell: the signed percentage, coloured by direction; an em dash when
+    there is no previous price to compare against."""
+    if text is None:
+        return f'<td style="{_TD}">—</td>'
+    return f'<td style="{_TD}{_DIFF_COLOR.get(text[0], "")}">{escape(text)}</td>'
+
+
 _BADGE = (
     "display:inline-block;background:#eef2ff;color:#3730a3;border-radius:6px;"
     "padding:2px 8px;margin:0 4px 4px 0;font-size:12px"

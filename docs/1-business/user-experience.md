@@ -12,7 +12,7 @@ The Dashboard is the landing page: it welcomes the user by name. *(Its cart-stat
 
 ## Telling the system what to watch
 
-The user opens a scraper's page from the group at the bottom of the side bar. Here each site has its own interface, designed for that site: typically the user can preview the products (a "dry run" that saves nothing) and then select what to monitor — individual products, whole categories, or whatever the site allows. From then on, at every scheduled execution, the scraper extracts the chosen products and deposits them into the user's **personal catalog**. When the catalog is empty a per-scraper **"Scrape now"** on the scraper's page populates it right away, without waiting for the next scheduled run.
+The user opens a scraper's page from the group at the bottom of the side bar. Here each site has its own interface, designed for that site: the user says what to monitor — individual products, whole categories, or whatever the site allows — and the system reads it from the site straight away, so it lands in the user's **personal catalog** immediately rather than at the next scheduled execution. From then on every scheduled run refreshes it. A per-scraper **"Scrape now"** on the scraper's page re-reads everything on demand.
 
 ## Building the carts
 

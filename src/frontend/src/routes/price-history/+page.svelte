@@ -18,6 +18,7 @@
 	} from '$lib/api/client';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import PriceChart from '$lib/components/PriceChart.svelte';
+	import { dateTime } from '$lib/format';
 
 	type Source = 'product' | 'cart';
 	type ChartPoint = { t: string; value: number; available: boolean };
@@ -31,6 +32,17 @@
 
 	let points = $state<ChartPoint[]>([]);
 	let currency = $state('EUR');
+
+	// When the selected product was last actually read from the site. A flat line says
+	// nothing about whether we are still looking, so the timestamp says it instead.
+	// Products only: a cart has one per member, and no single answer. It is the fetch
+	// time, not the run time — a scrape served from the cache does not move it, which the
+	// caption says out loud so the date is not read as "we checked then".
+	const lastSeen = $derived(
+		source === 'product' && productId != null
+			? (products.find((p) => p.id === productId)?.last_seen_at ?? null)
+			: null
+	);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
@@ -183,6 +195,15 @@
 			</select>
 		{/if}
 	</div>
+
+	{#if lastSeen}
+		<div>
+			<p class="text-sm text-slate-500">
+				{$_('priceHistory.lastSeen')}: <span class="font-mono">{dateTime(lastSeen)}</span>
+			</p>
+			<p class="text-xs text-slate-400">{$_('priceHistory.lastSeenNote')}</p>
+		</div>
+	{/if}
 
 	{#if error}
 		<p class="text-sm text-red-500">{error}</p>

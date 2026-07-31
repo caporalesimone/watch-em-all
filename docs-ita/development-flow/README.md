@@ -34,8 +34,10 @@
   *Risultato: **la mail col digest arriva in casella — il prodotto fa il suo mestiere (0.1)**.*
 - [x] **Fase 8 — Grafici dello storico** 📈 → [phase-08-price-charts.md](phase-08-price-charts.md) — completata (`0.8.0`)
   *Risultato: grafici interattivi per prodotto e carrello.*
-- [ ] **Fase 9 — Dragon Store completo** → [phase-09-dragonstore-complete.md](phase-09-dragonstore-complete.md)
-  *Risultato: monitoraggio per categorie, dry-run dalla UI, catalogo gestibile.*
+- [ ] **Fase 9 — Dragon Store completo** → [phase-09-dragonstore-complete.md](phase-09-dragonstore-complete.md) — *implementata (`0.9.0`), in attesa della validazione manuale*
+  *Risultato: monitoraggio per categorie, catalogo gestibile.*
+- [ ] **Fase 9b — Statistics** → [phase-09b-statistics.md](phase-09b-statistics.md)
+  *Risultato: le statistiche che la Fase 9 raccoglie nel database (per prodotto e per scraper) trovano una rappresentazione. La Fase 9 non ne mostra nessuna: si decide qui, guardando numeri veri già accumulati invece di immaginarseli su una tabella vuota.*
 - [ ] **Fase 10 — Governo admin** → [phase-10-admin-governance.md](phase-10-admin-governance.md)
   *Risultato: plancia admin completa — statistiche, limiti, utenti, manutenzione. (Creazione/elenco utenti **anticipati** come MVP prima della Fase 3; qui restano reset password, disabilita/riabilita, cancellazione differita + restore, filtri di stato, ultimo accesso, notifiche di cortesia, dashboard del carico.)*
 - [ ] **Fase 11 — Summary, analisi prezzi, export** → [phase-11-insights.md](phase-11-insights.md)
@@ -44,6 +46,12 @@
   *Risultato: secondo canale (Discord), audit i18n English-first, CI piena: release 1.0.*
 - 💡 **Fase 13 — Resilienza dello scraping** (post-1.0, idea da dettagliare) → [phase-13-scraping-resilience.md](phase-13-scraping-resilience.md)
   *Risultato: le connessioni verso i siti usano user-agent (e opzioni di richiesta) decisi dal core, con eventuale preferenza per-scraper. Annotazione, oltre il perimetro 1.0.*
+- 💡 **Fase 14 — Sito usabile da mobile** (post-1.0, idea da dettagliare) → [phase-14-mobile.md](phase-14-mobile.md)
+  *Risultato: le pagine utente si usano da telefono senza zoom né scorrimento orizzontale (14.1); il perimetro dell'area admin (14.2) è da discutere prima, perché è la parte cara.*
+- 💡 **Fase 15 — Notifiche sul catalogo** (post-1.0, idea da dettagliare) → [phase-15-catalog-notifications.md](phase-15-catalog-notifications.md)
+  *Risultato: sai quando un prodotto entra o sparisce dalle categorie che segui, non solo quando si muove un carrello. Ha senso solo dopo le categorie della Fase 9: è da lì che il catalogo cresce da solo.*
+- 💡 **Fase 16 — Custodia dello storico prezzi** (post-1.0, idea da dettagliare) → [phase-16-history-custody.md](phase-16-history-custody.md)
+  *Risultato: l'admin può guardare e potare lo storico prezzi, la sola tabella che per scelta non si cancella mai da sé. Nasce dalla Fase 9, che ha reso lo storico proprietà del prodotto e non dell'utente: da lì esistono catene che nessuno referenzia più, e decidere il loro destino è governo, non pulizia.*
 
 ## La logica dell'ordine
 

@@ -1,7 +1,7 @@
 """Unit tests for the alert baseline (phase 6.B2): snapshot payload + persistence.
 
 Pure tests on a local in-memory engine — no web app. Cover the snapshot shape
-(delisted excluded, per-product flags, cart-level flags) and upsert/get/delete.
+(per-product flags including ``removed``, cart-level flags) and upsert/get/delete.
 """
 
 from __future__ import annotations
@@ -65,13 +65,22 @@ def test_snapshot_payload_shape() -> None:
     ]
     payload = snapshot_payload(products, _state(all_on_sale=False, reached=True))
 
-    assert set(payload["products"].keys()) == {"1", "2"}  # delisted product 3 excluded (ALERT-R12)
-    assert payload["products"]["1"] == {"on_sale": True, "available": True, "price_current": "9.99"}
+    # Since 9.B9 the delisted member is in the baseline too, flagged: without a row to
+    # transition from, PRODUCT_DELISTED could not fire once (ALERT-R12).
+    assert set(payload["products"].keys()) == {"1", "2", "3"}
+    assert payload["products"]["1"] == {
+        "on_sale": True,
+        "available": True,
+        "price_current": "9.99",
+        "removed": False,
+    }
     assert payload["products"]["2"] == {
         "on_sale": False,
         "available": False,
         "price_current": "20.00",
+        "removed": False,
     }
+    assert payload["products"]["3"]["removed"] is True
     assert payload["all_on_sale"] is False
     assert payload["threshold_reached"] is True
 

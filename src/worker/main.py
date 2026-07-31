@@ -32,10 +32,12 @@ from src.core.notify import drain_deliveries, enqueue_deliveries
 from src.core.plugins.base import NotifierPlugin, ScraperPlugin
 from src.core.plugins.context import PluginContext, build_context
 from src.core.plugins.registry import LoadedPlugin, load_plugins
+from src.core.process_status import report
 from src.core.schedule import due_slot, install_tz, set_last_slot
 from src.core.schema_drift import check_schema_drift
 from src.core.scrape import implements_scraping, stamp_cooldown
 from src.core.scrape_cache import purge_expired as purge_expired_cache
+from src.core.scraper_stats import bump, record_run
 from src.core.settings import get_system_settings
 from src.core.system_log import install_system_log_handler
 from src.worker.runner import Runner
@@ -55,6 +57,10 @@ _scrapers: dict[str, ScraperPlugin] = {}
 # the pending ones each tick (phase 7).
 _notifiers: list[NotifierPlugin] = []
 
+# Set at boot when the database schema does not match this version (INC-R4). While it is on,
+# the tick heartbeats and does nothing else: everything else in it writes.
+_incompatible: bool = False
+
 # Submit a scraper run to the runner: (scraper_id, slot, trigger) -> enqueued?
 Submit = Callable[[str, datetime, str], bool]
 
@@ -65,9 +71,32 @@ def _shutdown(signum: int, _frame: FrameType | None) -> None:
 
 
 def _heartbeat(now: datetime) -> None:
-    """Touch the heartbeat file with ``now`` (epoch seconds) — CRON-R7."""
+    """Say that this worker is alive, twice over — CRON-R7 and PST-R1.
+
+    The **file** is what the container's own healthcheck reads (``unhealthy`` past 180s), and it
+    can only be that: it lives in the worker's own tmpfs, so nothing outside this container can
+    see it. That is why `/api/health` reported `worker_heartbeat_age_s: null` from phase 1 until
+    now — not because the worker was silent, but because the one place it spoke was unreachable.
+
+    The **row** is the half the web can read. Rate-limited by `report` itself (PST-R2), so a tick
+    lowered to its 1s floor for debugging does not become a write per second.
+    """
     with open(HEARTBEAT_FILE, "w") as fh:
         fh.write(str(int(now.timestamp())))
+    session = new_session()
+    try:
+        report(
+            session,
+            "worker",
+            state="suspended" if _incompatible else "running",
+            detail=(
+                "the database schema does not match this version; scheduled work is suspended"
+                if _incompatible
+                else None
+            ),
+        )
+    finally:
+        session.close()
 
 
 def _boot() -> None:
@@ -90,16 +119,38 @@ def _boot() -> None:
     metadatas = [Base.metadata] + [
         lp.plugin.table_metadata for lp in loaded if lp.plugin.table_metadata is not None
     ]
+    global _incompatible
+    _incompatible = False
     try:
-        for item in check_schema_drift(get_engine(), metadatas):
-            if item.missing_table:
-                log.warning("schema drift: table %r is missing from the database", item.table)
-            else:
-                log.warning(
-                    "schema drift: table %r is missing column(s): %s",
-                    item.table,
-                    ", ".join(item.missing_columns),
+        drift = check_schema_drift(get_engine(), metadatas)
+        for item in drift:
+            log.error("schema drift: %s", item.summary())
+        if drift:
+            # The web serves its incompatibility page (INC-R1); the worker's equivalent is to
+            # do nothing, which is the only safe answer here. It has no user to explain
+            # itself to, and unlike a page it *writes*: a scrape against a schema this
+            # process does not agree with would fail halfway through a run, on a database
+            # somebody may still be able to salvage.
+            _incompatible = True
+            # Forced past the rate limit: a change of state is news, not a repetition, and the
+            # admin's errors feed should not have to wait half a minute to learn it (PST-R2).
+            session = new_session()
+            try:
+                report(
+                    session,
+                    "worker",
+                    state="suspended",
+                    detail="the database schema does not match this version; "
+                    "scheduled work is suspended",
+                    force=True,
                 )
+            finally:
+                session.close()
+            log.error(
+                "database incompatible with this version — scheduled work is suspended "
+                "(no scrapes, no deliveries); the heartbeat continues so the web can see "
+                "this worker is alive"
+            )
     except Exception:
         log.exception("schema-drift check failed")
     session = new_session()
@@ -179,6 +230,11 @@ def _run_scraper(
                 ulog.products_new = delta.new
                 ulog.price_changes = delta.price_changes
                 run.products_removed += delta.removed
+                # What the scraper filtered out before delivering (9.B5): the column has been
+                # on scrape_run since 4.B6 and nothing wrote it, so a run over a category of 39
+                # reported 38 found and left the missing one unaccounted for. Only the plugin
+                # knows — the catalog service is handed the survivors.
+                run.products_excluded += delta.excluded
                 ulog.status = "ok"
                 outcomes.append("ok")
             except Exception as exc:
@@ -203,6 +259,23 @@ def _run_scraper(
         run.status = _aggregate_status(outcomes, timed_out)
         run.finished_at = datetime.now(UTC)
         ctx.db.commit()
+        # Lifetime statistics (9.B6c): scrape_run has retention, so this row is the only
+        # memory of what this scraper has ever done. Never let it break a run.
+        try:
+            record_run(
+                ctx.db,
+                scraper_id,
+                ok=run.status == "ok",
+                seconds=(run.finished_at - run.started_at).total_seconds(),
+                http_requests=run.http_requests,
+                cache_hits=run.cache_hits,
+                bytes_downloaded=ctx.http.bytes_downloaded,
+                politeness_wait_s=ctx.http.waited_seconds,
+                robots_denied=ctx.http.robots_denied,
+                products_delivered=run.products_found,
+            )
+        except Exception:
+            log.exception("could not record the lifetime statistics of %s", scraper_id)
         set_last_slot(ctx.db, scraper_id, slot)
         log.info(
             "run %s (%s): %s — %d user(s), found=%d new=%d price_changes=%d removed=%d "
@@ -233,6 +306,13 @@ def scraper_job(scraper_id: str, slot: datetime, trigger: str = "scheduled") -> 
     with scraper_lock(get_engine(), scraper_id) as acquired:
         if not acquired:
             log.warning("runner: %s already running, slot %s skipped", scraper_id, slot)
+            session = new_session()
+            try:
+                bump(session, scraper_id, {"runs_skipped_locked": 1})
+            except Exception:
+                log.exception("could not record the skipped run of %s", scraper_id)
+            finally:
+                session.close()
             return
         log.info("running %s (slot %s, %s)", scraper_id, slot, trigger)
         ctx = build_context(lp.manifest, plugin)
@@ -314,12 +394,17 @@ def _loop(submit: Submit, max_ticks: int | None = None) -> None:
             _daily_maintenance(now)
             last_maint_date = now.date()
         _heartbeat(now)
-        session = new_session()
-        try:
-            dispatch_due(session, now, tz, submit)
-        finally:
-            session.close()
-        _drain_deliveries_step()  # phase 7: drain pending channel deliveries, decoupled from scrape
+        # The heartbeat still goes out while the schema is incompatible — it is how the web
+        # knows this process is alive, and a silent worker would read as a second, different
+        # fault. What is suspended is everything that would *write* through the mismatch.
+        if not _incompatible:
+            session = new_session()
+            try:
+                dispatch_due(session, now, tz, submit)
+            finally:
+                session.close()
+            # Phase 7: drain pending channel deliveries, decoupled from scrape.
+            _drain_deliveries_step()
         ticks += 1
         if max_ticks is not None and ticks >= max_ticks:
             break
@@ -344,5 +429,15 @@ def run() -> None:
     _boot()
     runner = Runner(scraper_job)
     runner.start()
-    log.info("worker started; heartbeat on %s (tick from feature flag)", HEARTBEAT_FILE)
-    _loop(runner.submit)
+    log.info(
+        "worker started, version %s; heartbeat on %s (tick from feature flag)",
+        get_settings().version,
+        HEARTBEAT_FILE,
+    )
+    try:
+        _loop(runner.submit)
+    finally:
+        # `_shutdown` announces the signal; this announces that the loop actually left. The
+        # pair is what tells a stop apart from a crash — and a `finally` catches both, since
+        # the signal handler stops the process by raising SystemExit through the loop.
+        log.info("worker stopped")

@@ -194,8 +194,8 @@ def cart_history(
     range: Annotated[Range, Query(description="time window: week=7d, month=30d, all")] = "month",
 ) -> CartHistory:
     cart = _get_owned(db, user, cart_id)  # 404 if not the user's cart (DB-R1)
-    member_ids = [p.id for p in _cart_products(db, cart.id)]
-    series = cart_series(db, member_ids, range)
+    members = [(p.plugin_id, p.external_id) for p in _cart_products(db, cart.id)]
+    series = cart_series(db, members, range)
     return CartHistory(
         cart_id=cart.id,
         range=range,

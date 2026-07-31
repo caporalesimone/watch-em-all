@@ -29,11 +29,18 @@ DEFAULT_CACHE_TTL_MIN = 720
 
 @dataclass(frozen=True)
 class CachedResponse:
-    """A cache hit, enough to rebuild an ``HttpResponse`` (status + body + content-type)."""
+    """A cache hit, enough to rebuild an ``HttpResponse`` (status + body + content-type).
+
+    ``fetched_at`` is **when the site actually answered**, not when the row was read back.
+    It was stored from the first version of the cache and then thrown away on read, which
+    is how ``last_seen_at`` ended up meaning "when we last re-served this" instead of
+    "when this data was obtained" — a lie that grows with the half-life.
+    """
 
     status_code: int
     content: bytes
     content_type: str | None
+    fetched_at: datetime
 
 
 def _normalize_url(url: str) -> str:
@@ -122,6 +129,7 @@ class ScrapeCache:
                     status_code=int(meta.get("status", 200)),
                     content=bytes(row.response_body),
                     content_type=meta.get("content_type"),
+                    fetched_at=_aware(row.fetched_at),
                 )
             finally:
                 session.close()

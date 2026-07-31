@@ -24,7 +24,7 @@ class TestMioScraper(ScraperContractSuite):
 | `external_id` univoci dentro una consegna | SCR-R9 |
 | Gli out-of-stock sono **presenti** con `is_available=False` | SCR-R7 |
 | Lista deduplicata con input sovrapposti | SCR-R8 |
-| `run_test` non invoca mai `update_catalog` né scrive su tabelle | SCR-R11 |
+| Una consegna parziale (un prodotto risolto all'aggiunta) passa da `upsert_catalog`, **mai** da `update_catalog` | CATSVC-R2 |
 | Tutto l'I/O di rete passa da `context.http` | CTX-R1 |
 | `delete_user_data` rimuove ogni riga dell'utente dalle tabelle del plugin, idempotente | SCR-R14 |
 | Schemi config validi (`ConfigField`), chiavi uniche | CFG-R1 |
@@ -52,8 +52,7 @@ class TestMioScraper(ScraperContractSuite):
 
 - [ ] Manifest completo (`api_version` corrente, icona, cartelle i18n)
 - [ ] Cartelle `i18n/` con `en.json` presente e completo (è il fallback obbligatorio)
-- [ ] Dry-run dalla UI: risultati sensati, **nessuna riga scritta** (verifica con pgweb in dev)
-- [ ] Pagina utente: selezione → entry negli input; pagina admin: parametri + test funzionante
+- [ ] Pagina utente: aggiunta di un URL → entry negli input **e** prodotto già a catalogo (verifica con pgweb in dev); pagina admin: parametri funzionanti
 - [ ] Run completa in dev: prodotti a catalogo, provenienza visibile nel Product Picker
 - [ ] Seconda run senza modifiche al sito: **zero** nuovi prodotti, zero variazioni spurie (conferma stabilità `external_id`)
 - [ ] (Notifier) test di consegna reale dal Profilo, in entrambe le lingue

@@ -12,6 +12,12 @@ L'admin apre il monitoraggio e capisce in un colpo d'occhio quanto lavorano gli 
 
 ## MVP
 
+### Catalogo (rifinitura, chiesta il 2026-07-31)
+
+> Non è governo admin: è una rifinitura di una pagina **utente** che Simone ha chiesto di fare all'inizio di questa fase. Sta qui per scelta di sequenza, non perché appartenga al tema.
+
+- [ ] **10.F0 — La colonna Source mostra l'icona, non il nome** (~30m): nella tabella del catalogo la provenienza occupa oggi una colonna di testo — icona **più** nome dello scraper ripetuti su ogni riga, per un'informazione che in un'installazione con un solo negozio è costante e in una con tre si riconosce a colpo d'occhio dal logo. **È l'icona a portare il riconoscimento**, e per questo va ingrandita fino alla dimensione del riquadro dell'anteprima prodotto: le due celle si allineano, e un logo a 16px non identifica niente — togliere il nome *e* lasciare l'icona piccola renderebbe la colonna meno leggibile di adesso, non più. Il **tooltip** col nome al passaggio del mouse è un aiuto in più, non il canale dell'informazione (decisione di Simone, 2026-07-31). Due vincoli di implementazione: `SourceTag` è condiviso (catalogo, dettaglio carrello, pagine degli scraper), quindi la variante "sola icona" va aggiunta come **opzione del componente**, non copiata, o le tre pagine divergeranno alla prima modifica; e l'`alt` dell'immagine porta comunque il nome dello scraper — non per ridondanza col tooltip, ma perché un'icona con `alt` vuoto per uno screen reader **non esiste**, e quella cella resterebbe muta invece di ridondante. Costa un attributo. *Verifica: la colonna mostra solo il logo alla stessa altezza dell'anteprima, l'hover ne dice il nome, uno screen reader legge il nome dello scraper, e le altre pagine che usano `SourceTag` non cambiano aspetto.*
+
 ### Backend
 
 - [ ] **10.B1 — Utenti: create/reset/disable** (~1h): API con invalidazione token (`token_version`), login a credenziali corrette su disabilitato → codice `account_disabled` (AUTH-R10) ([user-management](../3-features/admin/user-management.md)). *Verifica: utente disabilitato → fuori entro la scadenza dell'access token.*
@@ -33,6 +39,18 @@ L'admin apre il monitoraggio e capisce in un colpo d'occhio quanto lavorano gli 
 - [ ] **10.B17 — API message-templates** (~1h): `GET/PUT/DELETE /api/admin/message-templates`, validazione dei placeholder in PUT. *Verifica: DELETE → torna il default; placeholder sconosciuto segnalato.*
 - [ ] **10.B18 — API calendario scraper** (~1h): `GET /api/admin/scrapers/calendar?date=` — slot pianificati del giorno + durata media delle run recenti (SCHED-R10). *Verifica: gli slot rispecchiano gli schedule; sospesi esclusi o marcati.*
 - [ ] **10.B19 — Scadenza password configurabile (admin)** (~1h): impostazione di sistema `password_expiry` (in `system_settings`, 10.B7) con **opzioni fisse** — **Mai (default)**, 1 mese, 3 mesi, 6 mesi, 1 anno; nuova colonna `password_changed_at` su `users`, aggiornata a ogni cambio password; al login, se la password è più vecchia della finestra configurata, si **forza il cambio** riusando `must_change_password` e il flusso di cambio forzato già esistente. *Verifica: impostata a 1 mese → un utente con password più vecchia di un mese è forzato al cambio al login; "Mai" → nessun forzamento.*
+
+### Da discutere prima di stimare (nessuna implementazione senza discussione)
+
+> ⛔ **Non implementare nulla di questo blocco prima di averlo discusso e deciso con Simone.** È un'idea annotata il 2026-07-27, non un MVP: manca la scelta di fondo, e sceglierla male costa più che rimandarla.
+
+- [ ] **10.D1 — Notifiche per l'admin sui log** *(da discutere)*: oggi i canali di notifica (fase 7) servono **solo l'utente** e solo per eventi di catalogo/carrello; l'admin non riceve nulla, e per accorgersi di un problema deve aprire la pagina dei log e guardare. L'idea è una sezione di notifiche **propria dell'admin**, dove sottoscriversi a ciò che il sistema logga — l'esempio concreto è "mandami una notifica quando il portale logga degli `error`". Il caso reale che la motiva è il blocco di Dragon Store del 2026-07-25: gli errori c'erano nei log dal primo giorno, ma nessuno li ha visti finché Simone non è andato a leggerli.
+  >
+  > **La decisione aperta è la logica di attivazione**, e le due strade non sono equivalenti:
+  > - **Istantanea** — si notifica appena il log viene scritto. Reattiva, ma un guasto ripetitivo genera una raffica: lo scraper che fallisce su 40 watch produrrebbe 40 notifiche identiche. Servirebbe come minimo un raggruppamento o un antiflood.
+  > - **A finestre** — un engine dedicato all'admin che gira ogni tot ore, guarda i log del periodo e decide cosa è **significativo** (un errore isolato non lo è, venti errori uguali sì; un errore nuovo mai visto prima probabilmente sì). Più simile a come funzionano già gli alert utente, che sono per digest e non per evento singolo.
+  >
+  > Altri punti da chiarire quando se ne parla: chi riceve (tutti gli admin? il super-user di fase 9?); quali canali (riuso di quelli di fase 7 o un percorso separato); che granularità di sottoscrizione (per livello, per sorgente, per testo); e se questo debba diventare un **notifier con destinatario admin** dentro l'infrastruttura esistente invece di un sistema parallelo — che è la domanda architetturale più importante delle quattro.
 
 ### Frontend
 

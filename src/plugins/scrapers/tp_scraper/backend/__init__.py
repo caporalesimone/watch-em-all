@@ -25,7 +25,7 @@ import logging
 import random
 import re
 import secrets
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -45,7 +45,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from src.core.catalog import update_catalog as _update_catalog_service
-from src.core.contracts import BrandRef, CategoryRef, DeltaCounters, Product
+from src.core.contracts import DeltaCounters, Product
 from src.core.errors import APIError
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.context import PluginContext
@@ -258,31 +258,46 @@ class TpScraperPlugin(ScraperPlugin):
     # (implements_scraping stays False). The catalog write path below is driven
     # only by the developer-facing routes.
 
-    def _to_product(self, row: GeneratedProduct) -> Product:
-        return Product(
-            plugin_id=PLUGIN_ID,
-            external_id=self.external_id_for(raw=row.url, url=row.url),
+    def _to_product(self, context: PluginContext, row: GeneratedProduct) -> Product:
+        """One generated row as a ``Product``, through the base's assembler (SCR-R18).
+
+        This used to be a third hand-written copy of the same construction, complete with the
+        comment about `discount_pct` copied verbatim from the Dragon Store — and with
+        `scraped_at=now()`, the line PROD-R8 forbids a real scraper. Harmless in a generator
+        (these rows *are* produced now), and precisely the line a third scraper would have
+        copied from here.
+
+        A generator has no site to read availability from, so it states `is_available` itself:
+        the schema.org token is what a real scraper carries, and `InStock`/`OutOfStock` is the
+        faithful translation of a boolean this plugin invented.
+        """
+        tags = self.new_tags()
+        for tag in row.tags or []:
+            tags.add_tag(tag)
+        return self.build_product(
+            context,
+            raw=row.url,
             url=row.url,
             name=row.name,
-            image_url=row.image_url,
-            brand=BrandRef(text=row.brand_text) if row.brand_text else None,
-            tags=list(row.tags or []),
-            category=[CategoryRef(**c) for c in (row.category or [])],
             price_current=row.price_current,
             price_original=row.price_original,
-            discount_pct=None,  # the core derives it from original/current
+            availability="InStock" if row.is_available else "OutOfStock",
+            brand_text=row.brand_text,
+            image_url=row.image_url,
             currency=row.currency,
-            is_available=row.is_available,
-            scraped_at=datetime.now(UTC),
-            extra={},
+            breadcrumb=[(c["text"], c.get("link")) for c in (row.category or [])],
+            tags=tags,
+            # No `fetched_at`: nothing was fetched. These rows are generated, so "now" is the
+            # truth here rather than a shortcut — the one context in which it is.
         )
 
     def _deliver(self, db: Session, user_id: int) -> DeltaCounters:
         """Re-deliver this user's full generated set; the core inserts the new
         ones, records price/availability changes and delists any that are gone.
         Commits the session (adds/deletes). Returns the delta the service computed."""
-        products = [self._to_product(r) for r in _user_rows(db, user_id)]
-        return _write_context(db).update_catalog(user_id, products)
+        context = _write_context(db)
+        products = [self._to_product(context, r) for r in _user_rows(db, user_id)]
+        return context.update_catalog(user_id, products)
 
     def router(self) -> APIRouter:
         router = APIRouter()

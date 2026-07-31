@@ -2,6 +2,10 @@
 
 Pure service-level: an in-memory SQLite session, PriceHistory rows inserted directly with
 explicit ``recorded_at`` so the range windows and the pre-range entry can be asserted precisely.
+
+Nothing here creates a catalog row, and that is the point since the chain became per-product:
+the history is keyed on ``(plugin_id, external_id)`` and needs no row, no user and no foreign
+key to exist. Before, these tests had to seed products and their owner just to satisfy a cascade.
 """
 
 from __future__ import annotations
@@ -16,8 +20,9 @@ from sqlalchemy.orm import Session
 from src.core.models import PriceHistory
 from src.core.price_history import cart_series, product_series
 
-PRODUCT = 1
-USER = 1
+PLUGIN = "tp"
+P1 = "e1"
+P2 = "e2"
 
 
 @pytest.fixture()
@@ -39,12 +44,12 @@ def _hist(
     days_ago: float,
     price: str,
     available: bool = True,
-    product_id: int = PRODUCT,
+    external_id: str = P1,
 ) -> None:
     session.add(
         PriceHistory(
-            product_id=product_id,
-            user_id=USER,
+            plugin_id=PLUGIN,
+            external_id=external_id,
             price_current=Decimal(price),
             price_original=Decimal(price),
             discount_pct=Decimal("0.00"),
@@ -56,7 +61,17 @@ def _hist(
 
 
 def test_empty_product_returns_no_points(session: Session) -> None:
-    assert product_series(session, PRODUCT, "all") == []
+    assert product_series(session, PLUGIN, P1, "all") == []
+
+
+def test_history_needs_no_catalog_row(session: Session) -> None:
+    """The chain belongs to the product, so it reads back with nobody watching it — which is
+    what makes a removed product hand its past to the next user who adds it."""
+    _hist(session, days_ago=3, price="12.00")
+
+    series = product_series(session, PLUGIN, P1, "all")
+
+    assert [str(p.price) for p in series] == ["12.00"]
 
 
 def test_all_returns_every_point_oldest_first(session: Session) -> None:
@@ -64,7 +79,7 @@ def test_all_returns_every_point_oldest_first(session: Session) -> None:
     _hist(session, days_ago=20, price="30.00")
     _hist(session, days_ago=2, price="25.00")
 
-    series = product_series(session, PRODUCT, "all")
+    series = product_series(session, PLUGIN, P1, "all")
 
     assert [str(p.price) for p in series] == ["40.00", "30.00", "25.00"]
     assert series[0].t < series[1].t < series[2].t
@@ -75,7 +90,7 @@ def test_week_keeps_only_the_window_plus_clamped_pre_entry(session: Session) -> 
     _hist(session, days_ago=20, price="30.00")  # the last change BEFORE the 7-day window
     _hist(session, days_ago=2, price="25.00")  # inside the window
 
-    series = product_series(session, PRODUCT, "week")
+    series = product_series(session, PLUGIN, P1, "week")
 
     # Only the nearest pre-window entry (30.00) is carried in, not the older 40.00.
     assert [str(p.price) for p in series] == ["30.00", "25.00"]
@@ -89,7 +104,7 @@ def test_month_window_includes_the_pre_entry(session: Session) -> None:
     _hist(session, days_ago=20, price="30.00")  # inside
     _hist(session, days_ago=2, price="25.00")  # inside
 
-    series = product_series(session, PRODUCT, "month")
+    series = product_series(session, PLUGIN, P1, "month")
 
     assert [str(p.price) for p in series] == ["40.00", "30.00", "25.00"]
 
@@ -99,16 +114,37 @@ def test_availability_flag_is_preserved(session: Session) -> None:
     _hist(session, days_ago=3, price="20.00", available=False)  # went out of stock
     _hist(session, days_ago=1, price="22.00", available=True)  # back in stock
 
-    series = product_series(session, PRODUCT, "week")
+    series = product_series(session, PLUGIN, P1, "week")
 
     assert [p.available for p in series] == [True, False, True]
 
 
 def test_other_products_are_not_mixed_in(session: Session) -> None:
-    _hist(session, days_ago=1, price="10.00", product_id=PRODUCT)
-    _hist(session, days_ago=1, price="99.00", product_id=2)
+    _hist(session, days_ago=1, price="10.00", external_id=P1)
+    _hist(session, days_ago=1, price="99.00", external_id=P2)
 
-    series = product_series(session, PRODUCT, "all")
+    series = product_series(session, PLUGIN, P1, "all")
+
+    assert [str(p.price) for p in series] == ["10.00"]
+
+
+def test_same_external_id_of_another_plugin_is_not_mixed_in(session: Session) -> None:
+    """The identity is the pair: two scrapers are free to number their products the same way."""
+    _hist(session, days_ago=1, price="10.00")
+    session.add(
+        PriceHistory(
+            plugin_id="other",
+            external_id=P1,
+            price_current=Decimal("99.00"),
+            price_original=Decimal("99.00"),
+            discount_pct=Decimal("0.00"),
+            is_available=True,
+            recorded_at=datetime.now(UTC),
+        )
+    )
+    session.commit()
+
+    series = product_series(session, PLUGIN, P1, "all")
 
     assert [str(p.price) for p in series] == ["10.00"]
 
@@ -116,21 +152,19 @@ def test_other_products_are_not_mixed_in(session: Session) -> None:
 # --------------------------------------------------------------------------- cart series (8.B2)
 
 
-def test_cart_series_empty_cart() -> None:
-    from src.core.db import new_session
-
-    s = new_session()
-    try:
-        assert cart_series(s, [], "all") == []
-    finally:
-        s.close()
+def test_cart_series_empty_cart(session: Session) -> None:
+    # Takes the fixture like every other test here. It used to build its own session from
+    # the global factory, which only worked because some earlier test in the same process
+    # had already called `init_engine()` — an order dependency that was invisible until
+    # the suite started running across workers.
+    assert cart_series(session, [], "all") == []
 
 
 def test_cart_series_sums_members_stepwise(session: Session) -> None:
-    _hist(session, days_ago=6, price="10.00", product_id=1)  # p1 known from day 6
-    _hist(session, days_ago=4, price="20.00", product_id=2)  # p2 known from day 4
+    _hist(session, days_ago=6, price="10.00", external_id=P1)  # p1 known from day 6
+    _hist(session, days_ago=4, price="20.00", external_id=P2)  # p2 known from day 4
 
-    series = cart_series(session, [1, 2], "week")
+    series = cart_series(session, [(PLUGIN, P1), (PLUGIN, P2)], "week")
 
     # day 6: only p1 has a value yet → 10; day 4: both → 30.
     assert [str(p.total) for p in series] == ["10.00", "30.00"]
@@ -138,10 +172,10 @@ def test_cart_series_sums_members_stepwise(session: Session) -> None:
 
 
 def test_cart_series_excludes_unavailable_members(session: Session) -> None:
-    _hist(session, days_ago=3, price="10.00", available=True, product_id=1)
-    _hist(session, days_ago=3, price="20.00", available=False, product_id=2)  # out of stock
+    _hist(session, days_ago=3, price="10.00", available=True, external_id=P1)
+    _hist(session, days_ago=3, price="20.00", available=False, external_id=P2)  # out of stock
 
-    series = cart_series(session, [1, 2], "week")
+    series = cart_series(session, [(PLUGIN, P1), (PLUGIN, P2)], "week")
 
     # p2 is excluded while unavailable → the total is just p1's price at every instant.
     assert series

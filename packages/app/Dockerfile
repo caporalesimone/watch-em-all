@@ -59,8 +59,9 @@ COPY src/__init__.py /app/src/__init__.py
 COPY src/core /app/src/core
 COPY src/web /app/src/web
 COPY src/worker /app/src/worker
-# Plugins are auto-discovered at startup (registry) and their icons are served as
-# static assets, so the whole folder (manifest + backend + icon) ships in the image.
+# Plugins are auto-discovered at startup (registry) and files from their `frontend/assets`
+# are served as static assets (the icon, and whatever else a plugin page shows — REG-R6b),
+# so the whole folder (manifest + backend + assets) ships in the image.
 COPY src/plugins /app/src/plugins
 COPY --chmod=0755 packages/app/entrypoint.sh /app/entrypoint.sh
 USER app

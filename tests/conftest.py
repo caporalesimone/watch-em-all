@@ -3,11 +3,17 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+# A file-backed SQLite per test, not ``:memory:``. In-memory means one shared connection for
+# the whole process (StaticPool), and sessions on one connection share one transaction — so
+# the job drainer's rollback used to discard whatever the request had not committed yet
+# (9.X6c). A file gives every connection its own, the way PostgreSQL does in production, and
+# tmp_path keeps each test isolated (and each xdist worker separate).
 _CONFIG = (
     "core:\n"
-    '  database_url: "sqlite+pysqlite:///:memory:"\n'
+    '  database_url: "sqlite+pysqlite:///{db}"\n'
     '  secret_key: "${WEA_SECRET_KEY}"\n'
     '  default_locale: "en"\n'
     "  access_token_ttl_min: 15\n"
@@ -16,9 +22,12 @@ _CONFIG = (
 
 
 @pytest.fixture()
-def client(tmp_path: object, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+def app(tmp_path: object, monkeypatch: pytest.MonkeyPatch) -> Iterator[FastAPI]:
+    """The configured application, **not** started: the lifespan has not run yet. Almost every
+    test wants `client` below instead; take this one only to drive startup/shutdown yourself."""
     cfg = tmp_path / "config.yaml"  # type: ignore[operator]
-    cfg.write_text(_CONFIG, encoding="utf-8")
+    db = tmp_path / "test.db"  # type: ignore[operator]
+    cfg.write_text(_CONFIG.replace("{db}", str(db).replace("\\", "/")), encoding="utf-8")
     ver = tmp_path / "VERSION"  # type: ignore[operator]
     ver.write_text("9.9.9-test\n", encoding="utf-8")
 
@@ -44,12 +53,25 @@ def client(tmp_path: object, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestCl
     # politeness arithmetic stays fully covered by tests/core/test_http_client.py.
     monkeypatch.setattr(http_mod.HttpClient, "_wait_before", lambda self, attempt, interval_s: None)
 
+    # The job drainers (9.X6c) are woken by a poke, so the idle wait only shows up when a
+    # drainer found the run lock busy. Shrinking it keeps a test that has to wait for a
+    # retry in the milliseconds instead of the seconds.
+    from src.web import jobs as jobs_mod
+
+    monkeypatch.setattr(jobs_mod, "IDLE_WAIT_S", 0.02)
+
     # Fresh limiter per test so login attempts don't accumulate across tests.
     monkeypatch.setattr(
         auth_mod, "_login_limiter", RateLimiter(max_attempts=5, window_seconds=60.0)
     )
 
-    app = create_app()
+    yield create_app()
+    config_mod.get_settings.cache_clear()
+
+
+@pytest.fixture()
+def client(app: FastAPI) -> Iterator[TestClient]:
+    """The started application: entering the context runs the lifespan (schema, admin
+    bootstrap, plugins), leaving it runs the shutdown half."""
     with TestClient(app) as test_client:
         yield test_client
-    config_mod.get_settings.cache_clear()

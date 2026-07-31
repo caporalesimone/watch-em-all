@@ -2,7 +2,7 @@
 
 > **Layer 3 — User feature** · Audience: architects, developers.
 >
-> Limited to what is implemented (DOC-12). Phase 3 ships the read-only catalog view (the per-user, searchable, sortable, paginated table); phase 5 adds the selection role — picking rows and **adding them to an existing cart** (5.F4). The cleanup/mutation actions (remove delisted, selective removal, empty) still arrive in a later phase.
+> Limited to what is implemented (DOC-12). Phase 3 ships the read-only catalog view (the per-user, searchable, sortable, paginated table); phase 5 adds the selection role — picking rows and **adding them to an existing cart** (5.F4); phase 9 adds the **cleanups** (remove delisted, delete mode, empty).
 
 ## Purpose
 
@@ -15,9 +15,12 @@ The catalog is the set of products extracted by the user's scrapers. The **Produ
 - **CAT-R3** — **Unavailable** products stay in the catalog (visual indicator); they are never excluded automatically.
 - **CAT-R4** — **Delisted** products (`removed`, absent from the last scrape) stay in the table greyed out, excluded from carts and alerts, until the user cleans them up. If they reappear in a scrape, they become active again.
 - **CAT-R5** — The table is **paginated server-side**, sortable (source, title, current price, list price, availability, last update), and **searchable by title** (the API also filters by availability and delisting). On open it populates itself (even right after a scrape, which writes asynchronously): no need to launch the search by hand.
-- **CAT-R6** — Cleanup actions: remove delisted, selective removal (delete mode), empty the catalog. All with confirmation; the confirmation **states the consequences** (removal from carts and loss of the price history of the affected products). _(Arrives in a later phase, with the picker's selection/cleanup role.)_
+- **CAT-R6** — Cleanup actions: remove delisted, selective removal (delete mode), empty the catalog. All with confirmation; the confirmation **states the consequences** (removal from carts and loss of the price history of the affected products), and each action reports **how many rows went** — "nothing was delisted" and "twelve products went" are different answers to the same click. Emptying the catalog says the other half too: the **watches are not touched**, so the next scheduled run brings back whatever is still watched.
 - **CAT-R7** — **Catalog empty-state**: when the catalog is empty the Product Picker offers no scraping actions, but **points to the scraper pages** to configure what to watch and start the first population. **Scrape now** is **per-scraper** and lives on the scraper's page, not here ([scraper-plugin](../plugins/scraper-plugin.md), SCR-R15).
-- **CAT-R8** — Deleting a product from the catalog removes it **in cascade** from carts and deletes its price history. _(Arrives in a later phase, together with the cart/picker selection role.)_
+- **CAT-R8** — Deleting a product from the catalog removes it **in cascade** from every cart holding it, and the confirmation has to declare that. It does **not** delete its price history: that chain belongs to the product and is shared with everyone else watching it (CATSVC-R4), so the confirmation says the opposite — the history stays, and is still there if the product is added back.
+- **CAT-R10** — A confirmation states **how many carts are about to lose something**, counted rather than described: `{count} of them are in one of your carts and will be taken out of it`. The membership cascade is silent and invisible in the catalog table, and a delisted product only ever gets into a cart while it was still on sale — so it is a choice the user made that disappears without a word otherwise. Said only when the count is non-zero: a dialog does not grow a line to announce a zero.
+- **CAT-R11** — The confirmation for a **single product** is shaped around the product rather than being a paragraph: the product's own name is the heading (with a trash icon — no generic "Delete a product" title, which the icon already carries), its picture sits in a **fixed square** beside the consequences (`object-contain`, so the dialog does not change shape between a tall book cover and a wide box), and the consequences are three marked lines instead of prose — ⚠️ the carts it leaves, ⚠️ what brings it back and how to stop that, ℹ️ that its price history is kept. The ℹ️ line carries the same text colour as the warnings: it is a fact of equal standing, and setting it fainter made it read as a footnote. A caution mark on "your data is safe", conversely, teaches the eye to stop reading the marks.
+- **CAT-R9** — The confirmation for a single product says **whether it will come back, and from where**: the catalog carries the inputs that deliver it (PROD-R9), so the dialog names them instead of hedging, and says plainly that nothing will bring it back when the list is empty. 9.B7 accepted this consequence; until C14 only the empty-catalog confirmation mentioned it. The sentence is **four strings, not one with a guess in it**: the input's *kind* matters (naming "the category X" is false for a product watched on its own), the *plural* matters more (a product can arrive from two categories at once, and naming one of them promises a result that removing it does not produce), and the **scraper** is named too — a category is not addressable without knowing whose store it is, and that scraper's page is where the removal happens. The scraper's display name is resolved from the mounted plugins, the same source `SourceTag` uses, so renaming a plugin renames it here.
 
 ## The table
 
@@ -57,8 +60,8 @@ Distinction to keep firm (a frequent source of confusion):
 | | Plugin page | Product Picker (core) |
 |---|---|---|
 | Purpose | Decide **what to watch on the site** | Choose products **already in the catalog** for the carts |
-| Data | Live preview from the site (dry-run) | DB |
-| Writes | Scraper input (plugin tables) | Cart members |
+| Data | Read live from the site | DB |
+| Writes | Scraper input (plugin tables) + the product itself, scraped on the spot | Cart members |
 
 ## "Empty catalog → first population" cycle
 

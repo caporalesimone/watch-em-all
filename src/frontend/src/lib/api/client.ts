@@ -292,6 +292,17 @@ export interface CatalogItem {
 	extra: Record<string, unknown>;
 	first_seen_at: string;
 	last_seen_at: string;
+	// Which of the user's inputs still deliver this product (C14). Empty = nothing does, so a
+	// deletion is final; otherwise these are what will bring it back on the next scan.
+	sources: CatalogItemSource[];
+	// How many of the user's carts hold it: deleting it takes it out of all of them, silently
+	// (CART-R8), so a confirmation has to be able to count it (C7).
+	in_carts: number;
+}
+
+export interface CatalogItemSource {
+	kind: string; // the plugin's vocabulary (Dragon Store: 'product' | 'category')
+	label: string; // a name to show, kept current by the backend
 }
 
 export interface CatalogPage {
@@ -330,6 +341,36 @@ export function listCatalog(query: CatalogQuery = {}): Promise<CatalogPage> {
 	if (query.removed !== undefined) p.set('removed', String(query.removed));
 	const qs = p.toString();
 	return apiFetch(`/api/catalog${qs ? `?${qs}` : ''}`).then(asJson<CatalogPage>);
+}
+
+// Catalog cleanups (9.B7/9.F4). Each answers a different intention — tidy up what the site
+// no longer offers, drop this one, start over — and each returns how many rows went, because
+// "nothing was delisted" and "twelve products went" are different answers to the same click.
+export interface RemovedCount {
+	removed: number;
+}
+
+export function removeDelistedProducts(): Promise<RemovedCount> {
+	return apiFetch('/api/catalog/delisted', { method: 'DELETE' }).then(asJson<RemovedCount>);
+}
+
+// What that removal is about to do, before it does it (C7): every delisted row, and how many of
+// them are in a cart. Counted server-side over the whole catalog, not the visible page.
+export interface DelistedSummary {
+	total: number;
+	in_carts: number;
+}
+
+export function getDelistedSummary(): Promise<DelistedSummary> {
+	return apiFetch('/api/catalog/delisted').then(asJson<DelistedSummary>);
+}
+
+export function removeCatalogProduct(productId: number): Promise<RemovedCount> {
+	return apiFetch(`/api/catalog/${productId}`, { method: 'DELETE' }).then(asJson<RemovedCount>);
+}
+
+export function emptyCatalog(): Promise<RemovedCount> {
+	return apiFetch('/api/catalog', { method: 'DELETE' }).then(asJson<RemovedCount>);
 }
 
 // Price history (HIST-*). Series are served ready for the chart (the SPA does not
@@ -564,6 +605,10 @@ export interface AlertDigestProduct {
 	price_current: string;
 	discount_pct: string;
 	currency: string;
+	// The Difference column, already rendered by the backend (C19), so the email and this page
+	// cannot disagree. `null` = nothing to report (no previous price, or the product is
+	// delisted), which both render as an em dash.
+	difference: string | null;
 }
 
 export interface AlertDigestThreshold {

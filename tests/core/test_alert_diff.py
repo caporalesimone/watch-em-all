@@ -19,6 +19,7 @@ ALL_PRODUCT_TAGS = {
     AlertType.PRODUCT_OFF_SALE,
     AlertType.PRODUCT_UNAVAILABLE,
     AlertType.PRODUCT_AVAILABLE_AGAIN,
+    AlertType.PRODUCT_DELISTED,
 }
 
 
@@ -34,8 +35,15 @@ def _product(
     )
 
 
-def _prev(*, on_sale: bool, available: bool, price: str) -> dict[str, object]:
-    return {"on_sale": on_sale, "available": available, "price_current": price}
+def _prev(
+    *, on_sale: bool, available: bool, price: str, removed: bool = False
+) -> dict[str, object]:
+    return {
+        "on_sale": on_sale,
+        "available": available,
+        "price_current": price,
+        "removed": removed,
+    }
 
 
 def _snap(**products: dict[str, object]) -> dict[str, object]:
@@ -101,12 +109,43 @@ def test_new_member_is_silent() -> None:
     assert diff_products(new, _snap(), ALL_PRODUCT_TAGS) == []
 
 
-def test_delisted_member_ignored() -> None:
+def test_delisting_fires_once_and_alone() -> None:
+    # 9.B9: the transition into delisting is the event, and it is the *only* tag — the
+    # product also happens to look "on sale" now, which is exactly the noise ALERT-R12 drops.
     snap = _snap(**{"1": _prev(on_sale=False, available=True, price="100.00")})
     diffs = diff_products(
         [_product(1, price="80.00", discount="20", removed=True)], snap, ALL_PRODUCT_TAGS
     )
+    assert len(diffs) == 1
+    assert diffs[0].tags == [AlertType.PRODUCT_DELISTED]
+    assert diffs[0].price_previous == Decimal("100.00")
+
+
+def test_already_delisted_is_silent() -> None:
+    # Second run with the same delisted product: the baseline now says removed → nothing,
+    # not one event per run. Its price moved, and that is still not news.
+    snap = _snap(**{"1": _prev(on_sale=False, available=True, price="100.00", removed=True)})
+    assert (
+        diff_products(
+            [_product(1, price="80.00", discount="20", removed=True)], snap, ALL_PRODUCT_TAGS
+        )
+        == []
+    )
+
+
+def test_delisting_needs_the_tag_enabled() -> None:
+    snap = _snap(**{"1": _prev(on_sale=False, available=True, price="100.00")})
+    diffs = diff_products(
+        [_product(1, price="100.00", discount="0", removed=True)], snap, {AlertType.PRODUCT_ON_SALE}
+    )
     assert diffs == []
+
+
+def test_relisted_product_is_re_seeded_silently() -> None:
+    # Back in the delivery at a different price: no event, because the baseline describes it
+    # as it was before it vanished. The re-listing event itself is phase 15.
+    snap = _snap(**{"1": _prev(on_sale=True, available=False, price="100.00", removed=True)})
+    assert diff_products([_product(1, price="80.00", discount="20")], snap, ALL_PRODUCT_TAGS) == []
 
 
 def test_only_enabled_tags_survive() -> None:

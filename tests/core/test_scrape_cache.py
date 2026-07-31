@@ -83,6 +83,36 @@ def test_httpclient_serves_from_cache_without_http(client: TestClient) -> None:
     assert http.cache_hits == 2
 
 
+def test_cache_hit_carries_the_original_fetch_time(client: TestClient) -> None:
+    """A replayed response must date itself to the fetch that filled the cache, not to the
+    replay: ``last_seen_at`` is derived from it, and getting this wrong made a page up to a
+    half-life old look like it had just been read."""
+    fetched = datetime.now(UTC) - timedelta(hours=6)
+    session = new_session()
+    try:
+        session.add(
+            ScrapeCacheRow(
+                plugin_id="p1",
+                cache_key=cache_key("p1", "GET", URL),
+                response_body=b"<html>old but valid</html>",
+                response_meta_json={"status": 200, "content_type": "text/html"},
+                fetched_at=fetched,
+                expires_at=datetime.now(UTC) + timedelta(hours=6),
+            )
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    hit = ScrapeCache(get_engine(), "p1", ttl_min=720).get("GET", URL)
+    assert hit is not None
+    assert abs((hit.fetched_at - fetched).total_seconds()) < 1
+
+    resp = HttpClient(cache=ScrapeCache(get_engine(), "p1", ttl_min=720)).get(URL)
+    assert resp.fetched_at is not None
+    assert abs((resp.fetched_at - fetched).total_seconds()) < 1
+
+
 def _seed(plugin_id: str, url: str, expires: datetime) -> None:
     session = new_session()
     try:

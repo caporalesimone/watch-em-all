@@ -13,6 +13,7 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     DateTime,
     ForeignKey,
@@ -101,24 +102,132 @@ class CatalogProduct(Base):
     last_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+    # When the delisting sweep dropped it (9.B6b). `removed` alone cannot say "delisted
+    # since when", which the catalog cleanups want to sort on and phase 15 needs to emit
+    # its event exactly once. NULL whenever `removed` is false.
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # --- per-product statistics (9.B6b) -------------------------------------------------
+    # Counted per catalog row, so per user: two users watching the same product keep their
+    # own numbers. Written by the catalog service; how they are shown is phase 9b.
+    #
+    # Fresh reads only: a delivery served from the scrape cache increments `cache_hits`
+    # instead, otherwise this would count "times we re-served a page" rather than times the
+    # site actually answered about this product (9.X4, as a counter).
+    observations: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Deliveries that came off a cached page. Careful reading it: for a category product a
+    # single HTTP cache hit serves up to 50 products, so this means "my data came from a
+    # cached page", not "one request saved for me".
+    cache_hits: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Kept apart on purpose: `scrape_run.price_changes` increments on availability moves and
+    # on the first history row too, so it counts "history rows written". These two do not.
+    price_changes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    availability_changes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    price_min: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    price_min_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    price_max: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    price_max_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # How long the current price has held — the companion of `last_seen_at`: a flat line
+    # reads differently at three days than at eight months.
+    last_price_change_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
-class PriceHistory(Base):
-    """Append-only price/availability history (schema.md, CATSVC-R4).
+class PluginJob(Base):
+    """Progress and cooperative cancellation of one in-flight plugin job (C9/C10).
 
-    One entry is written only when the current price OR availability changed
-    vs. the last entry. No retention in V1. ``user_id`` is denormalised for
-    per-user purges and queries.
+    It exists to take a **transaction** away from the plugins, not a feature. Progress has to be
+    committed while the work is still running — the page polling it cannot see an uncommitted
+    row — and the plugin was doing that on the session it had been handed. In a scheduled run
+    that session is the *worker's*, mid-``run_for_user``, holding a half-filled
+    ``scrape_user_log``: the plugin's commit made that half-row durable, and a process that died
+    before the worker finished left it there for ever with a NULL status.
+
+    So the core keeps this book on **its own short-lived session** (the same pattern as the
+    scrape cache) and hands the plugin two questions instead of a session: *here is how far I
+    have got* and *has anyone asked me to stop?*.
+
+    Keyed ``(plugin_id, job_key)`` — the key is the plugin's own, in its own id space, so the
+    core needs to know nothing about what a job is. The row lives as long as the job: it is
+    written when work starts and dropped when it reaches a terminal state, so a missing row
+    means "nothing of this is running", which is the answer a cancel request needs.
     """
 
-    __tablename__ = "price_history"
-    __table_args__ = (Index("ix_price_history_product_recorded", "product_id", "recorded_at"),)
+    __tablename__ = "plugin_jobs"
+    __table_args__ = (UniqueConstraint("plugin_id", "job_key", name="uq_plugin_jobs_identity"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    plugin_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    job_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    progress_done: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # NULL while the total is not known yet — a category cannot know its size before page one.
+    progress_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    detail: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    # Cooperative: the worker reads this at the same checkpoints that write progress. A thread
+    # cannot be killed, and does not need to be.
+    cancel_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class ProductSource(Base):
+    """Which of a user's inputs delivered a catalog product — many-to-many (C14).
+
+    A product is deliberately **not** the child of one watch: the same product can be delivered
+    by several categories at once, and that is precisely why a single foreign key was refused
+    (9.B4/CATSVC-R2). A many-to-many is the shape that argument asks for, and it answers the
+    question a deletion confirmation has to answer — *will this come back?* — with the name of
+    the input instead of a conditional.
+
+    The source is **described, not joined**: this is a core table and a watch lives in the
+    plugin's own schema (CTX-R6), so there is nothing here to point a FK at. The plugin names
+    its own input; the core keeps the description current on every delivery and drops it when
+    the plugin says that input is gone.
+    """
+
+    __tablename__ = "product_sources"
+    __table_args__ = (
+        UniqueConstraint("product_id", "source_key", name="uq_product_sources_identity"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     product_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False
+        Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    # Refreshed on every delivery: an input the user renamed must not keep its old name here.
+    source_label: Mapped[str] = mapped_column(String(512), nullable=False)
+
+
+class PriceHistory(Base):
+    """Append-only price/availability history, **per product and not per user** (schema.md,
+    CATSVC-R4).
+
+    A price is a fact about the site, not about a user. Keyed per catalog row this table held
+    one chain *per watcher* of the same public fact — duplicated, and free to **diverge**: an
+    entry is written against the previous entry of its own chain, so a user who starts watching
+    later opens a chain whose "first price" was never the product's first. Keyed on the
+    product's identity ``(plugin_id, external_id)`` there is one chain, and one watcher is
+    enough to keep it growing for everyone.
+
+    It therefore **outlives** every catalog row that points at it: a user who removes a product
+    (or is deleted) leaves the history behind for whoever watches it next, which is knowledge
+    the new watcher could not have obtained otherwise. Nothing here is ever pruned — the admin
+    gets tools for history no user references any more in a later phase.
+    """
+
+    __tablename__ = "price_history"
+    __table_args__ = (
+        Index("ix_price_history_identity_recorded", "plugin_id", "external_id", "recorded_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # Product identity, NOT a foreign key to `products`: that table is per-user, and a
+    # cascade from it is exactly what used to destroy the history of a removed product.
+    plugin_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    external_id: Mapped[str] = mapped_column(String(64), nullable=False)
     price_current: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     price_original: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     discount_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
@@ -386,6 +495,38 @@ class ScraperAdminConfig(Base):
     )
 
 
+class ProcessStatus(Base):
+    """What one of this installation's processes is doing, and when it last said so (PST-R1).
+
+    Named for the question rather than for its first answer. The database is the only thing
+    the web and the worker share, so it is the only place either can report on itself to the
+    other; a table called ``worker_heartbeat`` would have had to be replaced the first time
+    something else needed reporting, and there is no reason to make that mistake on purpose.
+
+    One row per process, **updated in place** — a heartbeat is a state, not an event. Appended
+    it would be ~525.000 rows a year at the default tick to answer a question that only ever
+    reads the latest one, and those rows would then need a retention policy of their own.
+
+    Kept deliberately small: ``state`` and ``detail`` are here because the worker already has
+    something true to put in them (it suspends itself on an incompatible schema, INC-R4) and
+    the admin errors feed reads them. A column nothing writes and nobody reads is the mistake
+    C7 was about; the room for growth is in the **name and the key**, not in empty columns.
+    """
+
+    __tablename__ = "process_status"
+
+    # "worker", "web" — whoever reports. Not an enum: a second worker is a name, not a schema
+    # change.
+    process: Mapped[str] = mapped_column(String(32), primary_key=True)
+    # When this process last said it was alive. The writer rate-limits itself (PST-R2), so this
+    # is never more precise than the floor — and does not need to be.
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # What it is doing: "running" | "suspended". Free-form on purpose, same reason as `process`.
+    state: Mapped[str] = mapped_column(String(32), nullable=False, default="running")
+    # Why, when the state calls for it (a suspended worker says what suspended it).
+    detail: Mapped[str | None] = mapped_column(String(256), nullable=True)
+
+
 class SystemSetting(Base):
     """Global system settings (MNT-R3), key → JSON value, editable at runtime and
     **persistent** (unlike feature_flags). Typed access via
@@ -449,7 +590,7 @@ class ScrapeUserLog(Base):
 
 class SystemLog(Base):
     """Operational event log (LOG-R1..R4, 4.B7). The incremental ``id`` doubles as the
-    polling cursor (LOG-R3). ``source`` is one of worker | scraper | notifier | alert |
+    polling cursor (LOG-R3). ``source`` is one of worker | scraper | web | notifier | alert |
     summary; ``level`` info | warning | error. Messages never carry user operational
     content (LOG-R4) — only ids and metrics. Retention by MNT-R2 (worker daily purge)."""
 
@@ -486,3 +627,58 @@ class ScrapeCache(Base):
     response_meta_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ScraperStats(Base):
+    """Lifetime statistics for one scraper (9.B6c, phase 9b decides how to show them).
+
+    One row per ``plugin_id``, **global** (not per user), and **cumulative**. It exists
+    because ``scrape_run`` has retention: aggregating that table answers "recently", never
+    "ever". The health group is not a faster query but information nobody records today —
+    the 429s, the anti-bot gate and the ``robots.txt`` refusals live only as log lines,
+    which is exactly what was missing during the 25 July block, when the question was
+    "since when, and how often".
+
+    ``since`` is part of the contract, not decoration: a cumulative counter that never
+    resets misleads after a configuration change — politeness went from 1.5s to 11s in
+    0.8.1, and totals either side of that are not comparable.
+    """
+
+    __tablename__ = "scraper_stats"
+
+    plugin_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    since: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    # --- activity ---
+    runs_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    runs_ok: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    runs_failed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    runs_skipped_locked: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_failure_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Tells "it is failing right now" from "it failed once in March", which is the actual
+    # question in front of a monitoring page.
+    consecutive_failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    # --- traffic ---
+    http_requests_total: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    cache_hits_total: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    bytes_downloaded_total: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    # Kept apart from total run time on purpose: their ratio says whether the bottleneck is
+    # us or the site's Crawl-delay.
+    politeness_wait_s_total: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    run_seconds_total: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+
+    # --- health towards the site ---
+    rate_limited_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    gate_hits_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    gate_cleared_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    robots_denied_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    # --- yield ---
+    products_delivered_total: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    pages_fetched_total: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    parse_failures_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

@@ -20,6 +20,8 @@ from pydantic import BaseModel, ValidationError
 from src.core.errors import APIError
 from src.core.feature_flags import effective_flags, set_flags
 from src.core.models import SystemLog
+from src.core.process_status import Reported
+from src.core.process_status import read as read_status
 from src.core.schema_drift import SchemaDriftItem
 from src.core.settings import SystemSettings, get_system_settings, set_system_settings
 from src.core.system_log import distinct_sources, level_counts, list_logs, page_logs
@@ -53,18 +55,66 @@ def _schema_drift_error(drift: list[SchemaDriftItem]) -> AdminError:
     )
 
 
+# A worker that has not spoken for this long is reported (PST-R4). Deliberately the same
+# threshold the container healthcheck uses, so the admin page and `docker ps` cannot disagree
+# about whether the worker is up — two answers to one question is worse than a late answer.
+_WORKER_SILENT_AFTER_S = 180
+
+
+def _worker_error(reported: Reported | None) -> AdminError | None:
+    """What the worker is failing to do, if anything. Three states worth telling an admin apart:
+    it never reported, it stopped reporting, or it is reporting that it suspended itself."""
+    if reported is None:
+        return AdminError(
+            source="worker_status",
+            type="warning",
+            title="The worker has never reported",
+            description=(
+                "Nothing has been scraped or delivered since this database was created. Either "
+                "the worker has not started, or it cannot reach the database."
+            ),
+        )
+    if reported.state == "suspended":
+        return AdminError(
+            source="worker_status",
+            type="error",
+            title="The worker has suspended itself",
+            description=reported.detail or "No reason was recorded.",
+        )
+    age = reported.age_s()
+    if age > _WORKER_SILENT_AFTER_S:
+        return AdminError(
+            source="worker_status",
+            type="error",
+            title="The worker has stopped reporting",
+            description=(
+                f"Last seen {int(age)}s ago. Scheduled scrapes and notification deliveries are "
+                "not running."
+            ),
+        )
+    return None
+
+
 @router.get(
     "/errors",
     response_model=list[AdminError],
     summary="Admin-facing errors and warnings (admin only; e.g. schema drift behind its flag).",
 )
-def admin_errors(request: Request, settings: SettingsDep, _admin: AdminDep) -> list[AdminError]:
+def admin_errors(
+    request: Request, settings: SettingsDep, db: SessionDep, _admin: AdminDep
+) -> list[AdminError]:
     errors: list[AdminError] = []
     # Schema drift (4.B0): computed at startup, gated by WEA_SCHEMA_DRIFT_ALERT.
     if settings.schema_drift_alert:
         drift = list(getattr(request.app.state, "schema_drift", []))
         if drift:
             errors.append(_schema_drift_error(drift))
+    # The worker (PST-R4). Not behind a flag: a worker that is not running means nothing gets
+    # scraped and no notification goes out, which is a fault of the installation rather than a
+    # development nicety — and the symptom on its own ("my prices are stale") points nowhere.
+    worker = _worker_error(read_status(db, "worker"))
+    if worker is not None:
+        errors.append(worker)
     return errors
 
 

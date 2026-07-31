@@ -52,6 +52,13 @@ plugin = _Plugin()
 """
 
 _ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"></svg>'
+# The smallest valid PNG (1x1, transparent): enough to assert bytes come back and the
+# content-type is right, without a binary fixture in the repository.
+_PNG = bytes.fromhex(
+    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
+    "890000000a49444154789c6300010000050001"
+    "0d0a2db40000000049454e44ae426082"
+)
 
 
 def _write_plugin(
@@ -69,6 +76,14 @@ def _write_plugin(
     (plugin_dir / "backend" / "__init__.py").write_text(backend, encoding="utf-8")
     if icon:
         (plugin_dir / icon).write_text(_ICON_SVG, encoding="utf-8")
+    # A plugin's own assets folder (REG-R6b): a real image, plus two files that must not be
+    # reachable through the asset route — the kind a plugin folder genuinely contains.
+    assets = plugin_dir / "frontend" / "assets"
+    # `exist_ok`: one test writes the same plugin twice, to check which icon convention wins.
+    assets.mkdir(parents=True, exist_ok=True)
+    (assets / "category.png").write_bytes(_PNG)
+    (assets / "notes.txt").write_text("not an image", encoding="utf-8")
+    (plugin_dir / "secret.py").write_text("TOKEN = 'sekrit'", encoding="utf-8")
 
 
 def _build_app(tmp_path: Path) -> FastAPI:
@@ -159,6 +174,54 @@ def test_icon_served_and_unknown_is_404(tmp_path: Path) -> None:
         assert missing.json()["code"] == "not_found"
 
 
+def test_an_asset_from_the_plugins_own_folder_is_served(tmp_path: Path) -> None:
+    """REG-R6b: the icon route resolves a file by convention; this one takes a name, which is
+    what a plugin page needs to show anything else — a category placeholder, here."""
+    app = _build_app(tmp_path)
+    with TestClient(app) as client:
+        asset = client.get("/api/plugin-assets/tp_scraper/assets/category.png")
+
+        assert asset.status_code == 200
+        assert asset.headers["content-type"] == "image/png"
+        assert asset.content == _PNG
+
+
+def test_the_asset_route_serves_images_and_nothing_else(tmp_path: Path) -> None:
+    """A plugin folder holds its Python, its manifest and its fixtures too. An allow-list of
+    extensions is what keeps a route that takes a filename from handing those out."""
+    app = _build_app(tmp_path)
+    with TestClient(app) as client:
+        assert client.get("/api/plugin-assets/tp_scraper/assets/notes.txt").status_code == 404
+        assert client.get("/api/plugin-assets/tp_scraper/assets/secret.py").status_code == 404
+
+
+def test_the_asset_route_cannot_be_walked_out_of(tmp_path: Path) -> None:
+    """The traversal attempts, refused before the filesystem is touched. `manifest.json` is a
+    real file one directory up, so this is not a hypothetical target."""
+    app = _build_app(tmp_path)
+    with TestClient(app) as client:
+        for attempt in (
+            "..%2Fmanifest.json",
+            "..%2F..%2Fmanifest.json",
+            "%2Fetc%2Fpasswd",
+            ".env",
+        ):
+            resp = client.get(f"/api/plugin-assets/tp_scraper/assets/{attempt}")
+            assert resp.status_code == 404, attempt
+
+
+def test_an_asset_of_an_unknown_plugin_is_404(tmp_path: Path) -> None:
+    app = _build_app(tmp_path)
+    with TestClient(app) as client:
+        assert client.get("/api/plugin-assets/nope/assets/category.png").status_code == 404
+        # A name no plugin has, under a plugin that does exist: 404, and specifically not a 500
+        # from resolving a path that is not there.
+        assert client.get("/api/plugin-assets/tp_scraper/assets/missing.png").status_code == 404
+        # Each plugin serves out of **its own** folder: the notifier has its own copy of this
+        # name and gets that one, never the scraper's.
+        assert client.get("/api/plugin-assets/tp_notifier/assets/category.png").status_code == 200
+
+
 def test_icon_convention_prefers_ico_over_svg(tmp_path: Path) -> None:
     # No manifest.icon: the registry auto-detects frontend/assets/plugin-icon.{ico,svg},
     # preferring .ico.
@@ -179,7 +242,7 @@ def test_icon_convention_prefers_ico_over_svg(tmp_path: Path) -> None:
     }
     _write_plugin(tmp_path, "scrapers", "tp_scraper", manifest, _SCRAPER_BACKEND)
     assets = tmp_path / "scrapers" / "tp_scraper" / "frontend" / "assets"
-    assets.mkdir(parents=True)
+    assets.mkdir(parents=True, exist_ok=True)  # `_write_plugin` already made it
     (assets / "plugin-icon.svg").write_text(_ICON_SVG, encoding="utf-8")
     (assets / "plugin-icon.ico").write_bytes(b"\x00\x00\x01\x00")
 

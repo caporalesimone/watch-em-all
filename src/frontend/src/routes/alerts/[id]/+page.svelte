@@ -8,7 +8,6 @@
 		type AlertDetail,
 		type AlertDigestProduct
 	} from '$lib/api/client';
-	import DiscountBadge from '$lib/components/DiscountBadge.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import ProductCell from '$lib/components/ProductCell.svelte';
 	import SourceTag from '$lib/components/SourceTag.svelte';
@@ -35,10 +34,15 @@
 		PRODUCT_ON_SALE: 'alerts.tagOnSale',
 		PRODUCT_OFF_SALE: 'alerts.tagOffSale',
 		PRODUCT_UNAVAILABLE: 'alerts.tagUnavailable',
-		PRODUCT_AVAILABLE_AGAIN: 'alerts.tagAvailableAgain'
+		PRODUCT_AVAILABLE_AGAIN: 'alerts.tagAvailableAgain',
+		PRODUCT_DELISTED: 'alerts.tagDelisted'
 	};
 	const GOOD_TAGS = new Set(['PRODUCT_ON_SALE', 'PRODUCT_AVAILABLE_AGAIN']);
+	// Delisting is not "watch out", it is the end of the line: red, and told apart from the
+	// amber transitions that can still turn around on the next run (9.F6).
+	const FINAL_TAGS = new Set(['PRODUCT_DELISTED']);
 	function tagClass(tag: string): string {
+		if (FINAL_TAGS.has(tag)) return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
 		return GOOD_TAGS.has(tag)
 			? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
 			: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300';
@@ -138,6 +142,14 @@
 						{#if cart.products.length > 0}
 							<ul class="space-y-2">
 								{#each cart.products as p (p.product_id)}
+									<!--
+										The Difference arrives already rendered in the payload (C19). It used to
+										be recomputed here, in TypeScript, beside the same rule in Python for the
+										email — the debt 9.F8 declared. A delisted product now reads as an em
+										dash rather than `0%`: its two prices are equal by construction, so a
+										percentage said "the price held" about a row nobody can buy.
+									-->
+									{@const diff = p.difference}
 									<li
 										class="flex flex-wrap items-start justify-between gap-2 border-t border-slate-100 pt-2 dark:border-slate-800/60"
 									>
@@ -160,7 +172,22 @@
 												<span class="mx-1 text-slate-400">→</span>
 											{/if}
 											<span class="font-medium">{money(p.price_current, p.currency)}</span>
-											<DiscountBadge discountPct={p.discount_pct} />
+											<!--
+												Difference, not the sale discount (9.F8): the same quantity the email
+												reports, so the two channels tell the same story. The DiscountBadge that
+												used to sit here answers a different question — how far below the list
+												price this is — which belongs to the catalogue, not to a digest of what
+												changed; and at 0 it printed nothing, so a price that had risen was silent.
+											-->
+											{#if diff !== null}
+												<span
+													class="ml-1 {diff.startsWith('+')
+														? 'text-rose-600 dark:text-rose-400'
+														: diff.startsWith('-')
+															? 'text-emerald-600 dark:text-emerald-400'
+															: 'text-slate-400'}">{diff}</span
+												>
+											{/if}
 										</div>
 									</li>
 								{/each}

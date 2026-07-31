@@ -61,3 +61,20 @@ def require_admin(claims: UserDep) -> TokenClaims:
 
 
 AdminDep = Annotated[TokenClaims, Depends(require_admin)]
+
+
+# Three levels, not two (9.B8). A super-user is a normal user with their own carts who is also
+# trusted with the tools that send unplanned traffic to a site — the manual scrape above all,
+# which is the quickest way to make requests a Crawl-delay never asked for. The direction is
+# that manual scraping goes away; this phase narrows it to a role rather than removing it.
+_SUPER_ROLES = frozenset({"admin", "super_user"})
+
+
+def require_super_user(claims: UserDep) -> TokenClaims:
+    """Admin or super-user. A plain user gets 403 — from the API, not from a hidden button."""
+    if claims.role not in _SUPER_ROLES:
+        raise APIError(403, "forbidden", "super-user role required")
+    return claims
+
+
+SuperUserDep = Annotated[TokenClaims, Depends(require_super_user)]

@@ -45,12 +45,20 @@ def _product(db: Session, user_id: int, ext: str, *, price: str, discount: str) 
     return p
 
 
-def _cart_with_product(db: Session, user_id: int, name: str, product: CatalogProduct) -> Cart:
+def _cart_with_product(
+    db: Session,
+    user_id: int,
+    name: str,
+    product: CatalogProduct,
+    *,
+    alert_types: tuple[str, ...] = ("PRODUCT_ON_SALE",),
+) -> Cart:
     cart = Cart(user_id=user_id, name=name, mode="cross")
     db.add(cart)
     db.flush()
     db.add(CartMember(cart_id=cart.id, product_id=product.id))
-    db.add(CartAlertType(cart_id=cart.id, alert_type="PRODUCT_ON_SALE"))
+    for t in alert_types:
+        db.add(CartAlertType(cart_id=cart.id, alert_type=t))
     db.flush()
     return cart
 
@@ -113,3 +121,32 @@ def test_only_changed_carts_appear_in_digest() -> None:
         log = run_for_user(db, user.id, _no_adjuster, now=NOW)
         assert log is not None
         assert [c["cart_name"] for c in log.payload_json["cart_alerts"]] == ["Changes"]
+
+
+def test_delisting_notifies_once_through_the_whole_run() -> None:
+    # 9.B9 end to end: the run that observes the delisting notifies, the next one does not,
+    # and a price move on the delisted row stays silent (ALERT-R12).
+    with _session() as db:
+        user = User(username="carol", password_hash="x")
+        db.add(user)
+        db.flush()
+        p = _product(db, user.id, "a", price="100.00", discount="0")
+        _cart_with_product(
+            db, user.id, "Gone", p, alert_types=("PRODUCT_ON_SALE", "PRODUCT_DELISTED")
+        )
+        db.commit()
+
+        assert run_for_user(db, user.id, _no_adjuster, now=NOW) is None  # seed
+
+        p.removed = True
+        db.commit()
+        log = run_for_user(db, user.id, _no_adjuster, now=NOW)
+        assert log is not None
+        (cart,) = log.payload_json["cart_alerts"]
+        assert cart["products"][0]["tags"] == ["PRODUCT_DELISTED"]
+        assert cart["products"][0]["price_previous"] == "100.00"
+
+        # Still delisted, and now cheaper on paper: no second event.
+        p.discount_pct, p.price_current = Decimal("20"), Decimal("80.00")
+        db.commit()
+        assert run_for_user(db, user.id, _no_adjuster, now=NOW) is None

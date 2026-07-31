@@ -13,7 +13,7 @@ from sqlalchemy import inspect, select
 
 from src.core.contracts import Product
 from src.core.db import create_schema, get_engine, init_engine, new_session
-from src.core.models import CatalogProduct
+from src.core.models import CatalogProduct, User
 from src.core.plugins.base import NotifierPlugin, ScraperPlugin
 from src.core.plugins.context import build_context
 from src.core.plugins.manifest import Manifest
@@ -131,6 +131,20 @@ def test_update_catalog_binding_writes_through_service() -> None:
             return None
 
     ctx = build_context(manifest, _Scraper())
+    # The catalog row belongs to user 7, and SQLite now enforces that like PostgreSQL does
+    # (9.B7 switched its foreign keys on), so that user has to exist.
+    ctx.db.add(
+        User(
+            id=7,
+            username="seven",
+            first_name="S",
+            last_name="N",
+            password_hash="x",
+            role="user",
+            is_active=True,
+        )
+    )
+    ctx.db.commit()
     product = Product(
         plugin_id="dragon_store",
         external_id="abc123",

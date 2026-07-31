@@ -68,7 +68,9 @@ class UserCreate(BaseModel):
     username: str = Field(min_length=1, max_length=64)
     first_name: str = Field(min_length=1, max_length=64)
     last_name: str = Field(min_length=1, max_length=64)
-    role: Literal["admin", "user"]
+    # Three levels since 9.B8. A role is chosen at creation and not changed afterwards:
+    # promoting an existing account is phase 10, where the actions on accounts live.
+    role: Literal["admin", "super_user", "user"]
     temp_password: str = Field(min_length=8)  # AUTH-R6
 
 
@@ -82,6 +84,17 @@ class AdminUserSummary(BaseModel):
     must_change_password: bool
     last_login_at: datetime | None
     created_at: datetime
+
+
+class CatalogItemSource(BaseModel):
+    """One input that delivers a catalog product (C14): its kind, and a name to show.
+
+    No key: the page needs to *say* where a product comes from, not act on it, and shipping the
+    plugin's internal id would invite a client to build a link on something it does not own.
+    """
+
+    kind: str
+    label: str
 
 
 class CatalogItem(BaseModel):
@@ -105,6 +118,26 @@ class CatalogItem(BaseModel):
     extra: dict[str, Any]
     first_seen_at: datetime
     last_seen_at: datetime
+    # Which of the user's inputs still deliver this product (C14). Empty means nothing does, so
+    # deleting it is final; non-empty is what lets the confirmation name what will bring it back
+    # instead of hedging. Plural because two categories can deliver the same product.
+    sources: list[CatalogItemSource] = Field(default_factory=list)
+    # How many of the user's carts hold it. Deleting a product removes it from all of them
+    # (CART-R8) and the cascade is silent, so the confirmation has to be able to count it.
+    in_carts: int = 0
+
+
+class DelistedSummary(BaseModel):
+    """What "remove the delisted products" is about to do, before it does it (C7).
+
+    ``total`` is every delisted row, not the ones visible on the current page — the button
+    removes them all, so a count taken from twenty visible rows would understate the click.
+    ``in_carts`` is how many of those are in at least one cart, which is the part the user
+    cannot see from the catalog table at all.
+    """
+
+    total: int
+    in_carts: int
 
 
 class CatalogPage(BaseModel):
@@ -338,3 +371,10 @@ class CartAlertTypesBody(BaseModel):
     # the endpoint stores exactly this set (presence = enabled). Values are validated
     # against the AlertType enum. Empty list = disable all (deletes the baseline).
     alert_types: list[str] = Field(default_factory=list)
+
+
+class RemovedCount(BaseModel):
+    """How many catalog rows a cleanup removed (9.B7). A count, not a bare 204: "nothing was
+    delisted" and "twelve products went" are different answers to the same click."""
+
+    removed: int

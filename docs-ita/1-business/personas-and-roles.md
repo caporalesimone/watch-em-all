@@ -2,7 +2,7 @@
 
 > **Layer 1 — Business** · Audience: tutti · Solo testo descrittivo.
 >
-> La parte **già realizzata** (i due ruoli, le responsabilità realizzate, il confine di privacy, ruoli e account, l'audience della documentazione) è stata migrata nella wiki inglese canonica: [`docs/1-business/personas-and-roles.md`](../../docs/1-business/personas-and-roles.md). Qui restano **solo le responsabilità che dipendono da capacità non ancora costruite** (fase 6+).
+> La parte **già realizzata** (i ruoli — `user`, `super_user`, `admin` da 0.9.0 —, le responsabilità realizzate, il confine di privacy, ruoli e account, l'audience della documentazione) è stata migrata nella wiki inglese canonica: [`docs/1-business/personas-and-roles.md`](../../docs/1-business/personas-and-roles.md). Qui restano **solo le responsabilità che dipendono da capacità non ancora costruite** (fase 6+).
 
 ## Responsabilità dell'utente ancora da realizzare
 

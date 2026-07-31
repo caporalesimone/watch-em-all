@@ -8,31 +8,40 @@ Scrapers add the identity template-method (SCR-R10 / product.md): the plugin
 supplies only the SEED (``identity_seed``, abstract — a scraper without it does
 not load); normalisation and hashing are FINAL and identical for every scraper,
 so the same product always maps to the same ``external_id`` across processes
-(worker vs web). The runtime methods (``run_for_user`` / ``run_test``) arrive
-with the scraper runtime; their write path is the ``context.update_catalog``
-callback (the scraper never writes the catalog directly).
+(worker vs web). ``run_for_user`` is the runtime entry point; its write path is
+a ``context`` callback (the scraper never writes the catalog directly).
 """
 
 from __future__ import annotations
 
 import hashlib
 from abc import ABC, abstractmethod
+from datetime import UTC, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, final
 from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter
 
-from src.core.contracts import CategoryRef
+from src.core.contracts import BrandRef, CategoryRef, Product, ProductSourceRef
 
 if TYPE_CHECKING:
-    from decimal import Decimal
+    from collections.abc import Iterable, Mapping
 
     from sqlalchemy import MetaData
 
     from src.core.alert_engine import AlertEvent
-    from src.core.contracts import Adjustment, ConfigField, DeltaCounters, Product
+    from src.core.contracts import Adjustment, ConfigField, DeltaCounters
     from src.core.models import CatalogProduct
     from src.core.plugins.context import PluginContext
+
+# schema.org availability vocabulary (SCR-R18). A web standard, not one site's invention, so
+# reading it belongs here rather than in each scraper. `PreOrder` counts as orderable: it is
+# something the user can buy today.
+AVAILABLE_AVAILABILITY = frozenset({"InStock", "PreOrder"})
+KNOWN_AVAILABILITY = frozenset({"InStock", "OutOfStock", "PreOrder"})
+# Ours, not any site's: English like the other tag the system invents (product.md PROD-R5).
+PREORDER_TAG = "Pre Order"
 
 
 class Tags:
@@ -107,8 +116,8 @@ class ScraperPlugin(BasePlugin, ABC):
 
     Identity is a template method (SCR-R10): the plugin implements only
     ``identity_seed``; ``normalize_url`` / ``_stable_id`` / ``external_id_for``
-    are ``final`` and uniform for all scrapers. ``run_for_user`` / ``run_test``
-    are the runtime entry points (real scrapers override them).
+    are ``final`` and uniform for all scrapers. ``run_for_user`` is the runtime
+    entry point (real scrapers override it).
     """
 
     @abstractmethod
@@ -154,6 +163,86 @@ class ScraperPlugin(BasePlugin, ABC):
         product; ``add_child(name, url)`` root → leaf, then ``get_path()``."""
         return CategoryPath()
 
+    @final
+    def build_product(
+        self,
+        context: PluginContext,
+        *,
+        raw: Any,
+        url: str,
+        name: str,
+        price_current: Decimal,
+        price_original: Decimal | None = None,
+        availability: str | None = None,
+        brand_text: str | None = None,
+        brand_link: str | None = None,
+        image_url: str | None = None,
+        currency: str = "EUR",
+        breadcrumb: Iterable[tuple[str, str | None]] = (),
+        tags: Tags | None = None,
+        extra: Mapping[str, Any] | None = None,
+        fetched_at: datetime | None = None,
+        sources: Iterable[ProductSourceRef] = (),
+    ) -> Product:
+        """Assemble one ``Product`` from what the **site** said (SCR-R18).
+
+        The plugin supplies site facts; this enforces the parts of the contract that are the
+        same everywhere and are exactly what a hand-written assembly gets wrong. Before it
+        existed the same forty lines lived in three places across two scrapers — the second
+        Dragon Store copy is the crack C3 slipped through, and the ``tp_scraper`` copy carries
+        ``scraped_at=now()``, the one line PROD-R8 forbids.
+
+        What is imposed here, and why each one is not left to a caller:
+
+        - ``external_id`` always through :meth:`external_id_for` (SCR-R10) — the identity is
+          the history's anchor, and a hand-filled one breaks it silently.
+        - ``discount_pct`` is always ``None``: the core derives it from original/current
+          (CATSVC-R3). A plugin that computes its own answers a different question.
+        - ``scraped_at`` is ``fetched_at`` when the caller has it and the clock only otherwise
+          (PROD-R8) — a cached page is old data, and a scraper that stamps "now" makes it look
+          fresh.
+        - ``extra`` drops ``None`` values and **only** ``None`` values: the two Dragon Store
+          copies had drifted to different predicates, so an empty description survived from a
+          detail page and was thrown away from a listing card, which nobody decided.
+        - ``availability`` is read as schema.org (``InStock`` / ``OutOfStock`` / ``PreOrder``,
+          :data:`PREORDER_TAG` added for the last): a web vocabulary, not one site's.
+
+        What stays the plugin's: the URL grammar, the pagination, how to read a price the site
+        does not print, and which labels its sanitiser strips. ``tags`` is passed in already
+        accumulated because those labels are site knowledge — pass the same ``Tags`` the
+        price resolution added to, so a "Free" tag is not lost here.
+        """
+        product_tags = tags if tags is not None else self.new_tags()
+        if availability is not None and availability not in KNOWN_AVAILABILITY:
+            context.logger.warning(
+                "%s: unknown availability %r for %s", self.plugin_id, availability, url
+            )
+        if availability == "PreOrder":
+            product_tags.add_tag(PREORDER_TAG)
+
+        category = self.new_category()
+        for crumb_name, crumb_url in breadcrumb:
+            category.add_child(crumb_name, crumb_url)
+
+        return Product(
+            plugin_id=self.plugin_id,
+            external_id=self.external_id_for(raw=raw, url=url),
+            url=url,
+            name=name,
+            image_url=image_url,
+            brand=BrandRef(text=brand_text, link=brand_link) if brand_text else None,
+            tags=product_tags.get_tags(),
+            category=category.get_path(),
+            price_current=price_current,
+            price_original=price_original,
+            discount_pct=None,
+            currency=currency,
+            is_available=availability in AVAILABLE_AVAILABILITY,
+            scraped_at=fetched_at or datetime.now(UTC),
+            extra={k: v for k, v in (extra or {}).items() if v is not None},
+            sources=list(sources),
+        )
+
     def run_for_user(self, context: PluginContext, user_id: int) -> DeltaCounters:
         """Scrape this user's inputs and deliver the current products through
         ``context.update_catalog`` (the only write path), returning the delta
@@ -161,18 +250,47 @@ class ScraperPlugin(BasePlugin, ABC):
         real scrapers override it."""
         raise NotImplementedError(f"{self.plugin_id}: run_for_user not implemented")
 
-    def run_test(self, context: PluginContext, params: dict[str, Any]) -> list[Product]:
-        """Dry-run (SCR-R11): produce the products for UI-provided ``params``
-        WITHOUT writing anything (neither catalog nor inputs). Real scrapers
-        override it."""
-        raise NotImplementedError(f"{self.plugin_id}: run_test not implemented")
-
     def configured_users(self, context: PluginContext) -> list[int]:
         """User ids that have configured this scraper — the users a SCHEDULED run
         iterates (SCR-R3 reframed: the scraper tells the core whom to scrape). Default:
         none; a real scraper returns e.g. the users with at least one watch. Not used by
         scrape-now, which targets only the requesting user."""
         return []
+
+    # --- job queue (SCR-R17, 9.X6c) ------------------------------------------------------
+    # A scraper whose inputs take minutes to resolve (a site with a Crawl-delay, a category
+    # spread over pages) cannot resolve them inside a request. The core runs **one drainer
+    # per scraper** — different sites, different rules, so they may proceed in parallel while
+    # each stays serial with itself — and the plugin says what one unit of work is. The queue
+    # itself belongs to the plugin, in its own table: the core never learns its shape.
+
+    def has_queued_jobs(self, context: PluginContext) -> bool:
+        """Is there anything waiting? Asked **without** the run lock held.
+
+        The drainer looks before it locks: taking a scraper-wide lock only to discover there
+        is nothing to do would keep it churning, and a lock held for a peek is a lock a
+        scheduled run or a manual scrape cannot have. Default: no queue.
+        """
+        return False
+
+    def drain_next_job(self, context: PluginContext) -> bool:
+        """Take the oldest queued job and run it to completion. ``True`` if one was taken.
+
+        Called by the core's drainer, which holds this scraper's run lock for the whole call
+        — so a job never competes with a scheduled run or a manual scrape. Returning
+        ``False`` means "nothing to do" and the drainer goes back to sleep. Default: this
+        scraper has no queue.
+        """
+        return False
+
+    def reclaim_orphan_jobs(self, context: PluginContext) -> int:
+        """Mark jobs left mid-flight as failed at startup; returns how many.
+
+        Jobs run in the web process, so **none survives a restart**: a row still claiming to
+        be running is a leftover, and one that also blocks new submissions would shut the
+        user out of their own plugin with no way back. Default: no queue, nothing to reclaim.
+        """
+        return 0
 
     def get_adjustments(
         self, products: list[CatalogProduct], cart_total: Decimal

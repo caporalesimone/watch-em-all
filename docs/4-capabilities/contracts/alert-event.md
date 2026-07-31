@@ -61,6 +61,7 @@ class AlertType(StrEnum):
     PRODUCT_OFF_SALE        = "PRODUCT_OFF_SALE"
     PRODUCT_UNAVAILABLE     = "PRODUCT_UNAVAILABLE"
     PRODUCT_AVAILABLE_AGAIN = "PRODUCT_AVAILABLE_AGAIN"
+    PRODUCT_DELISTED        = "PRODUCT_DELISTED"         # left the site's delivery (once)
     # Cart events (valid inside a cart's cart_events)
     CART_ALL_ON_SALE               = "CART_ALL_ON_SALE"
     CART_THRESHOLD_REACHED         = "CART_THRESHOLD_REACHED"
@@ -99,6 +100,7 @@ class ProductAlertPayload(BaseModel):
     price_current: Decimal
     discount_pct: Decimal
     currency: str = "EUR"
+    difference: str | None            # the Difference column, ALREADY RENDERED — see AEV-R7
 
 class CartAlertPayload(BaseModel):
     cart_id: int
@@ -122,6 +124,7 @@ class AlertEvent(BaseModel):
 - **AEV-R2** — The payload is **self-sufficient to decide**: tags, before/after prices, provenance, links, totals and threshold (see ALERT-R7). The notifier queries nothing.
 - **AEV-R3** — The tags are rendered graphically by the channel (badge/emoji), never as strings with underscores.
 - **AEV-R4** — `Decimal` is serialized as a **string** in the JSON (history and API), `datetime` as ISO-8601 UTC. The whole `AlertEvent` is emitted via `model_dump(mode="json")`.
+- **AEV-R7** — `difference` is the **Difference** column already rendered (`"+25%"`, `"-20.2%"`, `"0%"`), computed once by the core so every channel shows the same number. It was a rule implemented twice — Python for the email, TypeScript for the in-app history — which is a drift waiting to happen, and 9.F8 declared that debt rather than paying it because this payload is *stored* and digests already written would not carry the field. `None` means **there is nothing to report**, which every renderer shows as an em dash, and it covers two cases: no previous price, and a **delisted** product — whose two prices are equal by construction, so a percentage would print `0%` on a row nobody can buy, reading as "the price held" instead of "this is gone". A notifier renders this; it never recomputes it.
 
 ## Example
 

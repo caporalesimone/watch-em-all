@@ -19,10 +19,10 @@
 - **ALERT-R8** — The first run after enabling does not notify (freshly seeded baseline); elements with no baseline (a product just added to an active cart) are seeded silently.
 
 ### Alert types
-- **ALERT-R9** — **Product** tags (meaningful only inside the cart): entered a sale / left a sale / became unavailable / became available again.
+- **ALERT-R9** — **Product** tags (meaningful only inside the cart): entered a sale / left a sale / became unavailable / became available again / **no longer listed**.
 - **ALERT-R10** — **Cart** events: all on sale / threshold reached / threshold reached partial (with products excluded because inactive).
 - **ALERT-R11** — Formal semantics of "on sale": discount > 0 against the list price. The state transition (out of sale → on sale) generates the tag; a **further drop** while already on sale generates the "on sale" tag again (the price changed in the buyer's favour: information the user wants). Price back above the list price or back to full → "left the sale".
-- **ALERT-R12** — Delisted products are **ignored** by the alerts (no tag); if they were in the baseline and get delisted, the visible event is their exclusion from the totals (a possible "partial threshold").
+- **ALERT-R12** — **Delisting is an event, exactly once.** The transition of a cart product into delisted produces `PRODUCT_DELISTED` on the run that observes it, and nothing on any run after that: a product that is *already* delisted produces no tag at all, price and availability included — its row keeps the last figures the site showed, and those stop being news the moment the product stops being for sale. The exclusion from the totals stays visible as before (a possible "partial threshold"). A product that comes back into the delivery is re-seeded **silently**, like a member met for the first time: its baseline describes it as it was before it vanished, so diffing against it would report a price move nobody made. The inverse event (a product returning) is not emitted yet.
 
 ### History
 - **ALERT-R13** — Every notification is **always** recorded in the internal history, before anything else; it has a **read/unread** state (opening a notification marks it read — an unread badge on the dashboard, kept live by polling).

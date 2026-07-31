@@ -33,6 +33,9 @@ class AlertType(StrEnum):
     PRODUCT_OFF_SALE = "PRODUCT_OFF_SALE"
     PRODUCT_UNAVAILABLE = "PRODUCT_UNAVAILABLE"
     PRODUCT_AVAILABLE_AGAIN = "PRODUCT_AVAILABLE_AGAIN"
+    # Delisting is the end of the story, not an availability blip: the product left the
+    # site's delivery altogether (9.B9). Emitted once, at the transition (ALERT-R12).
+    PRODUCT_DELISTED = "PRODUCT_DELISTED"
     # Cart events (valid inside CartAlert.cart_events)
     CART_ALL_ON_SALE = "CART_ALL_ON_SALE"
     CART_THRESHOLD_REACHED = "CART_THRESHOLD_REACHED"
@@ -96,6 +99,21 @@ class CategoryRef(BaseModel):
     link: str | None = None
 
 
+class ProductSourceRef(BaseModel):
+    """Which of the user's inputs delivered a product (PROD-R9).
+
+    Described rather than joined: a watch lives in the plugin's own schema (CTX-R6), so the
+    core cannot hold a foreign key to it. The plugin supplies a ``key`` that is stable for
+    that input's lifetime, the ``kind`` in its own vocabulary, and a ``label`` fit to show a
+    user — refreshed on every delivery, so renaming an input does not leave a stale name in
+    somebody's confirmation dialog.
+    """
+
+    key: str  # stable per input, in the plugin's space (e.g. the watch's id)
+    kind: str  # the plugin's vocabulary (Dragon Store: "product" | "category")
+    label: str  # shown to the user, so it has to be a name and not an id
+
+
 class Product(BaseModel):
     """The current state of one product as a scraper sees it (product.md).
 
@@ -124,8 +142,17 @@ class Product(BaseModel):
     currency: str = "EUR"  # ISO 4217; V1 neither converts nor aggregates currencies
 
     is_available: bool  # decided by the SCRAPER; never filtered out (PROD-R2)
+    # When the SITE produced this data, which is not always "now": a response served from
+    # the scrape cache carries the timestamp of the fetch that filled it
+    # (``HttpResponse.fetched_at``). The core stores it as ``last_seen_at``, so a scraper
+    # that hardcodes ``now()`` here makes stale data look fresh.
     scraped_at: datetime
     extra: dict[str, Any] = Field(default_factory=dict)  # plugin-specific, persisted in extra_json
+    # Which of the user's inputs produced this delivery (PROD-R9). **Plural**, and that is the
+    # whole point: the same product can arrive from two categories at once, which is why it was
+    # never given a single foreign key to a watch. Empty for a scraper with no notion of inputs,
+    # and the core then records no provenance for it.
+    sources: list[ProductSourceRef] = Field(default_factory=list)
 
 
 class Adjustment(BaseModel):
@@ -149,12 +176,20 @@ class Adjustment(BaseModel):
 class DeltaCounters(BaseModel):
     """What ``update_catalog`` returns for one delivery (CATSVC-R6).
 
-    Fed into the run record by the runner in later phases. ``found`` is the size
-    of the delivered list; ``new``/``price_changes``/``removed`` are the deltas
-    the service computed against the persisted catalog.
+    Fed into the run record by the runner. ``found`` is the size of the delivered
+    list; ``new``/``price_changes``/``removed`` are the deltas the service computed
+    against the persisted catalog.
+
+    ``excluded`` is the exception: the service never sets it, because an exclusion
+    happens **before** the delivery — it is what the scraper decided not to hand over
+    (Dragon Store's dented listings, 9.B5). A plugin that filters fills it on the way
+    out, and that is the only channel the run record has: without it `scrape_run`
+    reports "38 products found" for a page of 39 and nothing says where the other one
+    went (9.B6c/DoD).
     """
 
     found: int = 0
     new: int = 0
     price_changes: int = 0
     removed: int = 0
+    excluded: int = 0

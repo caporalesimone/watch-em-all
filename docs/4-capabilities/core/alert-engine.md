@@ -30,7 +30,7 @@ flowchart TD
 
 ## The baseline
 
-One row per **(user, cart)** in `alert_snapshot`: for each cart product `{on_sale, available, price_current}`, plus the cart-level `all_on_sale` and `threshold_reached` flags the cart-event diff compares against. Delisted members are excluded (ALERT-R12); a member that appears later is seeded silently by the run that meets it. It is managed by user events (outside `run()`), with no cadence:
+One row per **(user, cart)** in `alert_snapshot`: for each cart product `{on_sale, available, price_current, removed}`, plus the cart-level `all_on_sale` and `threshold_reached` flags the cart-event diff compares against. A member that appears later is seeded silently by the run that meets it. **Delisted members are in the baseline**, flagged by `removed`: that flag is what makes `PRODUCT_DELISTED` a transition (fired once) rather than a state (fired every run) — see ALERT-R12. It is managed by user events (outside `run()`), with no cadence:
 
 ```
 on enable_first_alert_type(cart):   seed_snapshot(cart)        # current state, no notification
@@ -51,9 +51,15 @@ def run(user_id):
         enabled  = alert_types(cart)
         products, events = {}, []
 
-        for m in cart.members where not m.removed:   # ALERT-R12: delisted ignored
+        for m in cart.members:
             prev = snap.products.get(m.id)
             if prev is None:                          # new in the cart: silent seed
+                continue
+            if m.removed:                             # ALERT-R12: the transition, once
+                if not prev.removed and PRODUCT_DELISTED in enabled:
+                    products[m.id] = ProductAlert(m, [PRODUCT_DELISTED], prev.price_current)
+                continue                              # already delisted → no tag at all
+            if prev.removed:                          # back in the delivery: silent re-seed
                 continue
             tags = []
             now_sale = m.discount_pct > 0
@@ -99,4 +105,6 @@ A cart with no active members has `all_on_sale = False` and `threshold = None` (
 | Further drop of a product already on sale | New ON_SALE tag with before/after prices |
 | Threshold already reached on the previous run | No new event until it rises and falls again |
 | Cart with no active products | No threshold evaluation (CART-R12) |
-| Delisted product | Ignored by the alerts (no tag); its exclusion from the totals may surface as a partial threshold (ALERT-R12) |
+| Product delisted since the last run | One `PRODUCT_DELISTED` tag, alone (no price or availability tag on the same product); its exclusion from the totals may still surface as a partial threshold (ALERT-R12) |
+| Product already delisted | No tag of any kind, on this run or any other (ALERT-R12) |
+| Delisted product back in the delivery | Re-seeded silently, no event — the baseline predates its disappearance |

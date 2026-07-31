@@ -14,7 +14,13 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from src.core.alert_engine import AlertEvent, CartAlertPayload, CartTotals, ProductAlertPayload
+from src.core.alert_engine import (
+    AlertEvent,
+    CartAlertPayload,
+    CartTotals,
+    ProductAlertPayload,
+    price_difference,
+)
 from src.core.contracts import AlertType
 from src.core.plugins.base import NotifierDeliveryError, NotifierPlugin
 
@@ -57,18 +63,37 @@ class _FakeSMTP:
         _FakeSMTP.sent.append(msg)
 
 
-def _digest() -> AlertEvent:
-    product = ProductAlertPayload(
+def _product(
+    previous: str | None,
+    current: str,
+    discount: str = "20",
+    tags: list[AlertType] | None = None,
+) -> ProductAlertPayload:
+    """A payload as the alert engine builds one — `difference` included.
+
+    The notifier does not compute that number any more (C19): it renders what the payload
+    carries, so this helper has to fill it the way the engine does, through the core rule.
+    """
+    tags = tags or [AlertType.PRODUCT_ON_SALE]
+    before = Decimal(previous) if previous is not None else None
+    return ProductAlertPayload(
         product_id=1,
         name="Widget",
         url="https://shop/x",
         plugin_id="dragon_store",
-        tags=[AlertType.PRODUCT_ON_SALE],
-        price_previous=Decimal("50.00"),
-        price_current=Decimal("39.90"),
-        discount_pct=Decimal("20"),
+        tags=tags,
+        price_previous=before,
+        price_current=Decimal(current),
+        discount_pct=Decimal(discount),
         currency="EUR",
+        difference=price_difference(
+            before, Decimal(current), delisted=AlertType.PRODUCT_DELISTED in tags
+        ),
     )
+
+
+def _digest(product: ProductAlertPayload | None = None) -> AlertEvent:
+    product = product or _product("50.00", "39.90")
     cart = CartAlertPayload(
         cart_id=1,
         cart_name="My cart",
@@ -105,6 +130,73 @@ def test_send_digest_keeps_provenance_and_prices(
     body = _FakeSMTP.sent[0].as_string()
     assert "dragon_store" in body  # provenance (NOT-R7)
     assert "39.90" in body and "50.00" in body  # before/after prices
+
+
+def _parts(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, product: ProductAlertPayload
+) -> tuple[str, str]:
+    """Send one digest and return its decoded (html, text) bodies — decoded because
+    quoted-printable folds long lines, and a folded `+25%` is not a substring of the raw
+    message."""
+    _FakeSMTP.sent = []
+    monkeypatch.setattr(smtplib, "SMTP", _FakeSMTP)
+    _email(client).send(_digest(product), _CONFIG, "en")
+    msg = _FakeSMTP.sent[0]
+    html = msg.get_body(preferencelist=("html",)).get_content()
+    text = msg.get_body(preferencelist=("plain",)).get_content()
+    return str(html), str(text)
+
+
+def test_difference_column_reports_a_price_rise_as_positive(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Issue #37: an off-sale product whose price went UP printed `-0%`, because the column
+    showed the sale discount (legitimately 0) with a hardcoded minus sign, next to a Was/Now
+    pair that said the opposite. €39.92 -> €49.90 is +25%."""
+    html, text = _parts(client, monkeypatch, _product("39.92", "49.90", discount="0"))
+    assert "Difference" in html and "Discount" not in html
+    assert "+25%" in html and "+25%" in text
+    assert "-0%" not in html and "-0%" not in text
+
+
+def test_difference_column_reports_a_price_drop_as_negative(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    html, text = _parts(client, monkeypatch, _product("50.00", "39.90"))
+    assert "-20.2%" in html and "-20.2%" in text  # one decimal kept when it is not zero
+
+
+def test_difference_column_handles_no_change_and_no_previous_price(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A digest can carry a product whose price did not move (an availability tag), and the
+    payload allows no previous price at all. Neither may render as a signed percentage."""
+    html, text = _parts(client, monkeypatch, _product("42.00", "42.00"))
+    assert "0%" in html and "+0%" not in html and "-0%" not in html
+    assert "(0%)" in text
+    html, text = _parts(client, monkeypatch, _product(None, "42.00"))
+    assert "—" in html and "(—)" in text
+
+
+def test_a_delisted_product_shows_no_percentage(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """C19: a delisted product has `price_previous == price_current` by construction — nothing
+    moved, the product left the site — so a percentage printed `0%` on a row nobody can buy,
+    which reads as "the price held" rather than "this is gone"."""
+    html, text = _parts(
+        client,
+        monkeypatch,
+        _product("42.00", "42.00", tags=[AlertType.PRODUCT_DELISTED]),
+    )
+
+    # The text body is unambiguous: the cell is printed in brackets.
+    assert "(—)" in text and "(0%)" not in text
+    # And in HTML the Difference cell is the em dash one, not a percentage. (`0%` alone would
+    # match the `width:100%` in the table's own style — a percentage sign is not evidence.)
+    from src.plugins.notifiers.email.backend import _TD
+
+    assert f'<td style="{_TD}">—</td>' in html
 
 
 def test_missing_config_raises(client: TestClient) -> None:

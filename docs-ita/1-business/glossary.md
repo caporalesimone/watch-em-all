@@ -2,7 +2,7 @@
 
 > **Layer 1 — Business** · Audience: tutti.
 >
-> I termini **già in uso** nel prodotto realizzato (Scraper, Notifier, Plugin, Catalogo, Product Picker, Carrello, Modalità carrello, Adjustment, Soglia, Provenienza, Identità del prodotto, Non disponibile, Delistato, Run, Slot, Cache di scrape, Dry-run/Test, Core, Worker) sono stati migrati nel glossario inglese canonico: [`docs/1-business/glossary.md`](../../docs/1-business/glossary.md). Qui restano **solo i termini che nominano capacità non ancora costruite** (fase 6+).
+> I termini **già in uso** nel prodotto realizzato (Scraper, Notifier, Plugin, Catalogo, Product Picker, Carrello, Modalità carrello, Adjustment, Soglia, Provenienza, Identità del prodotto, Non disponibile, Delistato, Run, Slot, Cache di scrape, Core, Worker) sono stati migrati nel glossario inglese canonico: [`docs/1-business/glossary.md`](../../docs/1-business/glossary.md). Qui restano **solo i termini che nominano capacità non ancora costruite** (fase 6+).
 
 | Termine | Definizione |
 |---|---|

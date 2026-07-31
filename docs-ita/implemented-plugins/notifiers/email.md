@@ -15,7 +15,8 @@ Consegna digest e summary via **email (SMTP)**. È il canale di riferimento: fun
 
 ## Formattazione
 
-- **Digest** (`alert_digest`): oggetto sintetico ("Watch 'Em All — N carrelli con novità"); corpo HTML con una sezione per carrello: badge degli eventi, tabella prodotti con provenienza (icona/nome scraper), prezzo prima → dopo, sconto, link; totali e barra soglia. Fallback text/plain.
+- **Digest** (`alert_digest`): oggetto sintetico ("Watch 'Em All — N carrelli con novità"); corpo HTML con una sezione per carrello: badge degli eventi, tabella prodotti con provenienza (icona/nome scraper), prezzo prima → dopo, **differenza**, link; totali e barra soglia. Fallback text/plain.
+  La colonna **differenza** è la variazione percentuale con segno fra i due prezzi della riga (positiva se il prezzo è salito, negativa se è sceso, colorata di conseguenza; trattino se non c'è un prezzo precedente con cui confrontarla). **Non** è lo `discount_pct` del prodotto, che è lo sconto sul prezzo di listino: la colonna mostrava quello con un meno cablato, quindi un prodotto uscito dalla promozione e **salito** di prezzo veniva riportato come `-0%` ([#37](https://github.com/caporalesimone/watch-em-all/issues/37)).
 - **Summary** (`summary`): oggetto "Riepilogo periodico"; corpo con lo stato di tutti i carrelli.
 - Lingua: dai file `backend/i18n/` del plugin (V1: solo `en.json`), secondo la lingua dell'utente, con fallback su `en`.
 

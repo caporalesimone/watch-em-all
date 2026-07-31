@@ -1,8 +1,19 @@
-"""Catalog read API (catalog-and-product-picker.md). Phase 3: GET /api/catalog.
+"""Catalog API (catalog-and-product-picker.md): read in phase 3, cleanups in phase 9.
 
-Returns the current user's catalog only (multi-tenancy DB-R1: scoped to the
-token's user), paginated, sortable and filterable. Writing the catalog is never
-done here — that is the Catalog Update Service's job, reached through a scrape.
+Returns the current user's catalog only (multi-tenancy DB-R1: scoped to the token's user),
+paginated, sortable and filterable. Products are never *written* here — that is the Catalog
+Update Service's job, reached through a scrape — but they can be **removed** (9.B7), which is a
+different thing: the user is throwing rows away, not describing what a site offers.
+
+A removal cascades to ``cart_members`` (``ON DELETE CASCADE``, CART-R8/CAT-R8), so deleting a
+product also takes it out of every cart holding it — which these endpoints have to be honest
+about. It does **not** touch ``price_history``: that chain is keyed on the product's identity
+and shared by everyone watching it, so it is not this user's to delete, and a product removed
+today keeps the past it will hand to whoever watches it next.
+
+Nothing here touches the **watches** either: those are a separate list with their own Remove,
+and the visible consequence — deleting a product you still watch brings it back on the next run
+— is accepted rather than hidden (decision 2026-07-29).
 """
 
 from __future__ import annotations
@@ -11,12 +22,19 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query
 from sqlalchemy import ColumnElement, func, select
-from sqlalchemy.orm import InstrumentedAttribute
+from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from src.core.contracts import BrandRef, CategoryRef
-from src.core.models import CatalogProduct
+from src.core.errors import APIError
+from src.core.models import CartMember, CatalogProduct, ProductSource
 from src.web.deps import SessionDep, UserDep
-from src.web.schemas import CatalogItem, CatalogPage
+from src.web.schemas import (
+    CatalogItem,
+    CatalogItemSource,
+    CatalogPage,
+    DelistedSummary,
+    RemovedCount,
+)
 
 router = APIRouter(prefix="/catalog", tags=["Catalog"])
 
@@ -30,7 +48,39 @@ _SORT_COLUMNS: dict[str, InstrumentedAttribute[Any]] = {
 }
 
 
-def _to_item(row: CatalogProduct) -> CatalogItem:
+def _sources_for(db: Session, product_ids: list[int]) -> dict[int, list[CatalogItemSource]]:
+    """The provenance of a whole page in one query (C14). One query for the page rather than one
+    per row: this feeds a list of up to a hundred products."""
+    if not product_ids:
+        return {}
+    out: dict[int, list[CatalogItemSource]] = {}
+    rows = db.scalars(
+        select(ProductSource)
+        .where(ProductSource.product_id.in_(product_ids))
+        .order_by(ProductSource.id.asc())
+    ).all()
+    for row in rows:
+        out.setdefault(row.product_id, []).append(
+            CatalogItemSource(kind=row.source_kind, label=row.source_label)
+        )
+    return out
+
+
+def _carts_holding(db: Session, product_ids: list[int]) -> dict[int, int]:
+    """How many carts hold each of these products — one query for the page (C7)."""
+    if not product_ids:
+        return {}
+    rows = db.execute(
+        select(CartMember.product_id, func.count())
+        .where(CartMember.product_id.in_(product_ids))
+        .group_by(CartMember.product_id)
+    ).all()
+    return {int(pid): int(count) for pid, count in rows}
+
+
+def _to_item(
+    row: CatalogProduct, sources: list[CatalogItemSource], in_carts: int = 0
+) -> CatalogItem:
     return CatalogItem(
         id=row.id,
         plugin_id=row.plugin_id,
@@ -50,6 +100,8 @@ def _to_item(row: CatalogProduct) -> CatalogItem:
         extra=row.extra_json,
         first_seen_at=row.first_seen_at,
         last_seen_at=row.last_seen_at,
+        sources=sources,
+        in_carts=in_carts,
     )
 
 
@@ -92,6 +144,102 @@ def list_catalog(
         .limit(page_size)
     ).all()
 
+    ids = [r.id for r in rows]
+    sources = _sources_for(db, ids)
+    in_carts = _carts_holding(db, ids)
     return CatalogPage(
-        items=[_to_item(r) for r in rows], total=total, page=page, page_size=page_size
+        items=[_to_item(r, sources.get(r.id, []), in_carts.get(r.id, 0)) for r in rows],
+        total=total,
+        page=page,
+        page_size=page_size,
     )
+
+
+@router.get(
+    "/delisted",
+    response_model=DelistedSummary,
+    summary="How many delisted products there are, and how many of them are in a cart.",
+)
+def delisted_summary(user: UserDep, db: SessionDep) -> DelistedSummary:
+    """What the "remove the delisted" confirmation needs to be honest (C7).
+
+    Counted over **every** delisted row rather than the visible page, because that is what the
+    button removes. The cart figure is the one the user cannot work out from the table: the
+    membership cascade is silent, so a delisted product they had put in a cart disappears from
+    it without a word unless the confirmation says so first.
+    """
+    delisted = [
+        CatalogProduct.user_id == user.sub,
+        CatalogProduct.removed.is_(True),
+    ]
+    total = db.scalar(select(func.count()).select_from(CatalogProduct).where(*delisted)) or 0
+    in_carts = (
+        db.scalar(
+            select(func.count(func.distinct(CartMember.product_id)))
+            .select_from(CartMember)
+            .join(CatalogProduct, CatalogProduct.id == CartMember.product_id)
+            .where(*delisted)
+        )
+        or 0
+    )
+    return DelistedSummary(total=total, in_carts=in_carts)
+
+
+# --- cleanups (9.B7) -------------------------------------------------------------------
+#
+# Three shapes, because they answer three different intentions: "tidy up what the site no
+# longer offers", "I do not want this one", "start over". Each reports how many rows went, so
+# the page can say what happened instead of just refreshing.
+
+
+@router.delete(
+    "/delisted",
+    response_model=RemovedCount,
+    summary="Remove every delisted product from the current user's catalog.",
+)
+def remove_delisted(user: UserDep, db: SessionDep) -> RemovedCount:
+    """The routine tidy-up: products a complete delivery no longer offered (9.B6 marked them,
+    with the date). Their cart memberships go with them; their price history stays, because it
+    belongs to the product rather than to this row."""
+    rows = db.scalars(
+        select(CatalogProduct).where(
+            CatalogProduct.user_id == user.sub, CatalogProduct.removed.is_(True)
+        )
+    ).all()
+    for row in rows:
+        db.delete(row)  # ORM delete, so the cart/history cascades run through the mapper too
+    db.commit()
+    return RemovedCount(removed=len(rows))
+
+
+@router.delete(
+    "/{product_id}",
+    response_model=RemovedCount,
+    summary="Remove one product from the current user's catalog.",
+)
+def remove_product(product_id: int, user: UserDep, db: SessionDep) -> RemovedCount:
+    row = db.scalar(
+        select(CatalogProduct).where(
+            CatalogProduct.id == product_id, CatalogProduct.user_id == user.sub
+        )
+    )
+    if row is None:
+        # Scoped to the user first: someone else's product must read as "not found", never as
+        # "forbidden", which would confirm that it exists.
+        raise APIError(404, "not_found", "product not found")
+    db.delete(row)
+    db.commit()
+    return RemovedCount(removed=1)
+
+
+@router.delete(
+    "", response_model=RemovedCount, summary="Empty the current user's catalog completely."
+)
+def empty_catalog(user: UserDep, db: SessionDep) -> RemovedCount:
+    """Start over. The watches survive, so the next run refills what is still watched — which
+    is why the confirmation in the UI has to say so (9.F4)."""
+    rows = db.scalars(select(CatalogProduct).where(CatalogProduct.user_id == user.sub)).all()
+    for row in rows:
+        db.delete(row)
+    db.commit()
+    return RemovedCount(removed=len(rows))

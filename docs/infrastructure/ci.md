@@ -10,7 +10,7 @@ A minimal pipeline (GitHub Actions) on every push/PR: it runs the tools already 
 |---|---|---|
 | Backend lint | `ruff check .` · `ruff format --check .` | blocking |
 | Backend typecheck | `mypy` (strict) | blocking |
-| Backend tests | `pytest` (unit + contract; integration on a Postgres service) | blocking |
+| Backend tests | `pytest` (unit + contract; integration on a Postgres service), **across cores** — `-n auto` via `pytest-xdist`, set in `addopts` so CI and local runs both get it | blocking |
 | Frontend lint | `prettier --check` · `svelte-check` | blocking |
 | i18n consistency | `i18n:check` — English keys **used vs defined** (core + plugins); 4.B11. Also runs **before the build** (`prebuild`) and **on tag** (job `i18n-guard`, a prerequisite of *Build images*) | blocking |
 | Frontend build | `npm run build` (runs `build:plugins` + `i18n:check`) | blocking |
@@ -35,7 +35,15 @@ Policy: `main` is always green; PRs are not merged with red jobs. Process detail
 poetry run pytest                                                          # whole suite (recursive)
 poetry run pytest tests/web                                                # one group
 poetry run pytest tests/plugins/dragon_store/test_dragon_store_parser.py   # one file
+poetry run pytest -n0 tests/web/test_catalog_api.py                        # serial: debugging one failure
 ```
+
+`-n auto` is on by default. Pass **`-n0`** when chasing a single failure — with workers the output
+interleaves and tracebacks are harder to read. Parallelism is safe here because every worker is its
+own process: the module-level engine and the in-memory SQLite are per-worker, the mock HTTP servers
+in the plugin tests bind port 0, and no fixture is session- or module-scoped. A test that reaches
+for global state instead of a fixture will fail under workers — which is the point: it was already
+depending on the order, silently.
 
 ## Dev images (on PRs)
 

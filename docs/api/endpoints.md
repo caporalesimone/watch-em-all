@@ -4,7 +4,7 @@
 >
 > English translation of the Italian reference [`docs-ita/api/endpoints.md`](../../docs-ita/api/endpoints.md), limited to what is implemented (DOC-12). Phase 1 ships Auth, Me and Health; phase 3 adds admin user management, plugin discovery, the read-only **catalog** and the scraper plugin's own routes; phase 4 adds the scraper scheduling/worker admin, the system log and the runtime settings/feature-flags; phase 5 adds **carts** (CRUD, membership and the computed state); phase 6 adds the per-cart **alert types** and the in-app **alert history**. Cart/product **history** and **notifier** delivery arrive in later phases.
 
-Role legend: 🌐 public · 👤 user · 🛡 admin
+Role legend: 🌐 public · 👤 user · ⚡ super-user (and admin) · 🛡 admin
 
 ## Auth — [auth](../4-capabilities/core/auth.md)
 
@@ -26,14 +26,14 @@ Role legend: 🌐 public · 👤 user · 🛡 admin
 
 | Method | Path | Role | Body | Notes |
 |---|---|---|---|---|
-| POST | `/api/admin/users` | 🛡 | `{username, first_name, last_name, role, temp_password}` | creates an account with a forced first-login password change; duplicate username → 409 (USR-R1/R2/R15) |
+| POST | `/api/admin/users` | 🛡 | `{username, first_name, last_name, role, temp_password}` | creates an account with a forced first-login password change; duplicate username → 409 (USR-R1/R2/R15). `role` ∈ {`user`, `super_user`, `admin`} — chosen here and not changed afterwards (promoting an existing account is a later phase) |
 | GET | `/api/admin/users` | 🛡 | — | lists all accounts (username, name, role, status, last login) |
 
 ## Admin — system
 
 | Method | Path | Role | Response | Notes |
 |---|---|---|---|---|
-| GET | `/api/admin/errors` | 🛡 | `[{source, type, title, description}]` | **admin-only** feed of errors/warnings (admin diagnostics), kept off the public `/api/health` probe. First source: schema drift (4.B0), behind `WEA_SCHEMA_DRIFT_ALERT` |
+| GET | `/api/admin/errors` | 🛡 | `[{source, type, title, description}]` | **admin-only** feed of errors/warnings (admin diagnostics), kept off the public `/api/health` probe. Sources: schema drift (4.B0, behind `WEA_SCHEMA_DRIFT_ALERT`) and the **worker's status** (PST-R4, never behind a flag — never reported / stopped reporting / suspended itself, each with what it means for scrapes and deliveries) |
 | GET | `/api/admin/logs` | 🛡 | `[{id, created_at, level, source, message, context}]` | **admin-only** system log **live tail** (4.B7/4.F3). Cursor by `id`: no `since` → latest `limit`; `since=<id>` → rows with `id > since` (ascending). Filters `level` (info/warning/error), `sources` (repeatable, multi), `q` (case-insensitive message search); `limit` 1–1000 (default 200) |
 | GET | `/api/admin/logs/page` | 🛡 | `{items, total, counts:{info,warning,error}, sources}` | **admin-only** system log **paged history** (4.F4): `page`+`size` (newest-first window) + `total` + per-level `counts` (over the source/search filters) + distinct `sources` (filter chips). Same `level`/`sources`/`q` filters |
 | GET | `/api/admin/feature-flags` | 🛡 | `{key: {…}}` | dev feature flags, effective values (defaults + overrides). Admin-only (4.B1a) |
@@ -57,6 +57,7 @@ Known flags (params shown with their defaults): `worker_tick` `{seconds: 60}` (w
 
 | Method | Path | Role | Response | Notes |
 |---|---|---|---|---|
+| GET | `/api/plugin-assets/{name}/assets/{filename}` | 🌐 | — | an image from that plugin's `frontend/assets` (REG-R6b): bare filename only, resolved inside the folder, image extensions only. Public, like the icon — an `<img>` carries no token |
 | GET | `/api/plugins` | 👤🛡 | `[{name, type, route_base, icon, display_name, version}]` | only enabled + loaded plugins; no internal paths. `route_base`/`icon` are `null` for a plugin without a frontend (notifiers); `version` is the plugin's own manifest version (4.B0a) |
 | GET | `/api/plugin-assets/{name}/icon` | 🌐 | image | the plugin's manifest `icon`, served as a static asset (path-traversal guarded); 404 if absent. Public like the SPA bundle — the browser loads it as an `<img>`, which cannot carry the bearer token |
 
@@ -66,9 +67,14 @@ Plugin-specific routes are registered by each plugin under `/api{route_base}` (e
 
 | Method | Path | Role | Query | Notes |
 |---|---|---|---|---|
-| GET | `/api/catalog` | 👤 | `?page=&page_size=&sort=&order=&q=&available=&removed=` | the current user's catalog as the Product Picker table: paginated server-side, returns `{items, total, page, page_size}`. `sort` ∈ {`name`, `plugin_id`, `price_current`, `price_original`, `is_available`, `last_seen_at`} (default `last_seen_at`); `order` `asc`\|`desc`; `q` = case-insensitive name search; `available`/`removed` = optional boolean filters |
+| GET | `/api/catalog` | 👤 | `?page=&page_size=&sort=&order=&q=&available=&removed=` | the current user's catalog as the Product Picker table: paginated server-side, returns `{items, total, page, page_size}`. `sort` ∈ {`name`, `plugin_id`, `price_current`, `price_original`, `is_available`, `last_seen_at`} (default `last_seen_at`); `order` `asc`\|`desc`; `q` = case-insensitive name search; `available`/`removed` = optional boolean filters. Each item carries `sources: [{kind, label}]` — which of the user's inputs still deliver it (C14, PROD-R9), so the deletion confirmation can name what will bring it back; empty means nothing will |
 
-The catalog is **read-only** here: it is written only through the Catalog Update Service (a scrape). The cleanup/mutation endpoints (remove delisted, selective/empty) arrive in a later phase, with the cart/Product Picker selection role.
+| GET | `/api/catalog/delisted` | 👤 | — | `{total, in_carts}` — what "remove the delisted" is about to do (C7): every delisted row of the user's catalog, and how many of them are in at least one cart. Counted server-side over the whole catalog, never the visible page |
+| DELETE | `/api/catalog/delisted` | 👤 | — | remove every delisted product of the current user → `{removed}`. The routine tidy-up |
+| DELETE | `/api/catalog/{product_id}` | 👤 | — | remove one product → `{removed: 1}`. Someone else's product answers **404**, never 403: a 403 would confirm the row exists |
+| DELETE | `/api/catalog` | 👤 | — | empty the catalog → `{removed}`. The **watches survive**, so the next run refills what is still watched — which is why the confirmation has to say so (CAT-R6) |
+
+The catalog is otherwise **read-only** here: it is filled only through the Catalog Update Service (a scrape). The three deletions are the user's own cleanups (9.B7/9.F4); each takes the product's **price history and cart memberships** with it (CAT-R8, an `ON DELETE CASCADE`) and reports how many rows went, so the page can say what happened instead of just refreshing.
 
 ## Price history — [price-history](../4-capabilities/core/price-history.md)
 
@@ -132,13 +138,14 @@ Registered under `/api/plugins/dragon-store` (the generic convention above); the
 
 | Method | Path | Role | Notes |
 |---|---|---|---|
-| POST | `/api/plugins/dragon-store/test` | 👤 | dry-run: returns `list[Product]`, writes nothing (SCR-R11) |
-| POST | `/api/plugins/dragon-store/scrape-now` | 👤 | immediate scrape for the requesting user only (writes the catalog); a run already in progress (scheduled or manual) → **409** (`scrape_in_progress`, SCHED-R4); within the cooldown → **429** with the time remaining; otherwise **202** + a background job (SCR-R15) |
-| GET | `/api/plugins/dragon-store/scrape-now` | 👤 | cooldown status: `{available, available_at, retry_after_seconds, interval_seconds}` (feeds the UI countdown) |
-| GET/POST/DELETE | `/api/plugins/dragon-store/watches` | 👤 | the user's watched product URLs; `POST` rejects a duplicate URL with **409** |
+| POST | `/api/plugins/dragon-store/scrape-now` | ⚡ | immediate scrape for the requesting user only (writes the catalog); **super-user or admin** (9.B8) — a plain user gets **403**; a run already in progress (scheduled or manual) → **409** (`scrape_in_progress`, SCHED-R4); within the cooldown → **429** with the time remaining; otherwise **202** + a background job (SCR-R15) |
+| GET | `/api/plugins/dragon-store/scrape-now` | ⚡ | cooldown status: `{available, available_at, retry_after_seconds, interval_seconds}` (feeds the UI countdown). Same restriction as the POST: the status of a command you cannot issue is not yours either |
+| GET | `/api/plugins/dragon-store/classify` | 👤 | `?url=` → `{kind}`: `"product"`, `"category"` or `null`. Decided from the URL alone, no request to the store; the add form asks while the URL is being pasted, so the dented toggle appears only for a category |
+| GET/POST/DELETE | `/api/plugins/dragon-store/watches` | 👤 | the user's watched products **and categories**; `POST {url, include_ammaccati?}` commits the row and queues it, answering **201** in milliseconds — the row *is* the job, resolved outside the request (9.X6b). A duplicate URL → **409** `duplicate_watch` (a UNIQUE, not a check); another add still in flight → **409** `add_in_progress`; an unrecognised URL → **422** `invalid_url`. `include_ammaccati` is dropped on a product URL (DRG-R7). Each row carries what its last scan yielded: `products_included`, `products_excluded`, `last_scanned_at` |
+| PATCH | `/api/plugins/dragon-store/watches/{id}` | 👤 | `{include_ammaccati}` — the dented filter on an existing **category**, applied from the next scan. A product watch → **422** `not_a_category`; a watch being resolved → **409** `watch_busy` (the walk reads that column between pages); someone else's → **404** |
 
 ## Health — [deployment](../infrastructure/deployment.md)
 
 | Method | Path | Role | Response | Notes |
 |---|---|---|---|---|
-| GET | `/api/health` | 🌐 | `200 {status, db, version, server_time, worker_heartbeat_age_s}` / `503` | app alive + DB reachable; `version` is the baked product version; `server_time` is ISO8601 with the installation-TZ offset (the UI clock source, 4.F1); `worker_heartbeat_age_s` is `null` until the worker persists its heartbeat (phase 4) |
+| GET | `/api/health` | 🌐 | `200 {status, db, version, server_time, worker_heartbeat_age_s}` / `503` | app alive + DB reachable; `version` is the baked product version; `server_time` is ISO8601 with the installation-TZ offset (the UI clock source, 4.F1); `worker_heartbeat_age_s` is the seconds since the worker last reported ([process-status](../4-capabilities/core/process-status.md), PST-R3) — `null` means it has not reported since this database was created, and nothing else |

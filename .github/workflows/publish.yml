@@ -26,7 +26,7 @@ jobs:
   version-guard:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Tag must match the top CHANGELOG entry (1.T4, INF-19)
         run: |
           top="$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)"
@@ -44,8 +44,8 @@ jobs:
   i18n-guard:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
       - name: i18n consistency (English reference, 4.B11)
@@ -61,7 +61,7 @@ jobs:
           - { image: watch-em-all, dockerfile: packages/app/Dockerfile }      # web + worker roles
           - { image: watch-em-all-ops, dockerfile: packages/ops/Dockerfile }
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0   # full history + tags so `git describe` (in the image build) yields the real version
       - uses: docker/setup-buildx-action@v4
