@@ -23,6 +23,7 @@
 	import ProductThumb from '$lib/components/ProductThumb.svelte';
 	import SourceTag from '$lib/components/SourceTag.svelte';
 	import { money } from '$lib/format';
+	import { mountedPlugins } from '$lib/stores/plugins';
 
 	const PAGE_SIZE = 20;
 
@@ -114,8 +115,8 @@
 
 	// --- cleanups (9.F4) ---
 	//
-	// Deleting a product takes its price history and its cart memberships with it: the
-	// database cascades, and a confirmation that does not say so is asking for consent to
+	// Deleting a product takes its cart memberships with it (the database cascades) and leaves
+	// its price history alone, and a confirmation that does not say so is asking for consent to
 	// something the user has not been told. Delete mode exists so that a row-level delete is a
 	// decision rather than a mis-click next to the "add to cart" checkbox.
 	// One member per kind, not `'delisted' | 'all'` on a shared one: a discriminant has to be a
@@ -134,6 +135,40 @@
 	// cannot be worked out from the table, and it is the one the cascade takes away silently.
 	let delistedTotal = $state(0);
 	let delistedInCarts = $state(0);
+
+	// The scraper's name as a person reads it, resolved from the mounted plugins exactly as
+	// `SourceTag` does — so renaming a plugin renames it here too, instead of leaving a
+	// `plugin_id` with an underscore in the middle of a sentence.
+	function scraperName(pluginId: string): string {
+		return $mountedPlugins.find((m) => m.name === pluginId)?.display_name ?? pluginId;
+	}
+
+	// What has to be removed for a deletion to stick, as a sentence — or null when nothing
+	// delivers this product any more and the deletion is simply final.
+	//
+	// Four cases, and each is its own string rather than one with a guess in it. The **kind**
+	// matters because "remove the category X" is false for a product watched on its own, and the
+	// **plural** matters more: a product can arrive from two categories at once (which is why
+	// provenance is many-to-many), and naming one of them would promise a result that removing
+	// it does not produce. The scraper is named too — a category is not addressable without
+	// knowing which store's it is, and its page is where the removal happens.
+	const sourceRemedy = $derived.by(() => {
+		if (pending === null || pending.kind !== 'one') return null;
+		const sources = pending.item.sources;
+		if (sources.length === 0) return null;
+		const scraper = scraperName(pending.item.plugin_id);
+		if (sources.length > 1) {
+			return $_('catalog.confirmComesBackFromMany', {
+				values: { inputs: sources.map((s) => s.label).join(', '), scraper }
+			});
+		}
+		const [only] = sources;
+		const key =
+			only.kind === 'category'
+				? 'catalog.confirmComesBackFromCategory'
+				: 'catalog.confirmComesBackFromProduct';
+		return $_(key, { values: { input: only.label, scraper } });
+	});
 
 	async function loadDelistedTotal(): Promise<void> {
 		try {
@@ -468,55 +503,110 @@
 -->
 {#if pending}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-		<div class="w-full max-w-md space-y-4 rounded-lg bg-white p-5 shadow-lg dark:bg-slate-900">
-			<h3 class="text-base font-semibold">
-				{pending.kind === 'delisted'
-					? $_('catalog.confirmDelistedTitle')
-					: pending.kind === 'all'
-						? $_('catalog.confirmEmptyTitle')
-						: $_('catalog.confirmOneTitle', { values: { name: pending.item.name } })}
-			</h3>
-			<p class="text-sm text-slate-500">
-				{pending.kind === 'delisted'
-					? $_('catalog.confirmDelistedBody', { values: { count: delistedTotal } })
-					: pending.kind === 'all'
-						? $_('catalog.confirmEmptyBody', { values: { count: data?.total ?? 0 } })
-						: $_('catalog.confirmOneBody')}
-			</p>
-			<p class="text-sm text-slate-500">{$_('catalog.confirmCascade')}</p>
-			<!--
-				How many carts are about to lose something (C7). The membership cascade is
-				silent, and this is the one number the catalog table cannot show: a delisted
-				product a user had put in a cart vanishes from it without a word otherwise.
-				Said only when it is true, so the dialog does not grow a line saying "0".
-			-->
-			{#if pending.kind === 'delisted' && delistedInCarts > 0}
-				<p class="text-sm text-amber-600 dark:text-amber-400">
-					{$_('catalog.confirmDelistedInCarts', { values: { count: delistedInCarts } })}
-				</p>
-			{:else if pending.kind === 'one' && pending.item.in_carts > 0}
-				<p class="text-sm text-amber-600 dark:text-amber-400">
-					{$_('catalog.confirmOneInCarts', { values: { count: pending.item.in_carts } })}
-				</p>
-			{/if}
-			{#if pending.kind === 'all'}
-				<p class="text-sm text-slate-500">{$_('catalog.confirmWatchesSurvive')}</p>
-			{:else if pending.kind === 'one'}
+		<div class="w-full max-w-[34rem] space-y-4 rounded-lg bg-white p-5 shadow-lg dark:bg-slate-900">
+			{#if pending.kind === 'one'}
 				<!--
-					9.B7 accepted that a product you still watch comes back, but only the
-					empty-catalog confirmation said so. Now this one can say it as a fact and name
-					the input, because the backend records which of them delivered the product
-					(C14) — a product can arrive from several categories at once, so it is a list.
+					A single product gets its own shape: the thing being deleted is a *thing*, with
+					a picture and a provenance, and the consequences are three facts rather than a
+					paragraph. No generic title — the product's name is the heading, with the trash
+					beside it; one line less, and the dialog opens on what it is about.
 				-->
+				<div
+					class="flex items-center justify-center gap-2 border-b border-slate-200 pb-3 dark:border-slate-800"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.7"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						class="h-5 w-5 shrink-0 text-red-600"
+						aria-hidden="true"
+					>
+						<path d="M3 6h18" />
+						<path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+						<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+						<path d="M10 11v6M14 11v6" />
+					</svg>
+					<h3 class="text-base font-semibold text-balance">{pending.item.name}</h3>
+				</div>
+				<div class="grid grid-cols-[7rem_1fr] items-start gap-4 max-[30rem]:grid-cols-1">
+					<!--
+						A FIXED square whatever the picture is, so the dialog does not change shape
+						between a tall book cover and a wide box; `object-contain` keeps the image's
+						own proportions inside it, letterboxed against the frame.
+					-->
+					<div
+						class="flex h-28 w-28 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800"
+					>
+						{#if pending.item.image_url}
+							<img
+								src={pending.item.image_url}
+								alt=""
+								class="max-h-full max-w-full object-contain"
+							/>
+						{/if}
+					</div>
+					<div class="flex min-w-0 flex-col gap-2 text-sm text-slate-500">
+						<!--
+							Only when it is true: the cascade is worth announcing, a zero is not.
+						-->
+						{#if pending.item.in_carts > 0}
+							<p class="grid grid-cols-[1.1rem_1fr] gap-2">
+								<span aria-hidden="true">⚠️</span>
+								<span>{$_('catalog.confirmOneInCarts')}</span>
+							</p>
+						{/if}
+						<p class="grid grid-cols-[1.1rem_1fr] gap-2">
+							<span aria-hidden="true">{sourceRemedy ? '⚠️' : 'ℹ️'}</span>
+							<span>
+								{#if sourceRemedy}
+									<!-- The consequence, then the remedy under it: two things to do
+									     with one warning, and a reader stops at the first. -->
+									<span class="mb-0.5 block">{$_('catalog.confirmComesBackLead')}</span>
+									{sourceRemedy}
+								{:else}
+									{$_('catalog.confirmNothingBringsItBack')}
+								{/if}
+							</span>
+						</p>
+						<!-- ℹ️, not ⚠️: a caution mark on "your data is safe" teaches the eye to
+						     stop reading the marks. Same colour as the rest — it is a fact of
+						     equal standing, just not a warning. -->
+						<p class="grid grid-cols-[1.1rem_1fr] gap-2">
+							<span aria-hidden="true">ℹ️</span>
+							<span>{$_('catalog.confirmHistoryKept')}</span>
+						</p>
+					</div>
+				</div>
+			{:else}
+				<h3 class="text-base font-semibold">
+					{pending.kind === 'delisted'
+						? $_('catalog.confirmDelistedTitle')
+						: $_('catalog.confirmEmptyTitle')}
+				</h3>
 				<p class="text-sm text-slate-500">
-					{#if pending.item.sources.length}
-						{$_('catalog.confirmComesBackFrom', {
-							values: { sources: pending.item.sources.map((s) => s.label).join(', ') }
-						})}
-					{:else}
-						{$_('catalog.confirmNothingBringsItBack')}
-					{/if}
+					{pending.kind === 'delisted'
+						? $_('catalog.confirmDelistedBody', { values: { count: delistedTotal } })
+						: $_('catalog.confirmEmptyBody', { values: { count: data?.total ?? 0 } })}
 				</p>
+				<p class="text-sm text-slate-500">{$_('catalog.confirmCascade')}</p>
+				<!--
+					How many carts are about to lose something (C7). The membership cascade is
+					silent, and this is the one number the catalog table cannot show: a delisted
+					product a user had put in a cart vanishes from it without a word otherwise.
+					Said only when it is true, so the dialog does not grow a line saying "0".
+				-->
+				{#if pending.kind === 'delisted' && delistedInCarts > 0}
+					<p class="text-sm text-amber-600 dark:text-amber-400">
+						{$_('catalog.confirmDelistedInCarts', { values: { count: delistedInCarts } })}
+					</p>
+				{/if}
+				{#if pending.kind === 'all'}
+					<p class="text-sm text-slate-500">{$_('catalog.confirmWatchesSurvive')}</p>
+				{/if}
 			{/if}
 			<div class="flex justify-end gap-2">
 				<button
