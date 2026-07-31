@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.core.contracts import DeltaCounters, Product
-from src.core.models import CatalogProduct, PriceHistory
+from src.core.models import CatalogProduct, PriceHistory, ProductSource
 
 
 def _last_history_entry(session: Session, plugin_id: str, external_id: str) -> PriceHistory | None:
@@ -194,6 +194,65 @@ def _append_history(session: Session, p: Product, original: Decimal, discount: D
     )
 
 
+def _record_sources(session: Session, row: CatalogProduct, p: Product) -> None:
+    """Remember which inputs delivered this product (C14), or refresh what we knew of them.
+
+    Additive on purpose: a product delivered by two categories keeps both rows, because the
+    honest answer to "will this come back if I delete it?" is "yes, from either of these". The
+    label is rewritten every time, so an input the user renamed never shows its old name in
+    somebody's confirmation dialog.
+
+    A delivery that names no source leaves the existing provenance alone rather than clearing
+    it: a single-product read of something a category also delivers says nothing about the
+    category, and forgetting that would answer the deletion question wrongly. Provenance is
+    dropped when the plugin says the input is gone (:func:`forget_source`).
+    """
+    if not p.sources:
+        return
+    known = {
+        r.source_key: r
+        for r in session.scalars(
+            select(ProductSource).where(ProductSource.product_id == row.id)
+        ).all()
+    }
+    for source in p.sources:
+        existing = known.get(source.key)
+        if existing is None:
+            session.add(
+                ProductSource(
+                    product_id=row.id,
+                    source_key=source.key,
+                    source_kind=source.kind,
+                    source_label=source.label,
+                )
+            )
+        else:
+            existing.source_kind = source.kind
+            existing.source_label = source.label
+
+
+def forget_source(session: Session, user_id: int, plugin_id: str, source_key: str) -> int:
+    """Drop the provenance of an input that no longer exists, and commit. Returns the rows hit.
+
+    The **products stay**: they are in the user's catalog, and removing a watch has never
+    removed what it delivered. What has to go is the claim that they still come from somewhere
+    — otherwise a deletion confirmation would keep promising a return that nothing will cause.
+    """
+    rows = session.scalars(
+        select(ProductSource)
+        .join(CatalogProduct, CatalogProduct.id == ProductSource.product_id)
+        .where(
+            CatalogProduct.user_id == user_id,
+            CatalogProduct.plugin_id == plugin_id,
+            ProductSource.source_key == source_key,
+        )
+    ).all()
+    for row in rows:
+        session.delete(row)
+    session.commit()
+    return len(rows)
+
+
 def _apply_delivery(
     session: Session, user_id: int, products: list[Product]
 ) -> tuple[DeltaCounters, set[int]]:
@@ -231,6 +290,8 @@ def _apply_delivery(
             if _update_statistics(row, p):
                 counters.price_changes += 1
             _update_mutable_fields(row, p, original, discount)
+
+        _record_sources(session, row, p)
 
         # CATSVC-R4: a history entry only on a price OR availability change of the product.
         if (

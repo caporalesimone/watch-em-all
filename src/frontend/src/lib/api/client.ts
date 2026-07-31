@@ -292,6 +292,14 @@ export interface CatalogItem {
 	extra: Record<string, unknown>;
 	first_seen_at: string;
 	last_seen_at: string;
+	// Which of the user's inputs still deliver this product (C14). Empty = nothing does, so a
+	// deletion is final; otherwise these are what will bring it back on the next scan.
+	sources: CatalogItemSource[];
+}
+
+export interface CatalogItemSource {
+	kind: string; // the plugin's vocabulary (Dragon Store: 'product' | 'category')
+	label: string; // a name to show, kept current by the backend
 }
 
 export interface CatalogPage {

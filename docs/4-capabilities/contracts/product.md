@@ -47,6 +47,8 @@ class Product(BaseModel):
     is_available: bool          # decided by the SCRAPER (temporary out-of-stock)
     scraped_at: datetime        # when the SITE answered — not "now"; see PROD-R8
     extra: dict = {}            # plugin-specific data, persisted in products.extra_json
+    sources: list[ProductSourceRef] = []
+    # which of the user's inputs delivered this product; PLURAL — see PROD-R9
 ```
 
 ## Contract rules
@@ -59,6 +61,7 @@ class Product(BaseModel):
 - **PROD-R6** — `brand` is an object `{text, link?}` (`BrandRef`): `text` mandatory, `link` **optional** (absolute URL to the brand page). The UI renders plain text, or **clickable** text (opens a new tab) when the link is present. `None` if the scraper does not extract the brand. It is a structured attribute in its own right, **distinct** from the `tags` field.
 - **PROD-R7** — `category` is the category **breadcrumb**: an ordered list **root → leaf** of `CategoryRef{text, link?}` (empty if absent). The UI renders it as `text / text / text`, each entry clickable on its `link` (new tab), **without a trailing `/`** after the last one. Generic: the core **only persists** it; the **mechanism** to build it (`add_child`/`get_path`) is provided by the scraper base ([scraper-plugin](../../3-features/plugins/scraper-plugin.md) SCR-R17).
 - **PROD-R8** — `scraped_at` is **when the site produced this data**, which is not always the moment the scraper built the `Product`. A response served from the scrape cache ([plugin-context](../core/plugin-context.md), CTX-R9) carries the timestamp of the fetch that filled it, exposed as `HttpResponse.fetched_at` (`None` = fetched just now); the scraper uses `fetched_at` when present and the clock otherwise. The core stores this value as `products.last_seen_at`, so a scraper that hardcodes `now()` makes data up to a full half-life old look like it was just read — defeating the one field a reader uses to judge freshness. It also decides `observations` against `cache_hits` in the per-product statistics, so dropping it corrupts two counters as well as one timestamp. **A scraper that reads a page listing many products has to carry the timestamp per page**, not per run: page 1 can come off the cache while page 2 is fetched for real.
+- **PROD-R9** — `sources` says **which of the user's inputs delivered this product** — `ProductSourceRef{key, kind, label}`, and it is a **list** because the same product can arrive from two categories at once. That is also why a product was never given a foreign key to a watch (9.B4). The source is *described*, not joined: a watch lives in the plugin's own schema (CTX-R6), so the core cannot point at it. `key` is stable for the input's lifetime (the plugin's own id) and is what `forget_source` is called with when that input is deleted; `kind` is the plugin's vocabulary; `label` is a **name shown to a user**, refreshed on every delivery so a renamed input never appears under its old name in a confirmation dialog. Empty for a scraper with no notion of inputs, and the core then records no provenance. A delivery that names no source **does not clear** what was known — a single-product read of something a category also delivers says nothing about the category.
 
 ## `external_id`: product identity
 

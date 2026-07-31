@@ -60,6 +60,8 @@
 		"confirmOneBody": "This product will be removed from your catalog.",
 		"confirmCascade": "Their place in any cart goes with them, and the removal cannot be undone. Their price history stays: it belongs to the product, so it is still there if you add it back.",
 		"confirmWatchesSurvive": "Your watches are not touched: the next scheduled run will bring back whatever is still watched.",
+			"confirmComesBackFrom": "It still comes from {sources}, so the next scheduled run will bring it back. Remove that input first if you want it gone for good.",
+			"confirmNothingBringsItBack": "No input delivers it any more, so nothing will bring it back.",
 		"confirmAction": "Remove"
 	},
 	"carts": {

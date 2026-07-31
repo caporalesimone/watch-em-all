@@ -33,6 +33,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
+from src.core.catalog import forget_source as _forget_source_service
 from src.core.catalog import update_catalog as _update_catalog_service
 from src.core.catalog import upsert_products as _upsert_products_service
 from src.core.db import get_engine, new_session
@@ -47,12 +48,24 @@ if TYPE_CHECKING:
 
 # (user_id, current products) -> delta counters. Bound to a session + plugin_id.
 UpdateCatalog = Callable[[int, "list[Product]"], "DeltaCounters"]
+# (user_id, source_key) -> provenance rows dropped. Bound to a session + plugin_id.
+ForgetSource = Callable[[int, str], int]
 
 
 def _no_catalog_write(user_id: int, products: list[Product]) -> DeltaCounters:
     """Default for a context built without that write path: raising beats silently
     dropping a delivery, and beats defaulting to a path the caller did not choose."""
     raise NotImplementedError("this context has no catalog write path")
+
+
+def bind_forget_source(session: Session, plugin_id: str) -> ForgetSource:
+    """Bound :func:`catalog.forget_source`: what a plugin calls when one of a user's inputs
+    ceases to exist, so the products it delivered stop claiming they still come from it."""
+
+    def _forget(user_id: int, source_key: str) -> int:
+        return _forget_source_service(session, user_id, plugin_id, source_key)
+
+    return _forget
 
 
 def bind_upsert_catalog(session: Session) -> UpdateCatalog:
@@ -81,6 +94,10 @@ class PluginContext:
     # resolved as its watch is added, or a run that failed to read the site. Never delists.
     upsert_catalog: UpdateCatalog = _no_catalog_write
     http: HttpClient = field(default_factory=HttpClient)  # polite/counted/retrying client (SCR-R6)
+    # Tell the core an input is gone, so the products it delivered stop naming it as a source
+    # (C14). Defaults to a no-op: a scraper with no notion of inputs never records provenance,
+    # so there is nothing for it to forget — unlike a missing write path, which is a mistake.
+    forget_source: ForgetSource = lambda user_id, source_key: 0  # noqa: E731
 
 
 def build_context(manifest: Manifest, plugin: BasePlugin) -> PluginContext:
@@ -107,6 +124,7 @@ def build_context(manifest: Manifest, plugin: BasePlugin) -> PluginContext:
         config={},
         update_catalog=_update_catalog,
         upsert_catalog=_upsert_catalog,
+        forget_source=bind_forget_source(session, plugin_id),
         http=build_http_client(session, plugin_id, logger),
     )
 

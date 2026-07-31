@@ -22,13 +22,13 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query
 from sqlalchemy import ColumnElement, func, select
-from sqlalchemy.orm import InstrumentedAttribute
+from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from src.core.contracts import BrandRef, CategoryRef
 from src.core.errors import APIError
-from src.core.models import CatalogProduct
+from src.core.models import CatalogProduct, ProductSource
 from src.web.deps import SessionDep, UserDep
-from src.web.schemas import CatalogItem, CatalogPage, RemovedCount
+from src.web.schemas import CatalogItem, CatalogItemSource, CatalogPage, RemovedCount
 
 router = APIRouter(prefix="/catalog", tags=["Catalog"])
 
@@ -42,7 +42,25 @@ _SORT_COLUMNS: dict[str, InstrumentedAttribute[Any]] = {
 }
 
 
-def _to_item(row: CatalogProduct) -> CatalogItem:
+def _sources_for(db: Session, product_ids: list[int]) -> dict[int, list[CatalogItemSource]]:
+    """The provenance of a whole page in one query (C14). One query for the page rather than one
+    per row: this feeds a list of up to a hundred products."""
+    if not product_ids:
+        return {}
+    out: dict[int, list[CatalogItemSource]] = {}
+    rows = db.scalars(
+        select(ProductSource)
+        .where(ProductSource.product_id.in_(product_ids))
+        .order_by(ProductSource.id.asc())
+    ).all()
+    for row in rows:
+        out.setdefault(row.product_id, []).append(
+            CatalogItemSource(kind=row.source_kind, label=row.source_label)
+        )
+    return out
+
+
+def _to_item(row: CatalogProduct, sources: list[CatalogItemSource]) -> CatalogItem:
     return CatalogItem(
         id=row.id,
         plugin_id=row.plugin_id,
@@ -62,6 +80,7 @@ def _to_item(row: CatalogProduct) -> CatalogItem:
         extra=row.extra_json,
         first_seen_at=row.first_seen_at,
         last_seen_at=row.last_seen_at,
+        sources=sources,
     )
 
 
@@ -104,8 +123,12 @@ def list_catalog(
         .limit(page_size)
     ).all()
 
+    sources = _sources_for(db, [r.id for r in rows])
     return CatalogPage(
-        items=[_to_item(r) for r in rows], total=total, page=page, page_size=page_size
+        items=[_to_item(r, sources.get(r.id, [])) for r in rows],
+        total=total,
+        page=page,
+        page_size=page_size,
     )
 
 

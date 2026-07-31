@@ -1097,6 +1097,60 @@ def test_a_single_watch_covered_by_a_category_costs_no_extra_request(client: Tes
     assert client.get("/api/catalog", headers=h).json()["total"] == 38
 
 
+# --- where a product comes from (C14) ---
+
+
+def _sources_of(client: TestClient, headers: dict[str, str], marker: str) -> list[tuple[str, str]]:
+    items = client.get("/api/catalog", params={"page_size": 100}, headers=headers).json()["items"]
+    (found,) = [i for i in items if marker in i["url"]]
+    return [(s["kind"], s["label"]) for s in found["sources"]]
+
+
+def test_the_catalog_says_which_input_delivers_a_product(client: TestClient) -> None:
+    """C14: the deletion confirmation has to answer "will this come back?" with a fact instead
+    of a conditional, and it can only do that if the delivery said where the product came from.
+    The label is the category's name, not its URL — it is shown to a user."""
+    uid, token = _user(client)
+    h = _bearer(token)
+    with CategoryServer() as base:
+        _add_watch(client, h, sp_url(base))
+        _run_for_user(client, uid)
+
+    assert _sources_of(client, h, ".gp.36099.uw") == [("category", "Il Richiamo di Cthulhu")]
+
+
+def test_a_product_watched_twice_over_names_both_inputs(client: TestClient) -> None:
+    """Why this is many-to-many and not a foreign key (9.B4): removing the category would not
+    stop this product coming back, because it is also watched on its own."""
+    uid, token = _user(client)
+    h = _bearer(token)
+    with CategoryServer() as base:
+        _add_watch(client, h, f"{base}/prod.1.1.1.gp.36099.uw")
+        _add_watch(client, h, sp_url(base))
+        _run_for_user(client, uid)
+
+    sources = dict(_sources_of(client, h, ".gp.36099.uw"))
+    assert set(sources) == {"product", "category"}
+    assert sources["category"] == "Il Richiamo di Cthulhu"
+
+
+def test_removing_an_input_stops_its_products_claiming_it(client: TestClient) -> None:
+    """The products stay — removing a watch has never removed what it found — but they stop
+    promising a return that nothing will cause any more."""
+    uid, token = _user(client)
+    h = _bearer(token)
+    with CategoryServer() as base:
+        _add_watch(client, h, sp_url(base))
+        _run_for_user(client, uid)
+    assert _sources_of(client, h, ".gp.36099.uw") == [("category", "Il Richiamo di Cthulhu")]
+
+    (watch,) = client.get(f"{DS}/watches", headers=h).json()
+    assert client.delete(f"{DS}/watches/{watch['id']}", headers=h).status_code == 204
+
+    assert client.get("/api/catalog", headers=h).json()["total"] == 38  # still theirs
+    assert _sources_of(client, h, ".gp.36099.uw") == []
+
+
 # --- what the page needs to describe a watch (9.F1/9.F2/9.F3) ---
 
 

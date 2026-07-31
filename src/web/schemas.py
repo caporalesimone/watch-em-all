@@ -86,6 +86,17 @@ class AdminUserSummary(BaseModel):
     created_at: datetime
 
 
+class CatalogItemSource(BaseModel):
+    """One input that delivers a catalog product (C14): its kind, and a name to show.
+
+    No key: the page needs to *say* where a product comes from, not act on it, and shipping the
+    plugin's internal id would invite a client to build a link on something it does not own.
+    """
+
+    kind: str
+    label: str
+
+
 class CatalogItem(BaseModel):
     # One product row of the current user's catalog, as the Product Picker reads
     # it. Money is Decimal (serialised as a JSON string — exact, no float drift).
@@ -107,6 +118,10 @@ class CatalogItem(BaseModel):
     extra: dict[str, Any]
     first_seen_at: datetime
     last_seen_at: datetime
+    # Which of the user's inputs still deliver this product (C14). Empty means nothing does, so
+    # deleting it is final; non-empty is what lets the confirmation name what will bring it back
+    # instead of hedging. Plural because two categories can deliver the same product.
+    sources: list[CatalogItemSource] = Field(default_factory=list)
 
 
 class CatalogPage(BaseModel):

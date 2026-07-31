@@ -47,12 +47,24 @@ from sqlalchemy import (
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
-from src.core.contracts import Adjustment, BrandRef, CategoryRef, DeltaCounters, Product
+from src.core.contracts import (
+    Adjustment,
+    BrandRef,
+    CategoryRef,
+    DeltaCounters,
+    Product,
+    ProductSourceRef,
+)
 from src.core.db import new_session
 from src.core.errors import APIError
 from src.core.http import RobotsDenied
 from src.core.plugins.base import ScraperPlugin, Tags
-from src.core.plugins.context import PluginContext, bind_upsert_catalog, build_http_client
+from src.core.plugins.context import (
+    PluginContext,
+    bind_forget_source,
+    bind_upsert_catalog,
+    build_http_client,
+)
 from src.core.robots import origin_of
 from src.core.scraper_stats import bump
 from src.web.deps import SessionDep, UserDep
@@ -245,6 +257,7 @@ def _request_context(db: Session, *, sleep: Callable[[float], None] | None = Non
         config={},
         update_catalog=_refuse_delisting,
         upsert_catalog=bind_upsert_catalog(db),
+        forget_source=bind_forget_source(db, PLUGIN_ID),
         http=build_http_client(db, PLUGIN_ID, logger, sleep=sleep),
     )
 
@@ -478,11 +491,16 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
             return
 
         if products:
-            # Never the delisting path: this delivery covers one input, and says nothing about
-            # the user's other products (CATSVC-R2b).
-            context.upsert_catalog(watch.user_id, products)
+            # The snapshot first: it is what names this watch, and the provenance below reads
+            # that name. Delivering before naming recorded a URL as the source of a product
+            # whose title we were holding.
             if product is not None:
                 watch.snapshot_json = _snapshot(product)
+            # Never the delisting path: this delivery covers one input, and says nothing about
+            # the user's other products (CATSVC-R2b). Everything here came from this one watch.
+            source = _source_ref(watch)
+            products = [p.model_copy(update={"sources": [source]}) for p in products]
+            context.upsert_catalog(watch.user_id, products)
             logger.info(
                 "dragon_store: watch %s resolved for user %s — %s product(s) stored",
                 watch.id,
@@ -516,6 +534,23 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
         _mark_failed(db, watch_id, "an internal error stopped this; the next run will retry")
     finally:
         db.close()
+
+
+def _source_ref(watch: Watch) -> ProductSourceRef:
+    """This watch described as a source (C14).
+
+    The key is the watch's id — stable for its whole life, and what ``forget_source`` is called
+    with when it is deleted. The label is the name the user reads in their list, so it is taken
+    from the snapshot and falls back to the URL only while the first scan has not named it yet.
+    Built **after** a run has refreshed the snapshots, or a first-ever scan would record the URL
+    of a listing page as the name of a category that now has one.
+    """
+    snapshot = watch.snapshot_json or {}
+    return ProductSourceRef(
+        key=str(watch.id),
+        kind=watch.kind,
+        label=str(snapshot.get("name") or watch.url),
+    )
 
 
 def _queue_position(db: Session, watch: Watch) -> int:
@@ -996,6 +1031,10 @@ class DragonStorePlugin(ScraperPlugin):
         )
 
         delivered: dict[str, Product] = {}
+        # Which watches delivered each product (C14). Ids, not descriptions: the labels are
+        # read at the end, once this run has refreshed every snapshot, so a category scanned
+        # for the first time is recorded under the name it just learned.
+        from_watches: dict[str, set[int]] = {}
         unpriced: list[ParsedCard] = []
         excluded = 0  # dented listings this run left out, for the run record (9.B5)
         failed = 0
@@ -1016,6 +1055,7 @@ class DragonStorePlugin(ScraperPlugin):
                 break
             for product in outcome.products:
                 delivered[product.external_id] = product
+                from_watches.setdefault(product.external_id, set()).add(watch.id)
             unpriced.extend(outcome.unpriced)
             excluded += outcome.excluded
             failed += 0 if outcome.complete else 1
@@ -1038,6 +1078,9 @@ class DragonStorePlugin(ScraperPlugin):
                         "the site again",
                         watch.url,
                     )
+                    # Still one of its sources: it is watched on its own as well, so deleting
+                    # the product would bring it back even if that category went away.
+                    from_watches.setdefault(external_id, set()).add(watch.id)
                     _record_scan(watch, included=1, excluded=0)
                     continue
                 try:
@@ -1058,6 +1101,7 @@ class DragonStorePlugin(ScraperPlugin):
                     failed += 1
                     continue
                 delivered[resolved.external_id] = resolved
+                from_watches.setdefault(resolved.external_id, set()).add(watch.id)
                 _record_scan(watch, included=1, excluded=0)
 
         # 3. The products no listing could price (9.B2b), last so the reads above count.
@@ -1074,14 +1118,28 @@ class DragonStorePlugin(ScraperPlugin):
                 )
                 aborted = True
 
-        products = list(delivered.values())
         # Refresh each watch's display snapshot from this run; the catalog write below commits
         # this session, persisting these too.
-        by_url = {p.url: p for p in products}
+        by_url = {p.url: p for p in delivered.values()}
         for watch in watches:
             latest = by_url.get(watch.url)
             if latest is not None:
                 watch.snapshot_json = _snapshot(latest)
+
+        # Provenance last, so every label above is the current one (C14).
+        by_id = {w.id: w for w in watches}
+        products = [
+            p.model_copy(
+                update={
+                    "sources": [
+                        _source_ref(by_id[wid])
+                        for wid in sorted(from_watches.get(p.external_id, ()))
+                        if wid in by_id
+                    ]
+                }
+            )
+            for p in delivered.values()
+        ]
 
         context.logger.info(
             "dragon_store: run for user %s delivered %s product(s) — %s HTTP request(s), "
@@ -1286,6 +1344,10 @@ class DragonStorePlugin(ScraperPlugin):
                 raise APIError(404, "not_found", "watch not found")
             db.delete(watch)
             db.commit()
+            # The products it delivered stay in the catalog — removing an input has never
+            # removed what it found. What must go is their claim to still come from it, or the
+            # catalog would keep promising that deleting one of them brings it back (C14).
+            bind_forget_source(db, PLUGIN_ID)(user.sub, str(watch_id))
 
         return router
 

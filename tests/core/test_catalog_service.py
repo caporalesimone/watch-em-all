@@ -15,9 +15,9 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from src.core.catalog import update_catalog, upsert_products
-from src.core.contracts import Product
-from src.core.models import CatalogProduct, PriceHistory, User
+from src.core.catalog import forget_source, update_catalog, upsert_products
+from src.core.contracts import Product, ProductSourceRef
+from src.core.models import CatalogProduct, PriceHistory, ProductSource, User
 
 PLUGIN = "dragon_store"
 USER = 1
@@ -417,6 +417,110 @@ def test_a_new_watcher_inherits_the_products_past(session: Session) -> None:
     ).one()
     assert other.price_original == Decimal("50.00")
     assert other.discount_pct == Decimal("30.00")
+
+
+# ------------------------------------------------------------------ provenance (C14, PROD-R9)
+
+
+def _sources(session: Session) -> list[tuple[str, str, str]]:
+    return [
+        (r.source_key, r.source_kind, r.source_label)
+        for r in session.scalars(select(ProductSource).order_by(ProductSource.id)).all()
+    ]
+
+
+def test_a_delivery_records_which_input_produced_it(session: Session) -> None:
+    update_catalog(
+        session,
+        USER,
+        PLUGIN,
+        [_product(sources=[ProductSourceRef(key="7", kind="category", label="Cthulhu")])],
+    )
+
+    assert _sources(session) == [("7", "category", "Cthulhu")]
+
+
+def test_two_inputs_delivering_the_same_product_are_both_kept(session: Session) -> None:
+    """The reason this is many-to-many: "will it come back?" is answered by *either* input."""
+    update_catalog(
+        session,
+        USER,
+        PLUGIN,
+        [
+            _product(
+                sources=[
+                    ProductSourceRef(key="7", kind="category", label="Cthulhu"),
+                    ProductSourceRef(key="9", kind="product", label="Necronomicon"),
+                ]
+            )
+        ],
+    )
+
+    assert _sources(session) == [
+        ("7", "category", "Cthulhu"),
+        ("9", "product", "Necronomicon"),
+    ]
+
+
+def test_a_renamed_input_does_not_keep_its_old_name(session: Session) -> None:
+    """The label is shown in a confirmation dialog, so a stale one misinforms."""
+    update_catalog(
+        session,
+        USER,
+        PLUGIN,
+        [_product(sources=[ProductSourceRef(key="7", kind="category", label="Old")])],
+    )
+    update_catalog(
+        session,
+        USER,
+        PLUGIN,
+        [_product(sources=[ProductSourceRef(key="7", kind="category", label="New")])],
+    )
+
+    assert _sources(session) == [("7", "category", "New")]
+
+
+def test_a_delivery_naming_no_source_does_not_erase_what_we_knew(session: Session) -> None:
+    """A single-product read of something a category also delivers says nothing about the
+    category. Clearing provenance here would answer the deletion question wrongly."""
+    update_catalog(
+        session,
+        USER,
+        PLUGIN,
+        [_product(sources=[ProductSourceRef(key="7", kind="category", label="Cthulhu")])],
+    )
+    update_catalog(session, USER, PLUGIN, [_product()])  # no sources named
+
+    assert _sources(session) == [("7", "category", "Cthulhu")]
+
+
+def test_forgetting_an_input_keeps_its_products(session: Session) -> None:
+    """Removing a watch has never removed what it delivered — only the claim that it still
+    comes from there, which is what a confirmation reads to promise a return."""
+    update_catalog(
+        session,
+        USER,
+        PLUGIN,
+        [_product(sources=[ProductSourceRef(key="7", kind="category", label="Cthulhu")])],
+    )
+
+    dropped = forget_source(session, USER, PLUGIN, "7")
+
+    assert dropped == 1
+    assert _sources(session) == []
+    assert _count(session, CatalogProduct) == 1
+
+
+def test_forgetting_an_input_leaves_another_users_provenance_alone(session: Session) -> None:
+    _add_user(session, OTHER_USER)
+    source = [ProductSourceRef(key="7", kind="category", label="Cthulhu")]
+    update_catalog(session, USER, PLUGIN, [_product(sources=source)])
+    update_catalog(session, OTHER_USER, PLUGIN, [_product(sources=source)])
+    assert len(_sources(session)) == 2
+
+    # Two users can hold the same input key — the ids are the plugin's, per user.
+    assert forget_source(session, USER, PLUGIN, "7") == 1
+    assert len(_sources(session)) == 1
 
 
 def test_the_chain_outlives_the_catalog_row(session: Session) -> None:

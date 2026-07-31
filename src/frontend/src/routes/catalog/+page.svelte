@@ -479,6 +479,22 @@
 			<p class="text-sm text-slate-500">{$_('catalog.confirmCascade')}</p>
 			{#if pending.kind === 'all'}
 				<p class="text-sm text-slate-500">{$_('catalog.confirmWatchesSurvive')}</p>
+			{:else if pending.kind === 'one'}
+				<!--
+					9.B7 accepted that a product you still watch comes back, but only the
+					empty-catalog confirmation said so. Now this one can say it as a fact and name
+					the input, because the backend records which of them delivered the product
+					(C14) — a product can arrive from several categories at once, so it is a list.
+				-->
+				<p class="text-sm text-slate-500">
+					{#if pending.item.sources.length}
+						{$_('catalog.confirmComesBackFrom', {
+							values: { sources: pending.item.sources.map((s) => s.label).join(', ') }
+						})}
+					{:else}
+						{$_('catalog.confirmNothingBringsItBack')}
+					{/if}
+				</p>
 			{/if}
 			<div class="flex justify-end gap-2">
 				<button

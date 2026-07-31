@@ -99,6 +99,21 @@ class CategoryRef(BaseModel):
     link: str | None = None
 
 
+class ProductSourceRef(BaseModel):
+    """Which of the user's inputs delivered a product (PROD-R9).
+
+    Described rather than joined: a watch lives in the plugin's own schema (CTX-R6), so the
+    core cannot hold a foreign key to it. The plugin supplies a ``key`` that is stable for
+    that input's lifetime, the ``kind`` in its own vocabulary, and a ``label`` fit to show a
+    user — refreshed on every delivery, so renaming an input does not leave a stale name in
+    somebody's confirmation dialog.
+    """
+
+    key: str  # stable per input, in the plugin's space (e.g. the watch's id)
+    kind: str  # the plugin's vocabulary (Dragon Store: "product" | "category")
+    label: str  # shown to the user, so it has to be a name and not an id
+
+
 class Product(BaseModel):
     """The current state of one product as a scraper sees it (product.md).
 
@@ -133,6 +148,11 @@ class Product(BaseModel):
     # that hardcodes ``now()`` here makes stale data look fresh.
     scraped_at: datetime
     extra: dict[str, Any] = Field(default_factory=dict)  # plugin-specific, persisted in extra_json
+    # Which of the user's inputs produced this delivery (PROD-R9). **Plural**, and that is the
+    # whole point: the same product can arrive from two categories at once, which is why it was
+    # never given a single foreign key to a watch. Empty for a scraper with no notion of inputs,
+    # and the core then records no provenance for it.
+    sources: list[ProductSourceRef] = Field(default_factory=list)
 
 
 class Adjustment(BaseModel):

@@ -133,6 +133,36 @@ class CatalogProduct(Base):
     )
 
 
+class ProductSource(Base):
+    """Which of a user's inputs delivered a catalog product — many-to-many (C14).
+
+    A product is deliberately **not** the child of one watch: the same product can be delivered
+    by several categories at once, and that is precisely why a single foreign key was refused
+    (9.B4/CATSVC-R2). A many-to-many is the shape that argument asks for, and it answers the
+    question a deletion confirmation has to answer — *will this come back?* — with the name of
+    the input instead of a conditional.
+
+    The source is **described, not joined**: this is a core table and a watch lives in the
+    plugin's own schema (CTX-R6), so there is nothing here to point a FK at. The plugin names
+    its own input; the core keeps the description current on every delivery and drops it when
+    the plugin says that input is gone.
+    """
+
+    __tablename__ = "product_sources"
+    __table_args__ = (
+        UniqueConstraint("product_id", "source_key", name="uq_product_sources_identity"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    product_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    source_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    # Refreshed on every delivery: an input the user renamed must not keep its old name here.
+    source_label: Mapped[str] = mapped_column(String(512), nullable=False)
+
+
 class PriceHistory(Base):
     """Append-only price/availability history, **per product and not per user** (schema.md,
     CATSVC-R4).
