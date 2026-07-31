@@ -126,11 +126,14 @@ def test_removing_delisted_when_there_are_none_says_zero(client: TestClient) -> 
     assert client.delete("/api/catalog/delisted", headers=_bearer(token)).json()["removed"] == 0
 
 
-def test_removing_one_product_takes_its_history_and_cart_membership_with_it(
+def test_removing_one_product_takes_its_cart_membership_but_not_its_history(
     client: TestClient,
 ) -> None:
-    """The cascade is the whole reason these endpoints have to be honest about what they do:
-    price_history and cart_members hang off products with ON DELETE CASCADE."""
+    """What a removal costs, and what it does not. `cart_members` hangs off `products` with
+    ON DELETE CASCADE, so the product leaves every cart holding it — which the confirmation
+    has to say. `price_history` does **not**: it is keyed on the product's identity and shared
+    by everyone watching it, so it is not this user's to delete and it is still there for the
+    next watcher (CATSVC-R4). This is the assertion that used to read `== 1`."""
     uid, token = _account(client, "alice")
     h = _bearer(token)
     _seed(uid, "a", "b")
@@ -151,7 +154,7 @@ def test_removing_one_product_takes_its_history_and_cart_membership_with_it(
     try:
         assert session.scalar(select(func.count()).select_from(CatalogProduct)) == 1
         assert session.scalar(select(func.count()).select_from(CartMember)) == 0
-        assert session.scalar(select(func.count()).select_from(PriceHistory)) == 1
+        assert session.scalar(select(func.count()).select_from(PriceHistory)) == 2
     finally:
         session.close()
 

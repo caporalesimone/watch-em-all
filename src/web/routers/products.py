@@ -33,15 +33,18 @@ def product_history(
     db: SessionDep,
     range: Annotated[Range, Query(description="time window: week=7d, month=30d, all")] = "month",
 ) -> ProductHistory:
-    owned = db.scalar(
-        select(CatalogProduct.id).where(
+    # The identity, not just the ownership: the history is the product's and is shared by
+    # everyone watching it, so the series is fetched by (plugin_id, external_id). Ownership of
+    # *a row* with that identity is still what grants access to it.
+    owned = db.execute(
+        select(CatalogProduct.plugin_id, CatalogProduct.external_id).where(
             CatalogProduct.id == product_id, CatalogProduct.user_id == user.sub
         )
-    )
+    ).first()
     if owned is None:
         raise APIError(404, "product_not_found", "product not found")
 
-    series = product_series(db, product_id, range)
+    series = product_series(db, owned.plugin_id, owned.external_id, range)
     return ProductHistory(
         product_id=product_id,
         range=range,

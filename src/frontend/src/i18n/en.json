@@ -58,7 +58,7 @@
 		"confirmEmptyBody": "All {count} products will be removed.",
 		"confirmOneTitle": "Delete {name}?",
 		"confirmOneBody": "This product will be removed from your catalog.",
-		"confirmCascade": "Their price history and their place in any cart go with them. This cannot be undone.",
+		"confirmCascade": "Their place in any cart goes with them, and the removal cannot be undone. Their price history stays: it belongs to the product, so it is still there if you add it back.",
 		"confirmWatchesSurvive": "Your watches are not touched: the next scheduled run will bring back whatever is still watched.",
 		"confirmAction": "Remove"
 	},

@@ -134,21 +134,32 @@ class CatalogProduct(Base):
 
 
 class PriceHistory(Base):
-    """Append-only price/availability history (schema.md, CATSVC-R4).
+    """Append-only price/availability history, **per product and not per user** (schema.md,
+    CATSVC-R4).
 
-    One entry is written only when the current price OR availability changed
-    vs. the last entry. No retention in V1. ``user_id`` is denormalised for
-    per-user purges and queries.
+    A price is a fact about the site, not about a user. Keyed per catalog row this table held
+    one chain *per watcher* of the same public fact — duplicated, and free to **diverge**: an
+    entry is written against the previous entry of its own chain, so a user who starts watching
+    later opens a chain whose "first price" was never the product's first. Keyed on the
+    product's identity ``(plugin_id, external_id)`` there is one chain, and one watcher is
+    enough to keep it growing for everyone.
+
+    It therefore **outlives** every catalog row that points at it: a user who removes a product
+    (or is deleted) leaves the history behind for whoever watches it next, which is knowledge
+    the new watcher could not have obtained otherwise. Nothing here is ever pruned — the admin
+    gets tools for history no user references any more in a later phase.
     """
 
     __tablename__ = "price_history"
-    __table_args__ = (Index("ix_price_history_product_recorded", "product_id", "recorded_at"),)
+    __table_args__ = (
+        Index("ix_price_history_identity_recorded", "plugin_id", "external_id", "recorded_at"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    product_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False
-    )
-    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Product identity, NOT a foreign key to `products`: that table is per-user, and a
+    # cascade from it is exactly what used to destroy the history of a removed product.
+    plugin_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    external_id: Mapped[str] = mapped_column(String(64), nullable=False)
     price_current: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     price_original: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     discount_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)

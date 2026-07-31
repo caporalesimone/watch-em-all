@@ -75,7 +75,10 @@ def _count(session: Session, model: type) -> int:
 
 def test_new_product_then_idempotent(session: Session) -> None:
     first = update_catalog(session, USER, PLUGIN, [_product()])
-    assert (first.found, first.new, first.price_changes, first.removed) == (1, 1, 1, 0)
+    # A first sighting is `new`, not a price change: there was nothing for it to change from,
+    # and counting it made "2 new products" read as "2 price changes" (CATSVC-R4b). It still
+    # seeds the chain, which is what the history count below checks.
+    assert (first.found, first.new, first.price_changes, first.removed) == (1, 1, 0, 0)
     assert _count(session, CatalogProduct) == 1
     assert _count(session, PriceHistory) == 1
 
@@ -301,8 +304,8 @@ def test_a_fresh_read_counts_as_an_observation_and_a_replay_does_not(session: Se
 
 
 def test_price_and_availability_changes_are_counted_apart(session: Session) -> None:
-    """The run-level counter called price_changes increments on availability moves too, and on
-    the first history row: it counts history rows written. These two do not."""
+    """The run-level counter called price_changes increments on an availability move too, so it
+    cannot answer "how many prices moved". These two can, because they are counted apart."""
     update_catalog(session, USER, PLUGIN, [_product(price_current=Decimal("40.00"))])
     row = session.scalars(select(CatalogProduct)).one()
 
@@ -332,3 +335,98 @@ def test_the_range_remembers_the_best_and_worst_price_seen(session: Session) -> 
     assert row.price_min_at is not None and row.price_max_at is not None
     # And "how long has this price held" moved with the last actual change.
     assert row.last_price_change_at is not None
+
+
+# ------------------------------------------------- the shared chain (CATSVC-R4 / CATSVC-R4b)
+
+OTHER_USER = 2
+
+
+def _add_user(session: Session, user_id: int) -> None:
+    session.add(
+        User(
+            id=user_id,
+            username=f"u{user_id}",
+            first_name="U",
+            last_name="U",
+            password_hash="x",
+            role="user",
+            is_active=True,
+        )
+    )
+    session.commit()
+
+
+def test_two_users_of_the_same_product_share_one_chain(session: Session) -> None:
+    """A price is a fact about the site: watched by two users it used to be recorded twice,
+    and the two chains could diverge because each was compared against its own previous entry."""
+    _add_user(session, OTHER_USER)
+    update_catalog(session, USER, PLUGIN, [_product(price_current=Decimal("40.00"))])
+    update_catalog(session, OTHER_USER, PLUGIN, [_product(price_current=Decimal("40.00"))])
+
+    # Two catalog rows — the catalog is per user — but one history entry between them.
+    assert _count(session, CatalogProduct) == 2
+    assert _count(session, PriceHistory) == 1
+
+    # The move is recorded once, by whoever is delivered first in the run...
+    update_catalog(session, USER, PLUGIN, [_product(price_current=Decimal("30.00"))])
+    second = update_catalog(session, OTHER_USER, PLUGIN, [_product(price_current=Decimal("30.00"))])
+    assert _count(session, PriceHistory) == 2
+
+    # ...but the second user is still told their product moved, and their row still counts it.
+    # Read off the chain, this would have been (0 changes) for them: the chain already knew.
+    assert second.price_changes == 1
+    other = session.scalars(
+        select(CatalogProduct).where(CatalogProduct.user_id == OTHER_USER)
+    ).one()
+    assert other.price_changes == 1
+    assert other.price_current == Decimal("30.00")
+
+
+def test_a_new_watcher_inherits_the_products_past(session: Session) -> None:
+    """The point of the shared chain: history the new user could not have collected. The list
+    price comes off it too, so their first delivery already knows what a discount looks like."""
+    _add_user(session, OTHER_USER)
+    update_catalog(
+        session,
+        USER,
+        PLUGIN,
+        [_product(price_current=Decimal("50.00"), price_original=Decimal("50.00"))],
+    )
+    update_catalog(
+        session,
+        USER,
+        PLUGIN,
+        [_product(price_current=Decimal("35.00"), price_original=Decimal("50.00"))],
+    )
+    assert _count(session, PriceHistory) == 2
+
+    # A second user adds the same product now, and the site tells us no list price this time.
+    update_catalog(
+        session,
+        OTHER_USER,
+        PLUGIN,
+        [_product(price_current=Decimal("35.00"), price_original=None)],
+    )
+
+    # No entry was appended (nothing moved), and their row was resolved against the chain's
+    # last known list price instead of falling back to "no discount".
+    assert _count(session, PriceHistory) == 2
+    other = session.scalars(
+        select(CatalogProduct).where(CatalogProduct.user_id == OTHER_USER)
+    ).one()
+    assert other.price_original == Decimal("50.00")
+    assert other.discount_pct == Decimal("30.00")
+
+
+def test_the_chain_outlives_the_catalog_row(session: Session) -> None:
+    """No FK, no cascade: removing the product (or the user) must not destroy the history."""
+    update_catalog(session, USER, PLUGIN, [_product(price_current=Decimal("40.00"))])
+    update_catalog(session, USER, PLUGIN, [_product(price_current=Decimal("30.00"))])
+    row = session.scalars(select(CatalogProduct)).one()
+
+    session.delete(row)
+    session.commit()
+
+    assert _count(session, CatalogProduct) == 0
+    assert _count(session, PriceHistory) == 2

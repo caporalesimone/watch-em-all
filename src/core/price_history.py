@@ -34,16 +34,21 @@ class SeriesPoint:
     available: bool
 
 
-def product_series(session: Session, product_id: int, range_: Range) -> list[SeriesPoint]:
-    """The stepped price series for a product over ``range_``, ordered oldest → newest.
+def product_series(
+    session: Session, plugin_id: str, external_id: str, range_: Range
+) -> list[SeriesPoint]:
+    """The stepped price series for a **product identity** over ``range_``, oldest → newest.
 
-    Ownership is enforced by the caller (the router 404s a product the user does not own); this
-    reads by ``product_id`` alone. For week/month the window is ``[now - N days, now]`` and the
-    last entry before the window is prepended, clamped to the window start (HISTC-R4).
+    Ownership is enforced by the caller (the router 404s a product the user does not own), and
+    what it hands over is the identity of the row it checked, not its id: the chain belongs to
+    the product and is shared by everyone watching it, so a user who added the product
+    yesterday sees the price it had last month. For week/month the window is
+    ``[now - N days, now]`` and the last entry before the window is prepended, clamped to the
+    window start (HISTC-R4).
     """
     ordered = (
         select(PriceHistory)
-        .where(PriceHistory.product_id == product_id)
+        .where(PriceHistory.plugin_id == plugin_id, PriceHistory.external_id == external_id)
         .order_by(PriceHistory.recorded_at.asc(), PriceHistory.id.asc())
     )
 
@@ -58,7 +63,11 @@ def product_series(session: Session, product_id: int, range_: Range) -> list[Ser
     # timestamp to the window start so the step line begins at the edge, not before it.
     before = session.scalar(
         select(PriceHistory)
-        .where(PriceHistory.product_id == product_id, PriceHistory.recorded_at < cutoff)
+        .where(
+            PriceHistory.plugin_id == plugin_id,
+            PriceHistory.external_id == external_id,
+            PriceHistory.recorded_at < cutoff,
+        )
         .order_by(PriceHistory.recorded_at.desc(), PriceHistory.id.desc())
         .limit(1)
     )
@@ -84,15 +93,18 @@ class CartSeriesPoint:
     total: Decimal
 
 
-def cart_series(session: Session, member_ids: list[int], range_: Range) -> list[CartSeriesPoint]:
+def cart_series(
+    session: Session, members: list[tuple[str, str]], range_: Range
+) -> list[CartSeriesPoint]:
     """The stepped total series for a cart over ``range_`` (HIST-R4).
 
-    Projects the cart's CURRENT composition onto the past (no membership history): each member's
-    own stepped series is computed, then summed on a unified timeline of every change instant —
-    at each instant a member contributes its current price only while it was available (unavailable
+    ``members`` are the product **identities** of the cart's current membership. Projects the
+    cart's CURRENT composition onto the past (no membership history): each member's own stepped
+    series is computed, then summed on a unified timeline of every change instant — at each
+    instant a member contributes its current price only while it was available (unavailable
     stretches are excluded, per the declared simplification). An empty cart yields no points.
     """
-    series = {pid: product_series(session, pid, range_) for pid in member_ids}
+    series = {identity: product_series(session, *identity, range_) for identity in members}
     timeline = sorted({p.t for points in series.values() for p in points})
 
     out: list[CartSeriesPoint] = []

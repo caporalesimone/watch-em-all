@@ -31,7 +31,8 @@ flowchart TD
 - **CATSVC-R2** — Matching by identity `(user_id, plugin_id, external_id)` (UNIQUE constraint on the DB): found → update; not found → new product; existing row absent from the list → delisted (`removed = true`).
 - **CATSVC-R2b** — Delisting only applies to a delivery that is **complete**, and the caller is the only one who knows whether it is. Two write paths exist for that reason: `update_catalog` runs the delisting sweep, `upsert_products` never does. A partial delivery (one product resolved as its watch is added) and a failed run (the site was unreachable, gated or rate-limiting us) must both use `upsert_products` — "we could not read it" is not "it is gone". Getting this wrong is expensive rather than merely wrong: an empty delivery through `update_catalog` delists a user's entire catalog for that scraper, drags every cart holding those products to `has_delisted`, and suppresses their alerts (ALERT-R12) until the site comes back.
 - **CATSVC-R3** — Resolves missing prices per the Product contract (below).
-- **CATSVC-R4** — Writes to `price_history` **only** if the **current price** or the **availability** changes relative to the last entry (append-only; every entry also carries `is_available`).
+- **CATSVC-R4** — Writes to `price_history` **only** if the **current price** or the **availability** changes relative to the last entry (append-only; every entry also carries `is_available`). The chain is **per product, not per user**: it is keyed on the identity `(plugin_id, external_id)`, so one run delivering the same product for five users appends **one** entry, a user who has just added a product inherits its whole past, and the history **survives** the removal of any catalog row pointing at it — including the removal of the user. A price is a fact about the site; treated per user it was both duplicated and free to diverge, because an entry is compared against the previous entry *of its own chain* and a chain that starts later opens on a "first price" that was never the product's first.
+- **CATSVC-R4b** — The **counters** are per user even though the chain is not: `price_changes` counts the delivered products whose price or availability differs from what **that user's row** held, never what the shared chain says. Asking the chain would answer for whoever was delivered first and report "nothing changed" to every other watcher of the same product. A newly inserted product is counted in `new` only — there was nothing for it to change from.
 - **CATSVC-R5** — Updates everything that may change on the catalog record: `name`, `url`, `image_url`, `brand`, `tags`, `category`, `extra_json`, `is_available`, `removed` (a delisted product that reappears goes back to `removed = false`). `brand`, `tags`, and `category` ([product](../contracts/product.md) PROD-R5/R6/R7) are data the scraper delivers and the core **persists without interpreting**. `last_seen_at` is set to the delivery's `scraped_at` — the scraper's **observation** time (PROD-R8) — and never to the clock: a delivery rebuilt from a cached response is old data, and stamping it "now" would turn the field readers use to judge freshness into a record of when we last replayed a page.
 - **CATSVC-R6** — Returns the **delta counters** (found/new/price_changes/removed) to the caller for the runner's run record.
 - **CATSVC-R7** — An unavailable product is **never excluded**: it stays with `is_available = false`. Site-specific exclusions happen earlier, in the plugin.
@@ -62,14 +63,16 @@ def update_catalog(user_id, products: list[Product]) -> DeltaCounters:
     for p in products:
         resolve_prices(p)
         row = find(user_id, p.plugin_id, p.external_id)        # CATSVC-R2
+        last = last_history_entry(p.plugin_id, p.external_id)  # the PRODUCT's chain, CATSVC-R4
         if row is None:
             row = insert_product(user_id, p); counters.new += 1
         else:
+            if row_moved(row, p):                               # CATSVC-R4b: this USER's row
+                counters.price_changes += 1
             update_mutable_fields(row, p)                       # CATSVC-R5 (removed→false if reappeared)
-        last = last_history_entry(row)
         if last is None or last.price_current != p.price_current \
                         or last.is_available != p.is_available:  # CATSVC-R4
-            append_history(row, p); counters.price_changes += 1
+            append_history(p)          # keyed on identity: no row, no user
         seen.add(row.id)
     # delisting: rows of the plugin not seen in this delivery
     for row in rows(user_id, plugin_id) where row.id not in seen and not row.removed:

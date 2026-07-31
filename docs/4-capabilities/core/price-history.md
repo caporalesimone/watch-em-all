@@ -18,19 +18,21 @@ flowchart LR
 
 | Field | Notes |
 |---|---|
-| `product_id`, `user_id` | the series identity (`user_id` denormalised for per-user purges/queries) |
+| `plugin_id`, `external_id` | the series identity: the **product**, not a catalog row and not a user |
 | `price_current` | the discounted price (the chart's line) |
 | `price_original`, `discount_pct` | list price and discount at the time |
 | `is_available` | availability state at the time of the entry |
 | `recorded_at` | timestamp |
 
-Written **only** by the [Catalog Update Service](catalog-update-service.md) (CATSVC-R4), when `price_current` **or** `is_available` changes relative to the last entry. `product_id` is a FK with `ON DELETE CASCADE` — deleting a product removes its history. Schema in [database/schema.md](../database/schema.md).
+Written **only** by the [Catalog Update Service](catalog-update-service.md) (CATSVC-R4), when `price_current` **or** `is_available` changes relative to the last entry.
+
+There is **one chain per product**, shared by everyone watching it, and it is **not** a foreign key into `products`: that table is per-user, and a cascade from it is exactly what used to destroy the history of a product somebody removed. The consequences are the point of the design — a user who adds a product today can already see the price it had last month; a user who stops watching one leaves that knowledge for the next; and one watcher is enough to keep the chain growing for everybody. Schema in [database/schema.md](../database/schema.md).
 
 ## Technical requirements
 
-- **HISTC-R1** — Append-only: never update/delete an entry (except the cascade from a product deletion).
-- **HISTC-R2** — Index `(product_id, recorded_at)`: serves both the delta's "last entry" query and the charts' range queries.
-- **HISTC-R3** — No retention: the history is kept forever (it is the system's value).
+- **HISTC-R1** — Append-only: never update or delete an entry. Nothing cascades into this table — removing a product from a catalog, or deleting the user who watched it, leaves the chain untouched.
+- **HISTC-R2** — Index `(plugin_id, external_id, recorded_at)`: serves both the delta's "last entry" query and the charts' range queries.
+- **HISTC-R3** — No retention: the history is kept forever (it is the system's value). Pruning chains no user references any more is an **admin** capability of a later phase, never an automatic sweep.
 - **HISTC-R4** — Series are served **ready to plot** by the backend (the SPA does not aggregate): [endpoints](../../api/endpoints.md#price-history--price-history).
 - **HISTC-R5** — `Decimal` serialised as a string in the APIs and persisted JSON (never a float for prices).
 
@@ -41,20 +43,22 @@ entries are change points that the client draws as a **step line** (the value ho
 changes), never interpolated.
 
 ```
-def product_series(product_id, range):          # range: week=7d, month=30d, all
-    entries = history(product_id, since(range))  # ordered by recorded_at, id
+def product_series(plugin_id, external_id, range):   # range: week=7d, month=30d, all
+    entries = history(plugin_id, external_id, since(range))  # ordered by recorded_at, id
     # week/month: also carry the last change BEFORE the window, clamped to the window
     # start, so the step line starts at the right price. `is_available=false` marks a gap.
     return [{t, price: e.price_current, available: e.is_available} for e in entries]
 
 def cart_series(cart_id, range):
     members = current_members(cart_id)           # CURRENT composition (no membership history)
-    series  = [product_series(pid, range) for pid in members]
+    series  = [product_series(*identity_of(m), range) for m in members]
     # stepped sum on a unified timeline: at each instant, sum the current price of the
     # members that were AVAILABLE at that instant (unavailable stretches excluded).
     return stepwise_sum(series, skip_unavailable=True)  # [{t, total}]
 ```
 
-Ownership is enforced at the router (a product/cart the caller does not own is a 404); the helpers
-read by id. The cart series projects the **current** composition onto the past — it does not
-reconstruct who was a member on a past date (a declared simplification, HIST-R4).
+Ownership is enforced at the router (a product/cart the caller does not own is a 404), and what it
+passes down is the **identity** of the row it checked rather than its id: owning a row with that
+identity is what grants access to the product's shared chain. The cart series projects the
+**current** composition onto the past — it does not reconstruct who was a member on a past date
+(a declared simplification, HIST-R4).

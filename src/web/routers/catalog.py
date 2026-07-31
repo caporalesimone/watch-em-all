@@ -5,12 +5,15 @@ paginated, sortable and filterable. Products are never *written* here — that i
 Update Service's job, reached through a scrape — but they can be **removed** (9.B7), which is a
 different thing: the user is throwing rows away, not describing what a site offers.
 
-Every removal cascades, and the cascade is the reason these endpoints have to be honest about
-what they do: ``price_history`` and ``cart_members`` both hang off ``products`` with
-``ON DELETE CASCADE``, so deleting a product also drops its price history and takes it out of
-every cart holding it (CART-R8/CAT-R8). Nothing here touches the **watches**: those are a
-separate list with their own Remove, and the visible consequence — deleting a product you still
-watch brings it back on the next run — is accepted rather than hidden (decision 2026-07-29).
+A removal cascades to ``cart_members`` (``ON DELETE CASCADE``, CART-R8/CAT-R8), so deleting a
+product also takes it out of every cart holding it — which these endpoints have to be honest
+about. It does **not** touch ``price_history``: that chain is keyed on the product's identity
+and shared by everyone watching it, so it is not this user's to delete, and a product removed
+today keeps the past it will hand to whoever watches it next.
+
+Nothing here touches the **watches** either: those are a separate list with their own Remove,
+and the visible consequence — deleting a product you still watch brings it back on the next run
+— is accepted rather than hidden (decision 2026-07-29).
 """
 
 from __future__ import annotations
@@ -120,7 +123,8 @@ def list_catalog(
 )
 def remove_delisted(user: UserDep, db: SessionDep) -> RemovedCount:
     """The routine tidy-up: products a complete delivery no longer offered (9.B6 marked them,
-    with the date). Their price history and cart memberships go with them."""
+    with the date). Their cart memberships go with them; their price history stays, because it
+    belongs to the product rather than to this row."""
     rows = db.scalars(
         select(CatalogProduct).where(
             CatalogProduct.user_id == user.sub, CatalogProduct.removed.is_(True)
