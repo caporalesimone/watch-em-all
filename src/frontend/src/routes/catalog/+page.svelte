@@ -196,6 +196,16 @@
 		}
 	}
 
+	// ESC closes the confirmation, and does exactly what Cancel does — including while a removal
+	// is in flight, where Cancel already closes it too: one behaviour, two ways to reach it. A
+	// modal that traps the key but not the intent is worse than one that ignores it.
+	function onWindowKeydown(event: KeyboardEvent): void {
+		if (event.key === 'Escape' && pending !== null) {
+			event.preventDefault();
+			pending = null;
+		}
+	}
+
 	async function runCleanup(): Promise<void> {
 		if (pending === null) return;
 		const target = pending;
@@ -303,6 +313,8 @@
 	const th = 'py-2 pr-4 font-normal';
 	const sortable = 'cursor-pointer select-none hover:text-slate-800 dark:hover:text-slate-200';
 </script>
+
+<svelte:window onkeydown={onWindowKeydown} />
 
 <section class="space-y-6">
 	<PageTitle title={$_('catalog.title')} />
@@ -517,11 +529,19 @@
 	Saying that here is the difference between a confirmation and a trap.
 -->
 {#if pending}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+	<!-- Announced as a modal now that it answers ESC: a screen reader should say the same thing
+	     the keyboard behaviour implies. -->
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+		role="dialog"
+		aria-modal="true"
+	>
 		<!-- 5% wider than it was (34rem), and the whole gain goes to the picture: the text keeps
-		     the measure it had, the image box grows from 7rem to 8.75rem. -->
+		     the measure it had, the image box grows from 7rem to 8.75rem. Then 5% again, this
+		     time across the whole dialog (37.5rem) with the picture growing with it (9.25rem),
+		     so the text gained room too rather than only the frame. -->
 		<div
-			class="w-full max-w-[35.75rem] space-y-4 rounded-lg bg-white p-5 shadow-lg dark:bg-slate-900"
+			class="w-full max-w-[37.5rem] space-y-4 rounded-lg bg-white p-5 shadow-lg dark:bg-slate-900"
 		>
 			{#if pending.kind === 'one'}
 				<!--
@@ -551,14 +571,14 @@
 					</svg>
 					<h3 class="text-base font-semibold text-balance">{pending.item.name}</h3>
 				</div>
-				<div class="grid grid-cols-[8.75rem_1fr] items-start gap-4 max-[30rem]:grid-cols-1">
+				<div class="grid grid-cols-[9.25rem_1fr] items-start gap-4 max-[30rem]:grid-cols-1">
 					<!--
 						A FIXED square whatever the picture is, so the dialog does not change shape
 						between a tall book cover and a wide box; `object-contain` keeps the image's
 						own proportions inside it, letterboxed against the frame.
 					-->
 					<div
-						class="flex h-[8.75rem] w-[8.75rem] items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800"
+						class="flex h-[9.25rem] w-[9.25rem] items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800"
 					>
 						{#if pending.item.image_url}
 							<img
