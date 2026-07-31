@@ -516,7 +516,11 @@
 -->
 {#if pending}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-		<div class="w-full max-w-[34rem] space-y-4 rounded-lg bg-white p-5 shadow-lg dark:bg-slate-900">
+		<!-- 5% wider than it was (34rem), and the whole gain goes to the picture: the text keeps
+		     the measure it had, the image box grows from 7rem to 8.75rem. -->
+		<div
+			class="w-full max-w-[35.75rem] space-y-4 rounded-lg bg-white p-5 shadow-lg dark:bg-slate-900"
+		>
 			{#if pending.kind === 'one'}
 				<!--
 					A single product gets its own shape: the thing being deleted is a *thing*, with
@@ -545,14 +549,14 @@
 					</svg>
 					<h3 class="text-base font-semibold text-balance">{pending.item.name}</h3>
 				</div>
-				<div class="grid grid-cols-[7rem_1fr] items-start gap-4 max-[30rem]:grid-cols-1">
+				<div class="grid grid-cols-[8.75rem_1fr] items-start gap-4 max-[30rem]:grid-cols-1">
 					<!--
 						A FIXED square whatever the picture is, so the dialog does not change shape
 						between a tall book cover and a wide box; `object-contain` keeps the image's
 						own proportions inside it, letterboxed against the frame.
 					-->
 					<div
-						class="flex h-28 w-28 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800"
+						class="flex h-[8.75rem] w-[8.75rem] items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800"
 					>
 						{#if pending.item.image_url}
 							<img
