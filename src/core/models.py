@@ -133,6 +133,44 @@ class CatalogProduct(Base):
     )
 
 
+class PluginJob(Base):
+    """Progress and cooperative cancellation of one in-flight plugin job (C9/C10).
+
+    It exists to take a **transaction** away from the plugins, not a feature. Progress has to be
+    committed while the work is still running — the page polling it cannot see an uncommitted
+    row — and the plugin was doing that on the session it had been handed. In a scheduled run
+    that session is the *worker's*, mid-``run_for_user``, holding a half-filled
+    ``scrape_user_log``: the plugin's commit made that half-row durable, and a process that died
+    before the worker finished left it there for ever with a NULL status.
+
+    So the core keeps this book on **its own short-lived session** (the same pattern as the
+    scrape cache) and hands the plugin two questions instead of a session: *here is how far I
+    have got* and *has anyone asked me to stop?*.
+
+    Keyed ``(plugin_id, job_key)`` — the key is the plugin's own, in its own id space, so the
+    core needs to know nothing about what a job is. The row lives as long as the job: it is
+    written when work starts and dropped when it reaches a terminal state, so a missing row
+    means "nothing of this is running", which is the answer a cancel request needs.
+    """
+
+    __tablename__ = "plugin_jobs"
+    __table_args__ = (UniqueConstraint("plugin_id", "job_key", name="uq_plugin_jobs_identity"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    plugin_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    job_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    progress_done: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # NULL while the total is not known yet — a category cannot know its size before page one.
+    progress_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    detail: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    # Cooperative: the worker reads this at the same checkpoints that write progress. A thread
+    # cannot be killed, and does not need to be.
+    cancel_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
 class ProductSource(Base):
     """Which of a user's inputs delivered a catalog product — many-to-many (C14).
 

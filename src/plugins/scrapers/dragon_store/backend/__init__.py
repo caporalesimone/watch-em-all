@@ -58,8 +58,10 @@ from src.core.contracts import (
 from src.core.db import new_session
 from src.core.errors import APIError
 from src.core.http import RobotsDenied
+from src.core.plugin_jobs import JobProgress
 from src.core.plugins.base import ScraperPlugin, Tags
 from src.core.plugins.context import (
+    JobBook,
     PluginContext,
     bind_forget_source,
     bind_upsert_catalog,
@@ -135,14 +137,22 @@ def _note(context: PluginContext, **deltas: int) -> None:
 
 
 def _mark_progress(
-    watch: Watch, *, done: int, total: int | None, detail: str | None = None
+    context: PluginContext,
+    watch: Watch,
+    *,
+    done: int,
+    total: int | None = None,
+    detail: str | None = None,
 ) -> None:
     """Progress is counted in **requests**, which is where the time goes: about eleven seconds
-    of politeness each. The total is known from page one, so the bar is a real fraction."""
-    watch.progress_done = done
-    watch.progress_total = total
-    if detail is not None:
-        watch.status_detail = detail
+    of politeness each. The total is known from page one, so the bar is a real fraction.
+
+    Published through the core (CTX-R13), not written on this session: it has to be committed
+    while the walk is still running for the page to see it, and on a scheduled run this session
+    belongs to the **worker** — committing it there made a half-filled `scrape_user_log` row
+    durable in the middle of `run_for_user` (C10).
+    """
+    context.jobs.progress(str(watch.id), done=done, total=total, detail=detail)
 
 
 def _record_scan(watch: Watch, *, included: int, excluded: int) -> None:
@@ -203,14 +213,10 @@ class Watch(_Base):
     # Either the current step ("page 3 of 21") or why it failed — one field, because to the
     # user both answer "what is happening with this".
     status_detail: Mapped[str | None] = mapped_column(String(256), nullable=True)
-    # Progress in **requests**, which is where the time goes: 11s of politeness each. The
-    # total is known from the first page, which states "N risultati (50 per pagina - K in
-    # totale)"; NULL until then, and 1 for a single product.
-    progress_done: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    progress_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # Cooperative cancellation (9.X6f): a running job reads this at the same checkpoints
-    # that write progress. A thread cannot be killed, and does not need to be.
-    cancel_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Progress and cooperative cancellation are **not** here any more (C9/C10): they live in
+    # the core's book of in-flight jobs, keyed by this row's id, because publishing progress
+    # means committing while the work runs — and on a scheduled run the session this plugin
+    # holds is the worker's. What stays is the lifecycle nobody else has an opinion about.
     queued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -257,6 +263,9 @@ def _request_context(db: Session, *, sleep: Callable[[float], None] | None = Non
         update_catalog=_refuse_delisting,
         upsert_catalog=bind_upsert_catalog(db),
         forget_source=bind_forget_source(db, PLUGIN_ID),
+        # Same book the scheduled run publishes to, under this plugin's id: a context that let
+        # this default would write progress into a namespace nobody reads.
+        jobs=JobBook(plugin_id=PLUGIN_ID),
         http=build_http_client(db, PLUGIN_ID, logger, sleep=sleep),
     )
 
@@ -364,7 +373,7 @@ def _category_snapshot(breadcrumb: list[tuple[str, str | None]]) -> dict[str, An
     }
 
 
-def _watch_out(watch: Watch) -> WatchOut:
+def _watch_out(watch: Watch, job: JobProgress | None = None) -> WatchOut:
     snap = watch.snapshot_json or {}
     return WatchOut(
         id=watch.id,
@@ -376,9 +385,17 @@ def _watch_out(watch: Watch) -> WatchOut:
         tags=snap.get("tags") or [],
         category=snap.get("category") or [],
         status=watch.status,
-        status_detail=watch.status_detail,
-        progress_done=watch.progress_done,
-        progress_total=watch.progress_total,
+        # One field, two kinds of news, and which one wins depends on whether the job is still
+        # going: while it runs the step is what the user wants ("page 3 of 21"), and the moment
+        # it is over the outcome is ("some pages could not be read"). Preferring the step either
+        # way left a finished walk showing where it had got to instead of why it stopped.
+        status_detail=(
+            job.detail
+            if job is not None and job.detail and watch.status in ("queued", "running")
+            else watch.status_detail
+        ),
+        progress_done=job.done if job is not None else 0,
+        progress_total=job.total if job is not None else None,
         include_ammaccati=watch.include_ammaccati,
         products_included=watch.products_included,
         products_excluded=watch.products_excluded,
@@ -390,28 +407,23 @@ class _JobCancelled(Exception):
     """The user asked this job to stop (9.X6f). Raised from the interruptible wait."""
 
 
-def _cancel_requested(watch_id: int) -> bool:
-    """Read the cancel flag on its own short session: the job's own session is in the middle
-    of a scrape, and this has to see what a *request* committed a moment ago."""
-    db = new_session()
-    try:
-        return bool(db.scalar(select(Watch.cancel_requested).where(Watch.id == watch_id)))
-    finally:
-        db.close()
-
-
-def _cancellable_sleep(watch_id: int) -> Callable[[float], None]:
+def _cancellable_sleep(jobs: JobBook, watch_id: int) -> Callable[[float], None]:
     """A politeness wait that notices a cancellation.
 
     Almost all of a scrape's wall-clock is this wait — 11 seconds per request, by the site's
     own request — so a cancellation that only took effect between requests would feel broken.
     Checks four times a second and gives up the moment the flag is set.
+
+    The reading is the core's (CTX-R13). It used to open a session of its own here, which was
+    right for the wrong owner: the flag is committed by a web request, so a session that has
+    already read the row would keep answering with its own snapshot — and this plugin should
+    not be opening sessions to find out.
     """
 
     def sleep(seconds: float) -> None:
         deadline = time.monotonic() + seconds
         while True:
-            if _cancel_requested(watch_id):
+            if jobs.cancelled(str(watch_id)):
                 raise _JobCancelled
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -438,7 +450,11 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
         watch.started_at = datetime.now(UTC)
         db.commit()
 
-        context = _request_context(db, sleep=_cancellable_sleep(watch_id))
+        jobs = JobBook(plugin_id=PLUGIN_ID)
+        # Opens the job in the core's book: progress at zero and any cancellation from a
+        # previous attempt cleared, so a stale request cannot kill this one.
+        jobs.begin(str(watch_id), total=1 if watch.kind == "product" else None)
+        context = _request_context(db, sleep=_cancellable_sleep(jobs, watch_id))
         product: Product | None = None
         products: list[Product] = []
         detail: str | None = None
@@ -473,7 +489,7 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
                 # A product costs exactly one request and it has just been made, readable page
                 # or not. Nothing counts steps on this path, so the step is recorded where it
                 # happens — inferring it at the end is what made a half-read category lie (C20).
-                _mark_progress(watch, done=1, total=1)
+                _mark_progress(context, watch, done=1, total=1)
         except DragonStoreRateLimited as exc:
             detail = "the site is rate-limiting us; the next run will fill this in"
             logger.error("dragon_store: could not resolve %s while adding it — %s", watch.url, exc)
@@ -483,7 +499,6 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
             # taken stays" would quietly stop being true.
             watch.status = "cancelled"
             watch.status_detail = "cancelled while it was running"
-            watch.cancel_requested = False
             watch.finished_at = datetime.now(UTC)
             db.commit()
             logger.info("dragon_store: watch %s cancelled by the user", watch.id)
@@ -928,7 +943,7 @@ class DragonStorePlugin(ScraperPlugin):
             if page == 1:
                 total_pages = parsed.total_pages or 1
                 breadcrumb = parsed.breadcrumb
-                _mark_progress(watch, done=0, total=total_pages)
+                _mark_progress(context, watch, done=0, total=total_pages)
                 context.logger.info(
                     "dragon_store: category %s has %s product(s) over %s page(s)",
                     watch.url,
@@ -950,10 +965,12 @@ class DragonStorePlugin(ScraperPlugin):
                 if card.price_current is None:
                     unpriced.append(card)
                 products[product.external_id] = product
+            # Published through the core, which commits its own session (C10). This used to
+            # commit `context.db` right here — the worker's session on a scheduled run, holding
+            # a half-filled `scrape_user_log` row that a crash would then leave behind for ever.
             _mark_progress(
-                watch, done=page, total=total_pages, detail=f"page {page} of {total_pages}"
+                context, watch, done=page, total=total_pages, detail=f"page {page} of {total_pages}"
             )
-            context.db.commit()  # the page polls this row: an update it cannot see is no update
             page += 1
 
         return _CategoryOutcome(
@@ -1163,9 +1180,12 @@ class DragonStorePlugin(ScraperPlugin):
 
         @router.get("/watches", response_model=list[WatchOut])
         def list_watches(user: UserDep, db: SessionDep) -> list[WatchOut]:
+            jobs = JobBook(plugin_id=PLUGIN_ID)
             out = []
             for watch in _user_watches(db, user.sub):
-                item = _watch_out(watch)
+                # The last job's progress outlives the job (C20): "read 2 of 21 pages" is what
+                # a walk stopped early has to keep saying afterwards.
+                item = _watch_out(watch, jobs.read(str(watch.id)))
                 if watch.status == "queued":
                     item.queue_position = _queue_position(db, watch)
                 out.append(item)
@@ -1210,8 +1230,6 @@ class DragonStorePlugin(ScraperPlugin):
                 include_ammaccati=body.include_ammaccati and kind == "category",
                 status="queued",
                 queued_at=datetime.now(UTC),
-                # One request for a product page; a category learns its own total from page one.
-                progress_total=1 if kind == "product" else None,
             )
             db.add(watch)
             try:
@@ -1245,17 +1263,23 @@ class DragonStorePlugin(ScraperPlugin):
             )
             if watch is None:
                 return JobStatus(active=False)
+            # Progress comes from the core's book (CTX-R13), which is what the running job
+            # publishes to; the row supplies the lifecycle around it.
+            job = JobBook(plugin_id=PLUGIN_ID).read(str(watch.id))
             return JobStatus(
                 active=True,
                 watch_id=watch.id,
                 kind=watch.kind,
                 url=watch.url,
                 status=watch.status,
-                status_detail=watch.status_detail,
-                progress_done=watch.progress_done,
-                progress_total=watch.progress_total,
+                status_detail=(
+                    job.detail if job is not None and job.detail else watch.status_detail
+                ),
+                progress_done=job.done if job is not None else 0,
+                progress_total=job.total if job is not None else None,
                 queue_position=_queue_position(db, watch) if watch.status == "queued" else 0,
-                cancellable=watch.kind == "category" and not watch.cancel_requested,
+                cancellable=watch.kind == "category"
+                and not (job is not None and job.cancel_requested),
             )
 
         @router.post("/watches/{watch_id}/cancel", status_code=202)
@@ -1282,10 +1306,13 @@ class DragonStorePlugin(ScraperPlugin):
                 watch.status = "cancelled"
                 watch.status_detail = "cancelled before it started"
                 watch.finished_at = datetime.now(UTC)
-            else:
-                watch.cancel_requested = True
-            db.commit()
-            return {"status": "cancelling" if watch.status == "running" else "cancelled"}
+                db.commit()
+                return {"status": "cancelled"}
+            # Whether it was cancellable was decided just above, from the status this plugin
+            # owns; the flag itself lives in the core's book, where the running job reads it
+            # without either side sharing a session (C9/C10).
+            JobBook(plugin_id=PLUGIN_ID).request_cancel(str(watch_id))
+            return {"status": "cancelling"}
 
         @router.patch("/watches/{watch_id}", response_model=WatchOut)
         def update_watch(
@@ -1326,6 +1353,7 @@ class DragonStorePlugin(ScraperPlugin):
             # removed what it found. What must go is their claim to still come from it, or the
             # catalog would keep promising that deleting one of them brings it back (C14).
             bind_forget_source(db, PLUGIN_ID)(user.sub, str(watch_id))
+            JobBook(plugin_id=PLUGIN_ID).forget(str(watch_id))
 
         return router
 

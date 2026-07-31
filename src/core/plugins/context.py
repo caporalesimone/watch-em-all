@@ -38,6 +38,13 @@ from src.core.catalog import update_catalog as _update_catalog_service
 from src.core.catalog import upsert_products as _upsert_products_service
 from src.core.db import get_engine, new_session
 from src.core.http import HttpClient
+from src.core.plugin_jobs import JobProgress
+from src.core.plugin_jobs import begin_job as _begin_job
+from src.core.plugin_jobs import forget_job as _forget_job
+from src.core.plugin_jobs import is_cancel_requested as _is_cancel_requested
+from src.core.plugin_jobs import publish_progress as _publish_progress
+from src.core.plugin_jobs import read_progress as _read_progress
+from src.core.plugin_jobs import request_cancel as _request_cancel
 from src.core.scrape_cache import ScrapeCache
 from src.core.scraper_config import get_scraper_config
 
@@ -56,6 +63,52 @@ def _no_catalog_write(user_id: int, products: list[Product]) -> DeltaCounters:
     """Default for a context built without that write path: raising beats silently
     dropping a delivery, and beats defaulting to a path the caller did not choose."""
     raise NotImplementedError("this context has no catalog write path")
+
+
+@dataclass(frozen=True)
+class JobBook:
+    """The core's book of this plugin's in-flight jobs (CTX-R13): progress out, cancellation in.
+
+    Bound to the plugin's id, so a plugin names its jobs in its own id space and the core needs
+    to know nothing about what one is. Every method runs on a **short-lived session of the
+    core's own** — which is the reason this exists. Publishing progress means committing while
+    the work is still running, and a plugin doing that on the session it was handed was
+    committing the *worker's* unit of work, half-filled, mid-run.
+
+    :meth:`progress` never raises; the rest report the truth.
+    """
+
+    plugin_id: str
+
+    def begin(self, job_key: str, *, total: int | None = None) -> None:
+        """Open (or reopen) a job: progress to zero and any earlier cancellation cleared, so a
+        stale request cannot kill the next run."""
+        _begin_job(self.plugin_id, job_key, total=total)
+
+    def progress(
+        self, job_key: str, *, done: int, total: int | None = None, detail: str | None = None
+    ) -> None:
+        """Publish how far ``job_key`` has got. ``total``/``detail`` are kept when omitted."""
+        _publish_progress(self.plugin_id, job_key, done=done, total=total, detail=detail)
+
+    def cancelled(self, job_key: str) -> bool:
+        """Has anyone asked this job to stop? Called at the same checkpoints that write
+        progress — and inside the politeness wait, where most of a scrape's time goes."""
+        return _is_cancel_requested(self.plugin_id, job_key)
+
+    def read(self, job_key: str) -> JobProgress | None:
+        """This job's state for a reader (the page polling it); ``None`` if nothing is running."""
+        return _read_progress(self.plugin_id, job_key)
+
+    def request_cancel(self, job_key: str) -> None:
+        """Ask a job to stop at its next checkpoint. Whether it *was* cancellable is the
+        plugin's question — it is the one that knows what its jobs are."""
+        _request_cancel(self.plugin_id, job_key)
+
+    def forget(self, job_key: str) -> None:
+        """Drop the entry of something that no longer exists (its input was deleted). A finished
+        job keeps its row: the last progress is the record the page reads afterwards."""
+        _forget_job(self.plugin_id, job_key)
 
 
 def bind_forget_source(session: Session, plugin_id: str) -> ForgetSource:
@@ -98,6 +151,10 @@ class PluginContext:
     # (C14). Defaults to a no-op: a scraper with no notion of inputs never records provenance,
     # so there is nothing for it to forget — unlike a missing write path, which is a mistake.
     forget_source: ForgetSource = lambda user_id, source_key: 0  # noqa: E731
+    # Progress out, cancellation in, on the core's own sessions (C9/C10, CTX-R13). Defaults to
+    # a book under the empty plugin id: a context built without one still answers, and a plugin
+    # that never publishes progress never reaches it.
+    jobs: JobBook = field(default_factory=lambda: JobBook(plugin_id=""))
 
 
 def build_context(manifest: Manifest, plugin: BasePlugin) -> PluginContext:
@@ -125,6 +182,7 @@ def build_context(manifest: Manifest, plugin: BasePlugin) -> PluginContext:
         update_catalog=_update_catalog,
         upsert_catalog=_upsert_catalog,
         forget_source=bind_forget_source(session, plugin_id),
+        jobs=JobBook(plugin_id=plugin_id),
         http=build_http_client(session, plugin_id, logger),
     )
 

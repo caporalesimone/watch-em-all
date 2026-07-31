@@ -25,7 +25,7 @@ from sqlalchemy import select
 from src.core.db import new_session
 from src.core.http import HttpClient
 from src.core.models import CatalogProduct
-from src.core.plugins.context import build_context
+from src.core.plugins.context import JobBook, build_context
 from src.core.scraper_config import set_scraper_config
 
 DS = "/api/plugins/dragon-store"
@@ -665,20 +665,16 @@ def test_the_job_endpoint_describes_what_is_happening(client: TestClient) -> Non
 
     session = new_session()
     try:
-        session.add(
-            Watch(
-                user_id=uid,
-                kind="category",
-                url="https://x/c.sp.uw",
-                status="running",
-                progress_done=3,
-                progress_total=21,
-                status_detail="page 3 of 21",
-            )
-        )
+        session.add(Watch(user_id=uid, kind="category", url="https://x/c.sp.uw", status="running"))
         session.commit()
+        watch_id = session.scalars(select(Watch)).one().id
     finally:
         session.close()
+    # Progress lives in the core's book now, not on the row (C9/C10): a running job publishes
+    # it there, so a test standing in for one has to publish it the same way.
+    JobBook(plugin_id="dragon_store").progress(
+        str(watch_id), done=3, total=21, detail="page 3 of 21"
+    )
 
     job = client.get(f"{DS}/watches/job", headers=h).json()
     assert job["active"] is True
@@ -746,20 +742,16 @@ def test_a_running_job_stops_at_its_next_wait(client: TestClient) -> None:
     uid, _token = _user(client)
     session = new_session()
     try:
-        watch = Watch(
-            user_id=uid,
-            kind="category",
-            url="https://x/c.sp.uw",
-            status="running",
-            cancel_requested=True,
-        )
+        watch = Watch(user_id=uid, kind="category", url="https://x/c.sp.uw", status="running")
         session.add(watch)
         session.commit()
         watch_id = watch.id
     finally:
         session.close()
+    jobs = JobBook(plugin_id="dragon_store")
+    jobs.request_cancel(str(watch_id))
 
-    sleep = _cancellable_sleep(watch_id)
+    sleep = _cancellable_sleep(jobs, watch_id)
     started = time.monotonic()
     with pytest.raises(_JobCancelled):
         sleep(11.0)  # the real politeness interval
