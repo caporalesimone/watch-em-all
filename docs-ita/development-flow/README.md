@@ -50,6 +50,8 @@
   *Risultato: le pagine utente si usano da telefono senza zoom né scorrimento orizzontale (14.1); il perimetro dell'area admin (14.2) è da discutere prima, perché è la parte cara.*
 - 💡 **Fase 15 — Notifiche sul catalogo** (post-1.0, idea da dettagliare) → [phase-15-catalog-notifications.md](phase-15-catalog-notifications.md)
   *Risultato: sai quando un prodotto entra o sparisce dalle categorie che segui, non solo quando si muove un carrello. Ha senso solo dopo le categorie della Fase 9: è da lì che il catalogo cresce da solo.*
+- 💡 **Fase 16 — Custodia dello storico prezzi** (post-1.0, idea da dettagliare) → [phase-16-history-custody.md](phase-16-history-custody.md)
+  *Risultato: l'admin può guardare e potare lo storico prezzi, la sola tabella che per scelta non si cancella mai da sé. Nasce dalla Fase 9, che ha reso lo storico proprietà del prodotto e non dell'utente: da lì esistono catene che nessuno referenzia più, e decidere il loro destino è governo, non pulizia.*
 
 ## La logica dell'ordine
 
