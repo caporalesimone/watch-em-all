@@ -156,31 +156,33 @@
 			.replaceAll("'", '&#39;');
 	}
 
-	// What has to be removed for a deletion to stick, as a sentence — or null when nothing
-	// delivers this product any more and the deletion is simply final. HTML, for the bold names.
+	// What has to be removed for the deletion to stick — or null when there is nothing useful to
+	// say. HTML, for the bold names.
 	//
-	// Four cases, and each is its own string rather than one with a guess in it. The **kind**
-	// matters because "remove the category X" is false for a product watched on its own, and the
-	// **plural** matters more: a product can arrive from two categories at once (which is why
-	// provenance is many-to-many), and naming one of them would promise a result that removing
-	// it does not produce. The scraper is named too — a category is not addressable without
-	// knowing which store's it is, and its page is where the removal happens.
+	// **Only the categories.** A category is a *group* of products added to the scraper, and
+	// naming it tells the user something they cannot work out from this dialog: that a list they
+	// set up once keeps delivering this product. A product watched on its own is the opposite —
+	// the input's name *is* the product's name, already the heading, so the sentence would read
+	// "to delete this product, delete this product". The warning above still says it comes back;
+	// this line only exists when it can name where from.
+	//
+	// The plural is a real case, not a defensive one: a product can arrive from two categories at
+	// once (which is why provenance is many-to-many), and naming one of them would promise a
+	// result that removing it does not produce. The scraper is named too — a category is not
+	// addressable without knowing whose store it is, and its page is where the removal happens.
 	const sourceRemedy = $derived.by(() => {
 		if (pending === null || pending.kind !== 'one') return null;
-		const sources = pending.item.sources;
-		if (sources.length === 0) return null;
+		const categories = pending.item.sources.filter((s) => s.kind === 'category');
+		if (categories.length === 0) return null;
 		const scraper = escapeHtml(scraperName(pending.item.plugin_id));
-		if (sources.length > 1) {
-			// Each input bolded on its own, not the whole list as one run: the commas are ours.
-			// No kind word here — two inputs can be a category and a single product, and calling
-			// both "categories" to save a word would be false.
-			const inputs = sources.map((s) => `<strong>${escapeHtml(s.label)}</strong>`).join(', ');
+		if (categories.length > 1) {
+			// Each name bolded on its own, not the whole list as one run: the commas are ours.
+			const inputs = categories.map((s) => `<strong>${escapeHtml(s.label)}</strong>`).join(', ');
 			return $_('catalog.confirmRemedyMany', { values: { inputs, scraper } });
 		}
-		const [only] = sources;
-		const key =
-			only.kind === 'category' ? 'catalog.confirmRemedyCategory' : 'catalog.confirmRemedyProduct';
-		return $_(key, { values: { input: escapeHtml(only.label), scraper } });
+		return $_('catalog.confirmRemedyCategory', {
+			values: { input: escapeHtml(categories[0].label), scraper }
+		});
 	});
 
 	async function loadDelistedTotal(): Promise<void> {
@@ -576,7 +578,7 @@
 								<span>{$_('catalog.confirmOneInCarts')}</span>
 							</p>
 						{/if}
-						{#if sourceRemedy}
+						{#if pending.item.sources.length}
 							<!--
 								The consequence and the remedy each carry their own ⚠️: they are two
 								things to do about this deletion, and a reader scanning the marks
@@ -586,21 +588,23 @@
 								<span aria-hidden="true">⚠️</span>
 								<span>{$_('catalog.confirmComesBackLead')}</span>
 							</p>
-							<p class="grid grid-cols-[1.1rem_1fr] gap-2">
-								<span aria-hidden="true">⚠️</span>
-								<!--
+							{#if sourceRemedy}
+								<p class="grid grid-cols-[1.1rem_1fr] gap-2">
+									<span aria-hidden="true">⚠️</span>
+									<!--
 									HTML because the input's and the scraper's names are bold. Safe
 									because the template is ours and both values are escaped where
 									the sentence is built (`escapeHtml`) — they come off a scraped
 									page.
 								-->
-								<!--
+									<!--
 									Three lines, and the breaks live in the message rather than in
 									this markup: it stays one sentence a translator can reorder.
 									`whitespace-pre-line` turns its \n into the breaks.
 								-->
-								<span class="whitespace-pre-line">{@html sourceRemedy}</span>
-							</p>
+									<span class="whitespace-pre-line">{@html sourceRemedy}</span>
+								</p>
+							{/if}
 						{:else}
 							<p class="grid grid-cols-[1.1rem_1fr] gap-2">
 								<span aria-hidden="true">ℹ️</span>
