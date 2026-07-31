@@ -190,6 +190,7 @@
 			"lastName": "Last name",
 			"role": "Role",
 			"roleUser": "User",
+			"roleSuperUser": "Super-user",
 			"roleAdmin": "Admin",
 			"tempPassword": "Temporary password",
 			"generate": "Generate",
