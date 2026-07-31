@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 import threading
 import time
+from collections.abc import Callable
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -46,7 +47,7 @@ def _wait_resolved(client: TestClient, headers: dict[str, str], *, count: int = 
 
     Adding a watch no longer resolves it inside the request: the row is queued and this
     scraper's drainer picks it up. Tests therefore have to wait for the same thing the page
-    waits for. Woken by a poke, so this is milliseconds — the timeout only guards against a
+    waits for. Woken by a poke, so this is milliseconds â€” the timeout only guards against a
     genuinely stuck drainer.
     """
     deadline = time.monotonic() + 10.0
@@ -61,7 +62,7 @@ def _wait_resolved(client: TestClient, headers: dict[str, str], *, count: int = 
 
 
 def _add_watch(client: TestClient, headers: dict[str, str], url: str) -> Any:
-    """Add a watch and wait for its job to finish — what a user experiences as "added".
+    """Add a watch and wait for its job to finish â€” what a user experiences as "added".
 
     Since 9.X6b/c the POST only enqueues: the row comes back `queued` and this scraper's
     drainer resolves it, holding the run lock while it does. Every test that goes on to touch
@@ -159,7 +160,7 @@ def _user(client: TestClient, username: str = "alice") -> tuple[int, str]:
 
 def _super_user(client: TestClient, username: str = "sudo") -> tuple[int, str]:
     """A super-user, which is what the manual scrape now needs (9.B8). A plain user does not
-    get it at all — the restriction is the API's, not a hidden button's."""
+    get it at all â€” the restriction is the API's, not a hidden button's."""
     return _make_user(client, _admin_token(client), username, role="super_user")
 
 
@@ -187,7 +188,7 @@ def _run_for_user_cached(client: TestClient, uid: int):  # type: ignore[no-untyp
     `build_context` builds that client itself, so this is just the run with nothing swapped
     out; the suite's fixture neutralises the politeness wait on the class, so it is still
     fast. Needed to test what a cached page does to `last_seen_at` and the per-product
-    statistics — the one thing a cacheless client cannot show."""
+    statistics â€” the one thing a cacheless client cannot show."""
     lp = _dragon(client)
     ctx = build_context(lp.manifest, lp.plugin)
     try:
@@ -502,7 +503,7 @@ def test_interstitial_is_cleared_once_and_the_page_retried(client: TestClient) -
         rows = _wait_resolved(client, h)
 
     assert added.status_code == 201
-    # Resolved through the gate, not left as a bare URL — read from the row, since the
+    # Resolved through the gate, not left as a bare URL â€” read from the row, since the
     # response is sent before the job runs (9.X6b/c).
     assert rows[0]["name"]
     assert sum("captcha_check_ok" in c for c in server.calls) == 1  # cleared exactly once
@@ -566,7 +567,7 @@ def test_a_url_that_is_neither_a_product_nor_a_category_is_refused(client: TestC
 
 def test_a_job_left_running_by_a_dead_process_is_reclaimed(client: TestClient) -> None:
     """Jobs live in the web process, so a row still marked running cannot be: it is what a
-    restart left behind. Leaving it would be worse than a lost scrape — that state blocks the
+    restart left behind. Leaving it would be worse than a lost scrape â€” that state blocks the
     user's next submission, and a lock with no expiry shuts them out of their own plugin."""
     from src.plugins.scrapers.dragon_store.backend import Watch
 
@@ -704,9 +705,64 @@ def test_cancelling_a_queued_job_stops_it_before_it_starts(client: TestClient) -
     assert accepted.json()["status"] == "cancelled"
     row = client.get(f"{DS}/watches", headers=h).json()[0]
     assert row["status"] == "cancelled"
-    # The watch itself survives: the products a partial scrape wrote must keep something
-    # delivering them, or the next complete run delists exactly those.
+    # The watch itself survives: stopping an add is not removing an input, and the next
+    # scheduled run reads it.
     assert row["url"] == "https://x/c.sp.uw"
+
+
+def test_a_cancelled_job_records_no_scan(client: TestClient) -> None:
+    """C5: a cancelled job writes **nothing** about what a scan yielded, and that is a decision
+    rather than an omission.
+
+    `last_scanned_at` is not a neutral timestamp â€” it is the switch the list reads to decide
+    between "38 products, 1 dented left out Â· read at 14:32" and "never scanned" â€” and the two
+    counters beside it are NOT NULL with a default of 0. Stamping the date without counters
+    would therefore print "0 products, 0 excluded", which reads exactly like an empty category
+    or a scan that came back with nothing: three different situations wearing one sentence.
+    Nothing in the backend reads the field, so saying nothing costs nothing, and the requests
+    really spent are still recorded â€” in the job's progress, and in the run log.
+    """
+    import sys
+
+    from src.web.jobs import stop_drainers
+
+    stop_drainers()
+    _uid, token = _user(client)
+    h = _bearer(token)
+    lp = _dragon(client)
+    # The plugin is loaded dynamically, so *its* module is the one holding the class the run
+    # calls and the exception the run catches — importing the package here would patch a
+    # different class object and change nothing.
+    loaded = sys.modules[type(lp.plugin).__module__]
+
+    # The walk is cut where a cancellation cuts it: `_JobCancelled` out of the middle of a
+    # category. Raised directly rather than through a real cancellation, because the timing of
+    # one is not what this test is about — and the politeness wait a cancellation interrupts is
+    # neutralised in this suite anyway.
+    def cancelled_mid_walk(*_args: Any, **_kwargs: Any) -> None:
+        raise loaded._JobCancelled
+
+    with CategoryServer() as base:
+        created = client.post(f"{DS}/watches", json={"url": sp_url(base)}, headers=h)
+        assert created.status_code == 201
+        cls = type(lp.plugin)
+        original = cls._scrape_category
+        cls._scrape_category = cancelled_mid_walk  # type: ignore[assignment,method-assign]
+        try:
+            ctx = build_context(lp.manifest, lp.plugin)
+            try:
+                lp.plugin.drain_next_job(ctx)
+            finally:
+                ctx.db.close()
+        finally:
+            cls._scrape_category = original  # type: ignore[method-assign]
+
+    row = client.get(f"{DS}/watches", headers=h).json()[0]
+    assert row["status"] == "cancelled"
+    assert row["last_scanned_at"] is None  # "never scanned", not "read 0 products"
+    assert (row["products_included"], row["products_excluded"]) == (0, 0)
+    # And nothing was delivered (C1): cancelling means the user did not want it.
+    assert client.get("/api/catalog", headers=h).json()["total"] == 0
 
 
 def test_cancelling_something_that_is_not_running_is_refused(client: TestClient) -> None:
@@ -733,7 +789,7 @@ def test_cancelling_something_that_is_not_running_is_refused(client: TestClient)
 def test_a_running_job_stops_at_its_next_wait(client: TestClient) -> None:
     """Cancellation is cooperative and reaches into the politeness wait (9.X6f).
 
-    Almost all of a scrape is that wait — 11 seconds a request, by the site's own request —
+    Almost all of a scrape is that wait â€” 11 seconds a request, by the site's own request â€”
     so a flag only read between requests would feel broken. Here the wait is real (the
     fixture's neutralised sleep is bypassed by passing our own) and the job has to notice.
     """
@@ -766,18 +822,22 @@ class CategoryServer:
 
     ``pg=N`` picks the page, the way the site does. The Cthulhu category is one real page and
     happens to contain every awkward case at once: a preorder, one dented listing and two
-    products with no price. The two-page variant patches only the header of page 1 — the real
-    one claims 21 pages and we hold 2 — so the walk stops where the fixtures end instead of
+    products with no price. The two-page variant patches only the header of page 1 â€” the real
+    one claims 21 pages and we hold 2 â€” so the walk stops where the fixtures end instead of
     re-reading page 2 nineteen times.
 
     ``priced_details`` re-points one card's **detail** page at a fixture that does carry a
     price. Both priceless cards of the real page turn out to be free, so with the shipped
     fixtures a run that reads their detail pages and a run that throws those reads away land
-    the same catalog — which is how the bug in 9.B2b's tail pass stayed invisible.
+    the same catalog â€” which is how the bug in 9.B2b's tail pass stayed invisible.
 
     ``unreadable`` makes those listing pages answer **404** while page one still announces the
     full count: a walk that stops halfway, which is not the same failure as a site that is
-    gone — page one delivered, and the row has to say how far it got.
+    gone â€” page one delivered, and the row has to say how far it got.
+
+    ``on_listing`` is called with the page number each time a listing page is served, before the
+    body goes out. It exists so a test can make something happen **while** a walk is running â€”
+    a cancellation arriving between two pages, which is the only moment one can arrive at all.
     """
 
     def __init__(
@@ -786,6 +846,7 @@ class CategoryServer:
         paginated: bool = False,
         priced_details: dict[str, str] | None = None,
         unreadable: set[int] | None = None,
+        on_listing: Callable[[int], None] | None = None,
     ) -> None:
         cthulhu = (_FIX / "sp_192_cthulhu_one_page.html").read_bytes()
         page1 = (_FIX / "sp_115_classici_page1.html").read_bytes()
@@ -817,7 +878,10 @@ class CategoryServer:
                 gp = _GP_RE.search(self.path)
                 if ".sp.uw" in self.path:
                     found = re.search(r"[?&]pg=(\d+)", self.path)
-                    body = listing.get(int(found.group(1)) if found else 1)
+                    page = int(found.group(1)) if found else 1
+                    body = listing.get(page)
+                    if on_listing is not None:
+                        on_listing(page)
                 elif gp is not None:
                     body = details.get(gp.group(1))
                 else:
@@ -912,7 +976,7 @@ def test_dented_listings_come_in_only_when_the_watch_asks(client: TestClient) ->
 def test_a_product_the_listing_cannot_price_is_settled_on_its_own_page(
     client: TestClient,
 ) -> None:
-    """9.B2b: two cards on this page show no price. Neither may be guessed at — one is a free
+    """9.B2b: two cards on this page show no price. Neither may be guessed at â€” one is a free
     download, and treating the other kind as free would put a priced product in the catalog at
     zero and fire a price-drop alert on it."""
     uid, token = _user(client)
@@ -929,12 +993,12 @@ def test_a_product_the_listing_cannot_price_is_settled_on_its_own_page(
 
 def test_adding_a_category_keeps_the_prices_its_tail_pass_settled(client: TestClient) -> None:
     """C2: `_resolve_unpriced` writes into the dict it is given, and on the add path that dict
-    was built inline and thrown away — so the detail pages were fetched, politeness wait
+    was built inline and thrown away â€” so the detail pages were fetched, politeness wait
     included, and their prices went nowhere.
 
     22992 is a card the listing shows with no price at all; here its detail page carries one.
     Without the fix it lands at 0,00 with a Free tag, which is what an actual free download
-    looks like — a 9,90 product filed as free, and a price-drop alert waiting to happen.
+    looks like â€” a 9,90 product filed as free, and a price-drop alert waiting to happen.
     """
     _uid, token = _user(client)
     h = _bearer(token)
@@ -958,7 +1022,7 @@ def test_a_listing_served_from_the_cache_does_not_pretend_the_site_just_answered
     scrape cache carries the timestamp of the fetch that filled it.
 
     The walk used to discard that timestamp, so fifty products off a twelve-hour-old page were
-    all dated "now" — the field whose entire job is to say how fresh this is, reporting when we
+    all dated "now" â€” the field whose entire job is to say how fresh this is, reporting when we
     last re-served a listing. The same timestamp decides `observations` vs `cache_hits`, so both
     per-product counters were wrong by construction on a category.
 
@@ -982,8 +1046,8 @@ def test_a_listing_served_from_the_cache_does_not_pretend_the_site_just_answered
 
 class UnreadableServer:
     """A site that answers **200** with something that is not a product page at all: no
-    JSON-LD, no anti-bot gate, no error banner of its own. That is a parse failure — our
-    reading broke — as opposed to the site telling us, inside a 200, that it has no such page.
+    JSON-LD, no anti-bot gate, no error banner of its own. That is a parse failure â€” our
+    reading broke â€” as opposed to the site telling us, inside a 200, that it has no such page.
     """
 
     def __init__(self) -> None:
@@ -1014,7 +1078,7 @@ def test_a_product_page_that_will_not_parse_is_counted_like_a_listing_that_will_
     client: TestClient,
 ) -> None:
     """C6/9.B6c: `parse_failures_total` was bumped on a listing and never on a product page, so
-    the statistic could not show the breakage we have actually had — a page shape that stopped
+    the statistic could not show the breakage we have actually had â€” a page shape that stopped
     parsing. `scrape_run` has retention; this counter is the only memory of "since when".
     """
     _uid, token = _user(client)
@@ -1101,7 +1165,7 @@ def _sources_of(client: TestClient, headers: dict[str, str], marker: str) -> lis
 def test_the_catalog_says_which_input_delivers_a_product(client: TestClient) -> None:
     """C14: the deletion confirmation has to answer "will this come back?" with a fact instead
     of a conditional, and it can only do that if the delivery said where the product came from.
-    The label is the category's name, not its URL — it is shown to a user."""
+    The label is the category's name, not its URL â€” it is shown to a user."""
     uid, token = _user(client)
     h = _bearer(token)
     with CategoryServer() as base:
@@ -1127,7 +1191,7 @@ def test_a_product_watched_twice_over_names_both_inputs(client: TestClient) -> N
 
 
 def test_removing_an_input_stops_its_products_claiming_it(client: TestClient) -> None:
-    """The products stay — removing a watch has never removed what it found — but they stop
+    """The products stay â€” removing a watch has never removed what it found â€” but they stop
     promising a return that nothing will cause any more."""
     uid, token = _user(client)
     h = _bearer(token)
@@ -1165,7 +1229,7 @@ def test_the_backend_says_what_a_pasted_url_is(client: TestClient) -> None:
 
 
 def test_a_category_can_be_added_with_dented_items_included(client: TestClient) -> None:
-    """9.F2: the toggle is part of the add, not something to fix up afterwards — the first walk
+    """9.F2: the toggle is part of the add, not something to fix up afterwards â€” the first walk
     is the expensive one, and doing it twice to change one flag is what we are avoiding."""
     uid, token = _user(client)
     h = _bearer(token)
@@ -1208,7 +1272,7 @@ def test_a_product_watch_never_carries_the_dented_filter(client: TestClient) -> 
 
 def test_a_watch_reports_what_its_last_scan_took(client: TestClient) -> None:
     """9.F1/9.F3: the counters are what the list and the add-outcome panel read. They are a
-    photograph of the scan, written on the row — not a count of the catalog, which several
+    photograph of the scan, written on the row â€” not a count of the catalog, which several
     watches can contribute to at once."""
     uid, token = _user(client)
     h = _bearer(token)
@@ -1230,7 +1294,7 @@ def test_the_dented_filter_cannot_be_changed_mid_scan(client: TestClient) -> Non
     """The walk reads that column between pages: a change landing halfway through would apply
     to the second half of a category and not the first.
 
-    The drainer is stopped so the row stays in flight for the length of the assertion —
+    The drainer is stopped so the row stays in flight for the length of the assertion â€”
     otherwise the test measures that race instead of the rule (same reason as the queue tests).
     """
     from src.plugins.scrapers.dragon_store.backend import Watch
@@ -1255,7 +1319,7 @@ def test_the_dented_filter_cannot_be_changed_mid_scan(client: TestClient) -> Non
     assert busy.status_code == 409
     assert busy.json()["code"] == "watch_busy"
 
-    # Somebody else's watch is not found, never forbidden — that would confirm it exists.
+    # Somebody else's watch is not found, never forbidden â€” that would confirm it exists.
     _uid_b, token_b = _make_user(client, admin, "bob")
     other = client.patch(
         f"{DS}/watches/{watch_id}", json={"include_ammaccati": True}, headers=_bearer(token_b)
@@ -1269,7 +1333,7 @@ def test_the_dented_filter_cannot_be_changed_mid_scan(client: TestClient) -> Non
 def test_a_second_run_over_a_category_changes_nothing(client: TestClient) -> None:
     """The phase's Definition of Done, and the one place a dedup or delisting mistake would
     show as thirty-eight rows instead of one: run the same category twice with the site
-    unchanged and every delta has to be zero — including ``removed``, which is the dangerous
+    unchanged and every delta has to be zero â€” including ``removed``, which is the dangerous
     one, since the second delivery is complete and therefore *allowed* to delist."""
     uid, token = _user(client)
     h = _bearer(token)
@@ -1287,7 +1351,7 @@ def test_a_second_run_over_a_category_changes_nothing(client: TestClient) -> Non
     assert client.get("/api/catalog", headers=h).json()["total"] == 38
 
     # The other half of "nothing changed": the per-product statistics of 9.B6b. Every row was
-    # observed at least once and none recorded a price move — and there are 38 rows, not 38
+    # observed at least once and none recorded a price move â€” and there are 38 rows, not 38
     # times three, which is what a broken identity would look like.
     session = new_session()
     try:
@@ -1304,7 +1368,7 @@ def test_a_second_run_over_a_category_changes_nothing(client: TestClient) -> Non
 def test_a_run_reports_what_the_dented_filter_left_out(client: TestClient) -> None:
     """`scrape_run.products_excluded` has existed since 4.B6 and nothing ever wrote it: a run
     over a category of 39 reported 38 found and left the missing one unexplained. Only the
-    plugin can say — the catalog service is handed the survivors."""
+    plugin can say â€” the catalog service is handed the survivors."""
     admin = _admin_token(client)  # taken once: it changes the admin's own password
     uid, token = _make_user(client, admin, "alice")
     h = _bearer(token)
@@ -1324,8 +1388,8 @@ def test_a_run_reports_what_the_dented_filter_left_out(client: TestClient) -> No
 
 def test_a_category_walk_counts_its_pages_in_the_lifetime_statistics(client: TestClient) -> None:
     """9.B6c: `scrape_run` has retention, so the per-scraper row is the only memory of what
-    this scraper has ever done. A page read is where the time goes — eleven seconds of
-    politeness each — so it is counted per page, not per product."""
+    this scraper has ever done. A page read is where the time goes â€” eleven seconds of
+    politeness each â€” so it is counted per page, not per product."""
     uid, token = _user(client)
     h = _bearer(token)
     server = CategoryServer(paginated=True)
@@ -1373,7 +1437,7 @@ def test_a_walk_stopped_by_an_unreadable_page_records_the_pages_it_read(
     """C20: progress is counted in **requests**, so a walk that stopped early has to say so.
 
     The terminal transition used to fill the bar to its total unconditionally, so a category
-    that broke on page 2 of 2 left "2 of 2 read" on the row — next to a `status_detail` saying
+    that broke on page 2 of 2 left "2 of 2 read" on the row â€” next to a `status_detail` saying
     some pages could not be read. Two fields of the same row contradicting each other, and the
     contract (DRG-R2, features.md) promises the count of pages read.
     """
