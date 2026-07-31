@@ -27,6 +27,7 @@ from src.core.system_log import install_system_log_handler
 from src.web.adjust import register_notifiers, register_scrapers
 from src.web.deps import require_user
 from src.web.error_handlers import register_error_handlers
+from src.web.incompatible import install_incompatibility_gate
 from src.web.jobs import reclaim_orphans, start_drainers, stop_drainers
 from src.web.routers import (
     admin_notifiers,
@@ -105,14 +106,18 @@ def create_app() -> FastAPI:
         except Exception:
             log.exception("schema-drift check failed")
         for item in drift:
-            if item.missing_table:
-                log.warning("schema drift: table %r is missing from the database", item.table)
-            else:
-                log.warning(
-                    "schema drift: table %r is missing column(s): %s",
-                    item.table,
-                    ", ".join(item.missing_columns),
-                )
+            log.error("schema drift: %s", item.summary())
+        if drift:
+            # Logged as an error, not a warning, and said once in one line: from here on
+            # every page and every API route answers with the incompatibility instead of
+            # the application (INC-R1), so this is the only place the reason is written.
+            log.error(
+                "database incompatible with version %s — serving the incompatibility page "
+                "on every route except /api/health; nothing will be read or written",
+                settings.version,
+            )
+        # Filled before the first request is served, which is what makes the gate
+        # airtight: there is no window in which a mismatched database is reachable.
         _app.state.schema_drift = drift
         # Standard per-scraper scrape-now routes (SCR-R15): mounted here in the web
         # (they need the authenticated user + a request session, so they cannot
@@ -160,6 +165,10 @@ def create_app() -> FastAPI:
     )
 
     register_error_handlers(app)
+    # Before every route, including the SPA's catch-all: while the database does not match
+    # this version, the answer is the incompatibility page rather than a scattering of 500s
+    # from whichever page touches the wrong table first (INC-R1).
+    install_incompatibility_gate(app, settings.version)
 
     app.include_router(health.router, prefix="/api")
     app.include_router(auth.router, prefix="/api/auth")

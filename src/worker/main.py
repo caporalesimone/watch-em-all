@@ -56,6 +56,10 @@ _scrapers: dict[str, ScraperPlugin] = {}
 # the pending ones each tick (phase 7).
 _notifiers: list[NotifierPlugin] = []
 
+# Set at boot when the database schema does not match this version (INC-R4). While it is on,
+# the tick heartbeats and does nothing else: everything else in it writes.
+_incompatible: bool = False
+
 # Submit a scraper run to the runner: (scraper_id, slot, trigger) -> enqueued?
 Submit = Callable[[str, datetime, str], bool]
 
@@ -91,16 +95,24 @@ def _boot() -> None:
     metadatas = [Base.metadata] + [
         lp.plugin.table_metadata for lp in loaded if lp.plugin.table_metadata is not None
     ]
+    global _incompatible
+    _incompatible = False
     try:
-        for item in check_schema_drift(get_engine(), metadatas):
-            if item.missing_table:
-                log.warning("schema drift: table %r is missing from the database", item.table)
-            else:
-                log.warning(
-                    "schema drift: table %r is missing column(s): %s",
-                    item.table,
-                    ", ".join(item.missing_columns),
-                )
+        drift = check_schema_drift(get_engine(), metadatas)
+        for item in drift:
+            log.error("schema drift: %s", item.summary())
+        if drift:
+            # The web serves its incompatibility page (INC-R1); the worker's equivalent is to
+            # do nothing, which is the only safe answer here. It has no user to explain
+            # itself to, and unlike a page it *writes*: a scrape against a schema this
+            # process does not agree with would fail halfway through a run, on a database
+            # somebody may still be able to salvage.
+            _incompatible = True
+            log.error(
+                "database incompatible with this version — scheduled work is suspended "
+                "(no scrapes, no deliveries); the heartbeat continues so the web can see "
+                "this worker is alive"
+            )
     except Exception:
         log.exception("schema-drift check failed")
     session = new_session()
@@ -344,12 +356,17 @@ def _loop(submit: Submit, max_ticks: int | None = None) -> None:
             _daily_maintenance(now)
             last_maint_date = now.date()
         _heartbeat(now)
-        session = new_session()
-        try:
-            dispatch_due(session, now, tz, submit)
-        finally:
-            session.close()
-        _drain_deliveries_step()  # phase 7: drain pending channel deliveries, decoupled from scrape
+        # The heartbeat still goes out while the schema is incompatible — it is how the web
+        # knows this process is alive, and a silent worker would read as a second, different
+        # fault. What is suspended is everything that would *write* through the mismatch.
+        if not _incompatible:
+            session = new_session()
+            try:
+                dispatch_due(session, now, tz, submit)
+            finally:
+                session.close()
+            # Phase 7: drain pending channel deliveries, decoupled from scrape.
+            _drain_deliveries_step()
         ticks += 1
         if max_ticks is not None and ticks >= max_ticks:
             break
