@@ -15,8 +15,14 @@ that changed what the user sees were C1, C2 and C3; none was covered by a test, 
 — the tests went through `run_for_user`, while C2 lived on the *add* path and C3 needed a warm
 cache. **C1 is still open**, in group C, because it is a decision and not a repair.
 
-**Groups A and B are done, and group C has begun** (2026-07-30, one commit each) — see
-`git log --grep='(C'`.
+**All three groups are done** (A and B on 2026-07-30, C on 2026-07-31) — see `git log --grep='(C'`.
+Group C was decided item by item with Simone, one commit each, and two of the answers grew past
+the review: C8 became `build_product` in the **scraper base** rather than a helper inside the
+plugin (the duplication was triple and crossed two plugins), and the question C7 asked about
+price history turned into re-keying it **per product** instead of per user. The automatic
+cleanup of delisted products, and the notification that reports it, are deliberately **phase 15**,
+where the catalog-notification machinery lives; pruning history nobody references is **phase 16**,
+where the admin's tools live.
 
 - **A**: C4, C11, C12, C13, C16, C17, C18, C21. Two did not survive contact unchanged, and the
   commits say why: C17's field had readers after all (the tests that proved it was parsed), and
@@ -38,11 +44,24 @@ cache. **C1 is still open**, in group C, because it is a decision and not a repa
   touch), and the line was load-bearing for the single product — removing it alone left a
   *successful* add reading `0 of 1`, so each path now records its own step.
 
-**The rest of group C is open.**
+### Group C — closed 2026-07-31 (the decisions, for the record)
 
-### Group C — not mechanical: a decision is inside
+Each of these had more than one defensible answer, so each was Simone's call before code. What
+was decided, and the fact that settled it:
 
-Each of these has more than one defensible answer, so it is Simone's call before code.
+| ID | Decision |
+|---|---|
+| **C1** | **Cancelling discards everything.** "I did not want this" — and half a category is not what was asked for either. Costs nothing: every page fetched is already in the scrape cache, committed at the fetch and independent of the abandoned transaction. The comment, the message and the phase doc were the things that were wrong. |
+| **C5** | **Record nothing on a cancel.** `last_scanned_at` is not a neutral timestamp — it is the switch the list reads to choose between "38 products, 1 left out · read at 14:32" and "never scanned" — and the counters beside it are NOT NULL defaulting to 0, so stamping the date alone prints "0 products", indistinguishable from an empty category. Nothing in the backend reads it. Pinned by a test. |
+| **C7** | Split. The **confirmation counts the carts** it is about to empty (phase 9); the **automatic cleanup and its notification are phase 15**, which owns the catalog-notification machinery. The question it raised about price history became the re-keying above. |
+| **C8** | **`build_product` in the scraper base** (SCR-R18), not a helper in the plugin: the duplication was *triple* and crossed two plugins, and `tp_scraper`'s copy carried the `scraped_at=now()` PROD-R8 forbids. Also fixed a drift nobody had decided: the two `extra` filters had become truthiness and `is not None`. |
+| **C9 + C10** | **The core owns progress and cancellation** (`context.jobs`, CTX-R13), on its own short sessions. One seam for both: C10 was a plugin committing the worker's session mid-run, C9 the same problem mirrored — ~900 sessions to read one boolean. A plugin now opens no sessions at all. |
+| **C14** | **`product_sources`, many-to-many.** 9.B4 refused a single foreign key because a product can arrive from two categories at once, which is the argument *for* a many-to-many; the confirmation now names the input instead of hedging. |
+| **C15** | Distinguish the cases: 404 reloads in silence (the row is gone, which is what the click wanted), anything else says so, and `outcome` clears only when it is *that* watch. No 409 to handle — deleting a watch mid-job is supported on purpose. |
+| **C19** | **Em dash for a delisted row**, and the rule moved into the core payload (AEV-R7). The review said the payload could not tell a product was delisted; it could — the tag is in it and comes out alone (9.B9). |
+| **C22** | Two functions, kept, moved to `$lib/format` as `formatCountdown` / `formatDuration`. The two renderings are deliberate; the names are what say so. |
+
+The C-numbered originals are kept below for provenance.
 
 | ID | Description, filename |
 |---|---|
