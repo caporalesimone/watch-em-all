@@ -172,14 +172,14 @@
 		const scraper = escapeHtml(scraperName(pending.item.plugin_id));
 		if (sources.length > 1) {
 			// Each input bolded on its own, not the whole list as one run: the commas are ours.
+			// No kind word here — two inputs can be a category and a single product, and calling
+			// both "categories" to save a word would be false.
 			const inputs = sources.map((s) => `<strong>${escapeHtml(s.label)}</strong>`).join(', ');
-			return $_('catalog.confirmComesBackFromMany', { values: { inputs, scraper } });
+			return $_('catalog.confirmRemedyMany', { values: { inputs, scraper } });
 		}
 		const [only] = sources;
 		const key =
-			only.kind === 'category'
-				? 'catalog.confirmComesBackFromCategory'
-				: 'catalog.confirmComesBackFromProduct';
+			only.kind === 'category' ? 'catalog.confirmRemedyCategory' : 'catalog.confirmRemedyProduct';
 		return $_(key, { values: { input: escapeHtml(only.label), scraper } });
 	});
 
@@ -594,7 +594,12 @@
 									the sentence is built (`escapeHtml`) — they come off a scraped
 									page.
 								-->
-								<span>{@html sourceRemedy}</span>
+								<!--
+									Three lines, and the breaks live in the message rather than in
+									this markup: it stays one sentence a translator can reorder.
+									`whitespace-pre-line` turns its \n into the breaks.
+								-->
+								<span class="whitespace-pre-line">{@html sourceRemedy}</span>
 							</p>
 						{:else}
 							<p class="grid grid-cols-[1.1rem_1fr] gap-2">

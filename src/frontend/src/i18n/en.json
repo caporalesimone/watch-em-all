@@ -61,9 +61,9 @@
 		"confirmDelistedInCarts": "{count} of them are in one of your carts and will be taken out of it.",
 		"confirmOneInCarts": "It will be removed from every cart it is in.",
 		"confirmComesBackLead": "The next scrape brings it back.",
-		"confirmComesBackFromCategory": "Category <strong>{input}</strong> must be removed from the <strong>{scraper}</strong> scraper to delete this product permanently.",
-		"confirmComesBackFromProduct": "Product <strong>{input}</strong> must be removed from the <strong>{scraper}</strong> scraper to delete this product permanently.",
-		"confirmComesBackFromMany": "These inputs must all be removed from the <strong>{scraper}</strong> scraper to delete this product permanently: {inputs}.",
+		"confirmRemedyCategory": "To permanently remove this product\ndelete the category <strong>{input}</strong>\nfrom the <strong>{scraper}</strong> scraper.",
+		"confirmRemedyProduct": "To permanently remove this product\ndelete the product <strong>{input}</strong>\nfrom the <strong>{scraper}</strong> scraper.",
+		"confirmRemedyMany": "To permanently remove this product\ndelete {inputs}\nfrom the <strong>{scraper}</strong> scraper.",
 		"confirmHistoryKept": "Its price history is kept.",
 		"confirmNothingBringsItBack": "No input delivers it any more, so nothing will bring it back.",
 		"confirmAction": "Remove"
