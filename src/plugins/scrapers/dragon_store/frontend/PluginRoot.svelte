@@ -5,7 +5,7 @@
 	import ProductCell from '$lib/components/ProductCell.svelte';
 	import ProductTags from '$lib/components/ProductTags.svelte';
 	import ProductThumb from '$lib/components/ProductThumb.svelte';
-	import { dateTime } from '$lib/format';
+	import { dateTime, formatCountdown, formatDuration } from '$lib/format';
 	import { _ } from '$lib/i18n';
 	import { isPrivileged } from '$lib/stores/auth';
 
@@ -261,8 +261,28 @@
 	}
 
 	async function removeWatch(id: number): Promise<void> {
-		const res = await apiFetch(`${BASE}/watches/${id}`, { method: 'DELETE' });
-		if (res.ok) await loadWatches();
+		// Three lines that reported nothing: a failed DELETE was indistinguishable from a
+		// successful one, and the outcome panel stayed pinned to a watch that no longer existed
+		// (C15). The three functions around this one already read the error code; this one
+		// simply did not.
+		error = null;
+		try {
+			const res = await apiFetch(`${BASE}/watches/${id}`, { method: 'DELETE' });
+			// 404 = it is already gone, which is what the click asked for: reload in silence
+			// rather than complain about a state the user wanted. No 409 to handle — the
+			// endpoint deletes a watch whose job is in flight on purpose, and the resolver
+			// tolerates the row vanishing under it ("removed while it sat in the queue").
+			if (!res.ok && res.status !== 404) {
+				error = $_('dragon_store.error');
+				return;
+			}
+			// Only when it is *this* watch: clearing it always would wipe a panel describing
+			// a different input the user has not touched.
+			if (outcome?.id === id) outcome = null;
+			await loadWatches();
+		} catch {
+			error = $_('dragon_store.error');
+		}
 	}
 
 	async function doScrape(): Promise<void> {
@@ -285,26 +305,13 @@
 		}
 	}
 
-	function fmt(total: number): string {
-		const s = Math.max(0, Math.floor(total));
-		const h = Math.floor(s / 3600);
-		const m = Math.floor((s % 3600) / 60);
-		const sec = s % 60;
-		if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
-		if (m > 0) return `${m}m ${String(sec).padStart(2, '0')}s`;
-		return `${sec}s`;
-	}
-
-	function fmtInterval(total: number): string {
-		const s = Math.floor(total);
-		const h = Math.floor(s / 3600);
-		const m = Math.floor((s % 3600) / 60);
-		if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
-		return m > 0 ? `${m}m` : `${s}s`;
-	}
-
+	// The two duration formatters used to live here, and being near-identical they invited the
+	// question "why are there two?" every time. They are two on purpose — a countdown shows its
+	// seconds, a configured interval does not — and they now live in `$lib/format` under names
+	// that say which is which, where the next page that needs one will find it instead of
+	// writing a third (C22).
 	const locked = $derived(status !== null && !status.available);
-	const intervalLabel = $derived(status ? fmtInterval(status.interval_seconds) : '');
+	const intervalLabel = $derived(status ? formatDuration(status.interval_seconds) : '');
 
 	// A category and a product are read differently and are worth telling apart at a glance:
 	// one is a hundred products that come and go, the other is one product.
@@ -610,7 +617,9 @@
 			</button>
 			{#if locked}
 				<p class="text-xs text-slate-500">
-					{$_('dragon_store.scrape_now.cooldown_caption', { values: { time: fmt(remaining) } })}
+					{$_('dragon_store.scrape_now.cooldown_caption', {
+						values: { time: formatCountdown(remaining) }
+					})}
 				</p>
 			{/if}
 		</div>
