@@ -51,6 +51,7 @@ from src.core.contracts import (
     Adjustment,
     BrandRef,
     CategoryRef,
+    ConfigField,
     DeltaCounters,
     Product,
     ProductSourceRef,
@@ -68,11 +69,13 @@ from src.core.plugins.context import (
     build_http_client,
 )
 from src.core.robots import origin_of
+from src.core.run_log import record_traffic
+from src.core.scraper_config import plugin_config
 from src.core.scraper_stats import bump
 from src.web.deps import SessionDep, UserDep
 from src.web.jobs import poke
 
-from .adjustments import ADJUSTMENTS
+from .adjustments import DragonAdjustments, config_schema
 from .parser import (
     DragonStoreChallenge,
     DragonStoreParseError,
@@ -442,6 +445,9 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
     """
     logger = logging.getLogger(f"wea.plugin.{PLUGIN_ID}")
     db = new_session()
+    # Declared out here so the `finally` can record what this resolution cost the site even
+    # when it ended badly (10.B20): the requests were made either way.
+    context: PluginContext | None = None
     try:
         watch = db.get(Watch, watch_id)
         if watch is None:  # removed while it sat in the queue
@@ -555,6 +561,11 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
         db.rollback()
         _mark_failed(db, watch_id, "an internal error stopped this; the next run will retry")
     finally:
+        # This context builds its own HTTP client (see `_request_context`), so the core's job
+        # drainer cannot see what it did: the traffic is recorded here, beside the client that
+        # made it, and that is why the helper lives in the core and only the call is here.
+        if context is not None:
+            record_traffic(db, PLUGIN_ID, context.http)
         db.close()
 
 
@@ -599,6 +610,9 @@ def _mark_failed(db: Session, watch_id: int, detail: str) -> None:
 class DragonStorePlugin(ScraperPlugin):
     plugin_id = PLUGIN_ID
     table_metadata = _Base.metadata  # DB-R7: declare the plugin's own schema
+
+    # The cart rules, read from config once and kept until they change (10.B22).
+    _adjust_cache: DragonAdjustments | None = None
 
     # --- identity (SCR-R10): the native gp id, else None -> URL fallback ---
     def identity_seed(self, raw: Any) -> str | None:
@@ -655,12 +669,38 @@ class DragonStorePlugin(ScraperPlugin):
         # Users a scheduled run scrapes: everyone with at least one watch (SCR-R3).
         return list(context.db.scalars(select(Watch.user_id).distinct().order_by(Watch.user_id)))
 
+    def get_admin_config_schema(self) -> list[ConfigField]:
+        """The cart rules, editable by an admin (10.B22). Declared here rather than hard-wired
+        in `adjustments.py`, where phase 5 left a note promising exactly this move."""
+        return config_schema()
+
     def get_adjustments(
         self, products: list[CatalogProduct], cart_total: Decimal
     ) -> list[Adjustment]:
         # DRG-R5: a non-cumulative threshold discount + shipping (free above a threshold),
         # applied to the cart's discounted total. Rules live in adjustments.py.
-        return ADJUSTMENTS.compute(cart_total)
+        return self._adjustments().compute(cart_total)
+
+    def _adjustments(self) -> DragonAdjustments:
+        """The rules built from the stored config, cached until the config changes (10.B22).
+
+        Cached because this signature has no session — the cart engine calls it per cart, and
+        opening one to read four numbers each time would put a query on the path of every
+        recomputation. `on_config_changed` drops the cache, so a threshold saved in the admin
+        page takes effect on the next evaluation without a restart, which is what the MVP asks.
+        """
+        if self._adjust_cache is None:
+            db = new_session()
+            try:
+                self._adjust_cache = DragonAdjustments(
+                    plugin_config(db, PLUGIN_ID, config_schema())
+                )
+            finally:
+                db.close()
+        return self._adjust_cache
+
+    def on_config_changed(self) -> None:
+        self._adjust_cache = None
 
     # --- scraping (SCR-R4/R5/R6): one HTTP request per watch, via context.http ---
     def _clear_session(self, context: PluginContext, url: str) -> bool:

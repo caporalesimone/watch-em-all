@@ -11,6 +11,10 @@ export interface Me {
 	role: string;
 	locale: string;
 	must_change_password: boolean;
+	/** Where this account is reached — the username itself, for everyone but the bootstrap admin. */
+	notification_email: string;
+	/** Only the bootstrap admin may change it: everyone else's address *is* their username. */
+	email_editable: boolean;
 }
 
 interface TokenPair {
@@ -106,6 +110,16 @@ export function getMe(): Promise<Me> {
 	return apiFetch('/api/me').then(asJson<Me>);
 }
 
+/** Update the current profile. Only the bootstrap admin may send `contact_email` (10.F17). */
+export async function patchMe(body: { contact_email?: string; locale?: string }): Promise<Me> {
+	const res = await apiFetch('/api/me', {
+		method: 'PATCH',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+	return asJson<Me>(res);
+}
+
 export function getPlugins(): Promise<PluginInfo[]> {
 	return apiFetch('/api/plugins').then(asJson<PluginInfo[]>);
 }
@@ -185,6 +199,67 @@ export async function patchScraperConfig(
 	return asJson<ScraperConfig>(res);
 }
 
+// The settings a scraper declares for itself (10.B22). Schema and values together, because
+// the form is rendered from the schema and there is nothing to show without it.
+export interface PluginConfig {
+	scraper_id: string;
+	schema_fields: ConfigField[];
+	config: Record<string, unknown>;
+}
+
+export function getScraperPluginConfig(id: string): Promise<PluginConfig> {
+	return apiFetch(`/api/admin/scrapers/${id}/plugin-config`).then(asJson<PluginConfig>);
+}
+
+export async function setScraperPluginConfig(
+	id: string,
+	config: Record<string, unknown>
+): Promise<PluginConfig> {
+	const res = await apiFetch(`/api/admin/scrapers/${id}/plugin-config`, {
+		method: 'PUT',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ config })
+	});
+	return asJson<PluginConfig>(res);
+}
+
+// What a scraper has done since `since` (10.B20). Cumulative and pruning-proof: the Runs page
+// answers "recently", this answers "ever".
+export interface LifetimeStats {
+	plugin_id: string;
+	since: string;
+	runs_total: number;
+	runs_ok: number;
+	runs_failed: number;
+	runs_skipped_locked: number;
+	consecutive_failures: number;
+	last_run_at: string | null;
+	last_success_at: string | null;
+	last_failure_at: string | null;
+	http_requests_total: number;
+	cache_hits_total: number;
+	bytes_downloaded_total: number;
+	politeness_wait_s_total: number;
+	run_seconds_total: number;
+	rate_limited_total: number;
+	gate_hits_total: number;
+	gate_cleared_total: number;
+	robots_denied_total: number;
+	products_delivered_total: number;
+	pages_fetched_total: number;
+	parse_failures_total: number;
+}
+
+export function getLifetimeStats(id: string): Promise<LifetimeStats> {
+	return apiFetch(`/api/admin/scrapers/${id}/lifetime-stats`).then(asJson<LifetimeStats>);
+}
+
+/** Zero the counters and restamp `since` (10.B21). Destructive, no history kept. */
+export async function resetLifetimeStats(id: string): Promise<LifetimeStats> {
+	const res = await apiFetch(`/api/admin/scrapers/${id}/lifetime-stats/reset`, { method: 'POST' });
+	return asJson<LifetimeStats>(res);
+}
+
 // Clear a scraper's scrape cache (4.B9/4.F5); returns how many entries were removed.
 export async function clearScraperCache(id: string): Promise<{ deleted: number }> {
 	const res = await apiFetch(`/api/admin/scrapers/${id}/cache`, { method: 'DELETE' });
@@ -246,6 +321,11 @@ export interface SystemSettings {
 	catchup_warning_min: number;
 	log_retention_days: number;
 	user_deletion_retention_days: number;
+	// Fixed options, not free days (10.B19): 0 = never.
+	password_expiry_days: 0 | 30 | 90 | 180 | 365;
+	// The nightly maintenance window and what it leaves behind (10.B8a/b).
+	maintenance_hour: number;
+	alert_keep_last: number;
 }
 
 export function getSettings(): Promise<SystemSettings> {
@@ -409,6 +489,131 @@ export function getCartHistory(cartId: number, range: HistoryRange): Promise<Car
 }
 
 // Admin user management (USR-*): create + list. Admin-only on the backend.
+export interface DashboardTotals {
+	users_total: number;
+	users_active: number;
+	users_deleting: number;
+	products_total: number;
+	products_delisted: number;
+	carts_total: number;
+	price_history_rows: number;
+	watched_scrapers: number;
+}
+
+export interface DashboardNotifications {
+	window_days: number;
+	alerts: number;
+	delivered: number;
+	failed: number;
+	skipped: number;
+}
+
+export interface DashboardResponse {
+	totals: DashboardTotals;
+	notifications: DashboardNotifications;
+}
+
+export interface UserLoadRow {
+	user_id: number;
+	username: string | null;
+	scraper_id: string | null;
+	products: number;
+	carts: number;
+	http_requests: number;
+	cache_hits: number;
+}
+
+export interface DashboardUsers {
+	window_days: number;
+	by_user: UserLoadRow[];
+	by_user_and_scraper: UserLoadRow[];
+}
+
+export function getDashboard(windowDays: number): Promise<DashboardResponse> {
+	return apiFetch(`/api/admin/dashboard?window_days=${windowDays}`).then(asJson<DashboardResponse>);
+}
+
+export function getDashboardUsers(windowDays: number): Promise<DashboardUsers> {
+	return apiFetch(`/api/admin/dashboard/users?window_days=${windowDays}`).then(
+		asJson<DashboardUsers>
+	);
+}
+
+export interface CalendarSlot {
+	scraper_id: string;
+	at: string;
+	enabled: boolean;
+	avg_seconds: number | null;
+}
+
+export interface CalendarDay {
+	date: string;
+	slots: CalendarSlot[];
+}
+
+export function getScraperCalendar(date: string): Promise<CalendarDay> {
+	return apiFetch(`/api/admin/scrapers/calendar?date=${date}`).then(asJson<CalendarDay>);
+}
+
+export interface RunSummary {
+	run_id: number;
+	scraper_id: string;
+	trigger: string;
+	slot: string | null;
+	started_at: string;
+	finished_at: string | null;
+	status: string;
+	users_processed: number;
+	products_found: number;
+	products_new: number;
+	price_changes: number;
+	products_removed: number;
+	products_excluded: number;
+	http_requests: number;
+	cache_hits: number;
+	error_message: string | null;
+}
+
+export interface RunUserDetail {
+	user_id: number;
+	username: string | null;
+	started_at: string;
+	finished_at: string | null;
+	status: string;
+	products_found: number;
+	products_new: number;
+	price_changes: number;
+	http_requests: number;
+	cache_hits: number;
+	error_message: string | null;
+}
+
+export interface RunPage {
+	items: RunSummary[];
+	total: number;
+}
+
+export function listRuns(opts?: {
+	scraperId?: string | null;
+	status?: string | null;
+	/** Scheduled (the server's default), manual, or both (10.B20). */
+	trigger?: 'scheduled' | 'manual' | 'all';
+	page?: number;
+	pageSize?: number;
+}): Promise<RunPage> {
+	const q = new URLSearchParams();
+	if (opts?.scraperId) q.set('scraper_id', opts.scraperId);
+	if (opts?.status) q.set('status', opts.status);
+	if (opts?.trigger) q.set('trigger', opts.trigger);
+	q.set('page', String(opts?.page ?? 1));
+	q.set('page_size', String(opts?.pageSize ?? 25));
+	return apiFetch(`/api/admin/runs?${q}`).then(asJson<RunPage>);
+}
+
+export function getRunDetail(runId: number): Promise<RunUserDetail[]> {
+	return apiFetch(`/api/admin/runs/${runId}`).then(asJson<RunUserDetail[]>);
+}
+
 export interface AdminUser {
 	id: number;
 	username: string;
@@ -419,18 +624,75 @@ export interface AdminUser {
 	must_change_password: boolean;
 	last_login_at: string | null;
 	created_at: string;
+	// Deferred deletion (10.B3): both null on a normal account, both set once marked.
+	deletion_marked_at: string | null;
+	deletion_due_at: string | null;
 }
 
+export type UserStatusFilter = 'active' | 'disabled' | 'deleting';
+/** Every column of the Users table (10.F28). Role and status are ranked, not alphabetical. */
+export type UserSort =
+	| 'username'
+	| 'name'
+	| 'role'
+	| 'status'
+	| 'last_login'
+	| 'marked_at'
+	| 'due_at';
+
 export interface NewUser {
+	/** The account's email address, which is also its username (10.B23). */
 	username: string;
 	first_name: string;
 	last_name: string;
 	role: 'user' | 'admin';
-	temp_password: string;
 }
 
-export function listUsers(): Promise<AdminUser[]> {
-	return apiFetch('/api/admin/users').then(asJson<AdminUser[]>);
+export function listUsers(opts?: {
+	status?: UserStatusFilter | null;
+	sort?: UserSort;
+	order?: 'asc' | 'desc';
+}): Promise<AdminUser[]> {
+	const query = new URLSearchParams();
+	if (opts?.status) query.set('status', opts.status);
+	if (opts?.sort) query.set('sort', opts.sort);
+	if (opts?.order) query.set('order', opts.order);
+	const suffix = query.toString() ? `?${query}` : '';
+	return apiFetch(`/api/admin/users${suffix}`).then(asJson<AdminUser[]>);
+}
+
+/** The server generates the new password and mails it (10.B24) — nothing to send, nothing back. */
+export async function resetUserPassword(id: number): Promise<AdminUser> {
+	const res = await apiFetch(`/api/admin/users/${id}/reset-password`, { method: 'POST' });
+	return asJson<AdminUser>(res);
+}
+
+export async function setUserActive(id: number, isActive: boolean): Promise<AdminUser> {
+	const res = await apiFetch(`/api/admin/users/${id}`, {
+		method: 'PATCH',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ is_active: isActive })
+	});
+	return asJson<AdminUser>(res);
+}
+
+export async function markUserForDeletion(id: number): Promise<AdminUser> {
+	const res = await apiFetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+	return asJson<AdminUser>(res);
+}
+
+export async function restoreUser(id: number): Promise<AdminUser> {
+	const res = await apiFetch(`/api/admin/users/${id}/restore`, { method: 'POST' });
+	return asJson<AdminUser>(res);
+}
+
+/**
+ * Delete an already-marked account now, deadline waived (10.B27). Answers 204 with no body:
+ * there is no account left to describe, so the caller reloads the list rather than patching a
+ * row it still holds.
+ */
+export async function purgeUser(id: number): Promise<void> {
+	await apiFetch(`/api/admin/users/${id}/purge`, { method: 'DELETE' });
 }
 
 export async function createUser(payload: NewUser): Promise<AdminUser> {
@@ -636,12 +898,40 @@ export interface AlertDigestPayload {
 	cart_alerts: AlertDigestCart[];
 }
 
+// A text notification — an admin message or a core-generated one (AEV-R6). `body` is the
+// Markdown as written; `body_html` is that body already rendered and sanitised by the core, the
+// same helper the email uses, so the two channels cannot say the message differently.
+export interface TextMessagePayload {
+	kind: string;
+	user_id: number;
+	generated_at: string;
+	title: string;
+	body: string;
+	body_html?: string;
+}
+
+export type NotificationPayload = AlertDigestPayload | TextMessagePayload;
+
+export function isTextMessage(p: NotificationPayload): p is TextMessagePayload {
+	return p.kind === 'admin_message' || p.kind === 'system_message';
+}
+
+// The two categories a user sees (ADMSG-R4), derived from the kind and never stored.
+export function notificationCategory(kind: string): 'admin' | 'system' {
+	return kind === 'admin_message' ? 'admin' : 'system';
+}
+
 export interface AlertListItem {
 	id: number;
+	// Which table the id belongs to (10.B12). The history is a union of the user's own rows and
+	// the shared announcements, so an id alone does not identify a notification.
+	source: 'alert' | 'broadcast';
 	kind: string;
 	created_at: string;
 	read: boolean;
 	cart_count: number;
+	// Present for the text kinds only: a digest has no title, its preview is the cart count.
+	title: string | null;
 }
 
 export interface AlertPage {
@@ -660,20 +950,27 @@ export interface AlertDelivery {
 
 export interface AlertDetail {
 	id: number;
+	source: 'alert' | 'broadcast';
 	kind: string;
 	created_at: string;
 	read: boolean;
-	payload: AlertDigestPayload;
+	payload: NotificationPayload;
 	deliveries: AlertDelivery[];
 }
 
 export function listAlerts(
-	params: { page?: number; page_size?: number; kind?: string } = {}
+	params: {
+		page?: number;
+		page_size?: number;
+		kind?: string;
+		category?: 'system' | 'admin';
+	} = {}
 ): Promise<AlertPage> {
 	const q = new URLSearchParams();
 	if (params.page) q.set('page', String(params.page));
 	if (params.page_size) q.set('page_size', String(params.page_size));
 	if (params.kind) q.set('kind', params.kind);
+	if (params.category) q.set('category', params.category);
 	const qs = q.toString();
 	return apiFetch(`/api/alerts${qs ? `?${qs}` : ''}`).then(asJson<AlertPage>);
 }
@@ -682,8 +979,19 @@ export function getAlert(id: number): Promise<AlertDetail> {
 	return apiFetch(`/api/alerts/${id}`).then(asJson<AlertDetail>);
 }
 
+// An announcement, which lives in its own table and so has its own id space (10.B12).
+export function getBroadcast(id: number): Promise<AlertDetail> {
+	return apiFetch(`/api/alerts/broadcasts/${id}`).then(asJson<AlertDetail>);
+}
+
 export async function markAlertRead(id: number): Promise<void> {
 	await asEmpty(await apiFetch(`/api/alerts/${id}/read`, { method: 'POST' }));
+}
+
+// Advance the read pointer. Monotone by construction: marking a recent announcement read also
+// clears the older ones, which is the accepted shape of the one-row-per-broadcast design.
+export async function markBroadcastRead(id: number): Promise<void> {
+	await asEmpty(await apiFetch(`/api/alerts/broadcasts/${id}/read`, { method: 'POST' }));
 }
 
 // Bulk-delete the user's own alerts (6.F3). Ids not owned by the caller are ignored.
@@ -695,6 +1003,132 @@ export async function deleteAlerts(ids: number[]): Promise<void> {
 			body: JSON.stringify({ ids })
 		})
 	);
+}
+
+// Admin messages (10.B12/10.B13/10.F9). ------------------------------------------------------
+
+export interface MessageOutcomeCounts {
+	delivered: number;
+	pending: number;
+	failed: number;
+	skipped: number;
+}
+
+export interface AdminMessageSummary {
+	id: number;
+	audience: 'all' | 'user';
+	target_user_id: number | null;
+	target_username: string | null;
+	title: string;
+	body: string;
+	recipient_count: number;
+	created_at: string;
+	sender_username: string | null;
+	outcomes: MessageOutcomeCounts;
+	/** How many recipients have opened it **in the app** (10.B30). An aggregate, never a name. */
+	read_count: number;
+}
+
+export interface AdminMessagePage {
+	items: AdminMessageSummary[];
+	total: number;
+	page: number;
+	page_size: number;
+}
+
+export interface MessageRecipient {
+	user_id: number;
+	username: string;
+	channels: AlertDelivery[];
+}
+
+export interface AdminMessageDetail extends AdminMessageSummary {
+	recipients: MessageRecipient[];
+}
+
+/** Sent messages, newest first. `audience` narrows to broadcasts or one-to-one notes (10.F30). */
+export function listAdminMessages(
+	page = 1,
+	pageSize = 20,
+	audience: 'all' | 'user' | null = null
+): Promise<AdminMessagePage> {
+	const filter = audience ? `&audience=${audience}` : '';
+	return apiFetch(`/api/admin/messages?page=${page}&page_size=${pageSize}${filter}`).then(
+		asJson<AdminMessagePage>
+	);
+}
+
+/**
+ * Remove a sent message from the history (10.B29). Not an un-send: for a **broadcast** — one row
+ * for everybody — it also disappears from every recipient's list, which is the point, since they
+ * cannot delete it themselves. A targeted message leaves the recipient their own copy.
+ */
+export async function deleteAdminMessage(id: number): Promise<void> {
+	await apiFetch(`/api/admin/messages/${id}`, { method: 'DELETE' });
+}
+
+export function getAdminMessage(id: number): Promise<AdminMessageDetail> {
+	return apiFetch(`/api/admin/messages/${id}`).then(asJson<AdminMessageDetail>);
+}
+
+export async function sendAdminMessage(input: {
+	title: string;
+	body: string;
+	target_user_id?: number | null;
+}): Promise<AdminMessageSummary> {
+	const res = await apiFetch('/api/admin/messages', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(input)
+	});
+	return asJson<AdminMessageSummary>(res);
+}
+
+// The Preview tab. Rendered by the server so it is the same HTML the recipients get — see the
+// endpoint's own note on why there is no markdown-it in this bundle.
+export async function previewMessage(body: string): Promise<string> {
+	const res = await apiFetch('/api/admin/messages/preview', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ body })
+	});
+	return (await asJson<{ body_html: string }>(res)).body_html;
+}
+
+// The system-message catalog (10.B17). One entry per key the core declares, whether or not an
+// admin has rewritten it — so the list is the catalog, and `is_override` says which is which.
+export interface MessageTemplate {
+	key: string;
+	title: string;
+	body: string;
+	default_title: string;
+	default_body: string;
+	placeholders: string[];
+	required: string[];
+	is_override: boolean;
+	unknown_placeholders: string[];
+}
+
+export function listMessageTemplates(): Promise<MessageTemplate[]> {
+	return apiFetch('/api/admin/message-templates').then(asJson<MessageTemplate[]>);
+}
+
+export async function saveMessageTemplate(
+	key: string,
+	title: string,
+	body: string
+): Promise<MessageTemplate> {
+	const res = await apiFetch(`/api/admin/message-templates/${key}`, {
+		method: 'PUT',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ title, body })
+	});
+	return asJson<MessageTemplate>(res);
+}
+
+/** Drop the override: the message goes back to the core's default (not a copy of it). */
+export async function resetMessageTemplate(key: string): Promise<void> {
+	await asEmpty(await apiFetch(`/api/admin/message-templates/${key}`, { method: 'DELETE' }));
 }
 
 export function getUnreadCount(): Promise<number> {
@@ -715,6 +1149,9 @@ export interface ConfigField {
 	help_key: string | null;
 	options: string[] | null;
 	default: string | number | boolean | null;
+	/** How much of a row the field asks for (10.F26). Optional here so a schema stored or
+	 *  mocked before the field existed still renders — missing reads as `full`. */
+	width?: 'full' | 'half' | 'third' | 'quarter';
 }
 
 // A channel as the user's Profile sees it (composite state + personal schema; secrets write-only).
@@ -742,11 +1179,18 @@ export interface AdminNotifier {
 	is_set: Record<string, boolean>;
 	enabled: boolean; // the admin kill-switch (PCFG-R8)
 	admin_config_complete: boolean;
+	/** Whether this channel must prove itself before it can be switched on (10.B28). */
+	requires_validation: boolean;
+	/** Whether what is stored *now* is what was proven: a fingerprint match, not a flag. */
+	validated: boolean;
+	validated_at: string | null;
 }
 
-export interface NotifierTestResult {
+/** The outcome of a validation attempt, with the channel's fresh state beside it (10.B28). */
+export interface NotifierValidationResult {
 	ok: boolean;
 	error: string | null;
+	channel: AdminNotifier;
 }
 
 export function listNotifiers(): Promise<NotifierChannel[]> {
@@ -772,10 +1216,6 @@ export async function setNotifierEnabled(id: string, enabled: boolean): Promise<
 		body: JSON.stringify({ enabled })
 	});
 	return asJson<NotifierChannel>(res);
-}
-
-export function testNotifier(id: string): Promise<NotifierTestResult> {
-	return apiFetch(`/api/notifiers/${id}/test`, { method: 'POST' }).then(asJson<NotifierTestResult>);
 }
 
 export function listAdminNotifiers(): Promise<AdminNotifier[]> {
@@ -806,14 +1246,12 @@ export async function setAdminNotifierEnabled(
 	return asJson<AdminNotifier>(res);
 }
 
-export async function testAdminNotifier(
-	id: string,
-	config: Record<string, unknown>
-): Promise<NotifierTestResult> {
-	const res = await apiFetch(`/api/admin/notifiers/${id}/test`, {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ config })
-	});
-	return asJson<NotifierTestResult>(res);
+/**
+ * Send a real message through the channel and, if the server takes it, record the settings as
+ * validated (10.B28). The target is the admin's own account (10.B25) — the address the system
+ * will really use. A failure records nothing.
+ */
+export async function validateAdminNotifier(id: string): Promise<NotifierValidationResult> {
+	const res = await apiFetch(`/api/admin/notifiers/${id}/validate`, { method: 'POST' });
+	return asJson<NotifierValidationResult>(res);
 }

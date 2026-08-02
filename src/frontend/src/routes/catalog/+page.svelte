@@ -16,6 +16,7 @@
 		type CatalogPage,
 		type CatalogSort
 	} from '$lib/api/client';
+	import Modal from '$lib/components/Modal.svelte';
 	import DiscountBadge from '$lib/components/DiscountBadge.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import ProductCell from '$lib/components/ProductCell.svelte';
@@ -196,16 +197,6 @@
 		}
 	}
 
-	// ESC closes the confirmation, and does exactly what Cancel does — including while a removal
-	// is in flight, where Cancel already closes it too: one behaviour, two ways to reach it. A
-	// modal that traps the key but not the intent is worse than one that ignores it.
-	function onWindowKeydown(event: KeyboardEvent): void {
-		if (event.key === 'Escape' && pending !== null) {
-			event.preventDefault();
-			pending = null;
-		}
-	}
-
 	async function runCleanup(): Promise<void> {
 		if (pending === null) return;
 		const target = pending;
@@ -313,8 +304,6 @@
 	const th = 'py-2 pr-4 font-normal';
 	const sortable = 'cursor-pointer select-none hover:text-slate-800 dark:hover:text-slate-200';
 </script>
-
-<svelte:window onkeydown={onWindowKeydown} />
 
 <section class="space-y-6">
 	<PageTitle title={$_('catalog.title')} />
@@ -445,7 +434,7 @@
 								aria-label={$_('carts.addToCart')}
 							/>
 						</td>
-						<td class="py-2 pr-4"><SourceTag pluginId={item.plugin_id} link /></td>
+						<td class="py-2 pr-4"><SourceTag pluginId={item.plugin_id} link iconOnly /></td>
 						<td class="py-2 pr-4"><ProductThumb src={item.image_url} /></td>
 						<td class="py-2 pr-4">
 							<ProductCell
@@ -529,20 +518,19 @@
 	Saying that here is the difference between a confirmation and a trap.
 -->
 {#if pending}
-	<!-- Announced as a modal now that it answers ESC: a screen reader should say the same thing
-	     the keyboard behaviour implies. -->
-	<div
-		class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-		role="dialog"
-		aria-modal="true"
+	<!-- On the shared Modal (10.T2). Escape, the backdrop, the focus trap and the aria wiring
+	     come from the component now; what stays here is the only part that was ever specific —
+	     the shape of a confirmation that shows the *thing* being deleted. Width is `lg`, close
+	     to the 37.5rem this dialog had grown to, so the picture keeps its room. -->
+	<Modal
+		open={true}
+		size="lg"
+		title={$_('catalog.confirmAction')}
+		icon="🗑️"
+		closeLabel={$_('common.cancel')}
+		onclose={() => (pending = null)}
 	>
-		<!-- 5% wider than it was (34rem), and the whole gain goes to the picture: the text keeps
-		     the measure it had, the image box grows from 7rem to 8.75rem. Then 5% again, this
-		     time across the whole dialog (37.5rem) with the picture growing with it (9.25rem),
-		     so the text gained room too rather than only the frame. -->
-		<div
-			class="w-full max-w-[37.5rem] space-y-4 rounded-lg bg-white p-5 shadow-lg dark:bg-slate-900"
-		>
+		<div class="space-y-4">
 			{#if pending.kind === 'one'}
 				<!--
 					A single product gets its own shape: the thing being deleted is a *thing*, with
@@ -667,21 +655,22 @@
 					<p class="text-sm text-slate-500">{$_('catalog.confirmWatchesSurvive')}</p>
 				{/if}
 			{/if}
-			<div class="flex justify-end gap-2">
-				<button
-					class="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
-					onclick={() => (pending = null)}
-				>
-					{$_('common.cancel')}
-				</button>
-				<button
-					class="rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-500 disabled:opacity-50"
-					disabled={cleaning}
-					onclick={runCleanup}
-				>
-					{$_('catalog.confirmAction')}
-				</button>
-			</div>
 		</div>
-	</div>
+
+		{#snippet actions()}
+			<button
+				class="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+				onclick={() => (pending = null)}
+			>
+				{$_('common.cancel')}
+			</button>
+			<button
+				class="rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-500 disabled:opacity-50"
+				disabled={cleaning}
+				onclick={runCleanup}
+			>
+				{$_('catalog.confirmAction')}
+			</button>
+		{/snippet}
+	</Modal>
 {/if}

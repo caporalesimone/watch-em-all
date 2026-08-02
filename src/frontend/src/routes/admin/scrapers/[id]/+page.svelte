@@ -8,18 +8,49 @@
 	import {
 		clearScraperCache,
 		getScraperConfig,
+		getScraperPluginConfig,
 		listScrapers,
 		patchScraperConfig,
+		setScraperPluginConfig,
+		type PluginConfig,
 		type ScraperConfig
 	} from '$lib/api/client';
+	import DynamicConfigForm from '$lib/components/DynamicConfigForm.svelte';
+	import LifetimePanel from '$lib/components/LifetimePanel.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
+	import { changed, snapshot } from '$lib/forms';
 
 	let config = $state<ScraperConfig | null>(null);
+	let baseline = $state<ScraperConfig | null>(null); // what Save compares against (10.F23)
 	let displayName = $state('');
 	let loading = $state(true);
 	let saving = $state(false);
 	let saved = $state(false);
 	let error = $state<string | null>(null);
+
+	// What the scraper declares for itself (10.F13). Rendered by the same dynamic form the
+	// notifiers use since 7.F1: the page never learns a field name, so a scraper that adds a
+	// setting tomorrow appears here with no frontend change.
+	let pluginCfg = $state<PluginConfig | null>(null);
+	let pluginSaved = $state(false);
+	let pluginError = $state<string | null>(null);
+	let pluginBusy = $state(false);
+
+	async function savePluginConfig(values: Record<string, unknown>): Promise<void> {
+		const sid = $page.params.id;
+		if (!sid) return;
+		pluginBusy = true;
+		pluginSaved = false;
+		pluginError = null;
+		try {
+			pluginCfg = await setScraperPluginConfig(sid, values);
+			pluginSaved = true;
+		} catch {
+			pluginError = $_('admin.scrapers.pluginConfigError');
+		} finally {
+			pluginBusy = false;
+		}
+	}
 
 	let clearing = $state(false);
 	let clearConfirm = $state(false);
@@ -36,8 +67,16 @@
 		error = null;
 		saved = false;
 		try {
-			const [cfg, list] = await Promise.all([getScraperConfig(sid), listScrapers()]);
+			const [cfg, list, declared] = await Promise.all([
+				getScraperConfig(sid),
+				listScrapers(),
+				// A scraper that declares nothing is normal, not an error: the section simply
+				// says so rather than disappearing, which would leave the admin wondering.
+				getScraperPluginConfig(sid).catch(() => null)
+			]);
 			config = cfg;
+			baseline = snapshot(cfg);
+			pluginCfg = declared;
 			displayName = list.find((s) => s.scraper_id === sid)?.display_name ?? sid;
 		} catch {
 			error = $_('admin.scrapers.loadError');
@@ -51,6 +90,8 @@
 		saved = false;
 	}
 
+	const dirty = $derived(config !== null && changed(config, baseline));
+
 	async function save(): Promise<void> {
 		const sid = $page.params.id;
 		if (!config || !sid) return;
@@ -59,6 +100,7 @@
 		error = null;
 		try {
 			config = await patchScraperConfig(sid, config);
+			baseline = snapshot(config);
 			saved = true;
 		} catch {
 			error = $_('admin.scrapers.saveError');
@@ -142,7 +184,7 @@
 			<button
 				class="rounded bg-slate-800 px-4 py-1.5 text-sm text-white hover:bg-slate-700 disabled:opacity-50 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white"
 				onclick={save}
-				disabled={saving}
+				disabled={saving || !dirty}
 			>
 				{$_('common.save')}
 			</button>
@@ -150,6 +192,29 @@
 				>{/if}
 			{#if error}<span class="text-sm text-red-500">{error}</span>{/if}
 		</div>
+
+		<div class="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+			<h2 class="font-semibold">{$_('admin.scrapers.pluginConfig')}</h2>
+			<p class="mt-1 mb-3 text-sm text-slate-500">{$_('admin.scrapers.pluginConfigHint')}</p>
+			{#if pluginCfg && pluginCfg.schema_fields.length > 0}
+				<DynamicConfigForm
+					schema={pluginCfg.schema_fields}
+					config={pluginCfg.config}
+					busy={pluginBusy}
+					onSubmit={savePluginConfig}
+				/>
+				{#if pluginSaved}<p class="mt-2 text-sm text-green-600 dark:text-green-400">
+						{$_('admin.scrapers.pluginConfigSaved')}
+					</p>{/if}
+				{#if pluginError}<p class="mt-2 text-sm text-red-500">{pluginError}</p>{/if}
+			{:else}
+				<p class="text-sm text-slate-500">{$_('admin.scrapers.pluginConfigNone')}</p>
+			{/if}
+		</div>
+
+		<!-- What this scraper has done since a stated date (10.F15). Below the settings, because
+		     the settings are what you came to change and this is what you came to check. -->
+		<LifetimePanel scraperId={$page.params.id ?? ''} />
 
 		<div class="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
 			<h2 class="font-semibold">{$_('admin.scrapers.cache')}</h2>

@@ -129,6 +129,8 @@ def test_config_get_defaults_then_patch_subset(client: TestClient) -> None:
         "http_timeout_s": 15.0,
         "cache_ttl_min": 720,
         "scrape_now_min_interval_s": 3600,
+        # The last politeness knob to leave the code (10.B22).
+        "http_retries": 2,
     }
     patched = client.patch(CFG, json={"cache_ttl_min": 0, "http_timeout_s": 20}, headers=h)
     assert patched.status_code == 200
@@ -157,3 +159,61 @@ def test_config_rejects_unknown_key_and_out_of_range(client: TestClient) -> None
     # Out-of-range → 422 from the service validation.
     assert client.patch(CFG, json={"http_timeout_s": 999}, headers=h).status_code == 422
     assert client.patch(CFG, json={"cache_ttl_min": -1}, headers=h).status_code == 422
+
+
+# --------------------------------------------------- the config a scraper declares (10.B22)
+
+PCFG = "/api/admin/scrapers/dragon_store/plugin-config"
+
+
+def test_a_scraper_declares_its_own_settings(client: TestClient) -> None:
+    """10.B22. Until now no scraper declared a schema, which is why 10.F13 was a form with
+    nothing to render — the thresholds sat hard-wired in `adjustments.py` under a phase-5 note
+    promising this move."""
+    h = _bearer(_admin_token(client))
+    body = client.get(PCFG, headers=h).json()
+    keys = {f["key"] for f in body["schema_fields"]}
+    assert {"band1_min", "band1_pct", "shipping_cost", "free_shipping_min"} <= keys
+    assert body["config"]["band1_min"] == 100
+    # A declared key may never shadow one the core reads on the plugin's behalf.
+    assert not keys & {"politeness_delay_ms", "http_timeout_s", "cache_ttl_min"}
+
+
+def test_declared_and_reserved_settings_do_not_overwrite_each_other(client: TestClient) -> None:
+    """Both live in the same `config_json`, so this is the failure worth a test: saving one
+    side must leave the other exactly where it was."""
+    h = _bearer(_admin_token(client))
+    client.patch(CFG, json={"cache_ttl_min": 0}, headers=h)
+    client.put(PCFG, json={"config": {"band1_min": 50, "shipping_cost": 7}}, headers=h)
+
+    assert client.get(CFG, headers=h).json()["cache_ttl_min"] == 0
+    saved = client.get(PCFG, headers=h).json()["config"]
+    assert saved["band1_min"] == 50 and saved["shipping_cost"] == 7
+
+    # And the reverse: touching the reserved side leaves the declared values alone.
+    client.patch(CFG, json={"http_timeout_s": 20}, headers=h)
+    assert client.get(PCFG, headers=h).json()["config"]["band1_min"] == 50
+
+
+def test_a_saved_threshold_changes_the_next_evaluation(client: TestClient) -> None:
+    """The MVP's own check: the numbers move without a restart. The plugin caches the rules it
+    builds from them, so this is really a test that the cache is dropped when they change."""
+    from decimal import Decimal
+
+    from src.core.plugins.base import ScraperPlugin
+
+    h = _bearer(_admin_token(client))
+    loaded = [
+        lp.plugin
+        for lp in client.app.state.loaded_plugins  # type: ignore[attr-defined]
+        if isinstance(lp.plugin, ScraperPlugin) and lp.plugin.plugin_id == "dragon_store"
+    ]
+    plugin = loaded[0]
+
+    # Default: shipping costs 5 below the free threshold of 100.
+    before = plugin.get_adjustments([], Decimal("50"))
+    assert any(a.amount == Decimal("-5.00") for a in before)
+
+    client.put(PCFG, json={"config": {"shipping_cost": 9, "free_shipping_min": 500}}, headers=h)
+    after = plugin.get_adjustments([], Decimal("50"))
+    assert any(a.amount == Decimal("-9") for a in after), "the new cost, with no restart"

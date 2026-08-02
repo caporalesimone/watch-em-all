@@ -8,12 +8,13 @@ DB, rotate; a reused (stale-jti) refresh bumps token_version (global logout) and
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Request, Response, status
 from sqlalchemy import select
 
 from src.core.errors import APIError
+from src.core.identity import normalize_username
 from src.core.models import User
 from src.core.rate_limit import RateLimiter
 from src.core.security import (
@@ -25,6 +26,7 @@ from src.core.security import (
     new_jti,
     verify_password,
 )
+from src.core.settings import get_system_settings
 from src.web.deps import ClaimsDep, SessionDep, SettingsDep
 from src.web.schemas import ChangePasswordRequest, LoginRequest, RefreshRequest, TokenPair
 
@@ -58,6 +60,12 @@ def _issue_pair(settings: SettingsDep, user: User) -> TokenPair:
     return TokenPair(access_token=access, refresh_token=refresh, expires_at=access_exp)
 
 
+def _as_utc(value: datetime) -> datetime:
+    """SQLite hands back naive timestamps; everything we write is UTC (same helper idea as
+    9.B6b). Comparing a naive value with an aware one raises, and only in the tests."""
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+
 @router.post(
     "/login",
     response_model=TokenPair,
@@ -65,11 +73,16 @@ def _issue_pair(settings: SettingsDep, user: User) -> TokenPair:
 )
 def login(body: LoginRequest, request: Request, settings: SettingsDep, db: SessionDep) -> TokenPair:
     client_ip = request.client.host if request.client else "unknown"
-    rl_key = f"{client_ip}:{body.username.lower()}"
+    # Normalised the same way it is stored (10.B23), which is also what makes the rate-limit
+    # key honest: `Mario@x.it` and `mario@x.it` are one account, so they are one bucket.
+    username = normalize_username(body.username)
+    rl_key = f"{client_ip}:{username}"
     if not _login_limiter.allow(rl_key):
         raise APIError(429, "rate_limited", "too many login attempts, try again shortly")
 
-    user = db.scalar(select(User).where(User.username == body.username))
+    # A plain equality, not a `lower()`: every username is written normalised, so the unique
+    # index still does the work. Case-insensitivity lives in the write, not in the query.
+    user = db.scalar(select(User).where(User.username == username))
     # Wrong credentials must stay indistinguishable from a missing account (AUTH-R10).
     if user is None or not verify_password(body.password, user.password_hash):
         raise APIError(401, "invalid_credentials", "invalid username or password")
@@ -78,7 +91,17 @@ def login(body: LoginRequest, request: Request, settings: SettingsDep, db: Sessi
         raise APIError(403, "account_disabled", "this account can no longer sign in")
 
     _login_limiter.reset(rl_key)
-    user.last_login_at = datetime.now(tz=UTC)
+    now = datetime.now(tz=UTC)
+    # Password expiry (10.B19). Enforced here rather than as a refusal: the account is not in
+    # trouble, the password is old, so it reuses the forced-change flow the first login
+    # already knows — the person gets in and is sent straight to the change page. `0` = never,
+    # and it is the default, so nothing happens unless an admin turned this on.
+    max_age_days = get_system_settings(db).password_expiry_days
+    if max_age_days and not user.must_change_password:
+        age = now - _as_utc(user.password_changed_at)
+        if age > timedelta(days=max_age_days):
+            user.must_change_password = True
+    user.last_login_at = now
     pair = _issue_pair(settings, user)
     db.commit()
     return pair
@@ -152,6 +175,7 @@ def change_password(body: ChangePasswordRequest, claims: ClaimsDep, db: SessionD
             )
 
     user.password_hash = hash_password(body.new_password)
+    user.password_changed_at = datetime.now(tz=UTC)  # 10.X1: the age `password_expiry` measures
     user.must_change_password = False
     user.token_version += 1  # AUTH-R5: invalidate all tokens; client logs in again
     user.refresh_jti = None

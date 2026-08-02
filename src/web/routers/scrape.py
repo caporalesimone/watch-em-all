@@ -26,6 +26,7 @@ from src.core.locks import ScraperLock, acquire_scraper_lock
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.context import build_context
 from src.core.plugins.registry import LoadedPlugin
+from src.core.run_log import close_run, open_run, run_one_user
 from src.core.scrape import CooldownStatus, claim_scrape, cooldown_status
 from src.core.scraper_config import get_scraper_config
 from src.web.adjust import run_user_alerts
@@ -79,7 +80,28 @@ def make_scrape_now_router(loaded: LoadedPlugin) -> APIRouter:
     def _run(lock: ScraperLock, user_id: int) -> None:
         ctx = build_context(manifest, plugin)
         try:
-            plugin.run_for_user(ctx, user_id)
+            # Recorded like a scheduled run since 10.B20 — a run row marked **manual**, a user
+            # log, and the lifetime counters. Before this the manual path did the traffic and
+            # reported none of it, while the counters the plugin bumps from inside went up
+            # anyway: two numbers about the same requests, disagreeing. Simone's call of
+            # 2026-08-02 was to record everything and let the Runs page filter.
+            run = open_run(ctx.db, plugin.plugin_id, trigger="manual")
+            outcome = run_one_user(
+                ctx.db,
+                run,
+                user_id,
+                lambda: plugin.run_for_user(ctx, user_id),
+                http_before=(ctx.http.request_count, ctx.http.cache_hits),
+                http_after=lambda: (ctx.http.request_count, ctx.http.cache_hits),
+            )
+            close_run(
+                ctx.db,
+                run,
+                [outcome],
+                bytes_downloaded=ctx.http.bytes_downloaded,
+                politeness_wait_s=ctx.http.waited_seconds,
+                robots_denied=ctx.http.robots_denied,
+            )
             # Event-driven alerts: right after the delivery, diff this user's carts and
             # write a digest if anything changed (no time-cadence).
             run_user_alerts(ctx.db, user_id)

@@ -22,6 +22,7 @@ from sqlalchemy import (
     LargeBinary,
     Numeric,
     String,
+    Text,
     UniqueConstraint,
     func,
 )
@@ -34,7 +35,16 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    # The username **is** the email address (10.B23), so the column is sized for one: RFC 5321
+    # caps a path at 254 characters, and the old String(64) would have silently refused perfectly
+    # ordinary corporate addresses. Stored lower-cased — see `normalise_username`.
+    username: Mapped[str] = mapped_column(String(254), unique=True, nullable=False, index=True)
+    # Where to write when the username is *not* an address (10.X2). Exactly one account is in
+    # that position — the bootstrap admin, because it exists before anybody can type an email —
+    # and it is the only one that can set this. For everybody else it stays NULL and the
+    # username is the address, so there are never two fields that could disagree about where a
+    # person's mail goes.
+    contact_email: Mapped[str | None] = mapped_column(String(254), nullable=True)
     # Every account has a first and last name, both required (USR); stored here so
     # the UI can greet/display the person rather than the login handle.
     first_name: Mapped[str] = mapped_column(String(64), nullable=False, default="")
@@ -49,6 +59,22 @@ class User(Base):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     locale: Mapped[str] = mapped_column(String(8), nullable=False, default="en")
     must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # When the password currently in place was set (10.X1). Stamped at creation like
+    # `created_at` and moved on every password write, so `password_expiry` (10.B19) has an
+    # age to measure without a NULL meaning two different things ("never changed" and
+    # "predates the column"). It lands one MVP ahead of the logic that reads it: `create_all`
+    # does not alter existing tables, so adding it later would be a second database
+    # recreation — and that would reset the per-product counters phase 10b is waiting on.
+    password_changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    # Last broadcast this person has read (10.X1, written by 10.B12). A broadcast is one row
+    # for everybody rather than a copy per user, so read state cannot live on the message: it
+    # lives here, as "read up to N". NULL means no broadcast has ever been read, which is a
+    # different statement from 0. Deliberately NOT a foreign key to `admin_message`: that
+    # table lands an MVP later and a constraint cannot point at something that does not exist
+    # yet, the same reason `price_history` keys by identity instead of by row.
+    last_broadcast_read_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     refresh_jti: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -108,7 +134,7 @@ class CatalogProduct(Base):
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # --- per-product statistics (9.B6b) -------------------------------------------------
     # Counted per catalog row, so per user: two users watching the same product keep their
-    # own numbers. Written by the catalog service; how they are shown is phase 9b.
+    # own numbers. Written by the catalog service; how they are shown is phase 10b.
     #
     # Fresh reads only: a delivery served from the scrape cache increments `cache_hits`
     # instead, otherwise this would count "times we re-served a page" rather than times the
@@ -386,6 +412,79 @@ class AlertDelivery(Base):
     )
 
 
+class AdminMessage(Base):
+    """One message written by an admin (admin-notifications.md, ADMSG-R1/R6). Phase 10 (10.B12).
+
+    **A broadcast is one row, not one row per user** (Simone's decision, 2026-08-02): what an
+    announcement costs stops depending on how many accounts exist, and read state stays private
+    because it is never written here at all — each user carries a pointer instead
+    (``users.last_broadcast_read_id``). A message to a single user has one recipient already, so
+    it takes the ordinary path and lands in that user's ``alert_log``.
+
+    Immutable once sent (ADMSG-R6): there is no edit and no recall, because a message that has
+    already reached an inbox cannot be unsent — a mistake is corrected by sending another one.
+    ``sender_id`` goes null if the author's account is later deleted; the message stays, since
+    the people who received it still have it.
+    """
+
+    __tablename__ = "admin_message"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    sender_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    # "all" = broadcast (the pointer applies) | "user" = one recipient (an alert_log row).
+    audience: Mapped[str] = mapped_column(String(8), nullable=False, default="all")
+    target_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    # Frozen at send time: the audience of an announcement is who it went to *then*, and
+    # counting the users table later would answer a different question every month.
+    recipient_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class AdminMessageDelivery(Base):
+    """Per-recipient, per-channel outcome for an admin message (ADMSG-R2/R5). Phase 10 (10.B12).
+
+    A separate table from ``alert_delivery`` for one structural reason: a broadcast has no
+    ``alert_log`` row to hang outcomes off, and the outcome is inherently per **user** — the one
+    thing ``alert_delivery`` never had to know, because a digest belongs to a single person by
+    construction. Same status vocabulary, so the drain logic reads the same either way.
+
+    Note what this table does **not** contain: whether the recipient read it. Delivery is the
+    admin's business (ADMSG-R5), reading is not.
+    """
+
+    __tablename__ = "admin_message_delivery"
+    __table_args__ = (
+        Index("ix_admin_msg_delivery_msg", "admin_message_id"),
+        Index("ix_admin_msg_delivery_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    admin_message_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("admin_message.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    plugin_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    # pending | delivered | failed | skipped | skipped_no_notifier — as alert_delivery.
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="pending")
+    error: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
 class NotifierAdminConfig(Base):
     """Per-notifier admin config + global toggle (notifier-plugin.md NOT-R2 / PCFG-R8). Phase 7.
 
@@ -402,6 +501,34 @@ class NotifierAdminConfig(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class NotifierValidation(Base):
+    """Proof that a channel's system config was once accepted by its server (10.B28, NOT-R9).
+
+    A channel cannot be switched on until a real message has left through it: the admin presses
+    *Validate*, the core sends one, and if the server takes it the settings are recorded here.
+    Whether that server then delivers or bounces the mail is between it and the recipient — what
+    this proves is the only thing the installation can prove, that the credentials and the host
+    it was given work.
+
+    **A separate table rather than two columns on** :class:`NotifierAdminConfig`, and that is a
+    schema decision, not a modelling preference: pre-1.0 ``create_all`` creates missing *tables*
+    but never alters existing ones, so a new table costs nothing while a new column costs a
+    database recreation — and phase 10 already spent its one.
+
+    ``config_hash`` is the fingerprint of the config that was validated. Validity is therefore
+    not a flag somebody has to remember to clear: change a setting and the hash stops matching,
+    which *is* the invalidation.
+    """
+
+    __tablename__ = "notifier_validation"
+
+    plugin_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    config_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    validated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
 
@@ -630,7 +757,7 @@ class ScrapeCache(Base):
 
 
 class ScraperStats(Base):
-    """Lifetime statistics for one scraper (9.B6c, phase 9b decides how to show them).
+    """Lifetime statistics for one scraper (9.B6c, phase 10 decides how to show them).
 
     One row per ``plugin_id``, **global** (not per user), and **cumulative**. It exists
     because ``scrape_run`` has retention: aggregating that table answers "recently", never
@@ -682,3 +809,23 @@ class ScraperStats(Base):
     products_delivered_total: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     pages_fetched_total: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     parse_failures_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class SystemMessageTemplate(Base):
+    """An admin's rewrite of one core-generated text (admin-notifications.md, ADMSG-R7..R9).
+
+    **Only overrides live here** (ADMSG-R9). The catalog itself — keys, default texts, declared
+    placeholders — is code, in :mod:`src.core.system_messages`, so adding a message to the core
+    needs no migration and no seeding: a key with no row *is* its default, and it shows up in the
+    admin list the moment it exists. The same reasoning as ``system_settings``, for the same
+    reason: a default that has been copied into the database is a default that can go stale.
+    """
+
+    __tablename__ = "system_message_template"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

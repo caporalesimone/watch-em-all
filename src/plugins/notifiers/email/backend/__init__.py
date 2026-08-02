@@ -23,9 +23,15 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-from src.core.alert_engine import AlertEvent, CartAlertPayload
-from src.core.contracts import ConfigField
+from src.core.alert_engine import (
+    AlertEvent,
+    CartAlertPayload,
+    NotificationEvent,
+    TextMessageEvent,
+)
+from src.core.contracts import ACCOUNT_EMAIL_KEY, ConfigField
 from src.core.plugins.base import NotifierDeliveryError, NotifierPlugin
+from src.core.plugins.context import MarkdownHelper, PluginContext
 
 _I18N_DIR = Path(__file__).resolve().parent / "i18n"
 
@@ -74,12 +80,20 @@ class EmailNotifierPlugin(NotifierPlugin):
     retries = 3
     backoff_base_s = 1.0
 
+    # Handed over at load time; see `initialize`. None until then, which `_render` treats as one
+    # more reason to degrade rather than to fail.
+    _markdown: MarkdownHelper | None = None
+
     def get_admin_config_schema(self) -> list[ConfigField]:
         # Dev pre-fill (Mailpit) vs production defaults; see _DEV_MAILPIT above.
         host_default = "mailpit" if _DEV_MAILPIT else None
         port_default = 1025 if _DEV_MAILPIT else 587
         tls_default = not _DEV_MAILPIT  # Mailpit: TLS off; production: on
         from_default = "watch@mailpit.local" if _DEV_MAILPIT else None
+        # Three rows instead of six (10.F26). The widths say what belongs together: an SMTP
+        # server is one thought — where it is, on which port, with or without TLS — and reading
+        # it down a column of six made the admin assemble it themselves. Credentials are the
+        # second pair; the sender address stands alone because it is not part of the server.
         return [
             ConfigField(
                 key="smtp_host",
@@ -87,13 +101,26 @@ class EmailNotifierPlugin(NotifierPlugin):
                 type="text",
                 required=True,
                 default=host_default,
+                width="half",
             ),
             ConfigField(
-                key="smtp_port", label_key="email.cfg.port", type="number", default=port_default
+                key="smtp_port",
+                label_key="email.cfg.port",
+                type="number",
+                default=port_default,
+                width="quarter",
             ),
-            ConfigField(key="smtp_user", label_key="email.cfg.user", type="text"),
-            ConfigField(key="smtp_password", label_key="email.cfg.pass", type="password"),
-            ConfigField(key="use_tls", label_key="email.cfg.tls", type="bool", default=tls_default),
+            ConfigField(
+                key="use_tls",
+                label_key="email.cfg.tls",
+                type="bool",
+                default=tls_default,
+                width="quarter",
+            ),
+            ConfigField(key="smtp_user", label_key="email.cfg.user", type="text", width="half"),
+            ConfigField(
+                key="smtp_password", label_key="email.cfg.pass", type="password", width="half"
+            ),
             ConfigField(
                 key="from_address",
                 label_key="email.cfg.from",
@@ -104,22 +131,51 @@ class EmailNotifierPlugin(NotifierPlugin):
         ]
 
     def get_user_config_schema(self) -> list[ConfigField]:
-        to_default = "me@mailpit.local" if _DEV_MAILPIT else None
-        return [
-            ConfigField(
-                key="to_address",
-                label_key="email.cfg.to",
-                type="email",
-                required=True,
-                default=to_default,
-            )
-        ]
+        """Nothing (10.B25). The channel used to ask each person for a delivery address; since
+        10.B23 the account *is* an address, so the core injects it (``ACCOUNT_EMAIL_KEY``) and
+        there is no second field left to disagree with the first. What remains for the user is
+        the on/off switch, which is not config — it lives on the row, not in the schema."""
+        return []
 
     # -------------------------------------------------------------- send
 
-    def send(self, notification: AlertEvent, config: dict[str, Any], locale: str) -> None:
-        subject, html, text = self._format(notification, _strings(locale))
+    def initialize(self, context: PluginContext) -> None:
+        # Kept for the Markdown helpers (AEV-R7): `send` does not receive the context, and the
+        # rendering must come from the core rather than from a parser of this plugin's own.
+        self._markdown = context.markdown
+
+    def send(self, notification: NotificationEvent, config: dict[str, Any], locale: str) -> None:
+        if isinstance(notification, AlertEvent):
+            subject, html, text = self._format(notification, _strings(locale))
+        else:
+            subject, html, text = self._format_message(notification, _strings(locale))
         self._deliver(config, subject, html, text)
+
+    def _format_message(self, event: TextMessageEvent, s: dict[str, str]) -> tuple[str, str, str]:
+        """A text message as an email: the title is the subject, the body is the message.
+
+        No digest furniture around it — an announcement that arrived wrapped in "here are your
+        price alerts" would be lying about what it is.
+        """
+        body_html, body_text = self._render(event.body)
+        html = _HTML_SHELL.format(
+            heading=escape(event.title), body=body_html, footer=escape(s["footer"])
+        )
+        return event.title, html, f"{event.title}\n\n{body_text}\n"
+
+    def _render(self, body: str) -> tuple[str, str]:
+        """Markdown → (sanitised HTML, plain text), degrading rather than failing (NOT-R8).
+
+        If the helper is missing or throws, the message still goes out with its body escaped and
+        its line breaks kept. A formatting problem must never be the reason somebody does not
+        hear about scheduled maintenance — which is exactly the kind of message this carries.
+        """
+        try:
+            if self._markdown is None:
+                raise RuntimeError("markdown helper unavailable")
+            return self._markdown.to_html(body), self._markdown.strip(body)
+        except Exception:
+            return f"<p>{escape(body).replace(chr(10), '<br>')}</p>", body
 
     def send_test(self, config: dict[str, Any], locale: str, username: str = "") -> None:
         subject, html, text = self._format_test(username, _strings(locale))
@@ -224,7 +280,8 @@ class EmailNotifierPlugin(NotifierPlugin):
     def _deliver(self, config: dict[str, Any], subject: str, html: str, text: str) -> None:
         host = str(config.get("smtp_host") or "").strip()
         from_addr = str(config.get("from_address") or "").strip()
-        to_addr = str(config.get("to_address") or "").strip()
+        # The recipient comes from the account, not from this channel's config (10.B25).
+        to_addr = str(config.get(ACCOUNT_EMAIL_KEY) or "").strip()
         if not host or not from_addr or not to_addr:
             raise NotifierDeliveryError("email: incomplete configuration (host/from/to)")
         try:

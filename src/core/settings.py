@@ -7,7 +7,7 @@ later MVP (4.F2) — 4.B5 only reads ``scraper_run_timeout_min``.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -24,6 +24,21 @@ class SystemSettings(BaseModel):
     catchup_warning_min: int = Field(default=10, ge=0, le=1440)
     log_retention_days: int = Field(default=90, ge=0, le=3650)  # 0 = never purge
     user_deletion_retention_days: int = Field(default=30, ge=1, le=365)
+    # How long a password may stand before the next sign-in forces a new one (10.B19).
+    # **Fixed options, not free days**: an admin typing 3 instead of 30 would lock every
+    # account into a change on their next visit, and the range check cannot tell the two
+    # apart. 0 = never, which is the default — the feature is opt-in.
+    password_expiry_days: Literal[0, 30, 90, 180, 365] = 0
+    # The nightly maintenance window (10.B8a): the hour, in the install timezone, at which
+    # every housekeeping job runs. One window rather than jobs scattered through the day, so
+    # there is a single moment to look at when something did not get tidied — and a single
+    # moment the machine is busy. Default 07:00, after the night's scrapes and before anybody
+    # opens the page.
+    maintenance_hour: int = Field(default=7, ge=0, le=23)
+    # How many alerts each person keeps after the nightly purge (10.B8b). Counted, not aged:
+    # a quiet month should not empty your history, and a noisy week should not make it
+    # unreadable. 0 = keep everything, the same "off" that `log_retention_days` uses.
+    alert_keep_last: int = Field(default=100, ge=0, le=100_000)
 
 
 KNOWN_SETTINGS = set(SystemSettings.model_fields)

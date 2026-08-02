@@ -26,6 +26,7 @@ erDiagram
 | `alert_delivery` | id, alert_id FK **CASCADE**, plugin_id (null = nessun canale), status (`delivered`\|`failed`\|`skipped_no_notifier`), error_message, delivered_at | **un esito per canale** |
 | `notifier_admin_config` | plugin_id PK, config_json, **enabled** (default true), updated_at | parametri di sistema del canale; enabled = interruttore globale admin (PCFG-R8) |
 | `notifier_user_config` | plugin_id, user_id FK, **enabled** (flag attivazione), config_json — PK (plugin_id, user_id) | disattivare ≠ cancellare la config |
+| `notifier_validation` | plugin_id PK, config_hash, validated_at | prova che quelle impostazioni sono state accettate dal server (10.B28): finché l'hash combacia con la config salvata il canale è validato, e cambiare un campo lo invalida da solo |
 
 ## Regole trasversali
 

@@ -8,14 +8,18 @@ digest detail, a mark-read action and the unread count for the dashboard badge. 
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any, Literal
 
 from fastapi import APIRouter, Query
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select
 
+from src.core.admin_messages import unread_broadcast_count
+from src.core.contracts import NotificationKind
 from src.core.errors import APIError
-from src.core.models import AlertDelivery, AlertLog
-from src.core.notify import in_app_visible
+from src.core.markdown import to_html
+from src.core.models import AdminMessage, AdminMessageDelivery, AlertDelivery, AlertLog, User
+from src.core.notify import in_app_visible, message_event
 from src.web.deps import SessionDep, UserDep
 from src.web.schemas import (
     AlertDeliveryOut,
@@ -41,6 +45,36 @@ def _cart_count(row: AlertLog) -> int:
     return len(carts) if isinstance(carts, list) else 0
 
 
+def _title(row: AlertLog) -> str | None:
+    value = row.payload_json.get("title") if isinstance(row.payload_json, dict) else None
+    return str(value) if isinstance(value, str) else None
+
+
+# The two categories a user sees (ADMSG-R4). Derived from the kind rather than stored, so the
+# two can never disagree — and a kind added later has to be placed here on purpose.
+_ADMIN_KINDS = (NotificationKind.ADMIN_MESSAGE.value,)
+_SYSTEM_KINDS = (
+    NotificationKind.ALERT_DIGEST.value,
+    NotificationKind.SUMMARY.value,
+    NotificationKind.SYSTEM_MESSAGE.value,
+)
+
+
+def _text_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """A text message's payload with its body also rendered to HTML.
+
+    Rendered **here and not in the browser**, by the same core helper the email uses. The
+    alternative — markdown-it in the page — is the shape 9.F8 already had to undo once: the
+    Difference rule lived in Python for the email and in TypeScript for the page, and the two
+    drifted. One renderer means the email and the history cannot say the message differently,
+    and the HTML arrives already sanitised, so the page has nothing left to get wrong.
+    """
+    body = payload.get("body")
+    if not isinstance(body, str):
+        return payload
+    return {**payload, "body_html": to_html(body)}
+
+
 @router.get("", response_model=AlertPage, summary="List the user's alert history (paginated).")
 def list_alerts(
     user: UserDep,
@@ -48,31 +82,78 @@ def list_alerts(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     kind: str | None = Query(None),
+    category: Literal["system", "admin"] | None = Query(None),
 ) -> AlertPage:
     if not in_app_visible(db):  # admin disabled the in-app channel → inbox hidden for everyone
         return AlertPage(items=[], total=0, page=page, page_size=page_size)
     where = [AlertLog.user_id == user.sub]
     if kind is not None:
         where.append(AlertLog.kind == kind)
+    if category is not None:
+        where.append(AlertLog.kind.in_(_ADMIN_KINDS if category == "admin" else _SYSTEM_KINDS))
     total = db.scalar(select(func.count()).select_from(AlertLog).where(*where)) or 0
-    rows = db.scalars(
-        select(AlertLog)
-        .where(*where)
-        .order_by(AlertLog.created_at.desc(), AlertLog.id.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    ).all()
+    take = page * page_size  # enough of each source to fill this page after the merge
     items = [
         AlertListItem(
             id=r.id,
+            source="alert",
             kind=r.kind,
             created_at=r.created_at,
             read=r.read_at is not None,
             cart_count=_cart_count(r),
+            title=_title(r),
         )
-        for r in rows
+        for r in db.scalars(
+            select(AlertLog)
+            .where(*where)
+            .order_by(AlertLog.created_at.desc(), AlertLog.id.desc())
+            .limit(take)
+        ).all()
     ]
-    return AlertPage(items=items, total=total, page=page, page_size=page_size)
+
+    # The second source (10.B12). Broadcasts live in their own table — one row for everybody —
+    # so the history is a union rather than a query, and the merge happens here in Python. It
+    # can afford to: the nightly purge caps a user's alert rows and announcements are rare, so
+    # both sides are short lists. A SQL union would buy nothing and cost the read.
+    person = db.get(User, user.sub)
+    wanted = kind in (None, NotificationKind.ADMIN_MESSAGE.value) and category != "system"
+    if person is not None and wanted:
+        pointer = person.last_broadcast_read_id
+        broadcasts = db.scalars(
+            select(AdminMessage)
+            .where(AdminMessage.audience == "all")
+            .order_by(AdminMessage.created_at.desc(), AdminMessage.id.desc())
+            .limit(take)
+        ).all()
+        total += _broadcast_total(db)
+        items += [
+            AlertListItem(
+                id=b.id,
+                source="broadcast",
+                kind=NotificationKind.ADMIN_MESSAGE.value,
+                created_at=b.created_at,
+                # Read state is the pointer, not a flag: "read up to N" (see mark_broadcast_read).
+                read=pointer is not None and b.id <= pointer,
+                cart_count=0,
+                title=b.title,
+            )
+            for b in broadcasts
+        ]
+
+    items.sort(key=lambda i: (i.created_at, i.id), reverse=True)
+    start = (page - 1) * page_size
+    return AlertPage(
+        items=items[start : start + page_size], total=total, page=page, page_size=page_size
+    )
+
+
+def _broadcast_total(db: SessionDep) -> int:
+    return int(
+        db.scalar(
+            select(func.count()).select_from(AdminMessage).where(AdminMessage.audience == "all")
+        )
+        or 0
+    )
 
 
 @router.get("/unread-count", response_model=UnreadCount, summary="Unread count for the badge.")
@@ -87,11 +168,89 @@ def unread_count(user: UserDep, db: SessionDep) -> UnreadCount:
         )
         or 0
     )
+    # The second source (10.B12). A broadcast has no row of its own per user, so its unread
+    # state is the gap between the pointer and the newest announcement — the read-side price of
+    # writing one row instead of N.
+    row = db.get(User, user.sub)
+    if row is not None:
+        count += unread_broadcast_count(db, row)
     return UnreadCount(count=count)
+
+
+@router.get(
+    "/broadcasts/{message_id}",
+    response_model=AlertDetail,
+    summary="One announcement in full, with this user's own delivery outcomes.",
+)
+def get_broadcast(message_id: int, user: UserDep, db: SessionDep) -> AlertDetail:
+    if not in_app_visible(db):
+        raise APIError(404, "alert_not_found", "alert not found")
+    message = db.get(AdminMessage, message_id)
+    if message is None or message.audience != "all":
+        raise APIError(404, "alert_not_found", "alert not found")
+    person = db.get(User, user.sub)
+    pointer = person.last_broadcast_read_id if person is not None else None
+    deliveries = [
+        AlertDeliveryOut(
+            plugin_id=d.plugin_id, status=d.status, error=d.error, updated_at=d.updated_at
+        )
+        # Only this person's rows: the message is shared, the delivery is not (DB-R1).
+        for d in db.scalars(
+            select(AdminMessageDelivery)
+            .where(
+                AdminMessageDelivery.admin_message_id == message.id,
+                AdminMessageDelivery.user_id == user.sub,
+            )
+            .order_by(AdminMessageDelivery.id)
+        ).all()
+    ]
+    return AlertDetail(
+        id=message.id,
+        source="broadcast",
+        kind=NotificationKind.ADMIN_MESSAGE.value,
+        created_at=message.created_at,
+        read=pointer is not None and message.id <= pointer,
+        payload=_text_payload(message_event(message, user.sub).model_dump(mode="json")),
+        deliveries=deliveries,
+    )
+
+
+@router.post(
+    "/broadcasts/{message_id}/read",
+    status_code=204,
+    summary="Mark announcements read up to this one (the pointer only moves forward).",
+)
+def mark_broadcast_read(message_id: int, user: UserDep, db: SessionDep) -> None:
+    """Advance the pointer, never rewind it.
+
+    Reading is **monotone** here, and deliberately so: "read up to N" is the only sentence a
+    pointer can say, so marking a recent announcement read also clears the older ones. That is
+    the accepted trade of the single-row design — and it is the right shape for announcements,
+    where the newest one is the one that matters, while alerts keep their per-row read state
+    precisely because there it would be wrong.
+    """
+    row = db.get(User, user.sub)
+    if row is None:
+        raise APIError(404, "alert_not_found", "alert not found")
+    if row.last_broadcast_read_id is None or message_id > row.last_broadcast_read_id:
+        row.last_broadcast_read_id = message_id
+        db.commit()
 
 
 @router.delete("", status_code=204, summary="Delete the user's alerts by id (bulk).")
 def delete_alerts(body: AlertIdsBody, user: UserDep, db: SessionDep) -> None:
+    """Delete rows of ``alert_log``, and **only** those.
+
+    ⚠ The history this list shows comes from two tables with **independent id spaces** (10.B12):
+    announcement #5 and alert #5 are different objects. The ids accepted here are *alert* ids —
+    the ones the list marks ``source="alert"``. Passing a broadcast id would not fail: it would
+    silently delete whichever alert of this user happens to carry that number.
+
+    Nothing in the app can do that today — the page only offers a checkbox on rows whose source
+    is ``alert``, because a broadcast is one shared row that no single recipient may destroy. It
+    is written down because the next caller will not have that context, and the failure mode is
+    a silent deletion of the wrong thing rather than an error.
+    """
     # Scoped to the caller's own rows (DB-R1); ids they don't own are simply not matched.
     db.execute(sa_delete(AlertLog).where(AlertLog.user_id == user.sub, AlertLog.id.in_(body.ids)))
     db.commit()
@@ -117,7 +276,7 @@ def get_alert(alert_id: int, user: UserDep, db: SessionDep) -> AlertDetail:
         kind=row.kind,
         created_at=row.created_at,
         read=row.read_at is not None,
-        payload=row.payload_json,
+        payload=_text_payload(row.payload_json),
         deliveries=deliveries,
     )
 

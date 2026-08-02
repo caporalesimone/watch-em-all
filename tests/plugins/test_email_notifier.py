@@ -19,6 +19,7 @@ from src.core.alert_engine import (
     CartAlertPayload,
     CartTotals,
     ProductAlertPayload,
+    TextMessageEvent,
     price_difference,
 )
 from src.core.contracts import AlertType
@@ -29,7 +30,8 @@ _CONFIG = {
     "smtp_port": 1025,
     "use_tls": False,
     "from_address": "watch@local",
-    "to_address": "user@local",
+    # Injected by the core from the account, not configured on the channel (10.B25).
+    "account_email": "user@local",
 }
 
 
@@ -111,13 +113,13 @@ def test_send_test_builds_html_and_text(
 ) -> None:
     _FakeSMTP.sent = []
     monkeypatch.setattr(smtplib, "SMTP", _FakeSMTP)
-    _email(client).send_test(_CONFIG, "en", "alice")
+    _email(client).send_test(_CONFIG, "en", "alice@example.com")
     assert len(_FakeSMTP.sent) == 1
     msg = _FakeSMTP.sent[0]
     assert "test email" in msg["Subject"]
     body = msg.as_string()
     assert "text/html" in body and "text/plain" in body  # HTML + text fallback
-    assert "alice" in body  # dedicated test message names the user
+    assert "alice@example.com" in body  # dedicated test message names the user
     assert "Sample cart" not in body  # not the fake digest anymore
 
 
@@ -231,3 +233,72 @@ def test_recipient_refused_fails_immediately(
     monkeypatch.setattr(smtplib, "SMTP", _Refuse)
     with pytest.raises(NotifierDeliveryError, match="recipient refused"):
         _email(client).send_test(_CONFIG, "en")
+
+
+def _message(body: str, title: str = "Scheduled maintenance") -> TextMessageEvent:
+    return TextMessageEvent(user_id=1, generated_at=datetime.now(UTC), title=title, body=body)
+
+
+def _payload(msg: Any) -> str:
+    """The message as one string, with quoted-printable soft breaks undone — a long HTML line
+    gets wrapped by the email library, and asserting on the wrapped form would test the encoder."""
+    raw: str = msg.as_string()
+    return raw.replace("=\n", "").replace("=3D", "=")
+
+
+def test_text_message_is_rendered_as_formatted_email(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _FakeSMTP.sent = []
+    monkeypatch.setattr(smtplib, "SMTP", _FakeSMTP)
+    _email(client).send(
+        _message("We are **down** on Sunday.\n\n- morning\n- afternoon"), _CONFIG, "en"
+    )
+
+    msg = _FakeSMTP.sent[0]
+    # The title is the subject: an announcement wrapped in "here are your price alerts" would be
+    # lying about what it is.
+    assert msg["Subject"] == "Scheduled maintenance"
+    body = _payload(msg)
+    assert "<strong>down</strong>" in body  # Markdown became real formatting
+    assert "<li>morning</li>" in body
+    # And the plain-text alternative says the same thing without the markup.
+    assert "We are down on Sunday." in body
+    assert "**down**" not in body
+
+
+def test_hostile_markup_in_a_message_body_cannot_execute(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _FakeSMTP.sent = []
+    monkeypatch.setattr(smtplib, "SMTP", _FakeSMTP)
+    _email(client).send(_message("<script>alert(1)</script> hello"), _CONFIG, "en")
+    body = _payload(_FakeSMTP.sent[0])
+    # Escaped, not deleted: the reader sees the characters that were typed, which is the honest
+    # outcome for a message body — what matters is that no live tag reaches the client.
+    assert "<script>" not in body
+    assert "&lt;script&gt;" in body
+
+
+def test_a_broken_markdown_helper_still_delivers(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # NOT-R8: degradation, never failure. Formatting must not be the reason somebody does not
+    # hear about scheduled maintenance.
+    _FakeSMTP.sent = []
+    monkeypatch.setattr(smtplib, "SMTP", _FakeSMTP)
+    plugin = _email(client)
+
+    class _Broken:
+        def to_html(self, text: str) -> str:
+            raise RuntimeError("boom")
+
+        def strip(self, text: str) -> str:
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr(plugin, "_markdown", _Broken())
+    plugin.send(_message("**important** notice"), _CONFIG, "en")
+
+    assert len(_FakeSMTP.sent) == 1  # it went out anyway
+    body = _payload(_FakeSMTP.sent[0])
+    assert "**important** notice" in body  # unrendered, but present and readable

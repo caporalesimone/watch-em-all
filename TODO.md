@@ -5,6 +5,14 @@ New items get appended over time. **Done items are removed from here** — the r
 decided and why lives in the commits (`git log`), in the CHANGELOG entry of the version that
 shipped it, and in the phase document.
 
+
+## debug
+
+- il valore di cache nella pagina admin del plugin é da verificare. 
+prima segnalava 2 o 3 ma cé solo una categoria attiva.
+quanto dovrebbe essere la cache in questo caso?
+
+
 ## Off topic
 
 - **Two Claude Code skills: start-of-work and end-of-work.** Create a `/start-work` skill that opens a

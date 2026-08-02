@@ -41,8 +41,23 @@ class NotifierPlugin(BasePlugin):
 - **NOT-R5 — Errors.** The plugin does a few short retries with backoff on transient errors, then
   raises `NotifierDeliveryError` with a readable reason. The core records the final per-channel
   outcome (`delivered`/`failed`/`skipped`); a failed channel blocks neither the others nor the history.
-- **NOT-R6 — Test.** Every notifier sends a **test** with the current merged config, invoked by the
-  user (own target) and the admin (channel check). No persistence.
+- **NOT-R6 — Test.** Every notifier sends a **test** with the current merged config. **Admin-only
+  since 10.X4**: the probe answers *"does the system config work"*, which is a question for whoever
+  can fix it, and its target is the admin's own account rather than an address typed in a field. No
+  persistence.
+- **NOT-R9 — A channel proves itself before it is switched on** (10.B28). The test of NOT-R6 is
+  that proof: `POST /api/admin/notifiers/{id}/validate` sends a real message and, **if the server
+  accepts it**, records the settings as validated. Until then the kill-switch refuses to go on
+  (`422 not_validated`) and the channel is not available to anybody. Three consequences worth
+  stating:
+  - **What is claimed is narrow, on purpose.** The server took the message. Whether it then
+    delivers it, files it as spam or bounces it is between that server and the recipient — an
+    installation that claimed more would have to become a mail monitor.
+  - **The proof is about a configuration, not a channel.** What is stored is a fingerprint of the
+    settings that worked, so editing one invalidates the proof by arithmetic rather than by
+    somebody remembering to clear a flag — and a channel whose settings change is switched off.
+  - **A failure records nothing**, so a channel never drifts into "validated" by having been tried.
+  In-app is exempt: it has no server to accept anything and no config to get wrong.
 - **NOT-R7 — Content survives formatting.** Whatever the channel format, the decision-carrying data
   must survive: event tags, before/after prices, **provenance**, links, cart totals and threshold.
 

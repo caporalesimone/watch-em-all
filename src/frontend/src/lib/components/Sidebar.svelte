@@ -31,14 +31,20 @@
 	const primary = $derived<NavItem[]>(
 		isAdmin
 			? [
+					{ href: '/admin/dashboard', key: 'nav.adminDashboard' },
 					{ href: '/admin/logs', key: 'nav.systemLogs' },
 					{ href: '/admin/users', key: 'nav.users' },
 					{
 						href: '/admin/scrapers',
 						key: 'nav.scrapers',
-						children: [{ href: '/admin/scrapers/schedule', key: 'admin.scrapers.scheduleTitle' }]
+						children: [
+							{ href: '/admin/scrapers/schedule', key: 'admin.scrapers.scheduleTitle' },
+							{ href: '/admin/runs', key: 'nav.runs' },
+							{ href: '/admin/scrapers/calendar', key: 'nav.calendar' }
+						]
 					},
 					{ href: '/admin/notifiers', key: 'nav.notifiers' },
+					{ href: '/admin/messages', key: 'nav.messages' },
 					{
 						href: '/admin/settings',
 						key: 'nav.settings',

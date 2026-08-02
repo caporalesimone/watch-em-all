@@ -36,7 +36,6 @@ def _make_user(client: TestClient, admin_token: str, username: str) -> tuple[int
             "first_name": "Test",
             "last_name": "User",
             "role": "user",
-            "temp_password": "temp-pass-123",
         },
         headers=_bearer(admin_token),
     )
@@ -120,7 +119,7 @@ def _cross_cart(client: TestClient, token: str) -> int:
 
 
 def test_add_remove_and_idempotency(client: TestClient) -> None:
-    uid, token = _make_user(client, _admin_token(client), "alice")
+    uid, token = _make_user(client, _admin_token(client), "alice@example.com")
     _seed(uid, "dragon_store", {"external_id": "a"}, {"external_id": "b"})
     ids = _ids_by_external(client, token)
     cart = _cross_cart(client, token)
@@ -135,7 +134,7 @@ def test_add_remove_and_idempotency(client: TestClient) -> None:
 
 
 def test_cannot_add_delisted_but_can_add_out_of_stock(client: TestClient) -> None:
-    uid, token = _make_user(client, _admin_token(client), "alice")
+    uid, token = _make_user(client, _admin_token(client), "alice@example.com")
     _seed(
         uid,
         "dragon_store",
@@ -156,7 +155,7 @@ def test_cannot_add_delisted_but_can_add_out_of_stock(client: TestClient) -> Non
 
 
 def test_scraper_specific_rejects_foreign_scraper_product(client: TestClient) -> None:
-    uid, token = _make_user(client, _admin_token(client), "alice")
+    uid, token = _make_user(client, _admin_token(client), "alice@example.com")
     _seed(uid, "dragon_store", {"external_id": "d"})
     _seed(uid, "other_shop", {"external_id": "o"})
     ids = _ids_by_external(client, token)
@@ -175,7 +174,7 @@ def test_scraper_specific_rejects_foreign_scraper_product(client: TestClient) ->
 
 
 def test_single_currency_per_cart(client: TestClient) -> None:
-    uid, token = _make_user(client, _admin_token(client), "alice")
+    uid, token = _make_user(client, _admin_token(client), "alice@example.com")
     _seed(
         uid,
         "dragon_store",
@@ -192,7 +191,7 @@ def test_single_currency_per_cart(client: TestClient) -> None:
 
 
 def test_add_rejects_foreign_catalog_id(client: TestClient) -> None:
-    _uid, token = _make_user(client, _admin_token(client), "alice")
+    _uid, token = _make_user(client, _admin_token(client), "alice@example.com")
     cart = _cross_cart(client, token)
     resp = _add(client, token, cart, [999999])
     assert resp.status_code == 422
@@ -200,7 +199,7 @@ def test_add_rejects_foreign_catalog_id(client: TestClient) -> None:
 
 
 def test_scraper_specific_cart_shows_dragon_adjustments(client: TestClient) -> None:
-    uid, token = _make_user(client, _admin_token(client), "alice")
+    uid, token = _make_user(client, _admin_token(client), "alice@example.com")
     _seed(
         uid,
         "dragon_store",
@@ -234,7 +233,7 @@ def test_scraper_specific_cart_shows_dragon_adjustments(client: TestClient) -> N
 
 
 def test_threshold_set_clear_and_validation(client: TestClient) -> None:
-    uid, token = _make_user(client, _admin_token(client), "alice")
+    uid, token = _make_user(client, _admin_token(client), "alice@example.com")
     _seed(uid, "dragon_store", {"external_id": "a"})  # price 10.00, active
     ids = _ids_by_external(client, token)
     cart = _cross_cart(client, token)

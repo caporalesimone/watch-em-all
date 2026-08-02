@@ -18,6 +18,7 @@
 	import ProductThumb from '$lib/components/ProductThumb.svelte';
 	import SourceTag from '$lib/components/SourceTag.svelte';
 	import { money } from '$lib/format';
+	import { confirmDialog } from '$lib/stores/confirm';
 	import { mountedPlugins } from '$lib/stores/plugins';
 
 	const cartId = $derived(Number($page.params.id));
@@ -78,7 +79,14 @@
 	}
 
 	async function remove(): Promise<void> {
-		if (!cart || !confirm($_('carts.deleteConfirm'))) return;
+		if (!cart) return;
+		const ok = await confirmDialog({
+			title: $_('carts.delete'),
+			message: $_('carts.deleteConfirm'),
+			confirmLabel: $_('carts.delete'),
+			danger: true
+		});
+		if (!ok) return;
 		busy = true;
 		try {
 			await deleteCart(cart.id);
@@ -245,7 +253,12 @@
 						bind:value={draftName}
 						class="w-64 rounded border border-slate-300 bg-white px-2 py-1 text-lg dark:border-slate-700 dark:bg-slate-900"
 					/>
-					<button class="text-sm hover:underline" onclick={rename} disabled={busy}
+					<!-- Save lights up only on an actual edit (10.F23); `rename` already treated an
+					     unchanged name as a no-op, so this just says so before the click. -->
+					<button
+						class="text-sm hover:underline disabled:opacity-40 disabled:hover:no-underline"
+						onclick={rename}
+						disabled={busy || !draftName.trim() || draftName.trim() === cart.name}
 						>{$_('common.save')}</button
 					>
 					<button class="text-sm text-slate-500 hover:underline" onclick={() => (renaming = false)}
@@ -363,9 +376,11 @@
 						</div>
 						<div class="flex gap-3">
 							<button
-								class="hover:underline"
+								class="hover:underline disabled:opacity-40 disabled:hover:no-underline"
 								onclick={saveThreshold}
-								disabled={busy || !thrAmount.trim()}>{$_('common.save')}</button
+								disabled={busy ||
+									!thrAmount.trim() ||
+									thrAmount.trim() === (cart.threshold_amount ?? '')}>{$_('common.save')}</button
 							>
 							{#if cart.threshold_amount}
 								<button

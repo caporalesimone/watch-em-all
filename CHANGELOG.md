@@ -6,6 +6,88 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 Each entry is **short** and reads as a user-facing story: first a **bullet list of what changed for you** (additions, removals and changes together, light on jargon), then a brief **_under the hood_** paragraph on the architectural/technical changes. Older entries predate this style and are left as they are.
 
+## [0.10.0] - Unreleased
+
+**Phase 10 — Admin governance: the administrator's console filled in — run statistics and drill-down, the lifetime counters per scraper that phase 9 collects but never showed, system limits editable while it runs, full user management (with deferred deletion and restore), messages to users, retention and purge. It opens with a catalog polish: the Source column shows the store's logo alone. Entries land below as they ship.**
+
+> **This version recreates the database.** Pre-1.0 the schema changes freely and is not migrated. Two columns are added to `users`, both **at the start of the phase rather than when the features that read them ship** — deliberately, so the phase costs one recreation instead of three. Existing data is not carried over.
+
+### New
+
+- An admin can reset an account's password or disable and re-enable it — but never their own, so nobody can lock themselves out.
+- The user list sorts by last sign-in, with never-signed-in at the dormant end, and filters by active, disabled or being deleted.
+- Deleting an account no longer destroys it: it is marked with a deadline and can be restored until then, coming back disabled.
+- Removing a person takes their plugin data with them and leaves every product's price history untouched — that belongs to the product.
+- Accounts past their deletion deadline are destroyed once a day; if any plugin fails to clean up, nothing is destroyed and tomorrow retries.
+- Changing the deletion grace period only affects accounts marked from then on; a deadline already set never moves.
+- The Users page filters by status and sorts by last sign-in, and shows when an account was marked for deletion and when it goes.
+- Reset, disable and delete are one click each from the Users page; the delete confirmation names the date the account is actually destroyed.
+- Passwords can be given an expiry — never (the default), 1, 3, 6 or 12 months; an old one sends you to the change page at sign-in.
+- That expiry is a dropdown in System settings, so it can only ever be one of the values the server accepts.
+- All housekeeping now runs in one nightly window at an hour you choose (7am by default), and says in the log when it starts and ends.
+- Your notification history keeps its most recent 100 entries — a number you can change — instead of growing for ever.
+- Message bodies can be written in Markdown; every channel gets it rendered, and channels that cannot show formatting get readable plain text.
+- The admin can list recent scrape runs, filter them by scraper and outcome, and open one to see which user it failed for.
+- A Runs page under Scrapers shows what each run did — outcome, duration, products, requests and cache hits — with outcome filters and paging.
+- Clicking a run opens its per-user detail underneath, failures first, so a partial run says which account went wrong and why.
+- A dashboard endpoint reports how big the installation is and how its notifications are going, in counts only — never anybody's content.
+- A second one ranks accounts by the load they create, overall and per store, so heavy traffic has a name without exposing what it watches.
+- An admin Dashboard page shows the installation at a glance and how notifications went over the last 7 or 30 days.
+- The same page ranks accounts by the traffic they cause, overall and per store, so a heavy watcher is visible without exposing what they watch.
+- The admin can ask what a given day has planned: every scheduled run, in clock order, with how long that scraper usually takes.
+- A read-only day calendar draws those runs as blocks sized by their usual duration, so a heavy scraper looks heavy; clicking one opens its settings.
+- The admin can send a message to everyone or to one person; it reaches every channel they have, and the in-app copy always.
+- Sent messages list with how delivery went per recipient and channel — never whether anyone read them, which stays theirs.
+- Those messages arrive as email with their formatting intact; if rendering ever fails, the mail still goes out, plain.
+- Your notifications now filter by category and show announcements with their own badge, title and formatting.
+- The admin writes messages on a page of its own, with a Preview tab showing exactly what recipients get, and the sent list beneath.
+- Those messages never go to administrators — not the others, not the sender: the channel is for the people who use the installation.
+- Notifications you have read step back into grey, so what is still unread wins the glance instead of a small dot.
+- Every dialog in the app now behaves the same: Escape closes it, so does a click outside, and focus goes back where it was.
+- A message opens in a card at the centre of the screen, the same one whether you are the reader or the admin who sent it.
+
+### Changed
+
+- Schema prep, done once up front: `users` now records when its password was set and which announcement it last read.
+- Second schema step: a username is now sized for an email address, and the bootstrap admin can hold one of its own.
+- Your username is now your email address: refused if it is not one, stored lowercase, and it signs you in whatever case you type.
+- Email notifications need no setup: they go to your account address and arrive switched on, leaving you only the on/off choice.
+- Nobody picks your first password any more: the server generates one and mails it to you, and it is never stored in your history.
+- The Users page asks for an email address and no password; the reset button says the new one is mailed and every session ends.
+- Your profile shows where notifications reach you and why you cannot change it; the bootstrap admin, the one exception, sets its own.
+- Disabling an account, or scheduling it for deletion, now tells the person — and the deletion note names the date it happens.
+- Those system texts can be rewritten by the admin over the API, one at a time, and dropping the rewrite goes back to the built-in wording.
+- A System messages tab lists them all with their placeholders, a preview of what is really delivered, and one click back to the default.
+- A manual scrape is now recorded like a scheduled one — its own run row and its real traffic — so the counters stop describing only half the work.
+- The Runs page opens on the scheduled runs and filters to manual or both, so hand-started scrapes no longer crowd out the schedule.
+- Each scraper exposes what it has done since a stated date, and that tally can be zeroed when a configuration change makes it incomparable.
+- Its settings page now shows those totals in four groups, with the failure streak on top, and a button to start the count again.
+- A scraper can now declare its own settings, and the admin edits them in a form the app builds from that declaration alone.
+- Dragon Store's discount bands and shipping are the first of those: change them and the next cart estimate uses the new ones, no restart.
+- How many times a failed request is retried is configurable too, and the politeness field now says the site's own Crawl-delay is a hard minimum.
+- The Send test button is gone from your profile: the address is your account and already proved itself by delivering your password.
+- Being disabled, scheduled for deletion or deleted now always reaches you by email, whether or not you take email notifications.
+- An account already marked for deletion can be destroyed straight away, and the person is told it happened.
+- On such a row the Users page offers that instead of a password reset, which could do nothing for an account nobody can sign into.
+- Confirmations put the account and the date they name in bold, so what you are about to act on is legible at a glance.
+- Disabling or enabling an account now asks first, and says what it does: sessions end and the person is emailed, or they can sign in again.
+- Save stays greyed out until you actually change something — on every form that has one, so pressing it always means a change.
+- Writing a message warns you when email is off or unconfigured: the message will only appear in the app, and nobody gets a mail.
+- A channel's badge now reads Active, Switched off or Not configured, instead of calling a switched-off channel available.
+- The email settings fit in three rows: host, port and TLS sit together, and so do the credentials — a plugin can say which fields belong side by side.
+- Send test became Validate settings: a channel is switched on only once a real message has actually left through it.
+- A second badge says whether the settings are validated, and changing one of them undoes that and switches the channel off.
+- Disabled, scheduled for deletion and deleted now open the same way and name the account in bold, so you can tell which one it is about.
+- An account that cannot sign in is greyed out in the Users table, so the working ones stand out without reading the Status column.
+- Every column of that table sorts now; role and status sort by rank rather than alphabetically, which would have scattered them.
+- An announcement now shows a padlock in your history instead of a missing checkbox, and says why one recipient cannot delete it.
+- The admin can delete a sent message: for an announcement that removes it for everyone, which is the only way one ever goes away.
+- The sent list is a proper table with headers and pages, filters announcements from one-to-one notes, and no longer overlaps a long address onto the title.
+- Recipients read "Everyone" without a count, because the tags beside it count deliveries — one per person per channel — and the two numbers looked contradictory.
+- The sent list now counts people instead: how many an announcement reached and how many opened it in the app, with a tag left only for failures.
+- A message written to you alone is tagged Direct message with a letter, so it does not read like an announcement to everybody.
+- Headings work in a message body again — rendered two levels down, so a title inside a notification no longer looks like the page's own.
+
 ## [0.9.0] - 2026-07-31
 
 **Phase 9 — Dragon Store, complete: paste a category URL and dozens of products flow into your catalog on every run (with de-duplication and the site's own exclusions); delisted products grey out on their own and clear with a click. A product's price history now belongs to the product, so it outlives your catalog and you inherit it when you start watching.**

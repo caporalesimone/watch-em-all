@@ -36,7 +36,6 @@ def _make_user(client: TestClient, admin_token: str, username: str) -> tuple[int
             "first_name": "Test",
             "last_name": "User",
             "role": "user",
-            "temp_password": "temp-pass-123",
         },
         headers=_bearer(admin_token),
     )
@@ -98,21 +97,21 @@ def test_history_requires_auth(client: TestClient) -> None:
 
 
 def test_missing_cart_is_404(client: TestClient) -> None:
-    _uid, token = _make_user(client, _admin_token(client), "alice")
+    _uid, token = _make_user(client, _admin_token(client), "alice@example.com")
     resp = client.get("/api/carts/999/history", headers=_bearer(token))
     assert resp.status_code == 404
 
 
 def test_other_users_cart_is_404(client: TestClient) -> None:
     admin = _admin_token(client)
-    _a_uid, alice = _make_user(client, admin, "alice")
-    _b_uid, bob = _make_user(client, admin, "bob")
+    _a_uid, alice = _make_user(client, admin, "alice@example.com")
+    _b_uid, bob = _make_user(client, admin, "bob@example.com")
     cart = _cross_cart(client, alice)
     assert client.get(f"/api/carts/{cart}/history", headers=_bearer(bob)).status_code == 404
 
 
 def test_empty_cart_has_no_points(client: TestClient) -> None:
-    _uid, token = _make_user(client, _admin_token(client), "alice")
+    _uid, token = _make_user(client, _admin_token(client), "alice@example.com")
     cart = _cross_cart(client, token)
     resp = client.get(f"/api/carts/{cart}/history", headers=_bearer(token))
     assert resp.status_code == 200
@@ -120,7 +119,7 @@ def test_empty_cart_has_no_points(client: TestClient) -> None:
 
 
 def test_total_is_the_sum_of_members(client: TestClient) -> None:
-    uid, token = _make_user(client, _admin_token(client), "alice")
+    uid, token = _make_user(client, _admin_token(client), "alice@example.com")
     # Both in ONE batch: a second update_catalog would delist whatever is absent from it.
     _seed(
         uid,

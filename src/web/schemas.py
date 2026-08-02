@@ -10,9 +10,10 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.core.contracts import BrandRef, CategoryRef, ConfigField
+from src.core.identity import USERNAME_MAX, is_email, normalize_username
 from src.core.price_history import Range
 
 
@@ -46,10 +47,30 @@ class MeResponse(BaseModel):
     role: str
     locale: str
     must_change_password: bool
+    # Where this account is reached (10.B25). For everybody but the bootstrap admin this is
+    # the username itself, so the two are equal and the page shows one thing.
+    notification_email: str
+    # True only for the bootstrap admin — the one account whose username is not an address,
+    # because it existed before anybody could type one. Everyone else has nothing to edit:
+    # changing where your mail goes would mean changing who you sign in as.
+    email_editable: bool = False
 
 
 class MePatch(BaseModel):
     locale: str | None = None
+    contact_email: str | None = None
+
+    @field_validator("contact_email")
+    @classmethod
+    def _address(cls, value: str | None) -> str | None:
+        """Same rule as a username (10.B23): if it is going to receive mail it has to be an
+        address, and it is stored lowercase. Whether this account may set it at all is a
+        question about *who is asking*, so the router answers that one."""
+        if value is None:
+            return None
+        if not is_email(value):
+            raise ValueError("contact_email must be an email address")
+        return normalize_username(value)
 
 
 class HealthResponse(BaseModel):
@@ -63,15 +84,145 @@ class HealthResponse(BaseModel):
 
 
 class UserCreate(BaseModel):
-    # Admin-created account (USR-R1/R15): username + first/last name (both required)
-    # + role + a temporary password the user must change at first login (USR-R2).
-    username: str = Field(min_length=1, max_length=64)
+    # Admin-created account (USR-R1/R15): an **email address** + first/last name (both
+    # required) + role. **No password field** since 10.B24: the server generates one and mails
+    # it, so no credential travels through a form, a browser history or an admin's notes. The
+    # forced change at first login (USR-R2) stays; only who picks the first password changed.
+    username: str = Field(min_length=1, max_length=USERNAME_MAX)
     first_name: str = Field(min_length=1, max_length=64)
     last_name: str = Field(min_length=1, max_length=64)
     # Three levels since 9.B8. A role is chosen at creation and not changed afterwards:
     # promoting an existing account is phase 10, where the actions on accounts live.
     role: Literal["admin", "super_user", "user"]
-    temp_password: str = Field(min_length=8)  # AUTH-R6
+
+    @field_validator("username")
+    @classmethod
+    def _address(cls, value: str) -> str:
+        """The username is an address (10.B23), validated and normalised here.
+
+        Here rather than in the router because it has to hold for *every* way in, and because
+        normalising at the edge means everything downstream — the uniqueness check included —
+        is already comparing the stored form.
+        """
+        if not is_email(value):
+            raise ValueError("username must be an email address")
+        return normalize_username(value)
+
+
+class RunSummary(BaseModel):
+    """One scrape run as the monitoring list shows it (10.B6)."""
+
+    run_id: int
+    scraper_id: str
+    trigger: str
+    slot: datetime | None
+    started_at: datetime
+    finished_at: datetime | None
+    status: str
+    users_processed: int
+    products_found: int
+    products_new: int
+    price_changes: int
+    products_removed: int
+    products_excluded: int
+    http_requests: int
+    cache_hits: int
+    error_message: str | None
+
+
+class RunUserDetail(BaseModel):
+    """One user's share of a run (10.B6). `username` is resolved here rather than left as an
+    id: the whole point of the drill-down is to answer *who* failed, and an id does not."""
+
+    user_id: int
+    username: str | None
+    started_at: datetime
+    finished_at: datetime | None
+    status: str
+    products_found: int
+    products_new: int
+    price_changes: int
+    http_requests: int
+    cache_hits: int
+    error_message: str | None
+
+
+class RunPage(BaseModel):
+    items: list[RunSummary]
+    total: int
+
+
+class DashboardTotals(BaseModel):
+    """System-wide counts for the admin dashboard (10.B9). Aggregates only, never content
+    (DASH-R6): the admin governs the installation, they do not read anybody's carts."""
+
+    users_total: int
+    users_active: int
+    users_deleting: int
+    products_total: int
+    products_delisted: int
+    carts_total: int
+    price_history_rows: int
+    watched_scrapers: int
+
+
+class DashboardNotifications(BaseModel):
+    """Delivery health over a window (10.B9): how much went out, and how much failed."""
+
+    window_days: int
+    alerts: int
+    delivered: int
+    failed: int
+    skipped: int
+
+
+class DashboardResponse(BaseModel):
+    totals: DashboardTotals
+    notifications: DashboardNotifications
+
+
+class UserLoadRow(BaseModel):
+    """What one account costs the installation (10.B10). Numbers and a username, nothing
+    else: DASH-R6 lets the admin see the load a person creates, never what they are watching."""
+
+    user_id: int
+    username: str | None
+    scraper_id: str | None = None
+    products: int
+    carts: int
+    http_requests: int
+    cache_hits: int
+
+
+class DashboardUsers(BaseModel):
+    window_days: int
+    by_user: list[UserLoadRow]
+    by_user_and_scraper: list[UserLoadRow]
+
+
+class CalendarSlot(BaseModel):
+    """One planned run on a given day (10.B18, SCHED-R10).
+
+    ``avg_seconds`` is what recent runs of this scraper actually took, so the calendar can
+    draw a block with a width instead of a tick — null when there is nothing to average, and
+    null is honest: an invented default would draw a confident block around a guess.
+    """
+
+    scraper_id: str
+    at: datetime
+    enabled: bool
+    avg_seconds: int | None
+
+
+class CalendarDay(BaseModel):
+    date: str
+    slots: list[CalendarSlot]
+
+
+class AdminUserPatch(BaseModel):
+    # Enable / disable (10.B1). Only the flag: the role is chosen at creation and not
+    # changed afterwards, and the name is the person's, not the administrator's to edit.
+    is_active: bool
 
 
 class AdminUserSummary(BaseModel):
@@ -84,6 +235,10 @@ class AdminUserSummary(BaseModel):
     must_change_password: bool
     last_login_at: datetime | None
     created_at: datetime
+    # Deferred deletion (10.B3). Both null on a normal account; together they are the
+    # "being deleted" state the status filter reads and the page shows as a countdown.
+    deletion_marked_at: datetime | None = None
+    deletion_due_at: datetime | None = None
 
 
 class CatalogItemSource(BaseModel):
@@ -269,11 +424,17 @@ class CartItemsBody(BaseModel):
 class AlertListItem(BaseModel):
     # A row of the alert history list (6.B8). `read` = read_at is set; `cart_count` is the
     # number of carts in a digest (0 for non-digest kinds) — a light preview for the list.
+    # `source` says which table the id belongs to (10.B12): the history is a union of the
+    # user's own rows and the shared announcements, and the two id spaces are independent.
     id: int
+    source: str = "alert"  # alert | broadcast
     kind: str
     created_at: datetime
     read: bool
     cart_count: int
+    # The message title, for the text kinds only (10.F10). A digest has no title — its one-line
+    # preview is the cart count — so this is null there rather than a manufactured heading.
+    title: str | None = None
 
 
 class AlertPage(BaseModel):
@@ -296,11 +457,84 @@ class AlertDetail(BaseModel):
     # One notification in full (6.B8): the self-sufficient digest payload plus its read state
     # and the per-channel delivery outcomes (7.F5).
     id: int
+    source: str = "alert"  # alert | broadcast — see AlertListItem
     kind: str
     created_at: datetime
     read: bool
     payload: dict[str, Any]
     deliveries: list[AlertDeliveryOut] = Field(default_factory=list)
+
+
+# --------------------------------------------------------------- admin messages (phase 10.B12)
+
+
+class AdminMessageCreate(BaseModel):
+    # What the admin composes (ADMSG-R1). `target_user_id` absent = every active account.
+    title: str = Field(min_length=1, max_length=200)
+    body: str = Field(min_length=1, max_length=20_000)  # Markdown (AEV-R7)
+    target_user_id: int | None = None
+
+
+class AdminMessageOut(BaseModel):
+    # A sent message as the admin sees it. `recipient_count` is frozen at send time, so it keeps
+    # saying who it went to even after accounts come and go.
+    id: int
+    audience: str  # all | user
+    target_user_id: int | None
+    target_username: str | None
+    title: str
+    body: str
+    recipient_count: int
+    created_at: datetime
+
+
+class MessagePreviewRequest(BaseModel):
+    body: str = Field(max_length=20_000)
+
+
+class MessagePreviewOut(BaseModel):
+    # The rendered body, from the same core helper that renders it for real (10.F9). A round
+    # trip rather than a renderer in the browser: the preview is then identical to the delivered
+    # message *by construction*, not by two implementations happening to agree.
+    body_html: str
+
+
+class MessageOutcomeCounts(BaseModel):
+    # How the send went, per status (10.B13). These count **deliveries** — one per recipient per
+    # channel — so a single person with mail and in-app both on contributes two.
+    delivered: int = 0
+    pending: int = 0
+    failed: int = 0
+    skipped: int = 0  # includes `skipped_no_notifier`: in-app only, which is still a delivery
+
+
+class AdminMessageSummary(AdminMessageOut):
+    sender_username: str | None
+    outcomes: MessageOutcomeCounts
+    # How many recipients have opened it in the app (10.B30). **An aggregate and only an
+    # aggregate**: ADMSG-R5 keeps *who* read a message out of the admin's reach, and the
+    # per-recipient view below still carries delivery alone. In-app is the only reception this
+    # installation can honestly claim to know — an email that left the building says nothing
+    # about whether anybody looked at it.
+    read_count: int = 0
+
+
+class AdminMessagePage(BaseModel):
+    items: list[AdminMessageSummary]
+    total: int
+    page: int
+    page_size: int
+
+
+class MessageRecipientOut(BaseModel):
+    # One recipient of a message and how each of their channels went.
+    user_id: int
+    username: str
+    channels: list[AlertDeliveryOut] = Field(default_factory=list)
+
+
+class AdminMessageDetail(AdminMessageSummary):
+    recipients: list[MessageRecipientOut] = Field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- notifiers (phase 7)
@@ -323,8 +557,7 @@ class NotifierChannelOut(BaseModel):
 
 
 class AdminNotifierOut(BaseModel):
-    # A notifier channel as the admin's page sees it (GET /api/admin/notifiers). `user_schema`
-    # is included so the admin can supply a minimal target for the channel test (POST .../test).
+    # A notifier channel as the admin's page sees it (GET /api/admin/notifiers).
     plugin_id: str
     display_name: str
     is_in_app: bool
@@ -334,6 +567,21 @@ class AdminNotifierOut(BaseModel):
     is_set: dict[str, bool] = Field(default_factory=dict)
     enabled: bool  # the admin kill-switch (PCFG-R8)
     admin_config_complete: bool
+    # Whether this channel has to prove itself before it can be switched on, and whether what is
+    # stored right now is what it proved (10.B28). `validated` goes back to false on its own when
+    # a setting changes — it is a fingerprint comparison, not a flag.
+    requires_validation: bool = False
+    validated: bool = False
+    validated_at: datetime | None = None
+
+
+class NotifierValidationOut(BaseModel):
+    # The outcome of POST /api/admin/notifiers/{id}/validate, with the channel's fresh state
+    # beside it: the badge, the switch and the timestamp all change together, so they travel
+    # together rather than costing the page a second request to find out what happened.
+    ok: bool
+    error: str | None = None
+    channel: AdminNotifierOut
 
 
 class NotifierConfigBody(BaseModel):
@@ -346,15 +594,79 @@ class NotifierEnabledBody(BaseModel):
     enabled: bool
 
 
-class NotifierTestBody(BaseModel):
-    # Ad-hoc user fields for a test send (e.g. a target address). Empty for a user's own test
-    # (their stored config is used); the admin supplies the minimal user fields to probe a channel.
+class PluginConfigOut(BaseModel):
+    """What a scraper declares for itself, plus what is stored for it (10.B22).
+
+    Schema and values together in one response: the page renders the form from the schema and
+    has nothing to render without it, so two requests would only ever be made side by side.
+    """
+
+    scraper_id: str
+    schema_fields: list[ConfigField]
+    config: dict[str, Any]
+
+
+class PluginConfigBody(BaseModel):
     config: dict[str, Any] = Field(default_factory=dict)
 
 
-class NotifierTestResult(BaseModel):
-    ok: bool
-    error: str | None = None
+class LifetimeStats(BaseModel):
+    """What a scraper has done since ``since`` (10.B20).
+
+    Four groups, because they answer four different questions and mixing them is how a
+    monitoring page stops being read: **activity** (did it run, is it failing now),
+    **traffic** (what went out towards the site), **health** (how the site answered), and
+    **yield** (what came back). ``since`` is part of the payload and not decoration: a
+    cumulative counter with no start date cannot be interpreted after a configuration change,
+    and resetting it (10.B21) restamps exactly this field.
+    """
+
+    plugin_id: str
+    since: datetime
+
+    runs_total: int
+    runs_ok: int
+    runs_failed: int
+    runs_skipped_locked: int
+    consecutive_failures: int
+    last_run_at: datetime | None
+    last_success_at: datetime | None
+    last_failure_at: datetime | None
+
+    http_requests_total: int
+    cache_hits_total: int
+    bytes_downloaded_total: int
+    politeness_wait_s_total: int
+    run_seconds_total: int
+
+    rate_limited_total: int
+    gate_hits_total: int
+    gate_cleared_total: int
+    robots_denied_total: int
+
+    products_delivered_total: int
+    pages_fetched_total: int
+    parse_failures_total: int
+
+
+class MessageTemplateOut(BaseModel):
+    """One entry of the system-message catalog (10.B17). Carries the default **and** what is in
+    force, so the editor can show both and offer "back to default" without a second request."""
+
+    key: str
+    title: str
+    body: str
+    default_title: str
+    default_body: str
+    placeholders: list[str]
+    required: list[str]
+    is_override: bool
+    unknown_placeholders: list[str]
+
+
+class MessageTemplatePut(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    body: str = Field(min_length=1, max_length=20000)
 
 
 class UnreadCount(BaseModel):

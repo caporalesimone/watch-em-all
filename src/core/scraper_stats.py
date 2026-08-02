@@ -1,4 +1,4 @@
-"""Lifetime statistics per scraper (9.B6c; phase 9b decides how to show them).
+"""Lifetime statistics per scraper (9.B6c; phase 10 decides how to show them, 10.B20/10.F15).
 
 One cumulative row per ``plugin_id``. It exists because ``scrape_run`` has retention: querying
 that table answers "recently", never "ever". Two groups of writer, on purpose:
@@ -124,3 +124,19 @@ def record_run(
         consecutive_failures=0 if ok else previous + 1,
         stamp={"last_run_at": now, ("last_success_at" if ok else "last_failure_at"): now},
     )
+
+
+def reset_stats(session: Session, plugin_id: str) -> ScraperStats:
+    """Zero every counter and restamp ``since`` (10.B21). Commits, returns the fresh row.
+
+    Written field by field from ``_COUNTERS`` rather than by deleting the row and letting
+    :func:`get_stats` recreate it: a delete would take ``consecutive_failures`` and the three
+    timestamps with it, and *"is it failing right now"* is not a cumulative — it is the current
+    state of the scraper, and it is still true the second after somebody clears the totals.
+    """
+    row = get_stats(session, plugin_id)
+    for name in _COUNTERS:
+        setattr(row, name, 0)
+    row.since = datetime.now(UTC)
+    session.commit()
+    return row

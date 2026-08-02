@@ -1,9 +1,15 @@
 """User notifier API (endpoints.md, profile-and-notifiers.md). Phase 7 (7.B3/7.B4).
 
 The channels section of the Profile: list the notifiers available to the user with their personal
-schema + composite state, save personal config (secrets write-only), toggle a channel on/off, and
-send a synchronous test. Channels the admin has globally disabled are not listed. The in-app
-channel is shown but has no user config and cannot be disabled (always active for the user).
+schema + composite state, save personal config (secrets write-only) and toggle a channel on/off.
+Channels the admin has globally disabled are not listed. The in-app channel is shown but has no
+user config and cannot be disabled (always active for the user).
+
+**No test send here since 10.X4.** It made sense while a user typed their own delivery address
+into this page; since 10.B23/10.B25 the address *is* the account, and it has already proved it
+works by carrying the password that person signed in with. What was left was a button probing
+the server's SMTP config from a page whose owner can do nothing about it — the admin's probe
+(``POST /api/admin/notifiers/{id}/test``) is the same check where it can be acted on.
 """
 
 from __future__ import annotations
@@ -12,15 +18,9 @@ from fastapi import APIRouter, Request
 
 from src.core import notifiers as notif
 from src.core.errors import APIError
-from src.core.notify import send_test
 from src.core.plugins.base import NotifierPlugin
 from src.web.deps import SessionDep, UserDep
-from src.web.schemas import (
-    NotifierChannelOut,
-    NotifierConfigBody,
-    NotifierEnabledBody,
-    NotifierTestResult,
-)
+from src.web.schemas import NotifierChannelOut, NotifierConfigBody, NotifierEnabledBody
 
 router = APIRouter(prefix="/notifiers", tags=["Notifiers"])
 
@@ -104,19 +104,3 @@ def set_enabled(
         raise APIError(422, "in_app_always_active", "the in-app channel cannot be disabled")
     notif.set_user_enabled(db, user.sub, plugin_id, body.enabled)
     return _channel_out(db, plugin, user.sub)
-
-
-@router.post(
-    "/{plugin_id}/test",
-    response_model=NotifierTestResult,
-    summary="Send a test notification to the user's own target (synchronous, no persistence).",
-)
-def test(plugin_id: str, request: Request, user: UserDep, db: SessionDep) -> NotifierTestResult:
-    plugin = _get(request, plugin_id)
-    if notif.is_in_app(plugin_id):
-        return NotifierTestResult(ok=True)  # nothing to test: in-app is always available
-    try:
-        send_test(db, plugin, user.sub)
-        return NotifierTestResult(ok=True)
-    except Exception as exc:  # NotifierDeliveryError or any config/send error → readable outcome
-        return NotifierTestResult(ok=False, error=str(exc))

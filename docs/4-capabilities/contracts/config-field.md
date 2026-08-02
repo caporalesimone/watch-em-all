@@ -38,6 +38,14 @@ class ConfigField(BaseModel):
 - **CFG-R5** — On save, the backend **filters keys on the relevant schema** (foreign keys dropped and
   logged): a user cannot inject an admin key, and vice-versa.
 - **CFG-R6** — `default` typed coherently with `type` (e.g. `587`, `True`, not strings).
+- **CFG-R7** (10.F26) — `width` (`full` | `half` | `third` | `quarter`, default `full`) says **how
+  much of a row** a field asks for. The core renders a 12-column grid and honours it from the `sm`
+  breakpoint up; below that every field is full width. It belongs to the schema because only the
+  plugin knows which of its fields are **one thought** — a host, its port and its TLS switch are an
+  SMTP server, and read down a column of six the admin has to assemble that themselves. The core
+  cannot infer it, since it never learns a field name (CFG-R1), and putting it in the frontend
+  would be one rule about one field written twice, in two languages. It is a hint about
+  relatedness, not a layout: the renderer decides when there is room to honour it.
 
 ## Example (email notifier)
 
@@ -50,8 +58,9 @@ class ConfigField(BaseModel):
  ConfigField(key="use_tls", label_key="email.cfg.tls", type="bool", default=True),
  ConfigField(key="from_address", label_key="email.cfg.from", type="email", required=True)]
 
-# USER schema (personal target)
-[ConfigField(key="to_address", label_key="email.cfg.to", type="email", required=True)]
+# USER schema — empty for email since 10.B25: the recipient is the account, not a
+# field. A channel with a genuinely personal setting still declares one here.
+[]
 ```
 
 Notifier forms also carry a **Test** button and the per-user activation flag (managed by the core,

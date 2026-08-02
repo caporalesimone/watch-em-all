@@ -21,11 +21,11 @@ from typing import Any, cast
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from src.core.db import new_session
 from src.core.http import HttpClient
-from src.core.models import CatalogProduct
+from src.core.models import CatalogProduct, PriceHistory
 from src.core.plugins.context import JobBook, build_context
 from src.core.scraper_config import set_scraper_config
 
@@ -140,7 +140,6 @@ def _make_user(
             "first_name": "Test",
             "last_name": "User",
             "role": role,
-            "temp_password": "temp-pass-123",
         },
         headers=_bearer(admin_token),
     )
@@ -154,11 +153,11 @@ def _make_user(
     return uid, str(relogin.json()["access_token"])
 
 
-def _user(client: TestClient, username: str = "alice") -> tuple[int, str]:
+def _user(client: TestClient, username: str = "alice@example.com") -> tuple[int, str]:
     return _make_user(client, _admin_token(client), username)
 
 
-def _super_user(client: TestClient, username: str = "sudo") -> tuple[int, str]:
+def _super_user(client: TestClient, username: str = "sudo@example.com") -> tuple[int, str]:
     """A super-user, which is what the manual scrape now needs (9.B8). A plain user does not
     get it at all — the restriction is the API's, not a hidden button's."""
     return _make_user(client, _admin_token(client), username, role="super_user")
@@ -232,11 +231,41 @@ def test_watches_crud(client: TestClient) -> None:
 
 def test_watches_are_per_user(client: TestClient) -> None:
     admin = _admin_token(client)
-    _uid_a, ta = _make_user(client, admin, "alice")
-    _uid_b, tb = _make_user(client, admin, "bob")
+    _uid_a, ta = _make_user(client, admin, "alice@example.com")
+    _uid_b, tb = _make_user(client, admin, "bob@example.com")
     with DragonServer() as base:
         _add_watch(client, _bearer(ta), gp_url(base, "896"))
     assert client.get(f"{DS}/watches", headers=_bearer(tb)).json() == []
+
+
+def test_delete_user_data_takes_this_users_rows_and_nobody_elses(client: TestClient) -> None:
+    """10.B4: the hook the account purge (10.B5) calls, proven on a plugin that has tables.
+
+    The invariant worth stating is the one about what it must **not** touch: since phase 9 a
+    product's price history belongs to the product, not to whoever was watching it, and
+    `price_history` deliberately carries no foreign key to `products` for exactly this
+    reason. Deleting a person cannot be allowed to take everybody else's history with it.
+    """
+    admin = _admin_token(client)
+    _uid_a, ta = _make_user(client, admin, "alice@example.com")
+    _uid_b, tb = _make_user(client, admin, "bob@example.com")
+    with DragonServer() as base:
+        url = gp_url(base, "896")
+        _add_watch(client, _bearer(ta), url)
+        _add_watch(client, _bearer(tb), url)
+
+    lp = _dragon(client)
+    ctx = build_context(lp.manifest, lp.plugin)
+    try:
+        history_before = ctx.db.scalar(select(func.count()).select_from(PriceHistory))
+        lp.plugin.delete_user_data(ctx, _uid_a)
+        history_after = ctx.db.scalar(select(func.count()).select_from(PriceHistory))
+    finally:
+        ctx.db.close()
+
+    assert client.get(f"{DS}/watches", headers=_bearer(ta)).json() == []
+    assert len(client.get(f"{DS}/watches", headers=_bearer(tb)).json()) == 1
+    assert history_after == history_before, "the price history is the product's, not the user's"
 
 
 def test_add_duplicate_watch_rejected(client: TestClient) -> None:
@@ -314,6 +343,67 @@ def test_scrape_now_populates_catalog(client: TestClient) -> None:
 
     assert page["total"] == 1
     assert page["items"][0]["plugin_id"] == "dragon_store"
+
+
+def test_a_manual_scrape_is_recorded_like_a_scheduled_one(client: TestClient) -> None:
+    """10.B20. Until phase 10 the manual path did the traffic and reported none of it, while
+    the counters the plugin bumps from inside went up regardless — two numbers about the same
+    requests, disagreeing. Now it writes a run row marked `manual` and moves the lifetime
+    counters; Simone's call was to record everything and let the Runs page filter."""
+    admin = _admin_token(client)
+    _uid, token = _make_user(client, admin, "sudo@example.com", role="super_user")
+    h = _bearer(token)
+    with DragonServer() as base:
+        _add_watch(client, h, gp_url(base, "896"))
+        _wait_resolved(client, h)
+        assert client.post(f"{DS}/scrape-now", headers=h).status_code == 202
+
+    # Default view is the schedule: a manual run must not be in it (Simone, 2026-08-02).
+    scheduled = client.get("/api/admin/runs", headers=_bearer(admin)).json()
+    assert scheduled["total"] == 0
+
+    manual = client.get("/api/admin/runs?trigger=manual", headers=_bearer(admin)).json()
+    assert manual["total"] == 1
+    run = manual["items"][0]
+    assert run["trigger"] == "manual" and run["slot"] is None
+    assert run["users_processed"] == 1
+    assert run["status"] == "ok"
+
+    # …and the drill-down works on it like any other run.
+    detail = client.get(f"/api/admin/runs/{run['run_id']}", headers=_bearer(admin)).json()
+    assert len(detail) == 1 and detail[0]["status"] == "ok"
+
+    stats = client.get(
+        "/api/admin/scrapers/dragon_store/lifetime-stats", headers=_bearer(admin)
+    ).json()
+    assert stats["runs_total"] == 1 and stats["runs_ok"] == 1
+    assert stats["products_delivered_total"] >= 1
+    # The requests really made towards the site — including the ones the *job* made while
+    # resolving the pasted URL, which used to be invisible here even though the plugin's own
+    # counters were going up at the same time (the gap 10.B20 exists to close).
+    assert stats["http_requests_total"] > 0
+
+
+def test_the_lifetime_counters_reset_and_restamp(client: TestClient) -> None:
+    """10.B21: destructive and without history — the new `since` is the whole record."""
+    admin = _admin_token(client)
+    _uid, token = _make_user(client, admin, "sudo@example.com", role="super_user")
+    h = _bearer(token)
+    with DragonServer() as base:
+        _add_watch(client, h, gp_url(base, "896"))
+        _wait_resolved(client, h)
+        client.post(f"{DS}/scrape-now", headers=h)
+
+    before = client.get(
+        "/api/admin/scrapers/dragon_store/lifetime-stats", headers=_bearer(admin)
+    ).json()
+    assert before["runs_total"] > 0
+
+    after = client.post(
+        "/api/admin/scrapers/dragon_store/lifetime-stats/reset", headers=_bearer(admin)
+    ).json()
+    assert after["runs_total"] == 0 and after["http_requests_total"] == 0
+    assert after["since"] > before["since"], "the counters restart from a stated moment"
 
 
 def test_scrape_now_cooldown_blocks_second(client: TestClient) -> None:
@@ -1304,7 +1394,7 @@ def test_the_dented_filter_cannot_be_changed_mid_scan(client: TestClient) -> Non
     # One admin token for both users: taking a second one would log in with a password the
     # first call already changed.
     admin = _admin_token(client)
-    uid, token = _make_user(client, admin, "alice")
+    uid, token = _make_user(client, admin, "alice@example.com")
     h = _bearer(token)
     session = new_session()
     try:
@@ -1320,7 +1410,7 @@ def test_the_dented_filter_cannot_be_changed_mid_scan(client: TestClient) -> Non
     assert busy.json()["code"] == "watch_busy"
 
     # Somebody else's watch is not found, never forbidden — that would confirm it exists.
-    _uid_b, token_b = _make_user(client, admin, "bob")
+    _uid_b, token_b = _make_user(client, admin, "bob@example.com")
     other = client.patch(
         f"{DS}/watches/{watch_id}", json={"include_ammaccati": True}, headers=_bearer(token_b)
     )
@@ -1370,7 +1460,7 @@ def test_a_run_reports_what_the_dented_filter_left_out(client: TestClient) -> No
     over a category of 39 reported 38 found and left the missing one unexplained. Only the
     plugin can say — the catalog service is handed the survivors."""
     admin = _admin_token(client)  # taken once: it changes the admin's own password
-    uid, token = _make_user(client, admin, "alice")
+    uid, token = _make_user(client, admin, "alice@example.com")
     h = _bearer(token)
     with CategoryServer() as base:
         _add_watch(client, h, sp_url(base))
@@ -1380,7 +1470,7 @@ def test_a_run_reports_what_the_dented_filter_left_out(client: TestClient) -> No
     assert delta.excluded == 1  # the dented listing on that page
 
     # A single product excludes nothing, and must not inherit the count.
-    uid_b, token_b = _make_user(client, admin, "bob")
+    uid_b, token_b = _make_user(client, admin, "bob@example.com")
     with DragonServer() as base:
         _add_watch(client, _bearer(token_b), gp_url(base, "896"))
         assert _run_for_user(client, uid_b).excluded == 0

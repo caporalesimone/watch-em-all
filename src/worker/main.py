@@ -13,7 +13,7 @@ import os
 import signal
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from types import FrameType
 from zoneinfo import ZoneInfo
 
@@ -23,23 +23,26 @@ from sqlalchemy.orm import Session
 from src.core.alert_engine import run_for_user
 from src.core.cart_engine import AdjustmentFn
 from src.core.config import get_settings
+from src.core.contracts import DeltaCounters
 from src.core.db import Base, create_schema, get_engine, init_engine, new_session
 from src.core.feature_flags import effective_flags, worker_tick_seconds
 from src.core.locks import scraper_lock
-from src.core.maintenance import purge_expired
-from src.core.models import Cart, ScraperSchedule, ScrapeRun, ScrapeUserLog
-from src.core.notify import drain_deliveries, enqueue_deliveries
+from src.core.maintenance import purge_alerts_over_limit, purge_expired
+from src.core.models import Cart, ScraperSchedule
+from src.core.notify import drain_deliveries, drain_message_deliveries, enqueue_deliveries
 from src.core.plugins.base import NotifierPlugin, ScraperPlugin
 from src.core.plugins.context import PluginContext, build_context
 from src.core.plugins.registry import LoadedPlugin, load_plugins
 from src.core.process_status import report
+from src.core.run_log import close_run, open_run, run_one_user
 from src.core.schedule import due_slot, install_tz, set_last_slot
 from src.core.schema_drift import check_schema_drift
 from src.core.scrape import implements_scraping, stamp_cooldown
 from src.core.scrape_cache import purge_expired as purge_expired_cache
-from src.core.scraper_stats import bump, record_run
+from src.core.scraper_stats import bump
 from src.core.settings import get_system_settings
 from src.core.system_log import install_system_log_handler
+from src.core.user_purge import purge_due_users
 from src.worker.runner import Runner
 
 log = logging.getLogger("wea.worker")
@@ -48,6 +51,8 @@ HEARTBEAT_FILE = os.environ.get("WEA_HEARTBEAT_FILE", "/tmp/worker-heartbeat")
 
 # Schedulable scrapers (scraper_id -> LoadedPlugin), populated at boot.
 _loaded: dict[str, LoadedPlugin] = {}
+# Every loaded plugin, for the account purge (10.B5), which must ask them all.
+_all_plugins: list[LoadedPlugin] = []
 
 # All loaded scraper plugins (scraper_id -> ScraperPlugin), for binding get_adjustments
 # during alert runs — a scraper_specific cart's scraper may not be schedulable.
@@ -109,6 +114,11 @@ def _boot() -> None:
     _loaded.clear()
     _scrapers.clear()
     _notifiers.clear()
+    # Every plugin, not just the schedulable scrapers: the account purge (10.B5) has to ask
+    # each one to drop its rows, and a notifier with per-user tables is as relevant there as
+    # a scraper is.
+    _all_plugins.clear()
+    _all_plugins.extend(loaded)
     for lp in loaded:
         if isinstance(lp.plugin, ScraperPlugin):
             _scrapers[lp.plugin.plugin_id] = lp.plugin
@@ -160,9 +170,57 @@ def _boot() -> None:
         session.close()
 
 
-def _daily_maintenance(now: datetime) -> None:
+def _maintenance_due(now: datetime, tz: ZoneInfo, hour: int, last_run: date | None) -> bool:
+    """Has today's maintenance window opened, and not run yet? (10.B8a)
+
+    Pure, so the decision is testable without a clock. Interpreted in the **install
+    timezone** like the scraper slots (4.B3): "seven in the morning" has to mean the local
+    seven. It catches up rather than skipping — a worker that was down at 07:00 and starts
+    at 09:00 still tidies up today, because the alternative is a day of housekeeping quietly
+    lost whenever the machine reboots at the wrong moment.
+    """
+    local = now.astimezone(tz)
+    if last_run == local.date():
+        return False
+    return local.hour >= hour
+
+
+def _maintenance(now: datetime) -> None:
+    """The nightly housekeeping window (10.B8a): every scheduled job, in one place.
+
+    One window rather than jobs scattered around the loop, so there is a single moment to
+    look at when something did not get tidied — and a single moment the machine is busy.
+    It **announces itself at both ends**: a maintenance that starts and never says it
+    finished is the shape a hang has in a log, and without the closing line an admin cannot
+    tell one from a quiet night. The end line is in a ``finally`` so it survives a failure.
+    """
+    log.info("maintenance window started")
+    started = time.monotonic()
+    try:
+        _purge_operational_records(now)
+        _purge_alert_history()
+    finally:
+        log.info("maintenance window finished in %.1fs", time.monotonic() - started)
+
+
+def _purge_alert_history() -> None:
+    """Trim each person's notification history to the configured length (10.B8b)."""
+    try:
+        session = new_session()
+        try:
+            keep = get_system_settings(session).alert_keep_last
+            removed = purge_alerts_over_limit(session, keep)
+        finally:
+            session.close()
+        if removed:
+            log.info("alert retention: removed %d alert(s) beyond the last %d", removed, keep)
+    except Exception:
+        log.exception("alert retention failed")
+
+
+def _purge_operational_records(now: datetime) -> None:
     """Prune old system logs and run records beyond ``log_retention_days`` (MNT-R2).
-    Runs once a day from the loop; a failure must never stop the worker."""
+    A failure must never stop the worker, nor the jobs beside it in the window."""
     try:
         session = new_session()
         try:
@@ -180,16 +238,18 @@ def _daily_maintenance(now: datetime) -> None:
     except Exception:
         log.exception("daily maintenance failed")
 
-
-def _aggregate_status(outcomes: list[str], timed_out: bool) -> str:
-    """Run status from the per-user outcomes (scheduling-models.md)."""
-    if timed_out:
-        return "timeout"
-    if not outcomes or all(o == "ok" for o in outcomes):
-        return "ok"
-    if any(o == "ok" for o in outcomes):
-        return "partial"
-    return "error"
+    # Accounts whose grace period has expired (10.B5, CRON-R10). Its own try: an account
+    # that will not delete must not take the log retention down with it, and vice versa.
+    try:
+        session = new_session()
+        try:
+            purged = purge_due_users(session, now, _all_plugins, _notifiers)
+        finally:
+            session.close()
+        if purged:
+            log.info("purged %d account(s) past their deletion deadline", purged)
+    except Exception:
+        log.exception("account purge failed")
 
 
 def _run_scraper(
@@ -205,10 +265,13 @@ def _run_scraper(
     manual-cooldown anchor (SCR-R15) per user; a per-user error doesn't stop the others
     (POOL-R5); a run past ``deadline`` stops between users (SCHED-R7); the last slot is
     recorded even on failure/timeout (CRON-R6). Returns the set of user ids processed, so
-    the caller can run the alert engine for them (event-driven alerts)."""
-    run = ScrapeRun(scraper_id=scraper_id, trigger=trigger, slot=slot, started_at=datetime.now(UTC))
-    ctx.db.add(run)
-    ctx.db.commit()
+    the caller can run the alert engine for them (event-driven alerts).
+
+    The bookkeeping itself lives in :mod:`src.core.run_log` since 10.B20, shared with the
+    manual path — what stays here is the scheduling: the deadline, the cooldown stamp, and
+    the rule that one user's failure does not stop the queue.
+    """
+    run = open_run(ctx.db, scraper_id, trigger=trigger, slot=slot)
     outcomes: list[str] = []
     processed: set[int] = set()
     timed_out = False
@@ -219,63 +282,37 @@ def _run_scraper(
                 log.warning("scrape timed out: %s (slot %s)", scraper_id, slot)
                 break
             processed.add(user_id)
-            ulog = ScrapeUserLog(run_id=run.run_id, user_id=user_id, started_at=datetime.now(UTC))
-            ctx.db.add(ulog)
-            before = ctx.http.request_count
-            before_hits = ctx.http.cache_hits
-            try:
-                stamp_cooldown(ctx.db, scraper_id, user_id)
-                delta = plugin.run_for_user(ctx, user_id)
-                ulog.products_found = delta.found
-                ulog.products_new = delta.new
-                ulog.price_changes = delta.price_changes
-                run.products_removed += delta.removed
-                # What the scraper filtered out before delivering (9.B5): the column has been
-                # on scrape_run since 4.B6 and nothing wrote it, so a run over a category of 39
-                # reported 38 found and left the missing one unaccounted for. Only the plugin
-                # knows — the catalog service is handed the survivors.
-                run.products_excluded += delta.excluded
-                ulog.status = "ok"
-                outcomes.append("ok")
-            except Exception as exc:
-                log.exception("scrape failed: %s user %s", scraper_id, user_id)
-                ulog.status = "error"
-                ulog.error_message = str(exc)[:500]
-                outcomes.append("error")
-            ulog.http_requests = ctx.http.request_count - before
-            ulog.cache_hits = ctx.http.cache_hits - before_hits
-            ulog.finished_at = datetime.now(UTC)
-            run.users_processed += 1
-            run.products_found += ulog.products_found
-            run.products_new += ulog.products_new
-            run.price_changes += ulog.price_changes
-            run.http_requests += ulog.http_requests
-            run.cache_hits += ulog.cache_hits
-            ctx.db.commit()
+
+            def work(uid: int = user_id) -> DeltaCounters:
+                # Inside the per-user slice, not before it: the cooldown stamp is a database
+                # write like any other, and if it fails that is this user's problem, not a
+                # reason to abandon everybody still in the queue (POOL-R5).
+                stamp_cooldown(ctx.db, scraper_id, uid)
+                return plugin.run_for_user(ctx, uid)
+
+            outcomes.append(
+                run_one_user(
+                    ctx.db,
+                    run,
+                    user_id,
+                    work,
+                    http_before=(ctx.http.request_count, ctx.http.cache_hits),
+                    http_after=lambda: (ctx.http.request_count, ctx.http.cache_hits),
+                )
+            )
     except Exception as exc:
         log.exception("scrape run failed: %s", scraper_id)
         run.error_message = str(exc)[:500]
     finally:
-        run.status = _aggregate_status(outcomes, timed_out)
-        run.finished_at = datetime.now(UTC)
-        ctx.db.commit()
-        # Lifetime statistics (9.B6c): scrape_run has retention, so this row is the only
-        # memory of what this scraper has ever done. Never let it break a run.
-        try:
-            record_run(
-                ctx.db,
-                scraper_id,
-                ok=run.status == "ok",
-                seconds=(run.finished_at - run.started_at).total_seconds(),
-                http_requests=run.http_requests,
-                cache_hits=run.cache_hits,
-                bytes_downloaded=ctx.http.bytes_downloaded,
-                politeness_wait_s=ctx.http.waited_seconds,
-                robots_denied=ctx.http.robots_denied,
-                products_delivered=run.products_found,
-            )
-        except Exception:
-            log.exception("could not record the lifetime statistics of %s", scraper_id)
+        close_run(
+            ctx.db,
+            run,
+            outcomes,
+            timed_out=timed_out,
+            bytes_downloaded=ctx.http.bytes_downloaded,
+            politeness_wait_s=ctx.http.waited_seconds,
+            robots_denied=ctx.http.robots_denied,
+        )
         set_last_slot(ctx.db, scraper_id, slot)
         log.info(
             "run %s (%s): %s — %d user(s), found=%d new=%d price_changes=%d removed=%d "
@@ -364,12 +401,22 @@ def _drain_deliveries_step() -> None:
     Decoupled from the scrape so a slow/failing channel never blocks a run. Never raises."""
     session = new_session()
     try:
-        n = drain_deliveries(session, _notifiers)
+        # Both queues on the same step: an admin message is a notification like any other, and
+        # giving it a timer of its own would only mean two things to keep in sync (10.B12).
+        n = drain_deliveries(session, _notifiers) + drain_message_deliveries(session, _notifiers)
         if n:
             log.info("delivery drain: processed %d pending delivery(ies)", n)
     except Exception:
         session.rollback()
         log.exception("delivery drain failed")
+    finally:
+        session.close()
+
+
+def _maintenance_hour() -> int:
+    session = new_session()
+    try:
+        return get_system_settings(session).maintenance_hour
     finally:
         session.close()
 
@@ -386,13 +433,16 @@ def _loop(submit: Submit, max_ticks: int | None = None) -> None:
     """Tick forever (or ``max_ticks`` times, for tests): heartbeat + dispatch due slots."""
     tz = install_tz()
     last_interval: int | None = None
-    last_maint_date = None
+    last_maint_date: date | None = None
     ticks = 0
     while max_ticks is None or ticks < max_ticks:
         now = datetime.now(UTC)
-        if now.date() != last_maint_date:  # once per (UTC) day, and at the first tick
-            _daily_maintenance(now)
-            last_maint_date = now.date()
+        # Once a day, at the configured local hour (10.B8a). It used to run at the first
+        # tick after midnight UTC, which meant "whenever the worker happened to restart" —
+        # housekeeping at an hour nobody chose, and sometimes several times a day.
+        if _maintenance_due(now, tz, _maintenance_hour(), last_maint_date):
+            _maintenance(now)
+            last_maint_date = now.astimezone(tz).date()
         _heartbeat(now)
         # The heartbeat still goes out while the schema is incompatible — it is how the web
         # knows this process is alive, and a silent worker would read as a second, different

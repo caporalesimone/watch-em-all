@@ -103,6 +103,27 @@ services:
     ports: ["8081:8081"]                  # pgweb listens on 8081 (the web/app uses 8080)
     depends_on:
       db: { condition: service_healthy }
+    # `docker ps` showed pgweb as a bare "Up" next to four services reporting "healthy" (10.X3).
+    # The image ships no curl and no wget, but it does ship bash, and bash speaks TCP: the
+    # /dev/tcp redirection opens the socket and the printf sends a real request. It must be
+    # `CMD` with an explicit `bash` — `CMD-SHELL` runs dash, which has no /dev/tcp and fails
+    # with a puzzling "Directory nonexistent". The probe hits /api/connection rather than
+    # /api/info on purpose: /api/info answers from pgweb's own build metadata and would keep
+    # saying 200 with the database gone, which is the one failure a health check here exists
+    # to catch.
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8081 &&
+          printf 'GET /api/connection HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3 &&
+          grep -q '200 OK' <&3
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
     logging: *logging
 

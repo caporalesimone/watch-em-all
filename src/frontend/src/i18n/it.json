@@ -20,7 +20,10 @@
 		"featureFlags": "Feature flag",
 		"systemLogs": "Log di sistema",
 		"settings": "Impostazioni",
-		"priceHistory": "Storico prezzi"
+		"priceHistory": "Storico prezzi",
+		"runs": "Run",
+		"adminDashboard": "Dashboard",
+		"calendar": "Calendario"
 	},
 	"catalog": {
 		"title": "Catalogo",
@@ -109,7 +112,24 @@
 			"never": "Mai",
 			"created": "Creato \"{username}\" — comunica la password temporanea; dovrà cambiarla al primo accesso.",
 			"errorTaken": "Questo nome utente è già in uso.",
-			"errorGeneric": "Impossibile creare l'utente."
+			"errorGeneric": "Impossibile creare l'utente.",
+			"statusDeleting": "In cancellazione",
+			"filterAll": "Tutti",
+			"filterActive": "Attivi",
+			"filterDisabled": "Disabilitati",
+			"filterDeleting": "In cancellazione",
+			"colMarkedAt": "Marcato",
+			"colDueAt": "Eliminato il",
+			"actionReset": "Reimposta password",
+			"actionDisable": "Disabilita",
+			"actionEnable": "Abilita",
+			"actionDelete": "Elimina",
+			"actionRestore": "Annulla eliminazione",
+			"confirmReset": "Reimpostare la password di {username}? Quella attuale smette di funzionare e dovrà sceglierne una nuova.",
+			"confirmDelete": "Eliminare {username}? L'account si spegne subito e viene distrutto definitivamente il {date}. Fino ad allora puoi annullare.",
+			"confirmRestore": "Annullare l'eliminazione di {username}? L'account torna disabilitato — riattivarlo è un passo a parte.",
+			"resetDone": "Nuova password temporanea per {username}: {password}",
+			"errorSelf": "Non puoi disabilitare o eliminare il tuo account."
 		},
 		"notifiers": {
 			"title": "Notifier",
@@ -148,14 +168,25 @@
 				"scraper_run_timeout_min": "Timeout di run (minuti)",
 				"log_retention_days": "Retention log (giorni)",
 				"catchup_warning_min": "Soglia avviso recuperi (minuti)",
-				"user_deletion_retention_days": "Grazia cancellazione utenti (giorni)"
+				"user_deletion_retention_days": "Grazia cancellazione utenti (giorni)",
+				"maintenance_hour": "Ora della manutenzione",
+				"alert_keep_last": "Alert conservati per utente"
 			},
 			"fieldHints": {
 				"scraper_run_timeout_min": "Una run schedulata viene terminata se supera questo limite.",
 				"log_retention_days": "Log e record di run più vecchi vengono eliminati ogni giorno; 0 = mai. Lo storico prezzi non si tocca.",
 				"catchup_warning_min": "Avvisa quando uno slot recuperato è più vecchio di così (attivo quando arriva la feature).",
-				"user_deletion_retention_days": "Finestra di grazia prima della cancellazione definitiva di un utente (fase 10)."
-			}
+				"user_deletion_retention_days": "Finestra di grazia prima della cancellazione definitiva di un utente (fase 10).",
+				"maintenance_hour": "Ora locale in cui girano tutte le attività notturne di manutenzione.",
+				"alert_keep_last": "Le notifiche più vecchie si rimuovono ogni notte. 0 le tiene tutte."
+			},
+			"passwordExpiry": "Scadenza password",
+			"passwordExpiryHint": "Forza una password nuova quando l'attuale raggiunge questa età.",
+			"expiryNever": "Mai",
+			"expiry30": "1 mese",
+			"expiry90": "3 mesi",
+			"expiry180": "6 mesi",
+			"expiry365": "1 anno"
 		},
 		"featureFlags": {
 			"title": "Feature flag",
@@ -217,6 +248,74 @@
 				"willStartIn": "{name} parte tra {when}",
 				"removeTitle": "{name} · {time} (clicca per rimuovere)"
 			}
+		},
+		"runs": {
+			"title": "Run degli scraper",
+			"hint": "Solo le run recenti: queste righe le pota la manutenzione notturna.",
+			"colWhen": "Inizio",
+			"colScraper": "Scraper",
+			"colTrigger": "Avvio",
+			"colStatus": "Esito",
+			"colUsers": "Utenti",
+			"colFound": "Trovati",
+			"colNew": "Nuovi",
+			"colChanges": "Cambi prezzo",
+			"colRequests": "Richieste",
+			"colCache": "Cache hit",
+			"colDuration": "Durata",
+			"filterAll": "Tutti gli esiti",
+			"empty": "Nessuna run registrata.",
+			"prev": "Precedente",
+			"next": "Successiva",
+			"statusOk": "OK",
+			"statusPartial": "Parziale",
+			"statusError": "Errore",
+			"statusTimeout": "Timeout",
+			"detailTitle": "Per utente",
+			"colUser": "Utente",
+			"colError": "Errore",
+			"deletedUser": "(account cancellato)",
+			"close": "Chiudi"
+		},
+		"dashboard": {
+			"title": "Dashboard",
+			"window7": "7 giorni",
+			"window30": "30 giorni",
+			"totalsTitle": "Installazione",
+			"usersTotal": "Account",
+			"usersActive": "Attivi",
+			"usersDeleting": "In cancellazione",
+			"products": "Righe di catalogo",
+			"productsDelisted": "Delistati",
+			"carts": "Carrelli",
+			"history": "Righe di storico prezzi",
+			"notificationsTitle": "Notifiche",
+			"alerts": "Digest scritti",
+			"delivered": "Consegnate",
+			"failed": "Fallite",
+			"skipped": "Saltate",
+			"windowNote": "Contate sugli ultimi {days} giorni.",
+			"historyNote": "L'unica tabella che non viene mai potata.",
+			"loadTitle": "Carico per account",
+			"byPairTitle": "Per account e negozio",
+			"loadNote": "Il traffico è contato sulla finestra qui sopra; catalogo e carrelli sono uno stato corrente e non ne hanno.",
+			"colUser": "Account",
+			"colScraper": "Negozio",
+			"colProducts": "Catalogo",
+			"colCarts": "Carrelli",
+			"colRequests": "Richieste",
+			"colCache": "Cache hit",
+			"loadEmpty": "Nessuna run registrata in questa finestra.",
+			"deletedUser": "(account cancellato)"
+		},
+		"calendar": {
+			"title": "Calendario del giorno",
+			"hint": "Sola lettura: è quello che il worker intende fare. Si cambia nell'editor degli orari.",
+			"empty": "Per questa giornata non è schedulato niente.",
+			"suspended": "sospeso",
+			"unknownDuration": "durata sconosciuta",
+			"today": "Oggi",
+			"date": "Giorno"
 		}
 	},
 	"plugins": {

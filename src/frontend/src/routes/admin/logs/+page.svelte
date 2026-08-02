@@ -7,6 +7,7 @@
 	import { _ } from 'svelte-i18n';
 
 	import { getLogsPage, tailLogs, type SystemLogEntry, type LogQuery } from '$lib/api/client';
+	import Modal from '$lib/components/Modal.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 
 	type Level = 'info' | 'warning' | 'error';
@@ -431,28 +432,22 @@
 	{/if}
 </section>
 
+<!-- The JSON inspector, on the shared Modal (10.T2): Escape, the backdrop and the focus trap
+     now come from the component instead of being half-implemented here. -->
 {#if contextRow}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-		<div
-			class="max-h-[80vh] w-full max-w-lg overflow-auto rounded-lg border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-700 dark:bg-slate-900"
-			role="dialog"
-			aria-modal="true"
-		>
-			<div class="mb-3 flex items-center justify-between">
-				<h2 class="font-semibold">{$_('admin.logs.context')}</h2>
-				<button
-					type="button"
-					class="rounded px-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-					aria-label={$_('common.cancel')}
-					onclick={() => (contextRow = null)}>✕</button
-				>
-			</div>
-			<pre
-				class="overflow-auto rounded bg-slate-100 p-3 font-mono text-xs dark:bg-slate-800">{JSON.stringify(
-					contextRow.context,
-					null,
-					2
-				)}</pre>
-		</div>
-	</div>
+	{@const row = contextRow}
+	<Modal
+		open={true}
+		title={$_('admin.logs.context')}
+		icon="🔎"
+		closeLabel={$_('common.close')}
+		onclose={() => (contextRow = null)}
+	>
+		<pre
+			class="overflow-auto rounded bg-slate-100 p-3 font-mono text-xs dark:bg-slate-800">{JSON.stringify(
+				row.context,
+				null,
+				2
+			)}</pre>
+	</Modal>
 {/if}

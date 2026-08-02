@@ -69,7 +69,7 @@ def _no_adjuster(_cart: Cart) -> None:
 
 def test_run_seeds_then_one_digest_then_no_repeat() -> None:
     with _session() as db:
-        user = User(username="alice", password_hash="x")
+        user = User(username="alice@example.com", password_hash="x")
         db.add(user)
         db.flush()
         p1 = _product(db, user.id, "a", price="100.00", discount="0")
@@ -105,7 +105,7 @@ def test_run_seeds_then_one_digest_then_no_repeat() -> None:
 
 def test_only_changed_carts_appear_in_digest() -> None:
     with _session() as db:
-        user = User(username="bob", password_hash="x")
+        user = User(username="bob@example.com", password_hash="x")
         db.add(user)
         db.flush()
         p1 = _product(db, user.id, "a", price="100.00", discount="0")
@@ -127,7 +127,7 @@ def test_delisting_notifies_once_through_the_whole_run() -> None:
     # 9.B9 end to end: the run that observes the delisting notifies, the next one does not,
     # and a price move on the delisted row stays silent (ALERT-R12).
     with _session() as db:
-        user = User(username="carol", password_hash="x")
+        user = User(username="carol@example.com", password_hash="x")
         db.add(user)
         db.flush()
         p = _product(db, user.id, "a", price="100.00", discount="0")

@@ -26,8 +26,13 @@ Role legend: 🌐 public · 👤 user · ⚡ super-user (and admin) · 🛡 admi
 
 | Method | Path | Role | Body | Notes |
 |---|---|---|---|---|
-| POST | `/api/admin/users` | 🛡 | `{username, first_name, last_name, role, temp_password}` | creates an account with a forced first-login password change; duplicate username → 409 (USR-R1/R2/R15). `role` ∈ {`user`, `super_user`, `admin`} — chosen here and not changed afterwards (promoting an existing account is a later phase) |
-| GET | `/api/admin/users` | 🛡 | — | lists all accounts (username, name, role, status, last login) |
+| POST | `/api/admin/users` | 🛡 | `{username, first_name, last_name, role}` | creates an account with a forced first-login password change; duplicate username → 409 (USR-R1/R2/R15). The username **is** an email address and the password is generated and mailed, never typed here (10.B23/10.B24): `422 email_channel_unavailable` if the channel cannot deliver, and no account is created. `role` ∈ {`user`, `super_user`, `admin`} — chosen here and not changed afterwards |
+| GET | `/api/admin/users` | 🛡 | — | lists all accounts (username, name, role, status, last login). `?status=active\|disabled\|deleting`; `?sort=` on **any column** (`username\|name\|role\|status\|last_login\|marked_at\|due_at`, 10.F28 — role and status by rank, not alphabetically) with `?order=asc\|desc` |
+| PATCH | `/api/admin/users/{id}` | 🛡 | `{is_active}` | enable/disable. Disabling kills the refresh family and tells the person (USR-R11); never your own account → `403 cannot_target_self` |
+| POST | `/api/admin/users/{id}/reset-password` | 🛡 | — | generate a new password, mail it, force a change and end every session (AUTH-R5) |
+| DELETE | `/api/admin/users/{id}` | 🛡 | — | **soft delete**: switches the account off and sets `deletion_due_at` = now + grace period. Nothing is destroyed (USR-R7) |
+| POST | `/api/admin/users/{id}/restore` | 🛡 | — | cancel a pending deletion; the account comes back **disabled**, never directly active (USR-R8) |
+| DELETE | `/api/admin/users/{id}/purge` | 🛡 | — | destroy an **already-marked** account now, waiving the grace period (USR-R9b) → `204`. `409 not_being_deleted` if it is not marked, `403 cannot_target_self`, `500 purge_failed` if a plugin refuses to give up its data (the account is then unchanged) |
 
 ## Admin — system
 
@@ -121,16 +126,17 @@ The user's notification channels (phase 7). A channel the admin has globally dis
 | GET | `/api/notifiers` | 👤 | — | per channel: `{plugin_id, display_name, is_in_app, user_schema, config, is_set, available, user_config_complete, enabled, active}`. `config` holds only non-secret stored values |
 | PUT | `/api/notifiers/{plugin_id}/config` | 👤 | `{config}` | save the personal config; keys filtered on the user schema (CFG-R5), an omitted secret keeps the stored value (CFG-R3). In-app → **422** `in_app_no_config`. Unknown → **404** |
 | PATCH | `/api/notifiers/{plugin_id}` | 👤 | `{enabled}` | activate/deactivate for the user (config preserved). In-app → **422** `in_app_always_active` |
-| POST | `/api/notifiers/{plugin_id}/test` | 👤 | — | send a test to the user's own target (synchronous, no persistence) → `{ok, error}` |
+
+There is **no user-facing test send** (10.X4). It made sense while a user typed their own delivery address into this page; since 10.B23/10.B25 the address *is* the account and has already proved it works by carrying the password that person signed in with. What was left probed the server's SMTP config from a page whose owner cannot touch it — that probe lives on the admin side.
 
 ## Admin — notifiers (system config) — [notifier-plugin](../3-features/plugins/notifier-plugin.md)
 
 | Method | Path | Role | Body | Notes |
 |---|---|---|---|---|
-| GET | `/api/admin/notifiers` | 🛡 | — | per channel: `{plugin_id, display_name, is_in_app, admin_schema, user_schema, config, is_set, enabled, admin_config_complete}` (`user_schema` feeds the channel-test target) |
+| GET | `/api/admin/notifiers` | 🛡 | — | per channel: `{plugin_id, display_name, is_in_app, admin_schema, user_schema, config, is_set, enabled, admin_config_complete}` |
 | PUT | `/api/admin/notifiers/{plugin_id}/config` | 🛡 | `{config}` | set the system config; keys filtered on the admin schema, secrets write-only. In-app → **422** `in_app_no_config` |
-| PATCH | `/api/admin/notifiers/{plugin_id}` | 🛡 | `{enabled}` | global **kill-switch** (PCFG-R8): off = unavailable to everyone, personal configs preserved. Applies to in-app too |
-| POST | `/api/admin/notifiers/{plugin_id}/test` | 🛡 | `{config}` | probe the channel with the system config + an admin-supplied target (filtered on the user schema; not persisted) → `{ok, error}` |
+| PATCH | `/api/admin/notifiers/{plugin_id}` | 🛡 | `{enabled}` | global **kill-switch** (PCFG-R8): off = unavailable to everyone, personal configs preserved. Applies to in-app too. Switching **on** an unvalidated channel → **422** `not_validated` (10.B28) |
+| POST | `/api/admin/notifiers/{plugin_id}/validate` | 🛡 | — | send a real message through the channel, to the **admin's own account** (10.B25); if the server accepts it the settings are recorded as validated (NOT-R9) → `{ok, error, channel}`. Incomplete config → **422** `config_incomplete`; a refusal records nothing |
 
 ## Scraper plugin routes — Dragon Store (implemented)
 

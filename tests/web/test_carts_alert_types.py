@@ -34,7 +34,6 @@ def _make_user(client: TestClient, admin_token: str, username: str) -> str:
             "first_name": "Test",
             "last_name": "User",
             "role": "user",
-            "temp_password": "temp-pass-123",
         },
         headers=_bearer(admin_token),
     )
@@ -61,7 +60,7 @@ def test_alert_types_require_auth(client: TestClient) -> None:
 
 
 def test_set_replaces_and_persists(client: TestClient) -> None:
-    token = _make_user(client, _admin_token(client), "alice")
+    token = _make_user(client, _admin_token(client), "alice@example.com")
     cart_id = _make_cart(client, token)
 
     # A fresh cart has no alert types.
@@ -106,7 +105,7 @@ def test_set_replaces_and_persists(client: TestClient) -> None:
 def test_delisting_is_an_enablable_type(client: TestClient) -> None:
     """9.B9/9.F6: the fifth product tag is offered like the other four. The route validates
     against the AlertType enum, so this is the whole of what "available to enable" means."""
-    token = _make_user(client, _admin_token(client), "alice")
+    token = _make_user(client, _admin_token(client), "alice@example.com")
     cart_id = _make_cart(client, token)
     resp = client.put(
         f"/api/carts/{cart_id}/alert-types",
@@ -118,7 +117,7 @@ def test_delisting_is_an_enablable_type(client: TestClient) -> None:
 
 
 def test_unknown_alert_type_rejected(client: TestClient) -> None:
-    token = _make_user(client, _admin_token(client), "alice")
+    token = _make_user(client, _admin_token(client), "alice@example.com")
     cart_id = _make_cart(client, token)
     resp = client.put(
         f"/api/carts/{cart_id}/alert-types",
@@ -137,7 +136,7 @@ def test_enabling_first_type_seeds_baseline(client: TestClient) -> None:
     from src.core.db import new_session
     from src.core.models import AlertSnapshot
 
-    token = _make_user(client, _admin_token(client), "alice")
+    token = _make_user(client, _admin_token(client), "alice@example.com")
     cart_id = _make_cart(client, token)
 
     # No types yet → no baseline.
@@ -162,7 +161,7 @@ def test_disabling_all_types_deletes_baseline(client: TestClient) -> None:
     from src.core.db import new_session
     from src.core.models import AlertSnapshot
 
-    token = _make_user(client, _admin_token(client), "alice")
+    token = _make_user(client, _admin_token(client), "alice@example.com")
     cart_id = _make_cart(client, token)
 
     client.put(
@@ -182,8 +181,8 @@ def test_disabling_all_types_deletes_baseline(client: TestClient) -> None:
 
 def test_alert_types_are_per_user(client: TestClient) -> None:
     admin = _admin_token(client)
-    token_a = _make_user(client, admin, "alice")
-    token_b = _make_user(client, admin, "bob")
+    token_a = _make_user(client, admin, "alice@example.com")
+    token_b = _make_user(client, admin, "bob@example.com")
     cart_id = _make_cart(client, token_a)
 
     resp = client.put(

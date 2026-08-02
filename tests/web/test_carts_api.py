@@ -34,7 +34,6 @@ def _make_user(client: TestClient, admin_token: str, username: str) -> str:
             "first_name": "Test",
             "last_name": "User",
             "role": "user",
-            "temp_password": "temp-pass-123",
         },
         headers=_bearer(admin_token),
     )
@@ -54,7 +53,7 @@ def test_carts_require_auth(client: TestClient) -> None:
 
 
 def test_cross_cart_crud_cycle(client: TestClient) -> None:
-    token = _make_user(client, _admin_token(client), "alice")
+    token = _make_user(client, _admin_token(client), "alice@example.com")
 
     created = client.post(
         "/api/carts", json={"name": "Camera", "mode": "cross"}, headers=_bearer(token)
@@ -79,7 +78,7 @@ def test_cross_cart_crud_cycle(client: TestClient) -> None:
 
 
 def test_scraper_specific_requires_a_loaded_scraper(client: TestClient) -> None:
-    token = _make_user(client, _admin_token(client), "alice")
+    token = _make_user(client, _admin_token(client), "alice@example.com")
 
     ok = client.post(
         "/api/carts",
@@ -105,7 +104,7 @@ def test_scraper_specific_requires_a_loaded_scraper(client: TestClient) -> None:
 
 
 def test_cross_cart_rejects_scraper_id(client: TestClient) -> None:
-    token = _make_user(client, _admin_token(client), "alice")
+    token = _make_user(client, _admin_token(client), "alice@example.com")
     resp = client.post(
         "/api/carts",
         json={"name": "x", "mode": "cross", "scraper_id": "dragon_store"},
@@ -117,8 +116,8 @@ def test_cross_cart_rejects_scraper_id(client: TestClient) -> None:
 
 def test_carts_are_per_user(client: TestClient) -> None:
     admin = _admin_token(client)
-    token_a = _make_user(client, admin, "alice")
-    token_b = _make_user(client, admin, "bob")
+    token_a = _make_user(client, admin, "alice@example.com")
+    token_b = _make_user(client, admin, "bob@example.com")
 
     cart_id = client.post(
         "/api/carts", json={"name": "Alice cart", "mode": "cross"}, headers=_bearer(token_a)

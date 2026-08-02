@@ -28,18 +28,22 @@ The Profile page gathers what concerns the account itself: identity, interface l
 
 A **Notification channels** section lists every notifier the admin has made available. For each
 channel the user sees its **composite state** and, where applicable, a personal config form (rendered
-from the plugin's [`ConfigField`](../../4-capabilities/contracts/config-field.md) schema), an **on/off**
-toggle and a **Test** button (outcome shown as a toast). See [notifier-plugin](../plugins/notifier-plugin.md).
+from the plugin's [`ConfigField`](../../4-capabilities/contracts/config-field.md) schema) and an
+**on/off** toggle. See [notifier-plugin](../plugins/notifier-plugin.md).
 
 - **PROF-R6/R7** — A channel delivers only when it is admin-enabled **and** its system config is
   complete **and** the user's required fields are valid **and** the user has activated it. The
   composite state is shown plainly (available / needs your details / active). A channel the admin has
   globally disabled is **not listed**.
-- **PROF-R8** — Each configurable channel has a **Test** button: sends a test with the current merged
-  config; no persistence.
+- **PROF-R8** — ~~Each configurable channel has a **Test** button.~~ **Withdrawn in 10.X4.** It made
+  sense while a user typed their own delivery address into this page. Since 10.B23/10.B25 the address
+  *is* the account, and it has already proved it works by carrying the password that person signed in
+  with; what was left probed the server's SMTP config from a page whose owner cannot change it. The
+  probe survives on the admin's own page, where it can be acted on (NOT-R6).
 - **PROF-R9** — Secret fields are masked and write-only (never returned); a stored value is shown as
   "saved" without revealing it.
 - **PROF-R10** — Deactivating a channel keeps its config (re-activate without re-typing).
+- **PROF-R12** (10.F17) — The **notification address** is the account itself. Since 10.B23 the username *is* an email address, so the profile **shows** it and offers nothing to edit: changing where your mail goes would mean changing who you sign in as, which is an administrator's operation. The **bootstrap admin** is the single exception — it signs in with a name rather than an address, so it sets its own `contact_email` (`PATCH /api/me {contact_email}`, validated and stored lowercase); every other account gets `403 address_not_editable`. Consequence for the email channel: it declares **no user fields** any more (10.B25), so what is left of it in the profile is the on/off switch, which a new account already has on.
 - **In-app channel.** The in-app history is itself a channel, shown here as **always on** — the user
   cannot disable it (only the admin can, globally). So the dashboard banner no longer means "you get
   nothing"; it only nudges a user with **no external channel** active (e.g. email) to add one.

@@ -38,6 +38,8 @@ from src.core.catalog import update_catalog as _update_catalog_service
 from src.core.catalog import upsert_products as _upsert_products_service
 from src.core.db import get_engine, new_session
 from src.core.http import HttpClient
+from src.core.markdown import strip as _md_strip
+from src.core.markdown import to_html as _md_to_html
 from src.core.plugin_jobs import JobProgress
 from src.core.plugin_jobs import begin_job as _begin_job
 from src.core.plugin_jobs import forget_job as _forget_job
@@ -134,6 +136,18 @@ def bind_upsert_catalog(session: Session) -> UpdateCatalog:
     return _upsert
 
 
+@dataclass(frozen=True)
+class MarkdownHelper:
+    """``context.markdown.to_html(...)`` / ``.strip(...)`` — the two renderings, namespaced
+    so the context grows one attribute rather than two loose functions."""
+
+    def to_html(self, text: str) -> str:
+        return _md_to_html(text)
+
+    def strip(self, text: str) -> str:
+        return _md_strip(text)
+
+
 @dataclass
 class PluginContext:
     """Everything a plugin may use, and by convention nothing else."""
@@ -155,6 +169,11 @@ class PluginContext:
     # a book under the empty plugin id: a context built without one still answers, and a plugin
     # that never publishes progress never reaches it.
     jobs: JobBook = field(default_factory=lambda: JobBook(plugin_id=""))
+    # Markdown for message bodies (CTX-R8). A notifier needs both renderings of the same
+    # source — rich for a channel that can show it, plain for one that cannot — and neither
+    # belongs in a plugin: three notifiers writing their own would be three sanitisers, and
+    # the weakest one would define the security of all of them.
+    markdown: MarkdownHelper = field(default_factory=lambda: MarkdownHelper())
 
 
 def build_context(manifest: Manifest, plugin: BasePlugin) -> PluginContext:
@@ -215,6 +234,7 @@ def build_http_client(
     return HttpClient(
         timeout_s=cfg.http_timeout_s,
         min_interval_s=cfg.politeness_delay_ms / 1000,
+        max_retries=cfg.http_retries,
         cache=ScrapeCache(get_engine(), plugin_id, ttl_min=cfg.cache_ttl_min),
         # The client logs under the plugin's own namespace so one log stream tells the
         # whole story of a run: robots.txt, politeness, cache hits, failures.

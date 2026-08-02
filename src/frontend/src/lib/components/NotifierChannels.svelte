@@ -1,17 +1,21 @@
 <script lang="ts">
 	// User notifier channels (7.F3): the Profile "Notification channels" section. Lists the
 	// channels the admin has made available, each with its composite state, the personal
-	// config form (dynamic, from the plugin schema), an on/off toggle and a Test button.
+	// config form (dynamic, from the plugin schema) and an on/off toggle.
 	// In-app is shown as always-on with no form. Self-contained/props-driven (FE-18).
+	//
+	// The Test button is gone since 10.X4. It was here from when a user typed their own
+	// delivery address into this page; since 10.B23 the address *is* the account, and it has
+	// already proved it works — the password that got this person in arrived on it. What the
+	// button really probed was the server's SMTP config, which is the administrator's to fix
+	// and is tested from their own page.
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 
 	import {
-		ApiErr,
 		listNotifiers,
 		setNotifierConfig,
 		setNotifierEnabled,
-		testNotifier,
 		type NotifierChannel
 	} from '$lib/api/client';
 	import DynamicConfigForm from '$lib/components/DynamicConfigForm.svelte';
@@ -63,20 +67,6 @@
 		}
 	}
 
-	async function test(id: string): Promise<void> {
-		busy = id;
-		try {
-			const res = await testNotifier(id);
-			if (res.ok) pushToast($_('notifiers.testOk'), 'success');
-			else pushToast($_('notifiers.testFail', { values: { error: res.error ?? '' } }), 'error');
-		} catch (err) {
-			const msg = err instanceof ApiErr ? err.detail : '';
-			pushToast($_('notifiers.testFail', { values: { error: msg } }), 'error');
-		} finally {
-			busy = null;
-		}
-	}
-
 	function statusKey(c: NotifierChannel): string {
 		if (c.is_in_app) return 'notifiers.statusAlwaysOn';
 		if (!c.available) return 'notifiers.statusUnavailable';
@@ -117,15 +107,21 @@
 					{:else if !c.available}
 						<p class="mt-2 text-slate-500 dark:text-slate-400">{$_('notifiers.unavailableNote')}</p>
 					{:else}
-						<div class="mt-3">
-							<DynamicConfigForm
-								schema={c.user_schema}
-								config={c.config}
-								isSet={c.is_set}
-								busy={busy === c.plugin_id}
-								onSubmit={(v) => save(c.plugin_id, v)}
-							/>
-						</div>
+						<!-- A channel with nothing to fill in shows no form at all. Since 10.B25 email
+						     is exactly that: the address comes from the account, so what is left is
+						     the switch — and an empty form with a Save button under it would invite a
+						     click that does nothing. -->
+						{#if c.user_schema.length > 0}
+							<div class="mt-3">
+								<DynamicConfigForm
+									schema={c.user_schema}
+									config={c.config}
+									isSet={c.is_set}
+									busy={busy === c.plugin_id}
+									onSubmit={(v) => save(c.plugin_id, v)}
+								/>
+							</div>
+						{/if}
 						<div
 							class="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800/60"
 						>
@@ -136,14 +132,6 @@
 								class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
 							>
 								{c.enabled ? $_('notifiers.deactivate') : $_('notifiers.activate')}
-							</button>
-							<button
-								type="button"
-								disabled={busy === c.plugin_id || !c.user_config_complete}
-								onclick={() => test(c.plugin_id)}
-								class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
-							>
-								{$_('notifiers.test')}
 							</button>
 						</div>
 					{/if}

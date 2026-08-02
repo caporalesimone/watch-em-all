@@ -75,3 +75,66 @@ def client(app: FastAPI) -> Iterator[TestClient]:
     bootstrap, plugins), leaving it runs the shutdown half."""
     with TestClient(app) as test_client:
         yield test_client
+
+
+TEMP_PASSWORD = "temp-pass-123"
+"""What :func:`mailed_passwords` makes the server generate, so a test can sign in afterwards."""
+
+
+@pytest.fixture(autouse=True)
+def mailed_passwords(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> list[dict[str, str]]:
+    """Creating an account now mails a generated password (10.B24), which two things in this
+    suite could not live with: the password is random, and sending it needs a working SMTP.
+
+    So by default the generator is pinned to :data:`TEMP_PASSWORD` — the string the suite has
+    always used, which is why almost no test had to change — and the send is recorded instead of
+    performed. The returned list is what went out, for tests that want to assert on it.
+
+    A test that wants the **real** thing, channel gate included, marks itself
+    ``@pytest.mark.real_direct_mail`` and gets no patching at all. That marker is the only
+    way this fixture can hide a genuine failure, and it is on the tests that would notice.
+    """
+    sent: list[dict[str, str]] = []
+    if request.node.get_closest_marker("real_direct_mail"):
+        return sent
+
+    from src.core import direct_mail
+    from src.web.routers import admin_users
+
+    monkeypatch.setattr(admin_users, "generate_password", lambda: TEMP_PASSWORD)
+    monkeypatch.setattr(direct_mail, "channel_ready", lambda db, plugin: True)
+
+    def _record(db: object, plugin: object, **kw: object) -> None:
+        sent.append({"address": str(kw["address"]), "password": str(kw["password"])})
+
+    monkeypatch.setattr(direct_mail, "send_password", _record)
+    return sent
+
+
+@pytest.fixture(autouse=True)
+def mailed_notices(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> list[dict[str, str]]:
+    """The same treatment for the account-lifecycle notices (10.B26).
+
+    Disabling, marking or deleting an account now mails the person **directly**, past their
+    notification preference. Unstubbed that means every such test asks the email plugin to reach
+    an SMTP server that is not there — a failure the caller swallows by design, so nothing would
+    break, but the suite would pay for it in connection timeouts on tests about something else.
+
+    Returns the ``(key, address)`` pairs that went out, which is what a test about this asserts
+    on. Opt out with ``@pytest.mark.real_direct_mail``, like the passwords above.
+    """
+    sent: list[dict[str, str]] = []
+    if request.node.get_closest_marker("real_direct_mail"):
+        return sent
+
+    from src.core import direct_mail
+
+    def _record(db: object, plugin: object, *, key: str, address: str, **kw: object) -> None:
+        sent.append({"key": key, "address": address})
+
+    monkeypatch.setattr(direct_mail, "send", _record)
+    return sent

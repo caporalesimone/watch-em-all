@@ -37,7 +37,8 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 | GET | `/api/notifiers` | 👤 | — | per ogni canale: schema utente, `is_set` dei secret, stato composito (disponibile/configurato/attivo) |
 | PUT | `/api/notifiers/{plugin_id}/config` | 👤 | `{config}` | chiavi filtrate sullo schema utente; secret assente = non modificare |
 | PATCH | `/api/notifiers/{plugin_id}` | 👤 | `{enabled}` | attiva/disattiva senza perdere la config |
-| POST | `/api/notifiers/{plugin_id}/test` | 👤 | — | invia notifica di prova; esito sincrono |
+
+Un invio di prova lato utente **non esiste più** (10.X4): aveva senso finché il recapito lo scriveva l'utente in quella pagina, ma da 10.B23/10.B25 il recapito **è** l'account e si è già dimostrato funzionante portando la password con cui quella persona è entrata. Quel che restava era una sonda sulla configurazione SMTP del server, che l'utente non può comunque toccare: la prova vive solo lato admin, dove da 10.B28 è diventata la **validazione** del canale (`POST /api/admin/notifiers/{plugin_id}/validate`).
 
 ## Admin — utenti (ciclo di vita)
 
@@ -46,11 +47,12 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 | Metodo | Path | Ruolo | Body | Note |
 |---|---|---|---|---|
 | PATCH | `/api/admin/users/{id}` | 🛡 | `{is_active?, role?}` | disabilitazione → invalidazione token + notifica di cortesia (USR-R11) |
-| POST | `/api/admin/users/{id}/reset-password` | 🛡 | `{temp_password}` | + cambio forzato + invalidazione |
+| POST | `/api/admin/users/{id}/reset-password` | 🛡 | — | password generata e spedita (10.B24) + cambio forzato + invalidazione |
 | DELETE | `/api/admin/users/{id}` | 🛡 | — | **soft con scadenza**: disattiva + marca in cancellazione + `deletion_due_at` = ora + periodo di grazia, notifica di cortesia; nessun dato eliminato (USR-R7) |
 | POST | `/api/admin/users/{id}/restore` | 🛡 | — | annulla la cancellazione: → disabilitato (mai direttamente attivo, USR-R8) |
+| DELETE | `/api/admin/users/{id}/purge` | 🛡 | — | **cancellazione definitiva subito** su un account già marcato (USR-R9b): `204`, `409 not_being_deleted` se non marcato, `403 cannot_target_self`, `500 purge_failed` se un plugin rifiuta |
 
-Il **purge definitivo non ha endpoint**: è il job giornaliero del worker a eliminare gli account scaduti (USR-R9, CRON-R10). Anche l'elenco `GET /api/admin/users` guadagnerà in questa fase i filtri `?status=active\|disabled\|deleting` (USR-R14) e l'ordinamento per **ultimo accesso** (`last_login_at`, USR-R13).
+Il purge automatico resta il job giornaliero del worker sugli account scaduti (USR-R9, CRON-R10); l'endpoint qui sopra è la **stessa** distruzione con un altro innesco, non una seconda implementazione. Anche l'elenco `GET /api/admin/users` guadagna in questa fase i filtri `?status=active\|disabled\|deleting` (USR-R14) e l'ordinamento per **ultimo accesso** (`last_login_at`, USR-R13).
 
 ## Admin — scraper (storico e monitoraggio) — [scraper-scheduling-and-limits](../../docs/3-features/admin/scraper-scheduling-and-limits.md)
 
@@ -77,15 +79,16 @@ Il **purge definitivo non ha endpoint**: è il job giornaliero del worker a elim
 |---|---|---|---|---|
 | GET | `/api/admin/notifiers` | 🛡 | — | per canale: schema admin, `is_set` dei secret, stato, enabled |
 | PUT | `/api/admin/notifiers/{plugin_id}/config` | 🛡 | `{config}` | chiavi filtrate sullo schema admin |
-| PATCH | `/api/admin/notifiers/{plugin_id}` | 🛡 | `{enabled}` | interruttore globale del canale (PCFG-R8): off = non disponibile per tutti, config utente preservate |
-| POST | `/api/admin/notifiers/{plugin_id}/test` | 🛡 | `{...campi utente minimi}` | verifica del canale lato sistema |
+| PATCH | `/api/admin/notifiers/{plugin_id}` | 🛡 | `{enabled}` | interruttore globale del canale (PCFG-R8): off = non disponibile per tutti, config utente preservate. Accendere un canale **non validato** → `422 not_validated` (10.B28) |
+| POST | `/api/admin/notifiers/{plugin_id}/validate` | 🛡 | — | manda un messaggio vero all'account dell'admin (10.B25); se il server lo accetta, le impostazioni risultano **validate** (NOT-R9) → `{ok, error, channel}`. Config incompleta → `422 config_incomplete`; un rifiuto non registra nulla |
 
 ## Admin — notifiche agli utenti — [admin-notifications](../3-features/admin/admin-notifications.md)
 
 | Metodo | Path | Ruolo | Body / Query | Note |
 |---|---|---|---|---|
 | POST | `/api/admin/messages` | 🛡 | `{title, body, user_id?}` | body in **Markdown** (AEV-R7); invio a tutti gli utenti attivi (user_id assente) o a uno specifico; sempre in storico, consegna sui canali abilitati del destinatario |
-| GET | `/api/admin/messages` | 🛡 | `?page=` | messaggi inviati con esiti di consegna per destinatario/canale; mai lo stato letto/non letto (ADMSG-R5) |
+| GET | `/api/admin/messages` | 🛡 | `?page=&audience=all\|user` | messaggi inviati con esiti di consegna per destinatario/canale e **quanti** li hanno aperti in-app (`read_count`, 10.B30); mai **chi** (ADMSG-R5). Il filtro separa annunci e messaggi a una persona (10.F30) |
+| DELETE | `/api/admin/messages/{id}` | 🛡 | — | toglie il messaggio dallo storico (10.B29): un **broadcast** è una riga sola, quindi sparisce anche dallo storico di tutti i destinatari; un **mirato** lascia al destinatario la sua copia in `alert_log`. Non è un annullamento dell'invio (ADMSG-R6) |
 | GET | `/api/admin/message-templates` | 🛡 | — | catalogo completo: per ogni chiave default, placeholder dichiarati, eventuale override (ADMSG-R7) |
 | PUT | `/api/admin/message-templates/{key}` | 🛡 | `{title, body}` | imposta/aggiorna l'override (body Markdown; placeholder sconosciuti segnalati, ADMSG-R8) |
 | DELETE | `/api/admin/message-templates/{key}` | 🛡 | — | ripristina il default (cancella l'override, ADMSG-R9) |

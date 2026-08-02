@@ -22,6 +22,7 @@
 - **FE-10** — **Provenance** (the scraper icon) is shown everywhere a product appears: Product Picker, carts, notifications, previews. Not optional (UC-2).
 - **FE-11** — Destructive actions (clear catalog, delete cart/account): confirmation with **explicit consequences** in the text.
 - **FE-12** — Curated empty states: empty catalog (with scrape-now), no carts, no notifications — never a blank table without guidance.
+- **FE-19** (10.F23) — **A Save button is clickable only when something has changed.** Every editable form keeps a baseline — the values as loaded, or as last saved — and the button stays disabled while the two match (`$lib/forms.ts` holds the comparison, so it is not rewritten per page). A Save that is always live invites a click that writes back what is already stored: harmless in itself, but it teaches that the button means nothing, and on a page where another control *does* act immediately (the notifier kill-switch) that is the wrong lesson. Corollary for masked secrets: blank means "keep the stored value", so an untouched form with a stored secret is genuinely unchanged.
 
 ## i18n and formats
 

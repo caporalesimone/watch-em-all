@@ -15,13 +15,22 @@ from pydantic import BaseModel, Field, ValidationError
 
 from src.core import scrape_cache
 from src.core.errors import APIError
-from src.core.models import ScraperSchedule
+from src.core.models import ScraperSchedule, ScraperStats
 from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.registry import LoadedPlugin
 from src.core.schedule import get_schedule, upsert_schedule
 from src.core.scrape import implements_scraping
-from src.core.scraper_config import ScraperReservedConfig, get_scraper_config, set_scraper_config
+from src.core.scraper_config import (
+    ScraperReservedConfig,
+    declared_schema,
+    get_scraper_config,
+    plugin_config,
+    set_plugin_config,
+    set_scraper_config,
+)
+from src.core.scraper_stats import get_stats, reset_stats
 from src.web.deps import AdminDep, SessionDep
+from src.web.schemas import LifetimeStats, PluginConfigBody, PluginConfigOut
 
 router = APIRouter(prefix="/admin", tags=["Admin: scrapers"])
 
@@ -149,3 +158,115 @@ def set_scraper_admin_config(
         return set_scraper_config(db, scraper_id, body)
     except (ValidationError, ValueError) as exc:
         raise APIError(422, "invalid_config", str(exc)) from exc
+
+
+def _lifetime(row: ScraperStats) -> LifetimeStats:
+    return LifetimeStats(
+        plugin_id=row.plugin_id,
+        since=row.since,
+        runs_total=row.runs_total,
+        runs_ok=row.runs_ok,
+        runs_failed=row.runs_failed,
+        runs_skipped_locked=row.runs_skipped_locked,
+        consecutive_failures=row.consecutive_failures,
+        last_run_at=row.last_run_at,
+        last_success_at=row.last_success_at,
+        last_failure_at=row.last_failure_at,
+        http_requests_total=row.http_requests_total,
+        cache_hits_total=row.cache_hits_total,
+        bytes_downloaded_total=row.bytes_downloaded_total,
+        politeness_wait_s_total=row.politeness_wait_s_total,
+        run_seconds_total=row.run_seconds_total,
+        rate_limited_total=row.rate_limited_total,
+        gate_hits_total=row.gate_hits_total,
+        gate_cleared_total=row.gate_cleared_total,
+        robots_denied_total=row.robots_denied_total,
+        products_delivered_total=row.products_delivered_total,
+        pages_fetched_total=row.pages_fetched_total,
+        parse_failures_total=row.parse_failures_total,
+    )
+
+
+@router.get(
+    "/scrapers/{scraper_id}/lifetime-stats",
+    response_model=LifetimeStats,
+    summary="What this scraper has done since `since` — cumulative, survives log retention.",
+)
+def lifetime_stats(
+    scraper_id: str, request: Request, _admin: AdminDep, db: SessionDep
+) -> LifetimeStats:
+    """The counters `scrape_run` cannot answer for, because that table is pruned (10.B20).
+
+    A scraper that has never run still gets a row here, stamped now: `get_stats` creates it on
+    first read, so the page shows honest zeros with a start date rather than a 404 that reads
+    as *"this scraper does not exist"*.
+    """
+    if scraper_id not in _schedulable(request):
+        raise APIError(404, "not_found", f"no schedulable scraper {scraper_id!r}")
+    row = get_stats(db, scraper_id)
+    db.commit()  # `get_stats` may have created the row
+    return _lifetime(row)
+
+
+@router.post(
+    "/scrapers/{scraper_id}/lifetime-stats/reset",
+    response_model=LifetimeStats,
+    summary="Zero this scraper's lifetime counters and restamp `since` (admin only).",
+)
+def reset_lifetime_stats(
+    scraper_id: str, request: Request, _admin: AdminDep, db: SessionDep
+) -> LifetimeStats:
+    """Destructive and without history (10.B21), which is the point: a cumulative that never
+    resets lies after a configuration change — the politeness delay went from 1.5s to 11s in
+    0.8.1, and totals either side of that are not comparable. The alternative was a caption
+    explaining that the numbers mix two regimes, which asks the reader to do work a button
+    does better. Nothing is archived: the new `since` is the whole record of when it happened.
+    """
+    if scraper_id not in _schedulable(request):
+        raise APIError(404, "not_found", f"no schedulable scraper {scraper_id!r}")
+    row = reset_stats(db, scraper_id)
+    return _lifetime(row)
+
+
+@router.get(
+    "/scrapers/{scraper_id}/plugin-config",
+    response_model=PluginConfigOut,
+    summary="The settings this scraper declares for itself, with their current values (admin).",
+)
+def get_plugin_declared_config(
+    scraper_id: str, request: Request, _admin: AdminDep, db: SessionDep
+) -> PluginConfigOut:
+    loaded = _schedulable(request).get(scraper_id)
+    if loaded is None:
+        raise APIError(404, "not_found", f"no schedulable scraper {scraper_id!r}")
+    schema = declared_schema(loaded.plugin)
+    return PluginConfigOut(
+        scraper_id=scraper_id,
+        schema_fields=schema,
+        config=plugin_config(db, scraper_id, schema),
+    )
+
+
+@router.put(
+    "/scrapers/{scraper_id}/plugin-config",
+    response_model=PluginConfigOut,
+    summary="Save the scraper's declared settings (admin only); reserved keys are untouched.",
+)
+def set_plugin_declared_config(
+    scraper_id: str,
+    body: PluginConfigBody,
+    request: Request,
+    _admin: AdminDep,
+    db: SessionDep,
+) -> PluginConfigOut:
+    loaded = _schedulable(request).get(scraper_id)
+    if loaded is None:
+        raise APIError(404, "not_found", f"no schedulable scraper {scraper_id!r}")
+    plugin = loaded.plugin
+    assert isinstance(plugin, ScraperPlugin)  # `_schedulable` only ever holds scrapers
+    schema = declared_schema(plugin)
+    config = set_plugin_config(db, scraper_id, schema, body.config)
+    # The plugin may have derived something from these values and be holding it (Dragon Store
+    # builds a rules object). Telling it is what makes "no restart" true.
+    plugin.on_config_changed()
+    return PluginConfigOut(scraper_id=scraper_id, schema_fields=schema, config=config)

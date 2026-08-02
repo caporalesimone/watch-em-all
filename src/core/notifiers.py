@@ -21,13 +21,22 @@ disable it (always active for the user), and only the admin kill-switch can turn
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.orm import Session
 
-from src.core.models import NotifierAdminConfig, NotifierUserConfig
+from src.core.contracts import ACCOUNT_EMAIL_KEY
+from src.core.models import (
+    NotifierAdminConfig,
+    NotifierUserConfig,
+    NotifierValidation,
+    User,
+)
 
 if TYPE_CHECKING:
     from src.core.contracts import ConfigField
@@ -38,6 +47,13 @@ log = logging.getLogger(__name__)
 IN_APP_PLUGIN_ID = "in_app"
 """The built-in in-app channel: always active for the user (no user toggle), governed only by
 the admin kill-switch. Special-cased throughout — it has neither admin nor user config."""
+
+
+EMAIL_PLUGIN_ID = "email"
+"""The email channel, named in the core because two things outside the plugin need to point at
+it: the on-by-default switch a new account gets (10.B25), and the credential mail, which is sent
+directly rather than through the notification pipeline (10.B24). Naming it here keeps the string
+from being retyped at each of those places."""
 
 
 def is_in_app(plugin_id: str) -> bool:
@@ -132,27 +148,109 @@ def set_admin_config(
     db: Session, plugin: NotifierPlugin, incoming: dict[str, Any]
 ) -> dict[str, Any]:
     """Upsert the admin config for a notifier, filtering keys on the admin schema and keeping
-    secrets write-only. Returns the new stored config. Commits."""
+    secrets write-only. Returns the new stored config. Commits.
+
+    **Editing the settings of a validated channel switches it off** (10.B28). Without that, the
+    rule "only a validated channel can be switched on" would be a formality: validate once, then
+    point the host anywhere. The fingerprint has already stopped matching by then — this only
+    makes the consequence visible instead of leaving a channel that claims to be active while
+    nothing is known about where it now sends.
+    """
     schema = plugin.get_admin_config_schema()
     row = get_admin_row(db, plugin.plugin_id)
     stored = dict(row.config_json) if row is not None else {}
     new_config = _apply_save(schema, stored, incoming, side="admin")
+    changed = fingerprint(new_config) != fingerprint(stored)
+    gated = needs_validation(plugin.plugin_id)
     if row is None:
-        db.add(NotifierAdminConfig(plugin_id=plugin.plugin_id, config_json=new_config))
+        # A brand-new row starts **off** for a channel that has to prove itself. The default is
+        # "enabled" for the absent row, which is right for in-app and would otherwise hand a
+        # freshly configured email channel an on-switch it has not earned.
+        db.add(
+            NotifierAdminConfig(
+                plugin_id=plugin.plugin_id, config_json=new_config, enabled=not gated
+            )
+        )
     else:
         row.config_json = new_config
+        if changed and gated:
+            row.enabled = False
     db.commit()
     return new_config
 
 
 def set_admin_enabled(db: Session, plugin_id: str, enabled: bool) -> None:
-    """Flip the admin kill-switch, preserving any stored config. Commits."""
+    """Flip the admin kill-switch, preserving any stored config. Commits.
+
+    The *"not until it is validated"* rule lives at the API boundary, where it can answer with a
+    reason (``422 not_validated``); this stays a plain write so the core can still switch a
+    channel **off** unconditionally — which is what :func:`set_admin_config` does above.
+    """
     row = get_admin_row(db, plugin_id)
     if row is None:
         db.add(NotifierAdminConfig(plugin_id=plugin_id, config_json={}, enabled=enabled))
     else:
         row.enabled = enabled
     db.commit()
+
+
+# --------------------------------------------------------------------------- validation (10.B28)
+
+
+def needs_validation(plugin_id: str) -> bool:
+    """Whether a channel has to prove itself before it can be switched on.
+
+    Everything but in-app. In-app has no server to accept anything and no config to get wrong:
+    asking it to prove itself would mean inventing a send with nowhere to go.
+    """
+    return not is_in_app(plugin_id)
+
+
+def fingerprint(config: dict[str, Any]) -> str:
+    """A stable hash of a stored config, secrets included — the whole point is that changing a
+    password invalidates the proof as surely as changing the host. Sorted keys, so the same
+    settings saved in a different order are the same settings."""
+    canonical = json.dumps(config, sort_keys=True, default=str)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def validation_row(db: Session, plugin_id: str) -> NotifierValidation | None:
+    return db.get(NotifierValidation, plugin_id)
+
+
+def is_validated(db: Session, plugin_id: str) -> bool:
+    """Whether what is stored *now* is what was proven to work.
+
+    Comparing fingerprints rather than reading a flag is what makes this self-maintaining: there
+    is no code path that has to remember to invalidate, because an edited config simply no longer
+    matches its proof.
+    """
+    if not needs_validation(plugin_id):
+        return True
+    row = validation_row(db, plugin_id)
+    return row is not None and row.config_hash == fingerprint(admin_config(db, plugin_id))
+
+
+def validated_at(db: Session, plugin_id: str) -> datetime | None:
+    """When the current config was proven, or ``None`` if what is stored has never been."""
+    row = validation_row(db, plugin_id)
+    if row is None or row.config_hash != fingerprint(admin_config(db, plugin_id)):
+        return None
+    return row.validated_at
+
+
+def mark_validated(db: Session, plugin_id: str) -> datetime:
+    """Record that the config currently stored was accepted by its server. Commits."""
+    now = datetime.now(UTC)
+    digest = fingerprint(admin_config(db, plugin_id))
+    row = validation_row(db, plugin_id)
+    if row is None:
+        db.add(NotifierValidation(plugin_id=plugin_id, config_hash=digest, validated_at=now))
+    else:
+        row.config_hash = digest
+        row.validated_at = now
+    db.commit()
+    return now
 
 
 # --------------------------------------------------------------------------- user config
@@ -213,14 +311,32 @@ def set_user_enabled(db: Session, user_id: int, plugin_id: str, enabled: bool) -
 
 def merged_config(db: Session, plugin: NotifierPlugin, user_id: int) -> dict[str, Any]:
     """The admin+user config a notifier's ``send`` receives: each side filtered on its own schema,
-    the user's keys layered over the admin's."""
+    the user's keys layered over the admin's, and the core's own keys on top of both.
+
+    The core layer is one key today — where the recipient is reached (10.B25). It goes **last**
+    on purpose: it is not a preference, it is a fact about the account, and a stale value left in
+    a stored config must not be able to redirect somebody's mail.
+    """
     admin = _filter_keys(
         plugin.get_admin_config_schema(), admin_config(db, plugin.plugin_id), side="admin"
     )
     user = _filter_keys(
         plugin.get_user_config_schema(), user_config(db, user_id, plugin.plugin_id), side="user"
     )
-    return {**admin, **user}
+    return {**admin, **user, **account_keys(db, user_id)}
+
+
+def account_keys(db: Session, user_id: int) -> dict[str, Any]:
+    """The identity keys the core injects into every merged config (10.B25).
+
+    ``contact_email`` first, then the username: the fallback is not a convenience but the normal
+    path — since 10.B23 the username *is* the address, and ``contact_email`` exists only for the
+    bootstrap admin, the one account created before anybody could type one.
+    """
+    user = db.get(User, user_id)
+    if user is None:
+        return {}
+    return {ACCOUNT_EMAIL_KEY: user.contact_email or user.username}
 
 
 @dataclass
@@ -258,7 +374,11 @@ def resolve_state(db: Session, plugin: NotifierPlugin, user_id: int) -> ChannelS
             active=available,
         )
     a_complete = is_complete(plugin.get_admin_config_schema(), admin_config(db, pid))
-    available = a_enabled and a_complete
+    # Validation is part of being available, not a badge on the admin page (10.B28). It has to
+    # be checked here rather than trusted through the `enabled` flag: a channel with no admin
+    # row at all counts as enabled by default, so on a fresh installation the flag alone would
+    # let an unproven channel deliver.
+    available = a_enabled and a_complete and is_validated(db, pid)
     u_cfg = user_config(db, user_id, pid)
     u_complete = is_complete(plugin.get_user_config_schema(), u_cfg)
     u_enabled = user_enabled(db, user_id, pid)

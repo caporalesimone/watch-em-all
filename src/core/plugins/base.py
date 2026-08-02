@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy import MetaData
 
-    from src.core.alert_engine import AlertEvent
+    from src.core.alert_engine import NotificationEvent
     from src.core.contracts import Adjustment, ConfigField, DeltaCounters
     from src.core.models import CatalogProduct
     from src.core.plugins.context import PluginContext
@@ -302,6 +302,28 @@ class ScraperPlugin(BasePlugin, ABC):
         site-specific cart logic returns ``[]``."""
         return []
 
+    def on_config_changed(self) -> None:
+        """Called after an admin saves this scraper's declared config (10.B22).
+
+        A hook rather than a re-read, because only the plugin knows what it derived from those
+        values: Dragon Store turns four numbers into a rules object it keeps, and the honest
+        way to keep that fresh is to be told the numbers moved. Default: nothing to do.
+        """
+
+    def get_admin_config_schema(self) -> list[ConfigField]:
+        """The settings this scraper wants an administrator to be able to change (10.B22).
+
+        The same declarative shape the notifiers have had since 7.B3, so the admin page
+        renders one dynamic form and the core never learns a field name. **Admin only**: there
+        is no per-user level for a scraper (Simone, 2026-08-02) — these are settings about how
+        the installation treats a site, and a site does not care who is watching it.
+
+        A key here may not shadow a core reserved one (politeness, timeout, cache half-life):
+        the core reads those on the plugin's behalf, so redefining one would change behaviour
+        the plugin does not own. Default: none.
+        """
+        return []
+
 
 class NotifierDeliveryError(RuntimeError):
     """A notifier failed to deliver after its own retries (NOT-R5). The message is
@@ -334,13 +356,17 @@ class NotifierPlugin(BasePlugin):
         """Per-user config fields (personal delivery target). Default: none (CFG-R1)."""
         return []
 
-    def send(self, notification: AlertEvent, config: dict[str, Any], locale: str) -> None:
+    def send(self, notification: NotificationEvent, config: dict[str, Any], locale: str) -> None:
         """Format ``notification`` for the channel (in ``locale``, with the plugin's own
         backend translations) and deliver it. ``config`` is the admin+user merge already done
         and filtered by the core. On a transient error retry a few times with backoff, then
-        raise :class:`NotifierDeliveryError` with a readable reason (NOT-R5). Phase 7 delivers
-        only the ``alert_digest`` payload; summary/text messages arrive later. The base raises
-        so a notifier that forgets to implement it fails loudly."""
+        raise :class:`NotifierDeliveryError` with a readable reason (NOT-R5).
+
+        ``notification`` is a **union** since phase 10: the ``alert_digest`` payload phase 7
+        delivered, or the flat ``TextMessageEvent`` behind admin and system messages. A notifier
+        tells them apart by ``kind`` — never by looking for an attribute, which would make the
+        two payloads' shapes part of the contract by accident. The base raises so a notifier
+        that forgets to implement it fails loudly."""
         raise NotImplementedError(f"{self.plugin_id}: send not implemented")
 
     def send_test(self, config: dict[str, Any], locale: str, username: str = "") -> None:

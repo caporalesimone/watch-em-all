@@ -41,6 +41,17 @@
       "started": "Scrape started — your catalog will update shortly.",
       "cooldown_caption": "Next scrape available in {time}"
     },
+    "cfg": {
+      "band1Min": "Discount band 1 — cart from (€)",
+      "band1Pct": "Discount band 1 — percent off",
+      "band2Min": "Discount band 2 — cart from (€)",
+      "band2Pct": "Discount band 2 — percent off",
+      "band3Min": "Discount band 3 — cart from (€)",
+      "band3Pct": "Discount band 3 — percent off",
+      "shippingCost": "Shipping cost (€)",
+      "freeShippingMin": "Free shipping from (€)",
+      "freeShippingMinHelp": "Carts reaching this total ship free. The bands are not cumulative: only the highest one the cart reaches applies."
+    },
     "adjustments": {
       "threshold_discount": "Threshold discount {pct}%",
       "shipping": "Shipping",
