@@ -35,7 +35,16 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    # The username **is** the email address (10.B23), so the column is sized for one: RFC 5321
+    # caps a path at 254 characters, and the old String(64) would have silently refused perfectly
+    # ordinary corporate addresses. Stored lower-cased — see `normalise_username`.
+    username: Mapped[str] = mapped_column(String(254), unique=True, nullable=False, index=True)
+    # Where to write when the username is *not* an address (10.X2). Exactly one account is in
+    # that position — the bootstrap admin, because it exists before anybody can type an email —
+    # and it is the only one that can set this. For everybody else it stays NULL and the
+    # username is the address, so there are never two fields that could disagree about where a
+    # person's mail goes.
+    contact_email: Mapped[str | None] = mapped_column(String(254), nullable=True)
     # Every account has a first and last name, both required (USR); stored here so
     # the UI can greet/display the person rather than the login handle.
     first_name: Mapped[str] = mapped_column(String(64), nullable=False, default="")

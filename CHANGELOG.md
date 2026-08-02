@@ -49,6 +49,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 ### Changed
 
 - Schema prep, done once up front: `users` now records when its password was set and which announcement it last read.
+- Second schema step: a username is now sized for an email address, and the bootstrap admin can hold one of its own.
 
 ## [0.9.0] - 2026-07-31
 
