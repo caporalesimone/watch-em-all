@@ -109,7 +109,14 @@
 			"never": "Mai",
 			"created": "Creato \"{username}\" — comunica la password temporanea; dovrà cambiarla al primo accesso.",
 			"errorTaken": "Questo nome utente è già in uso.",
-			"errorGeneric": "Impossibile creare l'utente."
+			"errorGeneric": "Impossibile creare l'utente.",
+			"statusDeleting": "In cancellazione",
+			"filterAll": "Tutti",
+			"filterActive": "Attivi",
+			"filterDisabled": "Disabilitati",
+			"filterDeleting": "In cancellazione",
+			"colMarkedAt": "Marcato",
+			"colDueAt": "Eliminato il"
 		},
 		"notifiers": {
 			"title": "Notifier",

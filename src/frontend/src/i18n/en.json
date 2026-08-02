@@ -206,7 +206,14 @@
 			"never": "Never",
 			"created": "Created \"{username}\" — share the temporary password; they must change it at first login.",
 			"errorTaken": "That username is already in use.",
-			"errorGeneric": "Could not create the user."
+			"errorGeneric": "Could not create the user.",
+			"statusDeleting": "Being deleted",
+			"filterAll": "All",
+			"filterActive": "Active",
+			"filterDisabled": "Disabled",
+			"filterDeleting": "Being deleted",
+			"colMarkedAt": "Marked",
+			"colDueAt": "Deleted on"
 		},
 		"notifiers": {
 			"title": "Notifiers",

@@ -419,7 +419,13 @@ export interface AdminUser {
 	must_change_password: boolean;
 	last_login_at: string | null;
 	created_at: string;
+	// Deferred deletion (10.B3): both null on a normal account, both set once marked.
+	deletion_marked_at: string | null;
+	deletion_due_at: string | null;
 }
+
+export type UserStatusFilter = 'active' | 'disabled' | 'deleting';
+export type UserSort = 'username' | 'last_login';
 
 export interface NewUser {
 	username: string;
@@ -429,8 +435,45 @@ export interface NewUser {
 	temp_password: string;
 }
 
-export function listUsers(): Promise<AdminUser[]> {
-	return apiFetch('/api/admin/users').then(asJson<AdminUser[]>);
+export function listUsers(opts?: {
+	status?: UserStatusFilter | null;
+	sort?: UserSort;
+	order?: 'asc' | 'desc';
+}): Promise<AdminUser[]> {
+	const query = new URLSearchParams();
+	if (opts?.status) query.set('status', opts.status);
+	if (opts?.sort) query.set('sort', opts.sort);
+	if (opts?.order) query.set('order', opts.order);
+	const suffix = query.toString() ? `?${query}` : '';
+	return apiFetch(`/api/admin/users${suffix}`).then(asJson<AdminUser[]>);
+}
+
+export async function resetUserPassword(id: number, tempPassword: string): Promise<AdminUser> {
+	const res = await apiFetch(`/api/admin/users/${id}/reset-password`, {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ temp_password: tempPassword })
+	});
+	return asJson<AdminUser>(res);
+}
+
+export async function setUserActive(id: number, isActive: boolean): Promise<AdminUser> {
+	const res = await apiFetch(`/api/admin/users/${id}`, {
+		method: 'PATCH',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ is_active: isActive })
+	});
+	return asJson<AdminUser>(res);
+}
+
+export async function markUserForDeletion(id: number): Promise<AdminUser> {
+	const res = await apiFetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+	return asJson<AdminUser>(res);
+}
+
+export async function restoreUser(id: number): Promise<AdminUser> {
+	const res = await apiFetch(`/api/admin/users/${id}/restore`, { method: 'POST' });
+	return asJson<AdminUser>(res);
 }
 
 export async function createUser(payload: NewUser): Promise<AdminUser> {

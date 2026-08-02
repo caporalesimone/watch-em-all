@@ -2,7 +2,15 @@
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 
-	import { ApiErr, createUser, listUsers, type AdminUser, type NewUser } from '$lib/api/client';
+	import {
+		ApiErr,
+		createUser,
+		listUsers,
+		type AdminUser,
+		type NewUser,
+		type UserSort,
+		type UserStatusFilter
+	} from '$lib/api/client';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 
 	let users = $state<AdminUser[]>([]);
@@ -20,12 +28,51 @@
 	};
 	let form = $state<NewUser>({ ...empty });
 
+	// List controls (10.F1). The sort exists to answer "who has stopped using this", so the
+	// default stays alphabetical and the dormancy question is one click away.
+	let statusFilter = $state<UserStatusFilter | null>(null);
+	let sort = $state<UserSort>('username');
+	let order = $state<'asc' | 'desc'>('asc');
+
 	async function refresh(): Promise<void> {
-		users = await listUsers();
+		users = await listUsers({ status: statusFilter, sort, order });
 		loading = false;
 	}
 
 	onMount(() => void refresh());
+
+	function sortBy(column: UserSort): void {
+		if (sort === column) {
+			order = order === 'asc' ? 'desc' : 'asc';
+		} else {
+			sort = column;
+			// Last login opens on the dormant end: that is the reason to sort by it at all.
+			order = column === 'last_login' ? 'asc' : 'asc';
+		}
+		void refresh();
+	}
+
+	function setFilter(next: UserStatusFilter | null): void {
+		statusFilter = next;
+		void refresh();
+	}
+
+	function arrow(column: UserSort): string {
+		return sort === column ? (order === 'asc' ? ' ↑' : ' ↓') : '';
+	}
+
+	// Written out one by one rather than assembled from a prefix: the i18n gate matches
+	// literals, and a key it cannot see is a key it will call dead the day it stops being used.
+	const filters = $derived([
+		{ key: null, label: $_('admin.users.filterAll') },
+		{ key: 'active' as const, label: $_('admin.users.filterActive') },
+		{ key: 'disabled' as const, label: $_('admin.users.filterDisabled') },
+		{ key: 'deleting' as const, label: $_('admin.users.filterDeleting') }
+	]);
+
+	function when(value: string | null): string {
+		return value ? new Date(value).toLocaleDateString() : '—';
+	}
 
 	// 8 alphanumeric chars (A-Z a-z 0-9, no symbols), shown in clear so the admin
 	// can read it out; they can also type their own temporary password instead.
@@ -57,6 +104,9 @@
 	}
 
 	function status(user: AdminUser): string {
+		// Checked first: an account on its way out is also inactive, and "disabled" would be
+		// the less urgent half of the truth.
+		if (user.deletion_marked_at) return $_('admin.users.statusDeleting');
 		if (!user.is_active) return $_('admin.users.statusDisabled');
 		if (user.must_change_password) return $_('admin.users.statusPending');
 		return $_('admin.users.statusActive');
@@ -154,17 +204,37 @@
 	{#if notice}<p class="text-sm text-green-600 dark:text-green-400">{notice}</p>{/if}
 	{#if error}<p class="text-sm text-red-500">{error}</p>{/if}
 
+	<div class="flex flex-wrap gap-2 text-xs">
+		{#each filters as chip (chip.label)}
+			<button
+				type="button"
+				onclick={() => setFilter(chip.key)}
+				class="rounded-full border px-3 py-1 {statusFilter === chip.key
+					? 'border-slate-800 bg-slate-800 text-white dark:border-slate-200 dark:bg-slate-200 dark:text-slate-900'
+					: 'border-slate-300 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800'}"
+			>
+				{chip.label}
+			</button>
+		{/each}
+	</div>
+
 	{#if loading}
 		<p class="text-sm text-slate-500">{$_('common.loading')}</p>
 	{:else}
 		<table class="w-full text-left text-sm">
 			<thead class="border-b border-slate-200 text-xs text-slate-500 dark:border-slate-800">
 				<tr>
-					<th class="py-2 pr-4">{$_('admin.users.username')}</th>
+					<th class="cursor-pointer py-2 pr-4 select-none" onclick={() => sortBy('username')}
+						>{$_('admin.users.username')}{arrow('username')}</th
+					>
 					<th class="py-2 pr-4">{$_('admin.users.colName')}</th>
 					<th class="py-2 pr-4">{$_('admin.users.colRole')}</th>
 					<th class="py-2 pr-4">{$_('admin.users.colStatus')}</th>
-					<th class="py-2 pr-4">{$_('admin.users.colLastLogin')}</th>
+					<th class="cursor-pointer py-2 pr-4 select-none" onclick={() => sortBy('last_login')}
+						>{$_('admin.users.colLastLogin')}{arrow('last_login')}</th
+					>
+					<th class="py-2 pr-4">{$_('admin.users.colMarkedAt')}</th>
+					<th class="py-2 pr-4">{$_('admin.users.colDueAt')}</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -175,6 +245,12 @@
 						<td class="py-2 pr-4">{roleLabel(user.role)}</td>
 						<td class="py-2 pr-4">{status(user)}</td>
 						<td class="py-2 pr-4 text-slate-500">{lastLogin(user)}</td>
+						<td class="py-2 pr-4 text-slate-500">{when(user.deletion_marked_at)}</td>
+						<td
+							class="py-2 pr-4 {user.deletion_due_at
+								? 'text-red-600 dark:text-red-400'
+								: 'text-slate-500'}">{when(user.deletion_due_at)}</td
+						>
 					</tr>
 				{/each}
 			</tbody>
