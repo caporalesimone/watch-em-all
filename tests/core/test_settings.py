@@ -70,6 +70,10 @@ def test_settings_get_defaults_then_patch(client: TestClient) -> None:
         "catchup_warning_min": 10,
         "log_retention_days": 90,
         "user_deletion_retention_days": 30,
+        # Off by default (10.B19): the feature is opt-in, and this assertion is the guard
+        # that it stays that way — a default of anything else would put every account on a
+        # forced password change without an admin ever asking for one.
+        "password_expiry_days": 0,
     }
     patched = client.patch(
         "/api/admin/settings",
