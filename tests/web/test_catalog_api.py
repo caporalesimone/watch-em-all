@@ -91,7 +91,7 @@ def test_catalog_requires_auth(client: TestClient) -> None:
 
 def test_lists_user_catalog(client: TestClient) -> None:
     admin = _admin_token(client)
-    uid, token = _make_user(client, admin, "alice")
+    uid, token = _make_user(client, admin, "alice@example.com")
     _seed(
         uid,
         {"external_id": "a", "name": "Necronomicon", "price_current": Decimal("40.00")},
@@ -107,8 +107,8 @@ def test_lists_user_catalog(client: TestClient) -> None:
 
 def test_catalog_is_per_user(client: TestClient) -> None:
     admin = _admin_token(client)
-    uid_a, _ = _make_user(client, admin, "alice")
-    _, token_b = _make_user(client, admin, "bob")
+    uid_a, _ = _make_user(client, admin, "alice@example.com")
+    _, token_b = _make_user(client, admin, "bob@example.com")
     _seed(uid_a, {"external_id": "a", "name": "Alice item"})
     body = client.get("/api/catalog", headers=_bearer(token_b)).json()
     assert body["total"] == 0
@@ -116,7 +116,7 @@ def test_catalog_is_per_user(client: TestClient) -> None:
 
 def test_filter_by_availability(client: TestClient) -> None:
     admin = _admin_token(client)
-    uid, token = _make_user(client, admin, "alice")
+    uid, token = _make_user(client, admin, "alice@example.com")
     _seed(
         uid,
         {"external_id": "a", "name": "In stock", "is_available": True},
@@ -129,7 +129,7 @@ def test_filter_by_availability(client: TestClient) -> None:
 
 def test_sort_by_price(client: TestClient) -> None:
     admin = _admin_token(client)
-    uid, token = _make_user(client, admin, "alice")
+    uid, token = _make_user(client, admin, "alice@example.com")
     _seed(
         uid,
         {"external_id": "a", "name": "Cheap", "price_current": Decimal("5.00")},
@@ -141,7 +141,7 @@ def test_sort_by_price(client: TestClient) -> None:
 
 def test_sort_by_list_price(client: TestClient) -> None:
     admin = _admin_token(client)
-    uid, token = _make_user(client, admin, "alice")
+    uid, token = _make_user(client, admin, "alice@example.com")
     _seed(
         uid,
         {"external_id": "a", "name": "Low list", "price_original": Decimal("20.00")},
@@ -153,7 +153,7 @@ def test_sort_by_list_price(client: TestClient) -> None:
 
 def test_sort_by_availability(client: TestClient) -> None:
     admin = _admin_token(client)
-    uid, token = _make_user(client, admin, "alice")
+    uid, token = _make_user(client, admin, "alice@example.com")
     _seed(
         uid,
         {"external_id": "a", "name": "Available", "is_available": True},
@@ -165,7 +165,7 @@ def test_sort_by_availability(client: TestClient) -> None:
 
 def test_pagination(client: TestClient) -> None:
     admin = _admin_token(client)
-    uid, token = _make_user(client, admin, "alice")
+    uid, token = _make_user(client, admin, "alice@example.com")
     _seed(
         uid,
         {"external_id": "a", "name": "One"},

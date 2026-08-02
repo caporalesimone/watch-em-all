@@ -34,7 +34,7 @@ def _user_token(client: TestClient, admin: str) -> str:
     client.post(
         "/api/admin/users",
         json={
-            "username": "alice",
+            "username": "alice@example.com",
             "first_name": "Alice",
             "last_name": "Doe",
             "role": "user",
@@ -42,7 +42,9 @@ def _user_token(client: TestClient, admin: str) -> str:
         },
         headers=_bearer(admin),
     )
-    login = client.post("/api/auth/login", json={"username": "alice", "password": "temp-pass-123"})
+    login = client.post(
+        "/api/auth/login", json={"username": "alice@example.com", "password": "temp-pass-123"}
+    )
     access = login.json()["access_token"]
     client.post(
         "/api/auth/change-password",
@@ -50,7 +52,7 @@ def _user_token(client: TestClient, admin: str) -> str:
         headers=_bearer(access),
     )
     relogin = client.post(
-        "/api/auth/login", json={"username": "alice", "password": "alice-pass-123"}
+        "/api/auth/login", json={"username": "alice@example.com", "password": "alice-pass-123"}
     )
     return str(relogin.json()["access_token"])
 

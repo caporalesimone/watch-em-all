@@ -75,7 +75,7 @@ def test_requires_auth(client: TestClient) -> None:
 
 
 def test_list_detail_and_read_flow(client: TestClient) -> None:
-    token = _make_user(client, _admin_token(client), "alice")
+    token = _make_user(client, _admin_token(client), "alice@example.com")
     uid = _uid(client, token)
     alert_id = _seed_alert(uid, cart_count=2)
 
@@ -102,7 +102,7 @@ def test_list_detail_and_read_flow(client: TestClient) -> None:
 
 
 def test_kind_filter_and_pagination(client: TestClient) -> None:
-    token = _make_user(client, _admin_token(client), "alice")
+    token = _make_user(client, _admin_token(client), "alice@example.com")
     uid = _uid(client, token)
     for _ in range(3):
         _seed_alert(uid)
@@ -117,8 +117,8 @@ def test_kind_filter_and_pagination(client: TestClient) -> None:
 
 def test_alerts_are_per_user(client: TestClient) -> None:
     admin = _admin_token(client)
-    token_a = _make_user(client, admin, "alice")
-    token_b = _make_user(client, admin, "bob")
+    token_a = _make_user(client, admin, "alice@example.com")
+    token_b = _make_user(client, admin, "bob@example.com")
     alert_id = _seed_alert(_uid(client, token_a))
 
     assert client.get("/api/alerts", headers=_bearer(token_b)).json()["total"] == 0
@@ -127,7 +127,7 @@ def test_alerts_are_per_user(client: TestClient) -> None:
 
 
 def test_bulk_delete(client: TestClient) -> None:
-    token = _make_user(client, _admin_token(client), "alice")
+    token = _make_user(client, _admin_token(client), "alice@example.com")
     uid = _uid(client, token)
     a1, a2, a3 = _seed_alert(uid), _seed_alert(uid), _seed_alert(uid)
 
@@ -140,8 +140,8 @@ def test_bulk_delete(client: TestClient) -> None:
 
 def test_delete_is_per_user(client: TestClient) -> None:
     admin = _admin_token(client)
-    token_a = _make_user(client, admin, "alice")
-    token_b = _make_user(client, admin, "bob")
+    token_a = _make_user(client, admin, "alice@example.com")
+    token_b = _make_user(client, admin, "bob@example.com")
     alert_id = _seed_alert(_uid(client, token_a))
 
     # Bob can't delete Alice's alert — the id simply isn't matched (idempotent 204).

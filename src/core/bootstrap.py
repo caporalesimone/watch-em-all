@@ -11,6 +11,7 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.core.identity import normalize_username
 from src.core.models import User
 from src.core.security import hash_password
 
@@ -25,6 +26,11 @@ def ensure_initial_admin(
     if not password:
         log.warning("no users yet and WEA_ADMIN_INITIAL_PASSWORD unset; skipping admin bootstrap")
         return
+    # Normalised like every other account (10.B23), so the login's plain equality holds here
+    # too. **Not** required to be an address: this is the one exempt account — it exists before
+    # anybody can type one, and being the only username that is not an address is precisely how
+    # the rest of the system recognises it.
+    username = normalize_username(username)
     session.add(
         User(
             username=username,

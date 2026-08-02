@@ -10,9 +10,10 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.core.contracts import BrandRef, CategoryRef, ConfigField
+from src.core.identity import USERNAME_MAX, is_email, normalize_username
 from src.core.price_history import Range
 
 
@@ -63,15 +64,28 @@ class HealthResponse(BaseModel):
 
 
 class UserCreate(BaseModel):
-    # Admin-created account (USR-R1/R15): username + first/last name (both required)
-    # + role + a temporary password the user must change at first login (USR-R2).
-    username: str = Field(min_length=1, max_length=64)
+    # Admin-created account (USR-R1/R15): an **email address** + first/last name (both
+    # required) + role + a temporary password the user must change at first login (USR-R2).
+    username: str = Field(min_length=1, max_length=USERNAME_MAX)
     first_name: str = Field(min_length=1, max_length=64)
     last_name: str = Field(min_length=1, max_length=64)
     # Three levels since 9.B8. A role is chosen at creation and not changed afterwards:
     # promoting an existing account is phase 10, where the actions on accounts live.
     role: Literal["admin", "super_user", "user"]
     temp_password: str = Field(min_length=8)  # AUTH-R6
+
+    @field_validator("username")
+    @classmethod
+    def _address(cls, value: str) -> str:
+        """The username is an address (10.B23), validated and normalised here.
+
+        Here rather than in the router because it has to hold for *every* way in, and because
+        normalising at the edge means everything downstream — the uniqueness check included —
+        is already comparing the stored form.
+        """
+        if not is_email(value):
+            raise ValueError("username must be an email address")
+        return normalize_username(value)
 
 
 class RunSummary(BaseModel):

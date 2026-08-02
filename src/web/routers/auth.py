@@ -14,6 +14,7 @@ from fastapi import APIRouter, Request, Response, status
 from sqlalchemy import select
 
 from src.core.errors import APIError
+from src.core.identity import normalize_username
 from src.core.models import User
 from src.core.rate_limit import RateLimiter
 from src.core.security import (
@@ -72,11 +73,16 @@ def _as_utc(value: datetime) -> datetime:
 )
 def login(body: LoginRequest, request: Request, settings: SettingsDep, db: SessionDep) -> TokenPair:
     client_ip = request.client.host if request.client else "unknown"
-    rl_key = f"{client_ip}:{body.username.lower()}"
+    # Normalised the same way it is stored (10.B23), which is also what makes the rate-limit
+    # key honest: `Mario@x.it` and `mario@x.it` are one account, so they are one bucket.
+    username = normalize_username(body.username)
+    rl_key = f"{client_ip}:{username}"
     if not _login_limiter.allow(rl_key):
         raise APIError(429, "rate_limited", "too many login attempts, try again shortly")
 
-    user = db.scalar(select(User).where(User.username == body.username))
+    # A plain equality, not a `lower()`: every username is written normalised, so the unique
+    # index still does the work. Case-insensitivity lives in the write, not in the query.
+    user = db.scalar(select(User).where(User.username == username))
     # Wrong credentials must stay indistinguishable from a missing account (AUTH-R10).
     if user is None or not verify_password(body.password, user.password_hash):
         raise APIError(401, "invalid_credentials", "invalid username or password")

@@ -106,7 +106,7 @@ def _delist(uid: int, keep: str) -> None:
 
 
 def test_removing_delisted_products_leaves_the_live_ones(client: TestClient) -> None:
-    uid, token = _account(client, "alice")
+    uid, token = _account(client, "alice@example.com")
     h = _bearer(token)
     _seed(uid, "a", "b", "c")
     _delist(uid, "a")
@@ -122,7 +122,7 @@ def test_removing_delisted_products_leaves_the_live_ones(client: TestClient) -> 
 def test_the_delisted_summary_counts_the_whole_catalog_and_the_carts(client: TestClient) -> None:
     """C7: the confirmation has to say what the click is about to do, and the cart figure is the
     part the table cannot show — the membership cascade is silent."""
-    uid, token = _account(client, "alice")
+    uid, token = _account(client, "alice@example.com")
     h = _bearer(token)
     _seed(uid, "a", "b", "c")
     # In the cart first and delisted afterwards, which is the only order this happens in: a
@@ -147,7 +147,7 @@ def test_the_delisted_summary_counts_the_whole_catalog_and_the_carts(client: Tes
 
 
 def test_the_delisted_summary_is_zero_when_nothing_is_delisted(client: TestClient) -> None:
-    uid, token = _account(client, "alice")
+    uid, token = _account(client, "alice@example.com")
     _seed(uid, "a")
 
     assert client.get("/api/catalog/delisted", headers=_bearer(token)).json() == {
@@ -158,7 +158,7 @@ def test_the_delisted_summary_is_zero_when_nothing_is_delisted(client: TestClien
 
 def test_removing_delisted_when_there_are_none_says_zero(client: TestClient) -> None:
     """A count, not a bare 204: the page has to be able to say "there was nothing to tidy"."""
-    uid, token = _account(client, "alice")
+    uid, token = _account(client, "alice@example.com")
     _seed(uid, "a")
     assert client.delete("/api/catalog/delisted", headers=_bearer(token)).json()["removed"] == 0
 
@@ -171,7 +171,7 @@ def test_removing_one_product_takes_its_cart_membership_but_not_its_history(
     has to say. `price_history` does **not**: it is keyed on the product's identity and shared
     by everyone watching it, so it is not this user's to delete and it is still there for the
     next watcher (CATSVC-R4). This is the assertion that used to read `== 1`."""
-    uid, token = _account(client, "alice")
+    uid, token = _account(client, "alice@example.com")
     h = _bearer(token)
     _seed(uid, "a", "b")
     product_id = client.get("/api/catalog", headers=h).json()["items"][0]["id"]
@@ -198,8 +198,8 @@ def test_removing_one_product_takes_its_cart_membership_but_not_its_history(
 
 def test_someone_elses_product_reads_as_not_found(client: TestClient) -> None:
     """Never 403: that would confirm the row exists."""
-    uid_a, _ = _account(client, "alice")
-    _uid_b, token_b = _account(client, "bob")
+    uid_a, _ = _account(client, "alice@example.com")
+    _uid_b, token_b = _account(client, "bob@example.com")
     _seed(uid_a, "a")
     session = new_session()
     try:
@@ -213,8 +213,8 @@ def test_someone_elses_product_reads_as_not_found(client: TestClient) -> None:
 
 
 def test_emptying_the_catalog_removes_everything_of_that_user_only(client: TestClient) -> None:
-    uid_a, token_a = _account(client, "alice")
-    uid_b, token_b = _account(client, "bob")
+    uid_a, token_a = _account(client, "alice@example.com")
+    uid_b, token_b = _account(client, "bob@example.com")
     _seed(uid_a, "a", "b", "c")
     _seed(uid_b, "d")
 
@@ -226,14 +226,14 @@ def test_emptying_the_catalog_removes_everything_of_that_user_only(client: TestC
 def test_a_plain_user_cannot_reach_the_manual_scrape(client: TestClient) -> None:
     """9.B8: the manual scrape is the quickest way to send a site requests its Crawl-delay never
     asked for, so it belongs to the super-user. Refused by the API, not by a hidden button."""
-    _uid, token = _account(client, "alice")
+    _uid, token = _account(client, "alice@example.com")
     h = _bearer(token)
     assert client.post("/api/plugins/dragon-store/scrape-now", headers=h).status_code == 403
     assert client.get("/api/plugins/dragon-store/scrape-now", headers=h).status_code == 403
 
 
 def test_a_super_user_and_an_admin_can(client: TestClient) -> None:
-    _uid, token = _account(client, "sudo", role="super_user")
+    _uid, token = _account(client, "sudo@example.com", role="super_user")
     assert (
         client.get("/api/plugins/dragon-store/scrape-now", headers=_bearer(token)).status_code
         == 200

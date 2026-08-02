@@ -62,7 +62,7 @@ class FakeEmail(NotifierPlugin):
         self.sent.append((config, locale))
 
 
-def _user(db: Session, name: str = "alice") -> User:
+def _user(db: Session, name: str = "alice@example.com") -> User:
     u = User(username=name, password_hash="x")
     db.add(u)
     db.flush()

@@ -36,8 +36,8 @@ def _make_user(client: TestClient, token: str, username: str) -> int:
 
 def test_totals_count_the_installation(client: TestClient) -> None:
     token = _admin_token(client)
-    alice = _make_user(client, token, "alice")
-    _make_user(client, token, "bob")
+    alice = _make_user(client, token, "alice@example.com")
+    _make_user(client, token, "bob@example.com")
     client.delete(f"/api/admin/users/{alice}", headers=_bearer(token))
 
     totals = client.get("/api/admin/dashboard", headers=_bearer(token)).json()["totals"]
@@ -61,9 +61,9 @@ def test_the_notification_window_is_declared_and_configurable(client: TestClient
 def test_the_dashboard_never_returns_anything_a_person_owns(client: TestClient) -> None:
     """DASH-R6: the admin governs the installation, they do not read its contents."""
     token = _admin_token(client)
-    _make_user(client, token, "alice")
+    _make_user(client, token, "alice@example.com")
     raw = client.get("/api/admin/dashboard", headers=_bearer(token)).text
-    assert "alice" not in raw, "not even a username leaks into the aggregate view"
+    assert "alice@example.com" not in raw, "not even a username leaks into the aggregate view"
     for field in ("name", "url", "price", "cart_name"):
         assert f'"{field}"' not in raw
 
@@ -75,7 +75,7 @@ def test_the_dashboard_is_admin_only(client: TestClient) -> None:
 def test_the_load_view_lists_accounts_that_cost_nothing_too(client: TestClient) -> None:
     """10.B10: "costs nothing lately" is an answer; leaving a row out reads as "does not exist"."""
     token = _admin_token(client)
-    _make_user(client, token, "alice")
+    _make_user(client, token, "alice@example.com")
     body = client.get("/api/admin/dashboard/users", headers=_bearer(token)).json()
     assert body["window_days"] == 7
     # Nobody has scraped anything, so no traffic rows exist at all — and the list is honest
@@ -88,7 +88,7 @@ def test_the_load_view_carries_numbers_and_a_username_and_nothing_else(
     client: TestClient,
 ) -> None:
     token = _admin_token(client)
-    _make_user(client, token, "alice")
+    _make_user(client, token, "alice@example.com")
     raw = client.get("/api/admin/dashboard/users", headers=_bearer(token)).json()
     for row in raw["by_user"] + raw["by_user_and_scraper"]:
         assert set(row) <= {

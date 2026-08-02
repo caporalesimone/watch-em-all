@@ -67,7 +67,7 @@ def _configure_email_admin(client: TestClient, admin: str) -> None:
 
 
 def test_user_lists_in_app_and_email(client: TestClient) -> None:
-    token = _make_user(client, _admin_token(client), "alice")
+    token = _make_user(client, _admin_token(client), "alice@example.com")
     items = client.get("/api/notifiers", headers=_bearer(token)).json()
     channels = _by_id(items)
     assert items[0]["plugin_id"] == "in_app"  # in-app first
@@ -84,14 +84,14 @@ def test_admin_config_makes_email_available_secret_write_only(client: TestClient
     assert email["is_set"]["smtp_password"] is True  # a value is stored…
     assert "smtp_password" not in email["config"]  # …but never returned (CFG-R3)
 
-    token = _make_user(client, admin, "alice")
+    token = _make_user(client, admin, "alice@example.com")
     assert _by_id(client.get("/api/notifiers", headers=_bearer(token)).json())["email"]["available"]
 
 
 def test_user_config_enable_makes_email_active_and_filters_admin_keys(client: TestClient) -> None:
     admin = _admin_token(client)
     _configure_email_admin(client, admin)
-    token = _make_user(client, admin, "alice")
+    token = _make_user(client, admin, "alice@example.com")
 
     # Inject an admin key alongside the user field: it must be dropped (CFG-R5).
     saved = client.put(
@@ -109,7 +109,7 @@ def test_user_config_enable_makes_email_active_and_filters_admin_keys(client: Te
 
 
 def test_in_app_cannot_be_user_configured_or_disabled(client: TestClient) -> None:
-    token = _make_user(client, _admin_token(client), "alice")
+    token = _make_user(client, _admin_token(client), "alice@example.com")
     assert (
         client.put(
             "/api/notifiers/in_app/config", json={"config": {}}, headers=_bearer(token)
@@ -128,13 +128,13 @@ def test_admin_kill_switch_hides_email_from_users(client: TestClient) -> None:
     admin = _admin_token(client)
     _configure_email_admin(client, admin)
     client.patch("/api/admin/notifiers/email", json={"enabled": False}, headers=_bearer(admin))
-    token = _make_user(client, admin, "alice")
+    token = _make_user(client, admin, "alice@example.com")
     assert "email" not in _by_id(client.get("/api/notifiers", headers=_bearer(token)).json())
 
 
 def test_admin_disabling_in_app_hides_inbox(client: TestClient) -> None:
     admin = _admin_token(client)
-    token = _make_user(client, admin, "alice")
+    token = _make_user(client, admin, "alice@example.com")
     # Baseline: in-app listed, alerts endpoint reachable.
     assert "in_app" in _by_id(client.get("/api/notifiers", headers=_bearer(token)).json())
     client.patch("/api/admin/notifiers/in_app", json={"enabled": False}, headers=_bearer(admin))
@@ -149,7 +149,7 @@ def test_user_test_endpoint_reports_outcome(
 ) -> None:
     admin = _admin_token(client)
     _configure_email_admin(client, admin)
-    token = _make_user(client, admin, "alice")
+    token = _make_user(client, admin, "alice@example.com")
     client.put(
         "/api/notifiers/email/config",
         json={"config": {"to_address": "a@b.co"}},

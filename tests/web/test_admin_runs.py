@@ -76,7 +76,7 @@ def test_the_drill_down_puts_the_failure_first_and_names_the_user(client: TestCl
     created = client.post(
         "/api/admin/users",
         json={
-            "username": "alice",
+            "username": "alice@example.com",
             "first_name": "A",
             "last_name": "R",
             "role": "user",
@@ -107,7 +107,7 @@ def test_the_drill_down_puts_the_failure_first_and_names_the_user(client: TestCl
     rows = client.get(f"/api/admin/runs/{run_id}", headers=_bearer(token)).json()
     # Failures first: on a partial run, finding them is the whole reason to open this.
     assert rows[0]["status"] == "error"
-    assert rows[0]["username"] == "alice", "an id does not answer 'who'"
+    assert rows[0]["username"] == "alice@example.com", "an id does not answer 'who'"
     assert rows[0]["error_message"] == "the site said no"
 
 

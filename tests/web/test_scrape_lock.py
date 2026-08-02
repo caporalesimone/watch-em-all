@@ -28,7 +28,7 @@ def _user_token(client: TestClient, admin: str) -> str:
     client.post(
         "/api/admin/users",
         json={
-            "username": "carol",
+            "username": "carol@example.com",
             "first_name": "Carol",
             "last_name": "Doe",
             # The manual scrape belongs to the super-user from 9.B8: a plain account is
@@ -38,7 +38,9 @@ def _user_token(client: TestClient, admin: str) -> str:
         },
         headers=_bearer(admin),
     )
-    login = client.post("/api/auth/login", json={"username": "carol", "password": "temp-pass-123"})
+    login = client.post(
+        "/api/auth/login", json={"username": "carol@example.com", "password": "temp-pass-123"}
+    )
     access = login.json()["access_token"]
     client.post(
         "/api/auth/change-password",
@@ -46,7 +48,7 @@ def _user_token(client: TestClient, admin: str) -> str:
         headers=_bearer(access),
     )
     relogin = client.post(
-        "/api/auth/login", json={"username": "carol", "password": "carol-pass-123"}
+        "/api/auth/login", json={"username": "carol@example.com", "password": "carol-pass-123"}
     )
     return str(relogin.json()["access_token"])
 

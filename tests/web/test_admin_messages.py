@@ -65,8 +65,8 @@ def _unread(client: TestClient, token: str) -> int:
 
 def test_broadcast_is_one_row_and_everyone_sees_it(client: TestClient) -> None:
     admin = _admin_token(client)
-    alice = _make_user(client, admin, "alice")
-    bob = _make_user(client, admin, "bob")
+    alice = _make_user(client, admin, "alice@example.com")
+    bob = _make_user(client, admin, "bob@example.com")
 
     sent = client.post(
         "/api/admin/messages",
@@ -90,7 +90,7 @@ def test_broadcast_is_one_row_and_everyone_sees_it(client: TestClient) -> None:
 
 def test_broadcast_read_pointer_moves_forward_only(client: TestClient) -> None:
     admin = _admin_token(client)
-    alice = _make_user(client, admin, "alice")
+    alice = _make_user(client, admin, "alice@example.com")
 
     first = client.post(
         "/api/admin/messages", json={"title": "One", "body": "first"}, headers=_bearer(admin)
@@ -122,7 +122,7 @@ def test_broadcast_predating_an_account_arrives_already_read(client: TestClient)
         json={"title": "Old news", "body": "before you"},
         headers=_bearer(admin),
     )
-    late = _make_user(client, admin, "late")
+    late = _make_user(client, admin, "late@example.com")
     # An announcement is addressed to the people who were there. The archive is still visible —
     # announcements are public by nature — but it is not a backlog to clear, so the badge is 0.
     assert _unread(client, late) == 0
@@ -132,11 +132,11 @@ def test_broadcast_predating_an_account_arrives_already_read(client: TestClient)
 
 def test_history_unions_alerts_and_broadcasts(client: TestClient) -> None:
     admin = _admin_token(client)
-    alice = _make_user(client, admin, "alice")
+    alice = _make_user(client, admin, "alice@example.com")
     alice_id = next(
         u["id"]
         for u in client.get("/api/admin/users", headers=_bearer(admin)).json()
-        if u["username"] == "alice"
+        if u["username"] == "alice@example.com"
     )
     client.post(
         "/api/admin/messages",
@@ -172,12 +172,12 @@ def test_history_unions_alerts_and_broadcasts(client: TestClient) -> None:
 
 def test_targeted_message_lands_in_that_users_history_only(client: TestClient) -> None:
     admin = _admin_token(client)
-    alice = _make_user(client, admin, "alice")
-    bob = _make_user(client, admin, "bob")
+    alice = _make_user(client, admin, "alice@example.com")
+    bob = _make_user(client, admin, "bob@example.com")
     alice_id = next(
         u["id"]
         for u in client.get("/api/admin/users", headers=_bearer(admin)).json()
-        if u["username"] == "alice"
+        if u["username"] == "alice@example.com"
     )
 
     sent = client.post(
@@ -187,7 +187,7 @@ def test_targeted_message_lands_in_that_users_history_only(client: TestClient) -
     )
     assert sent.status_code == 201
     assert sent.json()["audience"] == "user"
-    assert sent.json()["target_username"] == "alice"
+    assert sent.json()["target_username"] == "alice@example.com"
     assert sent.json()["recipient_count"] == 1
 
     # One recipient means the ordinary path: a real history row, no pointer involved.
@@ -206,7 +206,7 @@ def test_a_user_with_no_channels_still_gets_it_in_app(client: TestClient) -> Non
     # ADMSG-R2 / ALERT-R13: the history is written regardless, so the message cannot be lost by
     # a person who has configured nothing. In-app is the channel nobody can switch off.
     admin = _admin_token(client)
-    alice = _make_user(client, admin, "alice")
+    alice = _make_user(client, admin, "alice@example.com")
     client.post(
         "/api/admin/messages", json={"title": "Heads up", "body": "hello"}, headers=_bearer(admin)
     )
@@ -227,7 +227,7 @@ def test_unknown_target_is_refused_not_silently_broadcast(client: TestClient) ->
 
 def test_sending_requires_admin(client: TestClient) -> None:
     admin = _admin_token(client)
-    alice = _make_user(client, admin, "alice")
+    alice = _make_user(client, admin, "alice@example.com")
     resp = client.post(
         "/api/admin/messages", json={"title": "t", "body": "b"}, headers=_bearer(alice)
     )
@@ -238,7 +238,7 @@ def test_sending_requires_admin(client: TestClient) -> None:
 def test_sent_list_shows_delivery_outcomes_never_read_state(client: TestClient) -> None:
     # ADMSG-R5, stated as a test: the admin's view of a message is about channels, not people.
     admin = _admin_token(client)
-    _make_user(client, admin, "alice")
+    _make_user(client, admin, "alice@example.com")
     client.post(
         "/api/admin/messages", json={"title": "Notice", "body": "body"}, headers=_bearer(admin)
     )
@@ -256,13 +256,13 @@ def test_sent_list_shows_delivery_outcomes_never_read_state(client: TestClient) 
 
 def test_message_detail_lists_recipients_and_their_channels(client: TestClient) -> None:
     admin = _admin_token(client)
-    _make_user(client, admin, "alice")
+    _make_user(client, admin, "alice@example.com")
     sent = client.post(
         "/api/admin/messages", json={"title": "Notice", "body": "body"}, headers=_bearer(admin)
     ).json()
 
     detail = client.get(f"/api/admin/messages/{sent['id']}", headers=_bearer(admin)).json()
-    assert {r["username"] for r in detail["recipients"]} == {"alice"}
+    assert {r["username"] for r in detail["recipients"]} == {"alice@example.com"}
     for person in detail["recipients"]:
         assert [c["plugin_id"] for c in person["channels"]] == ["in_app"]
         assert [c["status"] for c in person["channels"]] == ["delivered"]
@@ -272,7 +272,7 @@ def test_message_detail_lists_recipients_and_their_channels(client: TestClient) 
 
 def test_message_detail_404_and_admin_only(client: TestClient) -> None:
     admin = _admin_token(client)
-    alice = _make_user(client, admin, "alice")
+    alice = _make_user(client, admin, "alice@example.com")
     assert client.get("/api/admin/messages/999", headers=_bearer(admin)).status_code == 404
     assert client.get("/api/admin/messages", headers=_bearer(alice)).status_code == 403
     assert client.get("/api/admin/messages").status_code == 401
@@ -280,7 +280,7 @@ def test_message_detail_404_and_admin_only(client: TestClient) -> None:
 
 def test_history_filters_by_category_and_renders_the_body(client: TestClient) -> None:
     admin = _admin_token(client)
-    alice = _make_user(client, admin, "alice")
+    alice = _make_user(client, admin, "alice@example.com")
     announcement = client.post(
         "/api/admin/messages",
         json={"title": "Maintenance", "body": "We are **down** on Sunday."},
@@ -304,11 +304,11 @@ def test_history_filters_by_category_and_renders_the_body(client: TestClient) ->
 
 def test_a_digest_has_no_title_and_a_message_does(client: TestClient) -> None:
     admin = _admin_token(client)
-    alice = _make_user(client, admin, "alice")
+    alice = _make_user(client, admin, "alice@example.com")
     alice_id = next(
         u["id"]
         for u in client.get("/api/admin/users", headers=_bearer(admin)).json()
-        if u["username"] == "alice"
+        if u["username"] == "alice@example.com"
     )
     client.post(
         "/api/admin/messages",
@@ -334,7 +334,7 @@ def test_preview_renders_with_the_same_helper_that_delivers(client: TestClient) 
     rendered = preview.json()["body_html"]
     assert "<strong>there</strong>" in rendered and "<li>one</li>" in rendered
 
-    alice = _make_user(client, admin, "alice")
+    alice = _make_user(client, admin, "alice@example.com")
     sent = client.post(
         "/api/admin/messages", json={"title": "T", "body": draft}, headers=_bearer(admin)
     ).json()
@@ -344,7 +344,7 @@ def test_preview_renders_with_the_same_helper_that_delivers(client: TestClient) 
 
 def test_preview_is_admin_only_and_sanitises(client: TestClient) -> None:
     admin = _admin_token(client)
-    alice = _make_user(client, admin, "alice")
+    alice = _make_user(client, admin, "alice@example.com")
     assert client.post("/api/admin/messages/preview", json={"body": "x"}).status_code == 401
     assert (
         client.post(
@@ -366,11 +366,11 @@ def test_administrators_are_never_recipients(client: TestClient) -> None:
     # Simone's rule, 2026-08-02: this channel talks to the people who use the installation, and
     # whoever administers it already has the logs. Stated on the server, not in the dropdown.
     admin = _admin_token(client)
-    alice = _make_user(client, admin, "alice")
+    alice = _make_user(client, admin, "alice@example.com")
     client.post(
         "/api/admin/users",
         json={
-            "username": "second",
+            "username": "second@example.com",
             "first_name": "Second",
             "last_name": "Admin",
             "role": "admin",
@@ -381,7 +381,7 @@ def test_administrators_are_never_recipients(client: TestClient) -> None:
     second_id = next(
         u["id"]
         for u in client.get("/api/admin/users", headers=_bearer(admin)).json()
-        if u["username"] == "second"
+        if u["username"] == "second@example.com"
     )
 
     sent = client.post(
@@ -391,7 +391,7 @@ def test_administrators_are_never_recipients(client: TestClient) -> None:
     assert sent["recipient_count"] == 1
     assert _unread(client, alice) == 1
     detail = client.get(f"/api/admin/messages/{sent['id']}", headers=_bearer(admin)).json()
-    assert [r["username"] for r in detail["recipients"]] == ["alice"]
+    assert [r["username"] for r in detail["recipients"]] == ["alice@example.com"]
 
     # And an admin cannot be picked out by hand either.
     refused = client.post(
