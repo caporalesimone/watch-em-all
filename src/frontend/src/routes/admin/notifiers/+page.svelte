@@ -64,6 +64,23 @@
 		}
 	}
 
+	// The badge used to read "Available" whenever the system config was complete — which said
+	// nothing about whether the channel was switched on, so a channel disabled right next to it
+	// still claimed to be available (Simone, 2026-08-02). It now answers the question an admin
+	// is actually asking: is anything going out through this?
+	function badgeKey(c: AdminNotifier): string {
+		if (!c.admin_config_complete) return 'admin.notifiers.notConfigured';
+		return c.enabled ? 'admin.notifiers.statusActive' : 'admin.notifiers.statusOff';
+	}
+
+	function badgeClass(c: AdminNotifier): string {
+		if (!c.admin_config_complete)
+			return 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400';
+		return c.enabled
+			? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+			: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300';
+	}
+
 	async function test(id: string): Promise<void> {
 		busy = id;
 		try {
@@ -99,13 +116,10 @@
 							<span class="font-medium">{c.display_name}</span>
 							{#if !c.is_in_app}
 								<span
-									class="rounded px-1.5 py-0.5 text-xs {c.admin_config_complete
-										? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-										: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}"
+									class="rounded px-1.5 py-0.5 text-xs {badgeClass(c)}"
+									title={$_('admin.notifiers.statusHint')}
 								>
-									{c.admin_config_complete
-										? $_('admin.notifiers.available')
-										: $_('admin.notifiers.notConfigured')}
+									{$_(badgeKey(c))}
 								</span>
 							{/if}
 						</div>
