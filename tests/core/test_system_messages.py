@@ -142,3 +142,85 @@ def test_marking_for_deletion_names_the_date_it_will_happen(client: TestClient) 
     assert len(notes) == 1
     due = str(marked["deletion_due_at"])[:10]
     assert due in str(notes[0]["body"]), "the reversible window is the whole point of the note"
+
+
+# ------------------------------------------------------------------------ the admin API (10.B17)
+
+
+def test_the_list_is_the_catalog_not_the_table(client: TestClient) -> None:
+    """ADMSG-R9 from the outside: every key shows up with nothing stored anywhere."""
+    admin = _admin(client)
+    items = client.get("/api/admin/message-templates", headers=_bearer(admin)).json()
+    assert {i["key"] for i in items} == set(sysmsg.CATALOG)
+    assert all(i["is_override"] is False for i in items)
+    disabled = next(i for i in items if i["key"] == "user.disabled")
+    assert disabled["title"] == disabled["default_title"]
+    assert "deletion_due_date" not in disabled["placeholders"]
+
+
+def test_an_override_round_trips_and_a_delete_returns_the_default(client: TestClient) -> None:
+    admin = _admin(client)
+    saved = client.put(
+        "/api/admin/message-templates/user.disabled",
+        json={"title": "Closed", "body": "Sorry {first_name}."},
+        headers=_bearer(admin),
+    )
+    assert saved.status_code == 200
+    assert saved.json()["is_override"] is True
+
+    back = client.delete("/api/admin/message-templates/user.disabled", headers=_bearer(admin))
+    assert back.status_code == 204
+    after = client.get("/api/admin/message-templates", headers=_bearer(admin)).json()
+    entry = next(i for i in after if i["key"] == "user.disabled")
+    assert entry["is_override"] is False and entry["title"] == sysmsg.USER_DISABLED.title
+
+
+def test_an_unknown_placeholder_is_a_warning_a_missing_one_is_a_refusal(
+    client: TestClient,
+) -> None:
+    admin = _admin(client)
+    # Untidy, but it degrades to literal text — so it is saved, and reported.
+    warned = client.put(
+        "/api/admin/message-templates/user.disabled",
+        json={"title": "T", "body": "Bye {usernme}"},
+        headers=_bearer(admin),
+    ).json()
+    assert warned["is_override"] is True
+    assert warned["unknown_placeholders"] == ["usernme"]
+
+    # A credential mail without the credential is not saved at all.
+    refused = client.put(
+        "/api/admin/message-templates/user.credentials.reset",
+        json={"title": "T", "body": "Your password was reset."},
+        headers=_bearer(admin),
+    )
+    assert refused.status_code == 422
+    assert refused.json()["code"] == "missing_placeholder"
+    still_default = client.get("/api/admin/message-templates", headers=_bearer(admin)).json()
+    entry = next(i for i in still_default if i["key"] == "user.credentials.reset")
+    assert entry["is_override"] is False
+
+
+def test_a_key_the_core_does_not_declare_is_refused(client: TestClient) -> None:
+    admin = _admin(client)
+    resp = client.put(
+        "/api/admin/message-templates/made.up.key",
+        json={"title": "T", "body": "B"},
+        headers=_bearer(admin),
+    )
+    assert resp.status_code == 404
+
+
+def test_the_override_is_what_actually_gets_delivered(client: TestClient) -> None:
+    """The point of the endpoint: the text an admin saves is the text the person receives."""
+    admin = _admin(client)
+    client.put(
+        "/api/admin/message-templates/user.disabled",
+        json={"title": "Access closed", "body": "Sorry {first_name}, ask the office."},
+        headers=_bearer(admin),
+    )
+    uid = _make_user(client, admin)
+    client.patch(f"/api/admin/users/{uid}", json={"is_active": False}, headers=_bearer(admin))
+    note = _history(uid)[0]
+    assert note["title"] == "Access closed"
+    assert note["body"] == "Sorry Alice, ask the office."

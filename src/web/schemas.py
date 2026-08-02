@@ -574,6 +574,26 @@ class NotifierEnabledBody(BaseModel):
     enabled: bool
 
 
+class MessageTemplateOut(BaseModel):
+    """One entry of the system-message catalog (10.B17). Carries the default **and** what is in
+    force, so the editor can show both and offer "back to default" without a second request."""
+
+    key: str
+    title: str
+    body: str
+    default_title: str
+    default_body: str
+    placeholders: list[str]
+    required: list[str]
+    is_override: bool
+    unknown_placeholders: list[str]
+
+
+class MessageTemplatePut(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    body: str = Field(min_length=1, max_length=20000)
+
+
 class NotifierTestResult(BaseModel):
     ok: bool
     error: str | None = None
