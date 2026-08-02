@@ -31,6 +31,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - A Runs page under Scrapers shows what each run did — outcome, duration, products, requests and cache hits — with outcome filters and paging.
 - Clicking a run opens its per-user detail underneath, failures first, so a partial run says which account went wrong and why.
 - A dashboard endpoint reports how big the installation is and how its notifications are going, in counts only — never anybody's content.
+- A second one ranks accounts by the load they create, overall and per store, so heavy traffic has a name without exposing what it watches.
 
 ### Changed
 

@@ -146,6 +146,25 @@ class DashboardResponse(BaseModel):
     notifications: DashboardNotifications
 
 
+class UserLoadRow(BaseModel):
+    """What one account costs the installation (10.B10). Numbers and a username, nothing
+    else: DASH-R6 lets the admin see the load a person creates, never what they are watching."""
+
+    user_id: int
+    username: str | None
+    scraper_id: str | None = None
+    products: int
+    carts: int
+    http_requests: int
+    cache_hits: int
+
+
+class DashboardUsers(BaseModel):
+    window_days: int
+    by_user: list[UserLoadRow]
+    by_user_and_scraper: list[UserLoadRow]
+
+
 class AdminPasswordReset(BaseModel):
     # Same shape as creation (10.B1): the admin supplies the temporary password rather than
     # the server inventing one, so the single generator already in the admin page keeps

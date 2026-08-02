@@ -8,7 +8,7 @@ the closest it gets to a person is how many accounts exist in each state.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Query
 from sqlalchemy import func, select
@@ -20,10 +20,18 @@ from src.core.models import (
     CatalogProduct,
     PriceHistory,
     ScraperSchedule,
+    ScrapeRun,
+    ScrapeUserLog,
     User,
 )
 from src.web.deps import AdminDep, SessionDep
-from src.web.schemas import DashboardNotifications, DashboardResponse, DashboardTotals
+from src.web.schemas import (
+    DashboardNotifications,
+    DashboardResponse,
+    DashboardTotals,
+    DashboardUsers,
+    UserLoadRow,
+)
 
 router = APIRouter(prefix="/admin", tags=["Admin: dashboard"])
 
@@ -86,3 +94,98 @@ def dashboard(
             skipped=deliveries("skipped") + deliveries("skipped_no_notifier"),
         ),
     )
+
+
+@router.get(
+    "/dashboard/users",
+    response_model=DashboardUsers,
+    summary="Per-account load: how much work each person's watches cost (admin only).",
+)
+def dashboard_users(
+    _admin: AdminDep,
+    db: SessionDep,
+    window_days: Annotated[int, Query(ge=1, le=365)] = 7,
+) -> DashboardUsers:
+    """Who is generating the traffic, and against which store.
+
+    Still counts only (DASH-R6): a username and some numbers. "This account costs 900
+    requests a week" is a governance question; *what* it is watching is not the admin's.
+    """
+    since = datetime.now(tz=UTC) - timedelta(days=window_days)
+
+    # Owned rows, which have no time window: a catalog is a current state, not an event.
+    products: dict[Any, Any] = {
+        uid: n
+        for uid, n in db.execute(
+            select(CatalogProduct.user_id, func.count()).group_by(CatalogProduct.user_id)
+        ).all()
+    }
+    carts: dict[Any, Any] = {
+        uid: n
+        for uid, n in db.execute(select(Cart.user_id, func.count()).group_by(Cart.user_id)).all()
+    }
+
+    # Traffic, which does: it is measured out of `scrape_user_log`, and that table is pruned,
+    # so the window is not a nicety — it is the only period the data can speak for.
+    def traffic(*group_by: Any) -> list[Any]:
+        return list(
+            db.execute(
+                select(
+                    ScrapeUserLog.user_id,
+                    *group_by,
+                    func.coalesce(func.sum(ScrapeUserLog.http_requests), 0),
+                    func.coalesce(func.sum(ScrapeUserLog.cache_hits), 0),
+                )
+                .join(ScrapeRun, ScrapeRun.run_id == ScrapeUserLog.run_id)
+                .where(ScrapeRun.started_at >= since)
+                .group_by(ScrapeUserLog.user_id, *group_by)
+            ).all()
+        )
+
+    names: dict[Any, Any] = {
+        uid: name for uid, name in db.execute(select(User.id, User.username)).all()
+    }
+
+    by_user = [
+        UserLoadRow(
+            user_id=int(uid),
+            username=names.get(uid),
+            products=int(products.get(uid, 0)),
+            carts=int(carts.get(uid, 0)),
+            http_requests=int(req),
+            cache_hits=int(hits),
+        )
+        for uid, req, hits in traffic()
+    ]
+    # An account with watches but no run in the window still belongs on this list: "costs
+    # nothing lately" is an answer, and leaving it out would read as "does not exist".
+    seen = {row.user_id for row in by_user}
+    by_user += [
+        UserLoadRow(
+            user_id=int(uid),
+            username=names.get(uid),
+            products=int(products.get(uid, 0)),
+            carts=int(carts.get(uid, 0)),
+            http_requests=0,
+            cache_hits=0,
+        )
+        for uid in set(products) | set(carts)
+        if uid not in seen
+    ]
+    by_user.sort(key=lambda r: (-r.http_requests, -r.products, r.user_id))
+
+    by_pair = [
+        UserLoadRow(
+            user_id=int(uid),
+            username=names.get(uid),
+            scraper_id=str(scraper),
+            products=0,  # a product belongs to a catalog, not to a (user, scraper) pair
+            carts=0,
+            http_requests=int(req),
+            cache_hits=int(hits),
+        )
+        for uid, scraper, req, hits in traffic(ScrapeRun.scraper_id)
+    ]
+    by_pair.sort(key=lambda r: (-r.http_requests, r.user_id, r.scraper_id or ""))
+
+    return DashboardUsers(window_days=window_days, by_user=by_user, by_user_and_scraper=by_pair)
