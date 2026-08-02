@@ -65,6 +65,10 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - A scraper can now declare its own settings, and the admin edits them in a form the app builds from that declaration alone.
 - Dragon Store's discount bands and shipping are the first of those: change them and the next cart estimate uses the new ones, no restart.
 - How many times a failed request is retried is configurable too, and the politeness field now says the site's own Crawl-delay is a hard minimum.
+- The Send test button is gone from your profile: the address is your account and already proved itself by delivering your password.
+- Being disabled, scheduled for deletion or deleted now always reaches you by email, whether or not you take email notifications.
+- An account already marked for deletion can be destroyed straight away, and the person is told it happened.
+- On such a row the Users page offers that instead of a password reset, which could do nothing for an account nobody can sign into.
 
 ## [0.9.0] - 2026-07-31
 

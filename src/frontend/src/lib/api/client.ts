@@ -678,6 +678,15 @@ export async function restoreUser(id: number): Promise<AdminUser> {
 	return asJson<AdminUser>(res);
 }
 
+/**
+ * Delete an already-marked account now, deadline waived (10.B27). Answers 204 with no body:
+ * there is no account left to describe, so the caller reloads the list rather than patching a
+ * row it still holds.
+ */
+export async function purgeUser(id: number): Promise<void> {
+	await apiFetch(`/api/admin/users/${id}/purge`, { method: 'DELETE' });
+}
+
 export async function createUser(payload: NewUser): Promise<AdminUser> {
 	const res = await apiFetch('/api/admin/users', {
 		method: 'POST',
@@ -1172,10 +1181,6 @@ export async function setNotifierEnabled(id: string, enabled: boolean): Promise<
 		body: JSON.stringify({ enabled })
 	});
 	return asJson<NotifierChannel>(res);
-}
-
-export function testNotifier(id: string): Promise<NotifierTestResult> {
-	return apiFetch(`/api/notifiers/${id}/test`, { method: 'POST' }).then(asJson<NotifierTestResult>);
 }
 
 export function listAdminNotifiers(): Promise<AdminNotifier[]> {

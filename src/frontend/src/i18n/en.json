@@ -184,9 +184,6 @@
 		"unavailableNote": "This channel hasn't been configured by your administrator yet.",
 		"activate": "Activate",
 		"deactivate": "Deactivate",
-		"test": "Send test",
-		"testOk": "Test sent — check your inbox.",
-		"testFail": "Test failed: {error}",
 		"saved": "Channel settings saved.",
 		"saveError": "Could not save the channel settings.",
 		"loadError": "Could not load your channels."
@@ -229,10 +226,14 @@
 			"actionEnable": "Enable",
 			"actionDelete": "Delete",
 			"actionRestore": "Cancel deletion",
+			"actionPurge": "Delete permanently",
 			"confirmReset": "Reset {username}'s password? A new one is generated and emailed to them, their current password stops working, and every session they have open is signed out. You will not see the new password.",
 			"confirmDelete": "Delete {username}? The account is switched off now and destroyed for good on {date}. Until then you can cancel.",
 			"confirmRestore": "Cancel the deletion of {username}? The account comes back disabled — enabling it is a separate step.",
+			"confirmPurge": "Delete {username} permanently, right now? The account was due to be removed on {date}; this does it immediately, together with its watches, carts and history. Nothing can be restored afterwards, and {username} is told by email.",
 			"resetDone": "A new password has been emailed to {username}, who is now signed out everywhere.",
+			"purgeDone": "{username} has been deleted permanently and told by email.",
+			"errorPurgeFailed": "A plugin could not delete this account's data, so nothing was removed. Check the system logs and try again.",
 			"errorSelf": "You cannot disable or delete your own account."
 		},
 		"notifiers": {

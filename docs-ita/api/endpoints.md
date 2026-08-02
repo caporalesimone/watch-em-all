@@ -37,7 +37,8 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 | GET | `/api/notifiers` | 👤 | — | per ogni canale: schema utente, `is_set` dei secret, stato composito (disponibile/configurato/attivo) |
 | PUT | `/api/notifiers/{plugin_id}/config` | 👤 | `{config}` | chiavi filtrate sullo schema utente; secret assente = non modificare |
 | PATCH | `/api/notifiers/{plugin_id}` | 👤 | `{enabled}` | attiva/disattiva senza perdere la config |
-| POST | `/api/notifiers/{plugin_id}/test` | 👤 | — | invia notifica di prova; esito sincrono |
+
+Un invio di prova lato utente **non esiste più** (10.X4): aveva senso finché il recapito lo scriveva l'utente in quella pagina, ma da 10.B23/10.B25 il recapito **è** l'account e si è già dimostrato funzionante portando la password con cui quella persona è entrata. Quel che restava era una sonda sulla configurazione SMTP del server, che l'utente non può comunque toccare: la prova vive solo lato admin (`POST /api/admin/notifiers/{plugin_id}/test`).
 
 ## Admin — utenti (ciclo di vita)
 
@@ -46,11 +47,12 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 | Metodo | Path | Ruolo | Body | Note |
 |---|---|---|---|---|
 | PATCH | `/api/admin/users/{id}` | 🛡 | `{is_active?, role?}` | disabilitazione → invalidazione token + notifica di cortesia (USR-R11) |
-| POST | `/api/admin/users/{id}/reset-password` | 🛡 | `{temp_password}` | + cambio forzato + invalidazione |
+| POST | `/api/admin/users/{id}/reset-password` | 🛡 | — | password generata e spedita (10.B24) + cambio forzato + invalidazione |
 | DELETE | `/api/admin/users/{id}` | 🛡 | — | **soft con scadenza**: disattiva + marca in cancellazione + `deletion_due_at` = ora + periodo di grazia, notifica di cortesia; nessun dato eliminato (USR-R7) |
 | POST | `/api/admin/users/{id}/restore` | 🛡 | — | annulla la cancellazione: → disabilitato (mai direttamente attivo, USR-R8) |
+| DELETE | `/api/admin/users/{id}/purge` | 🛡 | — | **cancellazione definitiva subito** su un account già marcato (USR-R9b): `204`, `409 not_being_deleted` se non marcato, `403 cannot_target_self`, `500 purge_failed` se un plugin rifiuta |
 
-Il **purge definitivo non ha endpoint**: è il job giornaliero del worker a eliminare gli account scaduti (USR-R9, CRON-R10). Anche l'elenco `GET /api/admin/users` guadagnerà in questa fase i filtri `?status=active\|disabled\|deleting` (USR-R14) e l'ordinamento per **ultimo accesso** (`last_login_at`, USR-R13).
+Il purge automatico resta il job giornaliero del worker sugli account scaduti (USR-R9, CRON-R10); l'endpoint qui sopra è la **stessa** distruzione con un altro innesco, non una seconda implementazione. Anche l'elenco `GET /api/admin/users` guadagna in questa fase i filtri `?status=active\|disabled\|deleting` (USR-R14) e l'ordinamento per **ultimo accesso** (`last_login_at`, USR-R13).
 
 ## Admin — scraper (storico e monitoraggio) — [scraper-scheduling-and-limits](../../docs/3-features/admin/scraper-scheduling-and-limits.md)
 

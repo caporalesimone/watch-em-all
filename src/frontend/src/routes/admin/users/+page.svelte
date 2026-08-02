@@ -8,6 +8,7 @@
 		getSettings,
 		listUsers,
 		markUserForDeletion,
+		purgeUser,
 		resetUserPassword,
 		restoreUser,
 		setUserActive,
@@ -102,6 +103,7 @@
 		if (err.code === 'username_taken') return $_('admin.users.errorTaken');
 		if (err.code === 'email_channel_unavailable') return $_('admin.users.errorNoEmail');
 		if (err.code === 'password_email_failed') return $_('admin.users.errorMailFailed');
+		if (err.code === 'purge_failed') return $_('admin.users.errorPurgeFailed');
 		return $_('admin.users.errorGeneric');
 	}
 
@@ -149,6 +151,26 @@
 		});
 		if (!ok) return;
 		void act(() => markUserForDeletion(user.id));
+	}
+
+	async function doPurge(user: AdminUser): Promise<void> {
+		// The one dialog on this page that describes something with no way back, so it says all
+		// three parts out loud: the deadline on the row is being waived, the data goes with the
+		// account, and the person is told by email. "Are you sure?" would be the wrong question —
+		// the admin is sure, what they may not know is what exactly is about to happen.
+		const ok = await confirmDialog({
+			title: $_('admin.users.actionPurge'),
+			message: $_('admin.users.confirmPurge', {
+				values: { username: user.username, date: when(user.deletion_due_at) }
+			}),
+			confirmLabel: $_('admin.users.actionPurge'),
+			danger: true
+		});
+		if (!ok) return;
+		void act(async () => {
+			await purgeUser(user.id);
+			notice = $_('admin.users.purgeDone', { values: { username: user.username } });
+		});
 	}
 
 	async function doRestore(user: AdminUser): Promise<void> {
@@ -339,14 +361,24 @@
 							-->
 							{#if user.id !== $auth.user?.id}
 								<div class="flex flex-wrap gap-2 text-xs">
-									<button type="button" class={actionClass} onclick={() => doReset(user)}
-										>{$_('admin.users.actionReset')}</button
-									>
+									<!--
+										A row on its way out gets its own pair of actions. Resetting the password
+										of an account nobody can sign into was the previous occupant of this
+										space and did nothing at all: the mail would go out, the new password
+										would work on a login the deletion gate refuses anyway. What belongs
+										here is the other end of the same decision — finish it now (10.F20).
+									-->
 									{#if user.deletion_marked_at}
 										<button type="button" class={actionClass} onclick={() => doRestore(user)}
 											>{$_('admin.users.actionRestore')}</button
 										>
+										<button type="button" class={dangerClass} onclick={() => doPurge(user)}
+											>{$_('admin.users.actionPurge')}</button
+										>
 									{:else}
+										<button type="button" class={actionClass} onclick={() => doReset(user)}
+											>{$_('admin.users.actionReset')}</button
+										>
 										<button
 											type="button"
 											class={actionClass}
