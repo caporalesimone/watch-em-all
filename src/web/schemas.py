@@ -404,6 +404,9 @@ class AlertListItem(BaseModel):
     created_at: datetime
     read: bool
     cart_count: int
+    # The message title, for the text kinds only (10.F10). A digest has no title — its one-line
+    # preview is the cart count — so this is null there rather than a manufactured heading.
+    title: str | None = None
 
 
 class AlertPage(BaseModel):

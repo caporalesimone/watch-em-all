@@ -8,6 +8,7 @@ digest detail, a mark-read action and the unread count for the dashboard badge. 
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any, Literal
 
 from fastapi import APIRouter, Query
 from sqlalchemy import delete as sa_delete
@@ -16,6 +17,7 @@ from sqlalchemy import func, select
 from src.core.admin_messages import unread_broadcast_count
 from src.core.contracts import NotificationKind
 from src.core.errors import APIError
+from src.core.markdown import to_html
 from src.core.models import AdminMessage, AdminMessageDelivery, AlertDelivery, AlertLog, User
 from src.core.notify import in_app_visible, message_event
 from src.web.deps import SessionDep, UserDep
@@ -43,6 +45,36 @@ def _cart_count(row: AlertLog) -> int:
     return len(carts) if isinstance(carts, list) else 0
 
 
+def _title(row: AlertLog) -> str | None:
+    value = row.payload_json.get("title") if isinstance(row.payload_json, dict) else None
+    return str(value) if isinstance(value, str) else None
+
+
+# The two categories a user sees (ADMSG-R4). Derived from the kind rather than stored, so the
+# two can never disagree — and a kind added later has to be placed here on purpose.
+_ADMIN_KINDS = (NotificationKind.ADMIN_MESSAGE.value,)
+_SYSTEM_KINDS = (
+    NotificationKind.ALERT_DIGEST.value,
+    NotificationKind.SUMMARY.value,
+    NotificationKind.SYSTEM_MESSAGE.value,
+)
+
+
+def _text_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """A text message's payload with its body also rendered to HTML.
+
+    Rendered **here and not in the browser**, by the same core helper the email uses. The
+    alternative — markdown-it in the page — is the shape 9.F8 already had to undo once: the
+    Difference rule lived in Python for the email and in TypeScript for the page, and the two
+    drifted. One renderer means the email and the history cannot say the message differently,
+    and the HTML arrives already sanitised, so the page has nothing left to get wrong.
+    """
+    body = payload.get("body")
+    if not isinstance(body, str):
+        return payload
+    return {**payload, "body_html": to_html(body)}
+
+
 @router.get("", response_model=AlertPage, summary="List the user's alert history (paginated).")
 def list_alerts(
     user: UserDep,
@@ -50,12 +82,15 @@ def list_alerts(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     kind: str | None = Query(None),
+    category: Literal["system", "admin"] | None = Query(None),
 ) -> AlertPage:
     if not in_app_visible(db):  # admin disabled the in-app channel → inbox hidden for everyone
         return AlertPage(items=[], total=0, page=page, page_size=page_size)
     where = [AlertLog.user_id == user.sub]
     if kind is not None:
         where.append(AlertLog.kind == kind)
+    if category is not None:
+        where.append(AlertLog.kind.in_(_ADMIN_KINDS if category == "admin" else _SYSTEM_KINDS))
     total = db.scalar(select(func.count()).select_from(AlertLog).where(*where)) or 0
     take = page * page_size  # enough of each source to fill this page after the merge
     items = [
@@ -66,6 +101,7 @@ def list_alerts(
             created_at=r.created_at,
             read=r.read_at is not None,
             cart_count=_cart_count(r),
+            title=_title(r),
         )
         for r in db.scalars(
             select(AlertLog)
@@ -80,7 +116,8 @@ def list_alerts(
     # can afford to: the nightly purge caps a user's alert rows and announcements are rare, so
     # both sides are short lists. A SQL union would buy nothing and cost the read.
     person = db.get(User, user.sub)
-    if person is not None and kind in (None, NotificationKind.ADMIN_MESSAGE.value):
+    wanted = kind in (None, NotificationKind.ADMIN_MESSAGE.value) and category != "system"
+    if person is not None and wanted:
         pointer = person.last_broadcast_read_id
         broadcasts = db.scalars(
             select(AdminMessage)
@@ -98,6 +135,7 @@ def list_alerts(
                 # Read state is the pointer, not a flag: "read up to N" (see mark_broadcast_read).
                 read=pointer is not None and b.id <= pointer,
                 cart_count=0,
+                title=b.title,
             )
             for b in broadcasts
         ]
@@ -172,7 +210,7 @@ def get_broadcast(message_id: int, user: UserDep, db: SessionDep) -> AlertDetail
         kind=NotificationKind.ADMIN_MESSAGE.value,
         created_at=message.created_at,
         read=pointer is not None and message.id <= pointer,
-        payload=message_event(message, user.sub).model_dump(mode="json"),
+        payload=_text_payload(message_event(message, user.sub).model_dump(mode="json")),
         deliveries=deliveries,
     )
 
@@ -226,7 +264,7 @@ def get_alert(alert_id: int, user: UserDep, db: SessionDep) -> AlertDetail:
         kind=row.kind,
         created_at=row.created_at,
         read=row.read_at is not None,
-        payload=row.payload_json,
+        payload=_text_payload(row.payload_json),
         deliveries=deliveries,
     )
 

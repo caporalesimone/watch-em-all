@@ -4,10 +4,14 @@
 
 	import {
 		getAlert,
+		isTextMessage,
 		markAlertRead,
 		type AlertDetail,
+		type AlertDigestPayload,
 		type AlertDigestProduct
 	} from '$lib/api/client';
+	import DeliveryList from '$lib/components/DeliveryList.svelte';
+	import MessageBody from '$lib/components/MessageBody.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import ProductCell from '$lib/components/ProductCell.svelte';
 	import SourceTag from '$lib/components/SourceTag.svelte';
@@ -87,24 +91,11 @@
 		return mode === 'cross' ? $_('carts.modeCross') : $_('carts.modeSingle');
 	}
 
-	// Per-channel delivery outcomes (7.F5). Channel label is small and known; status drives colour.
-	function channelLabel(pluginId: string): string {
-		if (pluginId === 'in_app') return $_('alerts.channelInApp');
-		if (pluginId === 'email') return $_('alerts.channelEmail');
-		return pluginId;
-	}
-	const DELIVERY_STATUS: Record<string, string> = {
-		delivered: 'alerts.deliveryDelivered',
-		pending: 'alerts.deliveryPending',
-		failed: 'alerts.deliveryFailed',
-		skipped: 'alerts.deliverySkipped'
-	};
-	function deliveryClass(status: string): string {
-		if (status === 'delivered')
-			return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300';
-		if (status === 'failed') return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
-		return 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400';
-	}
+	// A digest and a text message land on the same page because they are the same notification
+	// to the user; only the middle of it differs.
+	const digest = $derived(
+		detail && !isTextMessage(detail.payload) ? (detail.payload as AlertDigestPayload) : null
+	);
 </script>
 
 <section class="space-y-6">
@@ -117,11 +108,13 @@
 	{:else}
 		<PageTitle title={fmt(detail.created_at)} />
 
-		{#if detail.payload.cart_alerts.length === 0}
+		{#if isTextMessage(detail.payload)}
+			<MessageBody payload={detail.payload} />
+		{:else if !digest || digest.cart_alerts.length === 0}
 			<p class="max-w-prose text-sm text-slate-500">{$_('alerts.empty')}</p>
 		{:else}
 			<div class="space-y-4">
-				{#each detail.payload.cart_alerts as cart (cart.cart_id)}
+				{#each digest.cart_alerts as cart (cart.cart_id)}
 					<div class="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
 						<div class="flex flex-wrap items-center gap-2">
 							<a href="/carts/{cart.cart_id}" class="text-base font-semibold hover:underline"
@@ -241,25 +234,6 @@
 			</div>
 		{/if}
 
-		{#if detail.deliveries.length > 0}
-			<div class="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-800">
-				<h2 class="text-sm font-medium text-slate-500">{$_('alerts.deliveriesTitle')}</h2>
-				<ul class="space-y-1 text-sm">
-					{#each detail.deliveries as d (d.plugin_id)}
-						{#if d.status === 'skipped_no_notifier'}
-							<li class="text-slate-400">{$_('alerts.deliveryNone')}</li>
-						{:else}
-							<li class="flex flex-wrap items-center gap-2">
-								<span>{channelLabel(d.plugin_id)}</span>
-								<span class="rounded px-1.5 py-0.5 text-xs {deliveryClass(d.status)}">
-									{$_(DELIVERY_STATUS[d.status] ?? d.status)}
-								</span>
-								{#if d.error}<span class="text-xs text-red-500">{d.error}</span>{/if}
-							</li>
-						{/if}
-					{/each}
-				</ul>
-			</div>
-		{/if}
+		<DeliveryList deliveries={detail.deliveries} />
 	{/if}
 </section>

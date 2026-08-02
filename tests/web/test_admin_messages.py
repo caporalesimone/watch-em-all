@@ -276,3 +276,46 @@ def test_message_detail_404_and_admin_only(client: TestClient) -> None:
     assert client.get("/api/admin/messages/999", headers=_bearer(admin)).status_code == 404
     assert client.get("/api/admin/messages", headers=_bearer(alice)).status_code == 403
     assert client.get("/api/admin/messages").status_code == 401
+
+
+def test_history_filters_by_category_and_renders_the_body(client: TestClient) -> None:
+    admin = _admin_token(client)
+    alice = _make_user(client, admin, "alice")
+    announcement = client.post(
+        "/api/admin/messages",
+        json={"title": "Maintenance", "body": "We are **down** on Sunday."},
+        headers=_bearer(admin),
+    ).json()
+
+    # The category is derived from the kind (ADMSG-R4): announcements are admin, digests are not.
+    admin_only = client.get("/api/alerts?category=admin", headers=_bearer(alice)).json()
+    assert [i["title"] for i in admin_only["items"]] == ["Maintenance"]
+    system_only = client.get("/api/alerts?category=system", headers=_bearer(alice)).json()
+    assert system_only["items"] == [] and system_only["total"] == 0
+
+    detail = client.get(
+        f"/api/alerts/broadcasts/{announcement['id']}", headers=_bearer(alice)
+    ).json()
+    # Rendered by the core, not by the browser: the same helper the email uses, already
+    # sanitised, so the two channels cannot say the message differently.
+    assert "<strong>down</strong>" in detail["payload"]["body_html"]
+    assert detail["payload"]["body"] == "We are **down** on Sunday."
+
+
+def test_a_digest_has_no_title_and_a_message_does(client: TestClient) -> None:
+    admin = _admin_token(client)
+    alice = _make_user(client, admin, "alice")
+    alice_id = next(
+        u["id"]
+        for u in client.get("/api/admin/users", headers=_bearer(admin)).json()
+        if u["username"] == "alice"
+    )
+    client.post(
+        "/api/admin/messages",
+        json={"title": "Just you", "body": "personal", "target_user_id": alice_id},
+        headers=_bearer(admin),
+    )
+    items = client.get("/api/alerts", headers=_bearer(alice)).json()["items"]
+    # A digest's one-line preview is its cart count, so `title` is null there rather than a
+    # manufactured heading.
+    assert [i["title"] for i in items] == ["Just you"]

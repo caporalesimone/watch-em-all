@@ -806,6 +806,29 @@ export interface AlertDigestPayload {
 	cart_alerts: AlertDigestCart[];
 }
 
+// A text notification — an admin message or a core-generated one (AEV-R6). `body` is the
+// Markdown as written; `body_html` is that body already rendered and sanitised by the core, the
+// same helper the email uses, so the two channels cannot say the message differently.
+export interface TextMessagePayload {
+	kind: string;
+	user_id: number;
+	generated_at: string;
+	title: string;
+	body: string;
+	body_html?: string;
+}
+
+export type NotificationPayload = AlertDigestPayload | TextMessagePayload;
+
+export function isTextMessage(p: NotificationPayload): p is TextMessagePayload {
+	return p.kind === 'admin_message' || p.kind === 'system_message';
+}
+
+// The two categories a user sees (ADMSG-R4), derived from the kind and never stored.
+export function notificationCategory(kind: string): 'admin' | 'system' {
+	return kind === 'admin_message' ? 'admin' : 'system';
+}
+
 export interface AlertListItem {
 	id: number;
 	// Which table the id belongs to (10.B12). The history is a union of the user's own rows and
@@ -815,6 +838,8 @@ export interface AlertListItem {
 	created_at: string;
 	read: boolean;
 	cart_count: number;
+	// Present for the text kinds only: a digest has no title, its preview is the cart count.
+	title: string | null;
 }
 
 export interface AlertPage {
@@ -837,17 +862,23 @@ export interface AlertDetail {
 	kind: string;
 	created_at: string;
 	read: boolean;
-	payload: AlertDigestPayload;
+	payload: NotificationPayload;
 	deliveries: AlertDelivery[];
 }
 
 export function listAlerts(
-	params: { page?: number; page_size?: number; kind?: string } = {}
+	params: {
+		page?: number;
+		page_size?: number;
+		kind?: string;
+		category?: 'system' | 'admin';
+	} = {}
 ): Promise<AlertPage> {
 	const q = new URLSearchParams();
 	if (params.page) q.set('page', String(params.page));
 	if (params.page_size) q.set('page_size', String(params.page_size));
 	if (params.kind) q.set('kind', params.kind);
+	if (params.category) q.set('category', params.category);
 	const qs = q.toString();
 	return apiFetch(`/api/alerts${qs ? `?${qs}` : ''}`).then(asJson<AlertPage>);
 }
@@ -856,8 +887,19 @@ export function getAlert(id: number): Promise<AlertDetail> {
 	return apiFetch(`/api/alerts/${id}`).then(asJson<AlertDetail>);
 }
 
+// An announcement, which lives in its own table and so has its own id space (10.B12).
+export function getBroadcast(id: number): Promise<AlertDetail> {
+	return apiFetch(`/api/alerts/broadcasts/${id}`).then(asJson<AlertDetail>);
+}
+
 export async function markAlertRead(id: number): Promise<void> {
 	await asEmpty(await apiFetch(`/api/alerts/${id}/read`, { method: 'POST' }));
+}
+
+// Advance the read pointer. Monotone by construction: marking a recent announcement read also
+// clears the older ones, which is the accepted shape of the one-row-per-broadcast design.
+export async function markBroadcastRead(id: number): Promise<void> {
+	await asEmpty(await apiFetch(`/api/alerts/broadcasts/${id}/read`, { method: 'POST' }));
 }
 
 // Bulk-delete the user's own alerts (6.F3). Ids not owned by the caller are ignored.

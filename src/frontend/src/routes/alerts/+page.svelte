@@ -2,7 +2,13 @@
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 
-	import { deleteAlerts, listAlerts, type AlertPage } from '$lib/api/client';
+	import {
+		deleteAlerts,
+		listAlerts,
+		notificationCategory,
+		type AlertListItem,
+		type AlertPage
+	} from '$lib/api/client';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { refreshUnread } from '$lib/stores/alerts';
 
@@ -13,26 +19,60 @@
 	let error = $state<string | null>(null);
 	let pageNum = $state(1);
 
+	// Category filter (ALERT-R16). Written as string literals in a $derived array so the i18n
+	// gate can see the keys used; a template-built key reads as dead to it.
+	let category = $state<'all' | 'system' | 'admin'>('all');
+	const CATEGORIES = $derived([
+		{ value: 'all' as const, label: $_('alerts.categoryAll') },
+		{ value: 'system' as const, label: $_('alerts.categorySystem') },
+		{ value: 'admin' as const, label: $_('alerts.categoryAdmin') }
+	]);
+
 	// Multi-select for bulk delete (ids may span pages).
 	let selectedIds = $state<number[]>([]);
 	let deleting = $state(false);
 	let deleteErr = $state<string | null>(null);
 
 	const pages = $derived(data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1);
+	// Announcements are shared rows, so nobody deletes them from their own history — only the
+	// user's own notifications are selectable, and "select all" means all of those.
+	const deletable = $derived(data ? data.items.filter((a) => a.source === 'alert') : []);
 	const allOnPageSelected = $derived(
-		!!data && data.items.length > 0 && data.items.every((a) => selectedIds.includes(a.id))
+		deletable.length > 0 && deletable.every((a) => selectedIds.includes(a.id))
 	);
 
 	async function load(): Promise<void> {
 		loading = true;
 		error = null;
 		try {
-			data = await listAlerts({ page: pageNum, page_size: PAGE_SIZE });
+			data = await listAlerts({
+				page: pageNum,
+				page_size: PAGE_SIZE,
+				category: category === 'all' ? undefined : category
+			});
 		} catch {
 			error = $_('alerts.error');
 		} finally {
 			loading = false;
 		}
+	}
+
+	function setCategory(next: 'all' | 'system' | 'admin'): void {
+		if (next === category) return;
+		category = next;
+		pageNum = 1; // a narrower list has fewer pages; page 3 of it may not exist
+		void load();
+	}
+
+	// Where a row leads: the two sources have independent id spaces, so the id alone is not
+	// enough to open a notification.
+	function href(a: AlertListItem): string {
+		return a.source === 'broadcast' ? `/alerts/broadcast/${a.id}` : `/alerts/${a.id}`;
+	}
+
+	// What the row says at a glance: a text message shows its title, a digest its cart count.
+	function preview(a: AlertListItem): string {
+		return a.title ?? $_('alerts.summary', { values: { count: a.cart_count } });
 	}
 
 	// onMount, not afterNavigate: the shell defers mounting until auth bootstrap finishes,
@@ -57,8 +97,7 @@
 	}
 
 	function toggleAll(): void {
-		if (!data) return;
-		const pageIds = data.items.map((a) => a.id);
+		const pageIds = deletable.map((a) => a.id);
 		selectedIds = allOnPageSelected
 			? selectedIds.filter((id) => !pageIds.includes(id))
 			: [...new Set([...selectedIds, ...pageIds])];
@@ -93,6 +132,19 @@
 <section class="space-y-6">
 	<PageTitle title={$_('alerts.title')} />
 
+	<div class="flex flex-wrap gap-2 text-sm">
+		{#each CATEGORIES as c (c.value)}
+			<button
+				onclick={() => setCategory(c.value)}
+				class="rounded-full border px-3 py-1 {category === c.value
+					? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
+					: 'border-slate-300 text-slate-500 dark:border-slate-700'}"
+			>
+				{c.label}
+			</button>
+		{/each}
+	</div>
+
 	{#if loading}
 		<p class="text-sm text-slate-500">{$_('common.loading')}</p>
 	{:else if error}
@@ -102,7 +154,12 @@
 	{:else if data}
 		<div class="flex flex-wrap items-center gap-3 text-sm">
 			<label class="flex items-center gap-2 text-slate-500">
-				<input type="checkbox" checked={allOnPageSelected} onchange={toggleAll} />
+				<input
+					type="checkbox"
+					checked={allOnPageSelected}
+					disabled={deletable.length === 0}
+					onchange={toggleAll}
+				/>
 				{$_('alerts.selectAll')}
 			</label>
 			{#if selectedIds.length > 0}
@@ -121,16 +178,22 @@
 		</div>
 
 		<ul class="divide-y divide-slate-100 dark:divide-slate-800/60">
-			{#each data.items as a (a.id)}
+			{#each data.items as a (`${a.source}-${a.id}`)}
+				{@const fromAdmin = notificationCategory(a.kind) === 'admin'}
 				<li class="flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-900/40">
-					<input
-						type="checkbox"
-						checked={selectedIds.includes(a.id)}
-						onchange={() => toggle(a.id)}
-						aria-label={fmt(a.created_at)}
-						class="ml-1 shrink-0"
-					/>
-					<a href="/alerts/{a.id}" class="flex flex-1 items-center gap-3 py-3">
+					{#if a.source === 'alert'}
+						<input
+							type="checkbox"
+							checked={selectedIds.includes(a.id)}
+							onchange={() => toggle(a.id)}
+							aria-label={fmt(a.created_at)}
+							class="ml-1 shrink-0"
+						/>
+					{:else}
+						<!-- An announcement is one row for everybody: there is nothing here to delete. -->
+						<span class="ml-1 w-[13px] shrink-0"></span>
+					{/if}
+					<a href={href(a)} class="flex flex-1 items-center gap-3 py-3">
 						<span class="w-2 shrink-0">
 							{#if !a.read}
 								<span
@@ -140,9 +203,17 @@
 							{/if}
 						</span>
 						<span class="w-44 shrink-0 text-xs text-slate-400">{fmt(a.created_at)}</span>
-						<span class="text-sm {a.read ? '' : 'font-semibold'}"
-							>{$_('alerts.summary', { values: { count: a.cart_count } })}</span
-						>
+						{#if fromAdmin}
+							<!-- Icon and colour of its own (ADMSG-R3): a message from a person must not read
+							     like one more automated digest in the same list. -->
+							<span
+								class="inline-flex shrink-0 items-center gap-1 rounded bg-violet-100 px-1.5 py-0.5 text-xs text-violet-700 dark:bg-violet-900/40 dark:text-violet-300"
+							>
+								<span aria-hidden="true">📣</span>
+								{$_('alerts.categoryAdmin')}
+							</span>
+						{/if}
+						<span class="truncate text-sm {a.read ? '' : 'font-semibold'}">{preview(a)}</span>
 					</a>
 				</li>
 			{/each}
