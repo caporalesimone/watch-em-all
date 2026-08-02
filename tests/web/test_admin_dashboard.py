@@ -1,0 +1,72 @@
+"""The admin dashboard (10.B9/10.B10): aggregates, and nothing that belongs to a person."""
+
+from __future__ import annotations
+
+from fastapi.testclient import TestClient
+
+
+def _bearer(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _admin_token(client: TestClient) -> str:
+    login = client.post("/api/auth/login", json={"username": "admin", "password": "initpass123"})
+    access = login.json()["access_token"]
+    client.post(
+        "/api/auth/change-password", json={"new_password": "adminpass123"}, headers=_bearer(access)
+    )
+    relogin = client.post("/api/auth/login", json={"username": "admin", "password": "adminpass123"})
+    return str(relogin.json()["access_token"])
+
+
+def _make_user(client: TestClient, token: str, username: str) -> int:
+    resp = client.post(
+        "/api/admin/users",
+        json={
+            "username": username,
+            "first_name": "T",
+            "last_name": "U",
+            "role": "user",
+            "temp_password": "temp-pass-123",
+        },
+        headers=_bearer(token),
+    )
+    return int(resp.json()["id"])
+
+
+def test_totals_count_the_installation(client: TestClient) -> None:
+    token = _admin_token(client)
+    alice = _make_user(client, token, "alice")
+    _make_user(client, token, "bob")
+    client.delete(f"/api/admin/users/{alice}", headers=_bearer(token))
+
+    totals = client.get("/api/admin/dashboard", headers=_bearer(token)).json()["totals"]
+    assert totals["users_total"] == 3  # admin + alice + bob
+    # The three states are three questions, not a partition: alice is both inactive and
+    # on her way out, and counting her once in each is the honest answer to both.
+    assert totals["users_active"] == 2
+    assert totals["users_deleting"] == 1
+    assert totals["products_total"] == 0
+    assert totals["carts_total"] == 0
+
+
+def test_the_notification_window_is_declared_and_configurable(client: TestClient) -> None:
+    token = _admin_token(client)
+    body = client.get("/api/admin/dashboard?window_days=30", headers=_bearer(token)).json()
+    assert body["notifications"]["window_days"] == 30, "a number without its window means nothing"
+    assert body["notifications"]["alerts"] == 0
+    assert body["notifications"]["delivered"] == 0
+
+
+def test_the_dashboard_never_returns_anything_a_person_owns(client: TestClient) -> None:
+    """DASH-R6: the admin governs the installation, they do not read its contents."""
+    token = _admin_token(client)
+    _make_user(client, token, "alice")
+    raw = client.get("/api/admin/dashboard", headers=_bearer(token)).text
+    assert "alice" not in raw, "not even a username leaks into the aggregate view"
+    for field in ("name", "url", "price", "cart_name"):
+        assert f'"{field}"' not in raw
+
+
+def test_the_dashboard_is_admin_only(client: TestClient) -> None:
+    assert client.get("/api/admin/dashboard").status_code == 401

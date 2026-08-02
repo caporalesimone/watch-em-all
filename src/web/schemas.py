@@ -117,6 +117,35 @@ class RunPage(BaseModel):
     total: int
 
 
+class DashboardTotals(BaseModel):
+    """System-wide counts for the admin dashboard (10.B9). Aggregates only, never content
+    (DASH-R6): the admin governs the installation, they do not read anybody's carts."""
+
+    users_total: int
+    users_active: int
+    users_deleting: int
+    products_total: int
+    products_delisted: int
+    carts_total: int
+    price_history_rows: int
+    watched_scrapers: int
+
+
+class DashboardNotifications(BaseModel):
+    """Delivery health over a window (10.B9): how much went out, and how much failed."""
+
+    window_days: int
+    alerts: int
+    delivered: int
+    failed: int
+    skipped: int
+
+
+class DashboardResponse(BaseModel):
+    totals: DashboardTotals
+    notifications: DashboardNotifications
+
+
 class AdminPasswordReset(BaseModel):
     # Same shape as creation (10.B1): the admin supplies the temporary password rather than
     # the server inventing one, so the single generator already in the admin page keeps
