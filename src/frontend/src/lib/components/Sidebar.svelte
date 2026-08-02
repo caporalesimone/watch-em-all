@@ -36,7 +36,10 @@
 					{
 						href: '/admin/scrapers',
 						key: 'nav.scrapers',
-						children: [{ href: '/admin/scrapers/schedule', key: 'admin.scrapers.scheduleTitle' }]
+						children: [
+							{ href: '/admin/scrapers/schedule', key: 'admin.scrapers.scheduleTitle' },
+							{ href: '/admin/runs', key: 'nav.runs' }
+						]
 					},
 					{ href: '/admin/notifiers', key: 'nav.notifiers' },
 					{

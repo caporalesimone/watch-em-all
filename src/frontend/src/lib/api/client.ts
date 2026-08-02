@@ -414,6 +414,62 @@ export function getCartHistory(cartId: number, range: HistoryRange): Promise<Car
 }
 
 // Admin user management (USR-*): create + list. Admin-only on the backend.
+export interface RunSummary {
+	run_id: number;
+	scraper_id: string;
+	trigger: string;
+	slot: string | null;
+	started_at: string;
+	finished_at: string | null;
+	status: string;
+	users_processed: number;
+	products_found: number;
+	products_new: number;
+	price_changes: number;
+	products_removed: number;
+	products_excluded: number;
+	http_requests: number;
+	cache_hits: number;
+	error_message: string | null;
+}
+
+export interface RunUserDetail {
+	user_id: number;
+	username: string | null;
+	started_at: string;
+	finished_at: string | null;
+	status: string;
+	products_found: number;
+	products_new: number;
+	price_changes: number;
+	http_requests: number;
+	cache_hits: number;
+	error_message: string | null;
+}
+
+export interface RunPage {
+	items: RunSummary[];
+	total: number;
+}
+
+export function listRuns(opts?: {
+	scraperId?: string | null;
+	status?: string | null;
+	page?: number;
+	pageSize?: number;
+}): Promise<RunPage> {
+	const q = new URLSearchParams();
+	if (opts?.scraperId) q.set('scraper_id', opts.scraperId);
+	if (opts?.status) q.set('status', opts.status);
+	q.set('page', String(opts?.page ?? 1));
+	q.set('page_size', String(opts?.pageSize ?? 25));
+	return apiFetch(`/api/admin/runs?${q}`).then(asJson<RunPage>);
+}
+
+export function getRunDetail(runId: number): Promise<RunUserDetail[]> {
+	return apiFetch(`/api/admin/runs/${runId}`).then(asJson<RunUserDetail[]>);
+}
+
 export interface AdminUser {
 	id: number;
 	username: string;

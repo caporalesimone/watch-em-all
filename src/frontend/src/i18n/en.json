@@ -22,7 +22,8 @@
 		"settings": "Settings",
 		"alerts": "Alerts",
 		"debug": "Debug",
-		"priceHistory": "Price history"
+		"priceHistory": "Price history",
+		"runs": "Runs"
 	},
 	"catalog": {
 		"title": "Catalog",
@@ -354,6 +355,29 @@
 				"willStartIn": "{name} will start in {when}",
 				"removeTitle": "{name} · {time} (click to remove)"
 			}
+		},
+		"runs": {
+			"title": "Scrape runs",
+			"hint": "Recent runs only: these records are pruned by the nightly maintenance.",
+			"colWhen": "Started",
+			"colScraper": "Scraper",
+			"colTrigger": "Trigger",
+			"colStatus": "Outcome",
+			"colUsers": "Users",
+			"colFound": "Found",
+			"colNew": "New",
+			"colChanges": "Price changes",
+			"colRequests": "Requests",
+			"colCache": "Cache hits",
+			"colDuration": "Duration",
+			"filterAll": "All outcomes",
+			"empty": "No runs recorded yet.",
+			"prev": "Previous",
+			"next": "Next",
+			"statusOk": "OK",
+			"statusPartial": "Partial",
+			"statusError": "Error",
+			"statusTimeout": "Timed out"
 		}
 	},
 	"plugins": {

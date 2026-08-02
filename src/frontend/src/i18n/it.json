@@ -20,7 +20,8 @@
 		"featureFlags": "Feature flag",
 		"systemLogs": "Log di sistema",
 		"settings": "Impostazioni",
-		"priceHistory": "Storico prezzi"
+		"priceHistory": "Storico prezzi",
+		"runs": "Run"
 	},
 	"catalog": {
 		"title": "Catalogo",
@@ -245,6 +246,29 @@
 				"willStartIn": "{name} parte tra {when}",
 				"removeTitle": "{name} · {time} (clicca per rimuovere)"
 			}
+		},
+		"runs": {
+			"title": "Run degli scraper",
+			"hint": "Solo le run recenti: queste righe le pota la manutenzione notturna.",
+			"colWhen": "Inizio",
+			"colScraper": "Scraper",
+			"colTrigger": "Avvio",
+			"colStatus": "Esito",
+			"colUsers": "Utenti",
+			"colFound": "Trovati",
+			"colNew": "Nuovi",
+			"colChanges": "Cambi prezzo",
+			"colRequests": "Richieste",
+			"colCache": "Cache hit",
+			"colDuration": "Durata",
+			"filterAll": "Tutti gli esiti",
+			"empty": "Nessuna run registrata.",
+			"prev": "Precedente",
+			"next": "Successiva",
+			"statusOk": "OK",
+			"statusPartial": "Parziale",
+			"statusError": "Errore",
+			"statusTimeout": "Timeout"
 		}
 	},
 	"plugins": {
