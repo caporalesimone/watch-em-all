@@ -29,6 +29,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - Message bodies can be written in Markdown; every channel gets it rendered, and channels that cannot show formatting get readable plain text.
 - The admin can list recent scrape runs, filter them by scraper and outcome, and open one to see which user it failed for.
 - A Runs page under Scrapers shows what each run did — outcome, duration, products, requests and cache hits — with outcome filters and paging.
+- Clicking a run opens its per-user detail underneath, failures first, so a partial run says which account went wrong and why.
 
 ### Changed
 

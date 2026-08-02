@@ -5,7 +5,7 @@
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 
-	import { listRuns, type RunSummary } from '$lib/api/client';
+	import { getRunDetail, listRuns, type RunSummary, type RunUserDetail } from '$lib/api/client';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 
 	let runs = $state<RunSummary[]>([]);
@@ -64,6 +64,29 @@
 		return ms < 1000 ? '<1s' : `${Math.round(ms / 1000)}s`;
 	}
 
+	// --- drill-down (10.F4) --------------------------------------------------------------
+	// Expanded inline under its own row rather than on a separate page: the question it
+	// answers ("which user did this run fail for") is only ever asked while looking at the
+	// run, and a navigation away would lose the filter and the page you were on.
+	let openRunId = $state<number | null>(null);
+	let detail = $state<RunUserDetail[]>([]);
+	let detailLoading = $state(false);
+
+	async function toggleDetail(runId: number): Promise<void> {
+		if (openRunId === runId) {
+			openRunId = null;
+			return;
+		}
+		openRunId = runId;
+		detail = [];
+		detailLoading = true;
+		try {
+			detail = await getRunDetail(runId);
+		} finally {
+			detailLoading = false;
+		}
+	}
+
 	const th = 'py-2 pr-4';
 </script>
 
@@ -108,7 +131,10 @@
 			</thead>
 			<tbody>
 				{#each runs as run (run.run_id)}
-					<tr class="border-b border-slate-100 dark:border-slate-800/60">
+					<tr
+						class="cursor-pointer border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800/60 dark:hover:bg-slate-800/40"
+						onclick={() => toggleDetail(run.run_id)}
+					>
 						<td class={th}>{new Date(run.started_at).toLocaleString()}</td>
 						<td class={th}>{run.scraper_id}</td>
 						<td class="{th} text-slate-500">{run.trigger}</td>
@@ -121,6 +147,61 @@
 						<td class={th}>{run.http_requests}</td>
 						<td class={th}>{run.cache_hits}</td>
 					</tr>
+					{#if openRunId === run.run_id}
+						<tr class="border-b border-slate-100 dark:border-slate-800/60">
+							<td colspan="11" class="bg-slate-50 px-3 py-3 dark:bg-slate-800/40">
+								<p class="mb-2 text-xs font-medium text-slate-500">
+									{$_('admin.runs.detailTitle')}
+								</p>
+								{#if detailLoading}
+									<p class="text-xs text-slate-500">{$_('common.loading')}</p>
+								{:else}
+									<table class="w-full text-left text-xs">
+										<thead class="text-slate-500">
+											<tr>
+												<th class="py-1 pr-4">{$_('admin.runs.colUser')}</th>
+												<th class="py-1 pr-4">{$_('admin.runs.colStatus')}</th>
+												<th class="py-1 pr-4">{$_('admin.runs.colFound')}</th>
+												<th class="py-1 pr-4">{$_('admin.runs.colNew')}</th>
+												<th class="py-1 pr-4">{$_('admin.runs.colChanges')}</th>
+												<th class="py-1 pr-4">{$_('admin.runs.colRequests')}</th>
+												<th class="py-1 pr-4">{$_('admin.runs.colCache')}</th>
+												<th class="py-1 pr-4">{$_('admin.runs.colError')}</th>
+											</tr>
+										</thead>
+										<tbody>
+											{#each detail as row (row.user_id)}
+												<tr>
+													<!--
+														A purged account leaves its rows behind, so the name can be
+														null. Saying so is better than an empty cell, which reads as
+														a bug rather than as history.
+													-->
+													<td class="py-1 pr-4">{row.username ?? $_('admin.runs.deletedUser')}</td>
+													<td class="py-1 pr-4 {TONE[row.status] ?? ''}"
+														>{outcomeLabel(row.status)}</td
+													>
+													<td class="py-1 pr-4">{row.products_found}</td>
+													<td class="py-1 pr-4">{row.products_new}</td>
+													<td class="py-1 pr-4">{row.price_changes}</td>
+													<td class="py-1 pr-4">{row.http_requests}</td>
+													<td class="py-1 pr-4">{row.cache_hits}</td>
+													<td class="py-1 pr-4 text-red-600 dark:text-red-400"
+														>{row.error_message ?? ''}</td
+													>
+												</tr>
+											{/each}
+										</tbody>
+									</table>
+								{/if}
+								<button
+									type="button"
+									class="mt-2 text-xs text-slate-500 underline"
+									onclick={() => (openRunId = null)}>{$_('admin.runs.close')}</button
+								>
+							</td>
+						</tr>
+					{/if}
 				{/each}
 			</tbody>
 		</table>

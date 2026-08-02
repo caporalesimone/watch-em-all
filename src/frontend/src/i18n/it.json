@@ -268,7 +268,12 @@
 			"statusOk": "OK",
 			"statusPartial": "Parziale",
 			"statusError": "Errore",
-			"statusTimeout": "Timeout"
+			"statusTimeout": "Timeout",
+			"detailTitle": "Per utente",
+			"colUser": "Utente",
+			"colError": "Errore",
+			"deletedUser": "(account cancellato)",
+			"close": "Chiudi"
 		}
 	},
 	"plugins": {

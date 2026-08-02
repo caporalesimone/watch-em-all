@@ -377,7 +377,12 @@
 			"statusOk": "OK",
 			"statusPartial": "Partial",
 			"statusError": "Error",
-			"statusTimeout": "Timed out"
+			"statusTimeout": "Timed out",
+			"detailTitle": "Per user",
+			"colUser": "User",
+			"colError": "Error",
+			"deletedUser": "(deleted account)",
+			"close": "Close"
 		}
 	},
 	"plugins": {
