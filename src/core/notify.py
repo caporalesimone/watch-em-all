@@ -27,10 +27,12 @@ from typing import TYPE_CHECKING
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.core import direct_mail
 from src.core.alert_engine import AlertEvent, NotificationEvent, TextMessageEvent
 from src.core.contracts import NotificationKind
 from src.core.models import AdminMessage, AdminMessageDelivery, AlertDelivery, AlertLog, User
 from src.core.notifiers import (
+    EMAIL_PLUGIN_ID,
     IN_APP_PLUGIN_ID,
     admin_enabled,
     is_in_app,
@@ -131,6 +133,68 @@ def send_system_message(
     return row
 
 
+def send_account_notice(
+    db: Session, user: User, key: str, notifiers: list[NotifierPlugin], **values: object
+) -> None:
+    """One of the things that happen *to* an account, told to its owner (USR-R11, 10.B26).
+
+    Two sends on purpose, because the two halves answer to different rules. The in-app copy goes
+    down the ordinary path so the note is in the history if the account ever comes back; the
+    **email** goes out directly, whatever this person's notification preference says — a switch
+    about price alerts is not consent to being disabled or deleted in silence, and someone who
+    can no longer sign in cannot go and read the in-app copy anyway.
+
+    Email is removed from the first send precisely so the two halves are not two copies of the
+    same mail. Every other channel keeps following the preference: it is email that the account
+    is *reachable at* since 10.B23, not Telegram or whatever else gets plugged in later.
+    """
+    others = [n for n in notifiers if n.plugin_id != EMAIL_PLUGIN_ID]
+    send_system_message(db, user, key, others, **values)
+    mail_account_notice(
+        db,
+        notifiers,
+        key,
+        user_id=user.id,
+        first_name=user.first_name,
+        username=user.username,
+        address=direct_mail.address_of(user),
+        locale=user.locale,
+        **values,
+    )
+
+
+def mail_account_notice(
+    db: Session,
+    notifiers: list[NotifierPlugin],
+    key: str,
+    *,
+    user_id: int,
+    first_name: str,
+    username: str,
+    address: str,
+    locale: str = "en",
+    **values: object,
+) -> None:
+    """The email half on its own, addressed by value rather than by row (10.B26).
+
+    Split out for the one caller that has no row left to pass: the purge sends *"your account
+    has been deleted"* after the delete has committed, so the name and the address have to have
+    been read beforehand — and there is no history to write the note to either.
+    """
+    direct_mail.send(
+        db,
+        direct_mail.email_channel(notifiers),
+        key=key,
+        user_id=user_id,
+        first_name=first_name,
+        username=username,
+        address=address,
+        now=datetime.now(UTC),
+        locale=locale,
+        **values,
+    )
+
+
 def drain_deliveries(db: Session, notifiers: list[NotifierPlugin]) -> int:
     """Send every ``pending`` delivery on its channel and record the outcome (7.B7 / the drain
     step). The plugin's ``send`` does its own retry/backoff; a failure is recorded as ``failed``
@@ -218,9 +282,15 @@ def message_event(message: AdminMessage, user_id: int) -> TextMessageEvent:
 
 
 def send_test(db: Session, plugin: NotifierPlugin, user_id: int) -> None:
-    """Send a test notification with the user's current merged config (NOT-R6). Synchronous, no
-    persistence — used by the user (own target) and, with an admin-supplied target, by the admin.
-    Propagates the plugin's error (the caller turns it into a readable API error)."""
+    """Probe a channel with the merged config of the admin running it (NOT-R6). Synchronous, no
+    persistence. Propagates the plugin's error (the caller turns it into a readable API error).
+
+    **Admin-only since 10.X4.** The same button used to sit on the Profile, from the days when a
+    user typed their own delivery address into it. Since 10.B23/10.B25 there is nothing personal
+    left to test — the address is the account, and it has already proved itself by carrying the
+    password the person signed in with. What remains is the question this probe really answers,
+    *"does the server's SMTP config work"*, and that one belongs to whoever configured it.
+    """
     user = db.get(User, user_id)
     locale = user.locale if user is not None else "en"
     username = user.username if user is not None else ""

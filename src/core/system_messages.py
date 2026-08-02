@@ -1,9 +1,9 @@
 """The catalog of texts the system writes to people (ADMSG-R7..R10, 10.B16).
 
-Everything the core says to a user in words lives here: the courtesy note when an account is
-disabled or marked for deletion (USR-R11), and the two credential mails (10.B24). One catalog,
-because the alternative is what phase 10 found when it opened — the same sentence written at the
-call site that needed it, free to drift from the one next to it.
+Everything the core says to a user in words lives here: the three account-lifecycle notices —
+disabled, scheduled for deletion, deleted (USR-R11, 10.B26) — and the two credential mails
+(10.B24). One catalog, because the alternative is what phase 10 found when it opened: the same
+sentence written at the call site that needed it, free to drift from the one next to it.
 
 Four properties, each of them a rule from the spec rather than a convenience:
 
@@ -61,13 +61,27 @@ USER_MARKED_FOR_DELETION = SystemMessage(
     title="Your Watch 'Em All account is scheduled for deletion",
     body=(
         "Hello {first_name},\n\n"
-        "Your Watch 'Em All account has been marked for deletion and will be removed on "
-        "**{deletion_due_date}**. Until then nothing is destroyed and an administrator can "
-        "still bring it back.\n\n"
+        "Your Watch 'Em All account ({username}) has been added to the list of accounts due to "
+        "be removed, and is scheduled for deletion on **{deletion_due_date}**. You can no "
+        "longer sign in, but until that date nothing is destroyed and an administrator can "
+        "still bring the account back.\n\n"
         "If this is not what you expected, get in touch with whoever administers the "
         "installation before that date."
     ),
     placeholders=("first_name", "username", "deletion_due_date"),
+)
+
+USER_DELETED = SystemMessage(
+    key="user.deleted",
+    title="Your Watch 'Em All account has been deleted",
+    body=(
+        "Hello {first_name},\n\n"
+        "Your Watch 'Em All account ({username}) has been permanently deleted, together with "
+        "everything it held: watches, carts, alerts and notification history.\n\n"
+        "This cannot be undone and there is nothing left to restore. If you need access again, "
+        "an administrator has to create a new account for you."
+    ),
+    placeholders=("first_name", "username"),
 )
 
 CREDENTIALS_CREATED = SystemMessage(
@@ -101,7 +115,13 @@ CREDENTIALS_RESET = SystemMessage(
 
 CATALOG: dict[str, SystemMessage] = {
     m.key: m
-    for m in (USER_DISABLED, USER_MARKED_FOR_DELETION, CREDENTIALS_CREATED, CREDENTIALS_RESET)
+    for m in (
+        USER_DISABLED,
+        USER_MARKED_FOR_DELETION,
+        USER_DELETED,
+        CREDENTIALS_CREATED,
+        CREDENTIALS_RESET,
+    )
 }
 
 

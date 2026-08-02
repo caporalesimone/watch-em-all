@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from src.core import credentials
+from src.core import direct_mail
 from src.core.errors import APIError
 from src.core.identity import is_email
 from src.core.models import User
@@ -23,7 +23,7 @@ def _to_response(user: User) -> MeResponse:
         role=user.role,
         locale=user.locale,
         must_change_password=user.must_change_password,
-        notification_email=credentials.address_of(user),
+        notification_email=direct_mail.address_of(user),
         email_editable=not is_email(user.username),
     )
 

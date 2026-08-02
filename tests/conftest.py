@@ -93,21 +93,48 @@ def mailed_passwords(
     performed. The returned list is what went out, for tests that want to assert on it.
 
     A test that wants the **real** thing, channel gate included, marks itself
-    ``@pytest.mark.real_credential_mail`` and gets no patching at all. That marker is the only
+    ``@pytest.mark.real_direct_mail`` and gets no patching at all. That marker is the only
     way this fixture can hide a genuine failure, and it is on the tests that would notice.
     """
     sent: list[dict[str, str]] = []
-    if request.node.get_closest_marker("real_credential_mail"):
+    if request.node.get_closest_marker("real_direct_mail"):
         return sent
 
-    from src.core import credentials as cred
+    from src.core import direct_mail
     from src.web.routers import admin_users
 
     monkeypatch.setattr(admin_users, "generate_password", lambda: TEMP_PASSWORD)
-    monkeypatch.setattr(cred, "channel_ready", lambda db, plugin: True)
+    monkeypatch.setattr(direct_mail, "channel_ready", lambda db, plugin: True)
 
     def _record(db: object, plugin: object, **kw: object) -> None:
         sent.append({"address": str(kw["address"]), "password": str(kw["password"])})
 
-    monkeypatch.setattr(cred, "send_password", _record)
+    monkeypatch.setattr(direct_mail, "send_password", _record)
+    return sent
+
+
+@pytest.fixture(autouse=True)
+def mailed_notices(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> list[dict[str, str]]:
+    """The same treatment for the account-lifecycle notices (10.B26).
+
+    Disabling, marking or deleting an account now mails the person **directly**, past their
+    notification preference. Unstubbed that means every such test asks the email plugin to reach
+    an SMTP server that is not there — a failure the caller swallows by design, so nothing would
+    break, but the suite would pay for it in connection timeouts on tests about something else.
+
+    Returns the ``(key, address)`` pairs that went out, which is what a test about this asserts
+    on. Opt out with ``@pytest.mark.real_direct_mail``, like the passwords above.
+    """
+    sent: list[dict[str, str]] = []
+    if request.node.get_closest_marker("real_direct_mail"):
+        return sent
+
+    from src.core import direct_mail
+
+    def _record(db: object, plugin: object, *, key: str, address: str, **kw: object) -> None:
+        sent.append({"key": key, "address": address})
+
+    monkeypatch.setattr(direct_mail, "send", _record)
     return sent

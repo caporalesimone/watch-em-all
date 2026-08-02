@@ -144,6 +144,44 @@ def test_marking_for_deletion_names_the_date_it_will_happen(client: TestClient) 
     assert due in str(notes[0]["body"]), "the reversible window is the whole point of the note"
 
 
+# --------------------------------------------- the mail that ignores the preference (10.B26)
+
+
+def test_the_notice_is_mailed_even_with_email_notifications_switched_off(
+    client: TestClient, mailed_notices: list[dict[str, str]]
+) -> None:
+    """The switch governs notifications — what somebody asked to be told about. Being locked out
+    of your own account is not one of those, and turning off price alerts is not consent to it."""
+    from src.core import notifiers as notif
+
+    admin = _admin(client)
+    uid = _make_user(client, admin)
+    with new_session() as db:
+        notif.set_user_enabled(db, uid, "email", False)
+
+    client.patch(f"/api/admin/users/{uid}", json={"is_active": False}, headers=_bearer(admin))
+
+    assert mailed_notices == [{"key": "user.disabled", "address": "alice@example.com"}]
+
+
+def test_the_notice_is_not_also_queued_on_the_email_channel(
+    client: TestClient, mailed_notices: list[dict[str, str]]
+) -> None:
+    """One notice, one mail. Email is taken out of the ordinary delivery pass precisely because
+    the direct send has already covered it — otherwise an account with email on gets it twice."""
+    from src.core.models import AlertDelivery
+
+    admin = _admin(client)
+    uid = _make_user(client, admin)  # email is on from creation (10.B25)
+
+    client.delete(f"/api/admin/users/{uid}", headers=_bearer(admin))
+
+    with new_session() as db:
+        channels = {d.plugin_id for d in db.scalars(select(AlertDelivery))}
+    assert channels == {"in_app"}, "the in-app copy is the history; the mail went straight out"
+    assert mailed_notices == [{"key": "user.marked_for_deletion", "address": "alice@example.com"}]
+
+
 # ------------------------------------------------------------------------ the admin API (10.B17)
 
 

@@ -243,7 +243,7 @@ def _purge_operational_records(now: datetime) -> None:
     try:
         session = new_session()
         try:
-            purged = purge_due_users(session, now, _all_plugins)
+            purged = purge_due_users(session, now, _all_plugins, _notifiers)
         finally:
             session.close()
         if purged:

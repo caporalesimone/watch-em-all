@@ -64,7 +64,7 @@ testpaths = ["tests"]
 # Use `-n0` when debugging a single failure — with workers the output interleaves.
 addopts = "-q -n auto"
 markers = [
-    "real_credential_mail: opt out of the stubbed password mail (see tests/conftest.py)",
+    "real_direct_mail: opt out of the stubbed direct mail (passwords and account notices) (see tests/conftest.py)",
 ]
 
 [build-system]
