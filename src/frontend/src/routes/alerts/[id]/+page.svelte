@@ -109,7 +109,11 @@
 		<PageTitle title={fmt(detail.created_at)} />
 
 		{#if isTextMessage(detail.payload)}
-			<MessageBody payload={detail.payload} />
+			<MessageBody
+				title={detail.payload.title}
+				html={detail.payload.body_html ?? null}
+				text={detail.payload.body}
+			/>
 		{:else if !digest || digest.cart_alerts.length === 0}
 			<p class="max-w-prose text-sm text-slate-500">{$_('alerts.empty')}</p>
 		{:else}

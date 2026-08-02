@@ -913,6 +913,79 @@ export async function deleteAlerts(ids: number[]): Promise<void> {
 	);
 }
 
+// Admin messages (10.B12/10.B13/10.F9). ------------------------------------------------------
+
+export interface MessageOutcomeCounts {
+	delivered: number;
+	pending: number;
+	failed: number;
+	skipped: number;
+}
+
+export interface AdminMessageSummary {
+	id: number;
+	audience: 'all' | 'user';
+	target_user_id: number | null;
+	target_username: string | null;
+	title: string;
+	body: string;
+	recipient_count: number;
+	created_at: string;
+	sender_username: string | null;
+	outcomes: MessageOutcomeCounts;
+}
+
+export interface AdminMessagePage {
+	items: AdminMessageSummary[];
+	total: number;
+	page: number;
+	page_size: number;
+}
+
+export interface MessageRecipient {
+	user_id: number;
+	username: string;
+	channels: AlertDelivery[];
+}
+
+export interface AdminMessageDetail extends AdminMessageSummary {
+	recipients: MessageRecipient[];
+}
+
+export function listAdminMessages(page = 1, pageSize = 20): Promise<AdminMessagePage> {
+	return apiFetch(`/api/admin/messages?page=${page}&page_size=${pageSize}`).then(
+		asJson<AdminMessagePage>
+	);
+}
+
+export function getAdminMessage(id: number): Promise<AdminMessageDetail> {
+	return apiFetch(`/api/admin/messages/${id}`).then(asJson<AdminMessageDetail>);
+}
+
+export async function sendAdminMessage(input: {
+	title: string;
+	body: string;
+	target_user_id?: number | null;
+}): Promise<AdminMessageSummary> {
+	const res = await apiFetch('/api/admin/messages', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(input)
+	});
+	return asJson<AdminMessageSummary>(res);
+}
+
+// The Preview tab. Rendered by the server so it is the same HTML the recipients get — see the
+// endpoint's own note on why there is no markdown-it in this bundle.
+export async function previewMessage(body: string): Promise<string> {
+	const res = await apiFetch('/api/admin/messages/preview', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ body })
+	});
+	return (await asJson<{ body_html: string }>(res)).body_html;
+}
+
 export function getUnreadCount(): Promise<number> {
 	return apiFetch('/api/alerts/unread-count')
 		.then(asJson<{ count: number }>)

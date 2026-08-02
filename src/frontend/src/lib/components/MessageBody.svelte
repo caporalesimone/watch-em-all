@@ -10,20 +10,26 @@
 	with its line breaks kept — degraded, never blank.
 -->
 <script lang="ts">
-	import type { TextMessagePayload } from '$lib/api/client';
-
-	let { payload }: { payload: TextMessagePayload } = $props();
+	// `title` is optional because the compose editor already has one above the tabs (10.F9);
+	// the read views pass it. `html` null means "not rendered" and we fall back to `text`.
+	let {
+		title = null,
+		html = null,
+		text
+	}: { title?: string | null; html?: string | null; text: string } = $props();
 </script>
 
 <article class="max-w-prose space-y-3">
-	<h2 class="text-lg font-semibold">{payload.title}</h2>
-	{#if payload.body_html}
+	{#if title}
+		<h2 class="text-lg font-semibold">{title}</h2>
+	{/if}
+	{#if html}
 		<div class="message-body text-sm">
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitised server-side (10.B14) -->
-			{@html payload.body_html}
+			{@html html}
 		</div>
 	{:else}
-		<p class="text-sm whitespace-pre-wrap">{payload.body}</p>
+		<p class="text-sm whitespace-pre-wrap">{text}</p>
 	{/if}
 </article>
 

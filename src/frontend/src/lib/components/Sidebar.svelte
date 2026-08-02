@@ -44,6 +44,7 @@
 						]
 					},
 					{ href: '/admin/notifiers', key: 'nav.notifiers' },
+					{ href: '/admin/messages', key: 'nav.messages' },
 					{
 						href: '/admin/settings',
 						key: 'nav.settings',

@@ -8,7 +8,9 @@
 
 	import type { AlertDelivery } from '$lib/api/client';
 
-	let { deliveries }: { deliveries: AlertDelivery[] } = $props();
+	// The admin view repeats this list once per recipient (10.F9), where a heading on every one
+	// of them is noise — there the recipient's name is the heading.
+	let { deliveries, heading = true }: { deliveries: AlertDelivery[]; heading?: boolean } = $props();
 
 	function channelLabel(pluginId: string): string {
 		if (pluginId === 'in_app') return $_('alerts.channelInApp');
@@ -32,8 +34,10 @@
 </script>
 
 {#if deliveries.length > 0}
-	<div class="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-800">
-		<h2 class="text-sm font-medium text-slate-500">{$_('alerts.deliveriesTitle')}</h2>
+	<div class="space-y-2 {heading ? 'border-t border-slate-200 pt-4 dark:border-slate-800' : ''}">
+		{#if heading}
+			<h2 class="text-sm font-medium text-slate-500">{$_('alerts.deliveriesTitle')}</h2>
+		{/if}
 		<ul class="space-y-1 text-sm">
 			{#each deliveries as d (d.plugin_id)}
 				{#if d.status === 'skipped_no_notifier'}

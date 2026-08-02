@@ -460,6 +460,17 @@ class AdminMessageOut(BaseModel):
     created_at: datetime
 
 
+class MessagePreviewRequest(BaseModel):
+    body: str = Field(max_length=20_000)
+
+
+class MessagePreviewOut(BaseModel):
+    # The rendered body, from the same core helper that renders it for real (10.F9). A round
+    # trip rather than a renderer in the browser: the preview is then identical to the delivered
+    # message *by construction*, not by two implementations happening to agree.
+    body_html: str
+
+
 class MessageOutcomeCounts(BaseModel):
     # How the send went, per status (10.B13). Deliberately not "read": ADMSG-R5 gives the admin
     # delivery, not reception — whether somebody opened it is theirs.

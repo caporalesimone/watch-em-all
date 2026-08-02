@@ -22,6 +22,7 @@ from sqlalchemy import func, select
 
 from src.core.admin_messages import send_admin_message
 from src.core.errors import APIError
+from src.core.markdown import to_html
 from src.core.models import AdminMessage, AdminMessageDelivery, User
 from src.core.plugins.base import NotifierPlugin
 from src.web.deps import AdminDep, SessionDep
@@ -33,6 +34,8 @@ from src.web.schemas import (
     AdminMessageSummary,
     AlertDeliveryOut,
     MessageOutcomeCounts,
+    MessagePreviewOut,
+    MessagePreviewRequest,
     MessageRecipientOut,
 )
 
@@ -90,6 +93,27 @@ def _summary(
         sender_username=sender.username if sender else None,
         outcomes=counts,
     )
+
+
+@router.post(
+    "/preview",
+    response_model=MessagePreviewOut,
+    summary="Render a draft body exactly as the recipients will see it (admin only).",
+)
+def preview(body: MessagePreviewRequest, _admin: AdminDep) -> MessagePreviewOut:
+    """The editor's Preview tab, answered by the renderer that does the real job.
+
+    A round trip instead of markdown-it in the browser, and the reason is the requirement
+    itself: the preview has to be *identical* to what gets delivered. Two renderers can only be
+    made to agree, and 9.F8 is the local proof that agreement decays — the Difference rule lived
+    in Python and in TypeScript until they stopped matching. One renderer, and the question
+    cannot arise.
+
+    Called on the tab switch, not on every keystroke (Simone's call, 2026-08-02): a preview a
+    person asks for is worth one request; a preview that renders itself while they type is worth
+    a few hundred.
+    """
+    return MessagePreviewOut(body_html=to_html(body.body))
 
 
 @router.get(

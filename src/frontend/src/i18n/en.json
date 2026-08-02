@@ -25,7 +25,8 @@
 		"priceHistory": "Price history",
 		"runs": "Runs",
 		"adminDashboard": "Dashboard",
-		"calendar": "Calendar"
+		"calendar": "Calendar",
+		"messages": "Messages"
 	},
 	"catalog": {
 		"title": "Catalog",
@@ -428,6 +429,36 @@
 			"unknownDuration": "duration unknown",
 			"today": "Today",
 			"date": "Day"
+		},
+		"messages": {
+			"title": "Messages to users",
+			"compose": "New message",
+			"audienceAll": "Everyone",
+			"audienceUser": "One user",
+			"pickUser": "Choose an account…",
+			"titleLabel": "Title",
+			"bodyPlaceholder": "Write the message. Markdown works: **bold**, *italic*, lists, links.",
+			"markdownHint": "Markdown: **bold**, *italic*, lists, > quotes, `code`, [links](https://example.com).",
+			"tabWrite": "Write",
+			"tabPreview": "Preview",
+			"previewEmpty": "Nothing to preview yet — write something first.",
+			"previewError": "The preview could not be rendered. The message can still be sent.",
+			"previewIsExact": "This is rendered by the server: it is exactly what the recipients will see.",
+			"sendAll": "Send to everyone ({count})",
+			"sendOne": "Send",
+			"confirmAll": "Send this to all {count} active accounts? A sent message cannot be edited or recalled.",
+			"confirmUser": "Send this to {username}? A sent message cannot be edited or recalled.",
+			"sentTo": "Sent to {count} recipient(s).",
+			"sendError": "The message could not be sent.",
+			"immutableHint": "Once sent it cannot be edited or recalled.",
+			"sentTitle": "Sent",
+			"noneSent": "No message has been sent yet.",
+			"toAll": "Everyone ({count})",
+			"recipients": "Delivery per recipient",
+			"outDelivered": "delivered",
+			"outPending": "pending",
+			"outFailed": "failed",
+			"outSkipped": "in-app only"
 		}
 	},
 	"plugins": {

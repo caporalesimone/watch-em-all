@@ -319,3 +319,44 @@ def test_a_digest_has_no_title_and_a_message_does(client: TestClient) -> None:
     # A digest's one-line preview is its cart count, so `title` is null there rather than a
     # manufactured heading.
     assert [i["title"] for i in items] == ["Just you"]
+
+
+def test_preview_renders_with_the_same_helper_that_delivers(client: TestClient) -> None:
+    # 10.F9: the Preview tab must not be an approximation. It goes through the server so the
+    # HTML it shows is the same HTML the recipients get — the property, asserted rather than
+    # assumed, by comparing the two.
+    admin = _admin_token(client)
+    draft = "Hello **there**\n\n- one\n- two"
+    preview = client.post(
+        "/api/admin/messages/preview", json={"body": draft}, headers=_bearer(admin)
+    )
+    assert preview.status_code == 200
+    rendered = preview.json()["body_html"]
+    assert "<strong>there</strong>" in rendered and "<li>one</li>" in rendered
+
+    alice = _make_user(client, admin, "alice")
+    sent = client.post(
+        "/api/admin/messages", json={"title": "T", "body": draft}, headers=_bearer(admin)
+    ).json()
+    delivered = client.get(f"/api/alerts/broadcasts/{sent['id']}", headers=_bearer(alice)).json()
+    assert delivered["payload"]["body_html"] == rendered
+
+
+def test_preview_is_admin_only_and_sanitises(client: TestClient) -> None:
+    admin = _admin_token(client)
+    alice = _make_user(client, admin, "alice")
+    assert client.post("/api/admin/messages/preview", json={"body": "x"}).status_code == 401
+    assert (
+        client.post(
+            "/api/admin/messages/preview", json={"body": "x"}, headers=_bearer(alice)
+        ).status_code
+        == 403
+    )
+    hostile = client.post(
+        "/api/admin/messages/preview",
+        json={"body": "<script>alert(1)</script>"},
+        headers=_bearer(admin),
+    ).json()["body_html"]
+    # What the admin sees in the preview is the escaped form, because that is what gets
+    # delivered — a preview that showed the raw text would be lying about the outcome.
+    assert "<script>" not in hostile and "&lt;script&gt;" in hostile

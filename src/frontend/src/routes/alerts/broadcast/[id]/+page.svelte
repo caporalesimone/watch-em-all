@@ -75,7 +75,11 @@
 		</span>
 
 		{#if isTextMessage(detail.payload)}
-			<MessageBody payload={detail.payload} />
+			<MessageBody
+				title={detail.payload.title}
+				html={detail.payload.body_html ?? null}
+				text={detail.payload.body}
+			/>
 		{/if}
 
 		<DeliveryList deliveries={detail.deliveries} />
