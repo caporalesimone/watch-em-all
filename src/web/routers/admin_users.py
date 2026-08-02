@@ -1,9 +1,10 @@
 """Admin user management (user-management.md): create, list, reset, enable/disable.
 
 Every route is admin-only (require_admin via AdminDep). The deferred soft-delete with its
-grace period and restore is 10.B3; the courtesy notification that goes with it belongs to
-the system-message catalog (10.B16), not here. There is no self-registration: accounts
-exist only because an admin created them (USR-R1).
+grace period and restore is 10.B3; the courtesy notification that goes with it now arrives
+from the system-message catalog (10.B16) — the wording lives there, this module only says
+when to send it. There is no self-registration: accounts exist only because an admin created
+them (USR-R1).
 
 **An admin never acts on their own account** (10.B1, Simone 2026-08-02). Disabling — and
 later deleting — yourself is refused server-side: with a single administrator it is a
@@ -15,6 +16,7 @@ one, so it locks nobody out.
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 
@@ -24,16 +26,19 @@ from sqlalchemy.sql.elements import UnaryExpression
 
 from src.core import credentials as cred
 from src.core import notifiers as notif
+from src.core import system_messages as sysmsg
 from src.core.admin_messages import latest_broadcast_id
 from src.core.errors import APIError
 from src.core.models import User
 from src.core.notifiers import EMAIL_PLUGIN_ID
+from src.core.notify import send_system_message
 from src.core.plugins.base import NotifierPlugin
 from src.core.security import generate_password, hash_password
 from src.core.settings import get_system_settings
 from src.web.deps import AdminDep, SessionDep
 from src.web.schemas import AdminUserPatch, AdminUserSummary, UserCreate
 
+log = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["Admin: users"])
 
 
@@ -52,7 +57,7 @@ def _notifiers(request: Request) -> list[NotifierPlugin]:
 def _mail_password(
     request: Request,
     db: SessionDep,
-    template: cred.CredentialTemplate,
+    key: str,
     *,
     first_name: str,
     address: str,
@@ -77,7 +82,7 @@ def _mail_password(
         cred.send_password(
             db,
             plugin,
-            template=template,
+            key=key,
             user_id=user_id,
             first_name=first_name,
             address=address,
@@ -89,6 +94,21 @@ def _mail_password(
             502, "password_email_failed", f"the password could not be sent: {exc}"
         ) from exc
     return password
+
+
+def _courtesy(request: Request, db: SessionDep, user: User, key: str, **values: object) -> None:
+    """Tell somebody what has just happened to their account (USR-R11, 10.B16).
+
+    **Best-effort, and after the commit.** The account state is the operation; the courtesy note
+    is a consequence of it. An administrator who disables an account must not see the request
+    fail — leaving them unsure whether it took — because a notifier was unreachable. The in-app
+    row is written first and is the copy that always exists, so nothing is lost either way:
+    somebody restored later finds the note waiting in their history.
+    """
+    try:
+        send_system_message(db, user, key, _notifiers(request), **values)
+    except Exception:  # noqa: BLE001 — a notification must never undo the thing it describes
+        log.warning("courtesy notification %s failed for user %s", key, user.id, exc_info=True)
 
 
 def _refuse_self(admin_id: int, target: User) -> None:
@@ -167,7 +187,12 @@ def create_user(
     # written: an account whose password nobody will ever read is not half a success, and this
     # ordering means a refusal leaves nothing behind to clean up.
     password = _mail_password(
-        request, db, cred.CREATED, first_name=body.first_name, address=body.username, user_id=0
+        request,
+        db,
+        sysmsg.CREDENTIALS_CREATED.key,
+        first_name=body.first_name,
+        address=body.username,
+        user_id=0,
     )
     user = User(
         username=body.username,
@@ -214,7 +239,7 @@ def reset_password(
     password = _mail_password(
         request,
         db,
-        cred.RESET,
+        sysmsg.CREDENTIALS_RESET.key,
         first_name=user.first_name,
         address=cred.address_of(user),
         user_id=user.id,
@@ -236,7 +261,9 @@ def reset_password(
     response_model=AdminUserSummary,
     summary="Mark an account for deletion after the grace period (admin only; never your own).",
 )
-def mark_for_deletion(user_id: int, admin: AdminDep, db: SessionDep) -> AdminUserSummary:
+def mark_for_deletion(
+    user_id: int, request: Request, admin: AdminDep, db: SessionDep
+) -> AdminUserSummary:
     """Soft delete (USR-R8): nothing is destroyed here, a date is set. The worker does the
     irreversible half when that date passes (10.B5)."""
     user = _target(db, user_id)
@@ -254,6 +281,13 @@ def mark_for_deletion(user_id: int, admin: AdminDep, db: SessionDep) -> AdminUse
         user.refresh_jti = None
         db.commit()
         db.refresh(user)
+        _courtesy(
+            request,
+            db,
+            user,
+            sysmsg.USER_MARKED_FOR_DELETION.key,
+            deletion_due_date=user.deletion_due_at.date().isoformat(),
+        )
     return _to_summary(user)
 
 
@@ -283,7 +317,7 @@ def restore(user_id: int, _admin: AdminDep, db: SessionDep) -> AdminUserSummary:
     summary="Enable or disable an account (admin only; never your own).",
 )
 def set_active(
-    user_id: int, body: AdminUserPatch, admin: AdminDep, db: SessionDep
+    user_id: int, body: AdminUserPatch, request: Request, admin: AdminDep, db: SessionDep
 ) -> AdminUserSummary:
     user = _target(db, user_id)
     if not body.is_active:
@@ -299,4 +333,6 @@ def set_active(
         user.refresh_jti = None
         db.commit()
         db.refresh(user)
+        if not body.is_active:
+            _courtesy(request, db, user, sysmsg.USER_DISABLED.key)
     return _to_summary(user)

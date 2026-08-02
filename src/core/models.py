@@ -781,3 +781,23 @@ class ScraperStats(Base):
     products_delivered_total: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     pages_fetched_total: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     parse_failures_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class SystemMessageTemplate(Base):
+    """An admin's rewrite of one core-generated text (admin-notifications.md, ADMSG-R7..R9).
+
+    **Only overrides live here** (ADMSG-R9). The catalog itself — keys, default texts, declared
+    placeholders — is code, in :mod:`src.core.system_messages`, so adding a message to the core
+    needs no migration and no seeding: a key with no row *is* its default, and it shows up in the
+    admin list the moment it exists. The same reasoning as ``system_settings``, for the same
+    reason: a default that has been copied into the database is a default that can go stale.
+    """
+
+    __tablename__ = "system_message_template"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

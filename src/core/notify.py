@@ -21,12 +21,13 @@ The engine never imports the notifier plugins; the caller (worker / web) passes 
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.core.alert_engine import AlertEvent, TextMessageEvent
+from src.core.alert_engine import AlertEvent, NotificationEvent, TextMessageEvent
 from src.core.contracts import NotificationKind
 from src.core.models import AdminMessage, AdminMessageDelivery, AlertDelivery, AlertLog, User
 from src.core.notifiers import (
@@ -36,6 +37,7 @@ from src.core.notifiers import (
     merged_config,
     resolve_state,
 )
+from src.core.system_messages import resolve
 
 if TYPE_CHECKING:
     from src.core.plugins.base import NotifierPlugin
@@ -43,6 +45,11 @@ if TYPE_CHECKING:
 log = logging.getLogger("wea.notifier")
 
 _DELIVERABLE = ("delivered", "pending")
+
+# The kinds whose `alert_log.payload_json` is a text message rather than a digest.
+_TEXT_KINDS = frozenset(
+    {NotificationKind.SYSTEM_MESSAGE.value, NotificationKind.ADMIN_MESSAGE.value}
+)
 
 
 def channel_outcomes(
@@ -84,6 +91,46 @@ def _row(alert_log_id: int, plugin_id: str, status: str) -> AlertDelivery:
     return AlertDelivery(alert_log_id=alert_log_id, plugin_id=plugin_id, status=status)
 
 
+def send_system_message(
+    db: Session, user: User, key: str, notifiers: list[NotifierPlugin], **values: object
+) -> AlertLog:
+    """Write and queue one core-generated text for one user (USR-R11, 10.B16). Commits.
+
+    The **ordinary** notification path, deliberately: a system message is a notification that
+    belongs to one person, so it is an ``alert_log`` row with ``alert_delivery`` rows hanging
+    off it, exactly like a digest. Routing it through the admin-message tables instead would
+    have meant a broadcast machine with an audience of one, plus a column to remember that
+    nobody sent it — and the in-app history is the copy that always exists (ADMSG-R2), which
+    this path already guarantees.
+    """
+    title, body = resolve(
+        db,
+        key,
+        locale=user.locale,
+        first_name=user.first_name or user.username,
+        username=user.username,
+        **values,
+    )
+    now = datetime.now(UTC)
+    event = TextMessageEvent(
+        kind=NotificationKind.SYSTEM_MESSAGE,
+        user_id=user.id,
+        generated_at=now,
+        title=title,
+        body=body,
+    )
+    row = AlertLog(
+        user_id=user.id,
+        kind=NotificationKind.SYSTEM_MESSAGE.value,
+        payload_json=event.model_dump(mode="json"),
+        created_at=now,
+    )
+    db.add(row)
+    db.commit()
+    enqueue_deliveries(db, row, notifiers)
+    return row
+
+
 def drain_deliveries(db: Session, notifiers: list[NotifierPlugin]) -> int:
     """Send every ``pending`` delivery on its channel and record the outcome (7.B7 / the drain
     step). The plugin's ``send`` does its own retry/backoff; a failure is recorded as ``failed``
@@ -101,7 +148,14 @@ def drain_deliveries(db: Session, notifiers: list[NotifierPlugin]) -> int:
         user = db.get(User, log_row.user_id)
         locale = user.locale if user is not None else "en"
         try:
-            event = AlertEvent.model_validate(log_row.payload_json)
+            # Two shapes share this table since 10.B16: a digest, and a core-generated text
+            # message. The kind on the row says which, so the payload is parsed as what it is
+            # instead of being guessed at from its fields.
+            event: NotificationEvent = (
+                TextMessageEvent.model_validate(log_row.payload_json)
+                if log_row.kind in _TEXT_KINDS
+                else AlertEvent.model_validate(log_row.payload_json)
+            )
             cfg = merged_config(db, plugin, log_row.user_id)
             plugin.send(event, cfg, locale)
             d.status = "delivered"
