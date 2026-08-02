@@ -47,10 +47,30 @@ class MeResponse(BaseModel):
     role: str
     locale: str
     must_change_password: bool
+    # Where this account is reached (10.B25). For everybody but the bootstrap admin this is
+    # the username itself, so the two are equal and the page shows one thing.
+    notification_email: str
+    # True only for the bootstrap admin — the one account whose username is not an address,
+    # because it existed before anybody could type one. Everyone else has nothing to edit:
+    # changing where your mail goes would mean changing who you sign in as.
+    email_editable: bool = False
 
 
 class MePatch(BaseModel):
     locale: str | None = None
+    contact_email: str | None = None
+
+    @field_validator("contact_email")
+    @classmethod
+    def _address(cls, value: str | None) -> str | None:
+        """Same rule as a username (10.B23): if it is going to receive mail it has to be an
+        address, and it is stored lowercase. Whether this account may set it at all is a
+        question about *who is asking*, so the router answers that one."""
+        if value is None:
+            return None
+        if not is_email(value):
+            raise ValueError("contact_email must be an email address")
+        return normalize_username(value)
 
 
 class HealthResponse(BaseModel):

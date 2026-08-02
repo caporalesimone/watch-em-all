@@ -58,6 +58,11 @@ export async function signOut(): Promise<void> {
 	auth.set({ status: 'anon', user: null });
 }
 
+/** Replace the cached profile after a PATCH /api/me, so the shell sees the new values. */
+export function setUser(user: api.Me): void {
+	auth.update((state) => ({ ...state, user }));
+}
+
 /** Used after a password change: the backend invalidated every token (AUTH-R5). */
 export function forceAnon(): void {
 	clearTokens();

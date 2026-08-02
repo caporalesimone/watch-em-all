@@ -5,7 +5,7 @@
 	import * as api from '$lib/api/client';
 	import NotifierChannels from '$lib/components/NotifierChannels.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
-	import { auth, forceAnon, isAdmin as isAdminStore } from '$lib/stores/auth';
+	import { auth, forceAnon, isAdmin as isAdminStore, setUser } from '$lib/stores/auth';
 	import { theme } from '$lib/stores/theme';
 
 	// Roles don't overlap: an admin governs and owns no carts/alerts, so the personal
@@ -17,6 +17,33 @@
 	let confirm = $state('');
 	let error = $state('');
 	let busy = $state(false);
+
+	// The notification address (10.F17). For everybody but the bootstrap admin it *is* the
+	// username, so it is shown and not offered for editing: changing where your mail goes
+	// would mean changing who you sign in as, which is an administrator's operation.
+	let address = $state($auth.user?.notification_email ?? '');
+	let addressBusy = $state(false);
+	let addressMsg = $state('');
+	const canEditAddress = $derived($auth.user?.email_editable === true);
+
+	async function saveAddress(event: SubmitEvent): Promise<void> {
+		event.preventDefault();
+		addressBusy = true;
+		addressMsg = '';
+		try {
+			const me = await api.patchMe({ contact_email: address });
+			setUser(me);
+			address = me.notification_email;
+			addressMsg = $_('common.saved');
+		} catch (err) {
+			addressMsg =
+				err instanceof api.ApiErr
+					? $_(`errors.${err.code}`, { default: $_('errors.generic') })
+					: $_('errors.generic');
+		} finally {
+			addressBusy = false;
+		}
+	}
 
 	const field =
 		'w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900';
@@ -70,6 +97,41 @@
 			<span class="text-slate-500 dark:text-slate-400">{$_('profile.language')}</span>
 			<span>{$_('profile.languageValue')}</span>
 		</div>
+
+		<!-- Where this account is reached (10.F17). One row for everybody, but only the bootstrap
+		     admin gets a field: it is the single account whose username is not an address, so it
+		     is the single one with something to fill in. -->
+		{#if canEditAddress}
+			<form onsubmit={saveAddress} class="space-y-1 pt-2">
+				<span class="block text-slate-500 dark:text-slate-400">{$_('profile.notifyEmail')}</span>
+				<div class="flex gap-2">
+					<input
+						type="email"
+						bind:value={address}
+						required
+						placeholder="name@example.com"
+						class="{field} flex-1"
+					/>
+					<button
+						type="submit"
+						disabled={addressBusy}
+						class="rounded border border-slate-300 px-3 py-1.5 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
+					>
+						{$_('common.save')}
+					</button>
+				</div>
+				<p class="text-xs text-slate-500 dark:text-slate-400">
+					{$_('profile.notifyEmailAdminHint')}
+				</p>
+				{#if addressMsg}<p class="text-xs text-slate-500">{addressMsg}</p>{/if}
+			</form>
+		{:else}
+			<div class="flex justify-between">
+				<span class="text-slate-500 dark:text-slate-400">{$_('profile.notifyEmail')}</span>
+				<span>{$auth.user?.notification_email}</span>
+			</div>
+			<p class="text-xs text-slate-500 dark:text-slate-400">{$_('profile.notifyEmailHint')}</p>
+		{/if}
 	</section>
 
 	<section class="space-y-2 text-sm">

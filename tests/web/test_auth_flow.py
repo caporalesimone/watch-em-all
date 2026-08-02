@@ -205,3 +205,72 @@ def test_expiry_off_leaves_an_ancient_password_alone(client: TestClient) -> None
         session.close()
     token = _login(client, "newpass123")
     assert client.get("/api/me", headers=_auth(token)).json()["must_change_password"] is False
+
+
+# ------------------------------------------------------ the account's own address (10.F17)
+
+
+def _admin_ready(client: TestClient) -> str:
+    """The bootstrap admin past the forced first change."""
+    access = _login(client, "initpass123")
+    client.post(
+        "/api/auth/change-password", headers=_auth(access), json={"new_password": "adminpass123"}
+    )
+    return _login(client, "adminpass123")
+
+
+def test_the_bootstrap_admin_is_the_only_account_that_sets_its_own_address(
+    client: TestClient,
+) -> None:
+    token = _admin_ready(client)
+    me = client.get("/api/me", headers=_auth(token)).json()
+    # Nothing set yet: the fallback is the username, which for this one account is not an
+    # address — which is exactly why it is the one account allowed to fill this in.
+    assert me["notification_email"] == "admin"
+    assert me["email_editable"] is True
+
+    saved = client.patch(
+        "/api/me", headers=_auth(token), json={"contact_email": "Boss@Example.COM"}
+    )
+    assert saved.status_code == 200
+    assert saved.json()["notification_email"] == "boss@example.com", "stored lowercase (10.B23)"
+
+    bad = client.patch("/api/me", headers=_auth(token), json={"contact_email": "not-an-address"})
+    assert bad.status_code == 400
+
+
+def test_an_ordinary_account_has_no_address_to_change(client: TestClient) -> None:
+    admin = _admin_ready(client)
+    client.post(
+        "/api/admin/users",
+        headers=_auth(admin),
+        json={
+            "username": "alice@example.com",
+            "first_name": "Alice",
+            "last_name": "Rossi",
+            "role": "user",
+        },
+    )
+    first = str(
+        client.post(
+            "/api/auth/login", json={"username": "alice@example.com", "password": "temp-pass-123"}
+        ).json()["access_token"]
+    )
+    # Past the forced first change, or every write would answer `must_change_password` instead.
+    client.post(
+        "/api/auth/change-password", headers=_auth(first), json={"new_password": "alicepass123"}
+    )
+    token = str(
+        client.post(
+            "/api/auth/login", json={"username": "alice@example.com", "password": "alicepass123"}
+        ).json()["access_token"]
+    )
+    me = client.get("/api/me", headers=_auth(token)).json()
+    assert me["notification_email"] == "alice@example.com"
+    assert me["email_editable"] is False
+
+    refused = client.patch(
+        "/api/me", headers=_auth(token), json={"contact_email": "elsewhere@example.com"}
+    )
+    assert refused.status_code == 403
+    assert refused.json()["code"] == "address_not_editable"

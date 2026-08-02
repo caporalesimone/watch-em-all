@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from src.core import credentials
 from src.core.errors import APIError
+from src.core.identity import is_email
 from src.core.models import User
 from src.web.deps import ClaimsDep, SessionDep, UserDep
 from src.web.schemas import MePatch, MeResponse
@@ -21,6 +23,8 @@ def _to_response(user: User) -> MeResponse:
         role=user.role,
         locale=user.locale,
         must_change_password=user.must_change_password,
+        notification_email=credentials.address_of(user),
+        email_editable=not is_email(user.username),
     )
 
 
@@ -52,5 +56,12 @@ def patch_me(body: MePatch, claims: UserDep, db: SessionDep) -> MeResponse:
         if body.locale != "en":
             raise APIError(400, "unsupported_locale", "only 'en' is supported in V1")
         user.locale = body.locale
+    if body.contact_email is not None:
+        # Only the bootstrap admin has an address to set (10.F17). For everybody else the
+        # username *is* the address, so changing where the mail goes would mean changing who
+        # they sign in as — a different operation, and an administrator's, not their own.
+        if is_email(user.username):
+            raise APIError(403, "address_not_editable", "your account address is your username")
+        user.contact_email = body.contact_email
     db.commit()
     return _to_response(user)

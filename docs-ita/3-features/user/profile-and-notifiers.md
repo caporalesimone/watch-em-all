@@ -25,6 +25,7 @@ La pagina Profilo concentra anche tutto ciò che riguarda la consegna delle noti
 - **PROF-R8** — Ogni canale ha un bottone **Test**: invia una notifica di prova con la configurazione corrente (merge sistema+utente) e mostra l'esito. Nessuna persistenza del test.
 - **PROF-R9** — I campi segreti sono mascherati e write-only (mai rispediti al client); un valore già impostato è indicato senza rivelarlo.
 - **PROF-R10** — Disattivare un canale **non** ne cancella la configurazione (si può riattivare senza reinserire i dati).
+- **PROF-R12** (10.F17) — L'**indirizzo di notifica è l'account**. Da 10.B23 l'username *è* un indirizzo email, quindi il profilo lo **mostra** e non offre niente da modificare: cambiare dove arriva la posta vorrebbe dire cambiare con cosa si accede, che è un'operazione dell'admin. L'unica eccezione è l'**admin di bootstrap**, che accede con un nome e non con un indirizzo e quindi imposta il proprio `contact_email` (`PATCH /api/me {contact_email}`, validato e normalizzato a minuscolo); per ogni altro account la risposta è `403 address_not_editable`. Conseguenza sul canale email: **non dichiara più campi utente** (10.B25), quindi nel profilo di quel canale resta l'interruttore — e su un account nuovo è già acceso.
 
 ## Stato composito di un canale
 

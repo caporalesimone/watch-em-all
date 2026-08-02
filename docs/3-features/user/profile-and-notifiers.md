@@ -40,6 +40,7 @@ toggle and a **Test** button (outcome shown as a toast). See [notifier-plugin](.
 - **PROF-R9** — Secret fields are masked and write-only (never returned); a stored value is shown as
   "saved" without revealing it.
 - **PROF-R10** — Deactivating a channel keeps its config (re-activate without re-typing).
+- **PROF-R12** (10.F17) — The **notification address** is the account itself. Since 10.B23 the username *is* an email address, so the profile **shows** it and offers nothing to edit: changing where your mail goes would mean changing who you sign in as, which is an administrator's operation. The **bootstrap admin** is the single exception — it signs in with a name rather than an address, so it sets its own `contact_email` (`PATCH /api/me {contact_email}`, validated and stored lowercase); every other account gets `403 address_not_editable`. Consequence for the email channel: it declares **no user fields** any more (10.B25), so what is left of it in the profile is the on/off switch, which a new account already has on.
 - **In-app channel.** The in-app history is itself a channel, shown here as **always on** — the user
   cannot disable it (only the admin can, globally). So the dashboard banner no longer means "you get
   nothing"; it only nudges a user with **no external channel** active (e.g. email) to add one.

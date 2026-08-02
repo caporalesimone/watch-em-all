@@ -11,6 +11,10 @@ export interface Me {
 	role: string;
 	locale: string;
 	must_change_password: boolean;
+	/** Where this account is reached — the username itself, for everyone but the bootstrap admin. */
+	notification_email: string;
+	/** Only the bootstrap admin may change it: everyone else's address *is* their username. */
+	email_editable: boolean;
 }
 
 interface TokenPair {
@@ -104,6 +108,16 @@ export async function logout(): Promise<void> {
 
 export function getMe(): Promise<Me> {
 	return apiFetch('/api/me').then(asJson<Me>);
+}
+
+/** Update the current profile. Only the bootstrap admin may send `contact_email` (10.F17). */
+export async function patchMe(body: { contact_email?: string; locale?: string }): Promise<Me> {
+	const res = await apiFetch('/api/me', {
+		method: 'PATCH',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+	return asJson<Me>(res);
 }
 
 export function getPlugins(): Promise<PluginInfo[]> {
