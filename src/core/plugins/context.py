@@ -234,6 +234,7 @@ def build_http_client(
     return HttpClient(
         timeout_s=cfg.http_timeout_s,
         min_interval_s=cfg.politeness_delay_ms / 1000,
+        max_retries=cfg.http_retries,
         cache=ScrapeCache(get_engine(), plugin_id, ttl_min=cfg.cache_ttl_min),
         # The client logs under the plugin's own namespace so one log stream tells the
         # whole story of a run: robots.txt, politeness, cache hits, failures.

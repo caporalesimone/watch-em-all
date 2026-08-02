@@ -199,6 +199,30 @@ export async function patchScraperConfig(
 	return asJson<ScraperConfig>(res);
 }
 
+// The settings a scraper declares for itself (10.B22). Schema and values together, because
+// the form is rendered from the schema and there is nothing to show without it.
+export interface PluginConfig {
+	scraper_id: string;
+	schema_fields: ConfigField[];
+	config: Record<string, unknown>;
+}
+
+export function getScraperPluginConfig(id: string): Promise<PluginConfig> {
+	return apiFetch(`/api/admin/scrapers/${id}/plugin-config`).then(asJson<PluginConfig>);
+}
+
+export async function setScraperPluginConfig(
+	id: string,
+	config: Record<string, unknown>
+): Promise<PluginConfig> {
+	const res = await apiFetch(`/api/admin/scrapers/${id}/plugin-config`, {
+		method: 'PUT',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ config })
+	});
+	return asJson<PluginConfig>(res);
+}
+
 // What a scraper has done since `since` (10.B20). Cumulative and pruning-proof: the Runs page
 // answers "recently", this answers "ever".
 export interface LifetimeStats {

@@ -574,6 +574,22 @@ class NotifierEnabledBody(BaseModel):
     enabled: bool
 
 
+class PluginConfigOut(BaseModel):
+    """What a scraper declares for itself, plus what is stored for it (10.B22).
+
+    Schema and values together in one response: the page renders the form from the schema and
+    has nothing to render without it, so two requests would only ever be made side by side.
+    """
+
+    scraper_id: str
+    schema_fields: list[ConfigField]
+    config: dict[str, Any]
+
+
+class PluginConfigBody(BaseModel):
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
 class LifetimeStats(BaseModel):
     """What a scraper has done since ``since`` (10.B20).
 

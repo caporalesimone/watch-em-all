@@ -1,5 +1,5 @@
 {
-	"_comment": "Config for scripts/i18n-check.mjs (4.B11). dynamicPrefixes: key prefixes assembled at runtime (e.g. $_(`errors.${code}`)) — keys under them are exempt from both the missing and the dead check, since a static scan cannot resolve them. ignoreKeys: exact keys to exempt (escape hatch for keys reserved for upcoming work). Keep this list as small as possible; everything that can be a literal should be one so it is checked precisely.",
+	"_comment": "Config for scripts/i18n-check.mjs (4.B11). dynamicPrefixes: key prefixes assembled at runtime (e.g. $_(`errors.${code}`)) — keys under them are exempt from both the missing and the dead check, since a static scan cannot resolve them. ignoreKeys: exact keys to exempt (escape hatch for keys reserved for upcoming work). `dragon_store.cfg.` is here for the same reason as `admin.scrapers.fields.`: those labels are named by a plugin's ConfigField schema in Python (10.B22) and reached through a variable, so a scan of the .svelte files cannot see them. Keep this list as small as possible; everything that can be a literal should be one so it is checked precisely.",
 	"dynamicPrefixes": [
 		"errors.",
 		"admin.settings.fields.",
@@ -7,6 +7,7 @@
 		"admin.scrapers.fields.",
 		"admin.scrapers.fieldHints.",
 		"dragon_store.adjustments.",
+		"dragon_store.cfg.",
 		"priceHistory.range."
 	],
 	"ignoreKeys": []

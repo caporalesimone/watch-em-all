@@ -20,10 +20,17 @@ from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.registry import LoadedPlugin
 from src.core.schedule import get_schedule, upsert_schedule
 from src.core.scrape import implements_scraping
-from src.core.scraper_config import ScraperReservedConfig, get_scraper_config, set_scraper_config
+from src.core.scraper_config import (
+    ScraperReservedConfig,
+    declared_schema,
+    get_scraper_config,
+    plugin_config,
+    set_plugin_config,
+    set_scraper_config,
+)
 from src.core.scraper_stats import get_stats, reset_stats
 from src.web.deps import AdminDep, SessionDep
-from src.web.schemas import LifetimeStats
+from src.web.schemas import LifetimeStats, PluginConfigBody, PluginConfigOut
 
 router = APIRouter(prefix="/admin", tags=["Admin: scrapers"])
 
@@ -219,3 +226,47 @@ def reset_lifetime_stats(
         raise APIError(404, "not_found", f"no schedulable scraper {scraper_id!r}")
     row = reset_stats(db, scraper_id)
     return _lifetime(row)
+
+
+@router.get(
+    "/scrapers/{scraper_id}/plugin-config",
+    response_model=PluginConfigOut,
+    summary="The settings this scraper declares for itself, with their current values (admin).",
+)
+def get_plugin_declared_config(
+    scraper_id: str, request: Request, _admin: AdminDep, db: SessionDep
+) -> PluginConfigOut:
+    loaded = _schedulable(request).get(scraper_id)
+    if loaded is None:
+        raise APIError(404, "not_found", f"no schedulable scraper {scraper_id!r}")
+    schema = declared_schema(loaded.plugin)
+    return PluginConfigOut(
+        scraper_id=scraper_id,
+        schema_fields=schema,
+        config=plugin_config(db, scraper_id, schema),
+    )
+
+
+@router.put(
+    "/scrapers/{scraper_id}/plugin-config",
+    response_model=PluginConfigOut,
+    summary="Save the scraper's declared settings (admin only); reserved keys are untouched.",
+)
+def set_plugin_declared_config(
+    scraper_id: str,
+    body: PluginConfigBody,
+    request: Request,
+    _admin: AdminDep,
+    db: SessionDep,
+) -> PluginConfigOut:
+    loaded = _schedulable(request).get(scraper_id)
+    if loaded is None:
+        raise APIError(404, "not_found", f"no schedulable scraper {scraper_id!r}")
+    plugin = loaded.plugin
+    assert isinstance(plugin, ScraperPlugin)  # `_schedulable` only ever holds scrapers
+    schema = declared_schema(plugin)
+    config = set_plugin_config(db, scraper_id, schema, body.config)
+    # The plugin may have derived something from these values and be holding it (Dragon Store
+    # builds a rules object). Telling it is what makes "no restart" true.
+    plugin.on_config_changed()
+    return PluginConfigOut(scraper_id=scraper_id, schema_fields=schema, config=config)

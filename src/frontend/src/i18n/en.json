@@ -337,6 +337,11 @@
 			"reserved": "Operational parameters",
 			"reservedHint": "Core settings applied on every run and manual scrape. They take effect on the next run — no restart.",
 			"cache": "Scrape cache",
+			"pluginConfig": "Settings from this scraper",
+			"pluginConfigHint": "Values this scraper declares for itself — the rules of the shop it reads. They take effect on the next evaluation, with no restart.",
+			"pluginConfigNone": "This scraper declares no settings of its own.",
+			"pluginConfigSaved": "Saved.",
+			"pluginConfigError": "Could not save these settings.",
 			"cacheHint": "Remove the cached pages so the next run fetches fresh from the site.",
 			"clearCache": "Clear cache",
 			"clearConfirm": "This removes all cached pages for this scraper. Continue?",
@@ -346,13 +351,15 @@
 				"politeness_delay_ms": "Politeness delay (milliseconds)",
 				"http_timeout_s": "HTTP timeout (seconds)",
 				"cache_ttl_min": "Cache half-life (minutes, 0 = off)",
-				"scrape_now_min_interval_s": "Manual scrape-now cooldown (seconds)"
+				"scrape_now_min_interval_s": "Manual scrape-now cooldown (seconds)",
+				"http_retries": "Retries on a failed request"
 			},
 			"fieldHints": {
-				"politeness_delay_ms": "Minimum wait between two requests to the same site.",
+				"politeness_delay_ms": "Minimum wait between two requests to the same site. If the site declares a Crawl-delay in its robots.txt, that value is the hard minimum: a smaller number here is raised to it, never applied as typed.",
 				"http_timeout_s": "How long to wait for a response before giving up on a request.",
 				"cache_ttl_min": "How long a fetched page is reused before fetching it again; 0 disables the cache.",
-				"scrape_now_min_interval_s": "Minimum time before a user can run Scrape now again."
+				"scrape_now_min_interval_s": "Minimum time before a user can run Scrape now again.",
+				"http_retries": "How many times a failed request is tried again before the run gives up. Each retry is another request to a site that has already not answered, so keep it low."
 			},
 			"viz": {
 				"title": "24-hour schedule",

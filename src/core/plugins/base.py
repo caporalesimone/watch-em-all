@@ -302,6 +302,28 @@ class ScraperPlugin(BasePlugin, ABC):
         site-specific cart logic returns ``[]``."""
         return []
 
+    def on_config_changed(self) -> None:
+        """Called after an admin saves this scraper's declared config (10.B22).
+
+        A hook rather than a re-read, because only the plugin knows what it derived from those
+        values: Dragon Store turns four numbers into a rules object it keeps, and the honest
+        way to keep that fresh is to be told the numbers moved. Default: nothing to do.
+        """
+
+    def get_admin_config_schema(self) -> list[ConfigField]:
+        """The settings this scraper wants an administrator to be able to change (10.B22).
+
+        The same declarative shape the notifiers have had since 7.B3, so the admin page
+        renders one dynamic form and the core never learns a field name. **Admin only**: there
+        is no per-user level for a scraper (Simone, 2026-08-02) — these are settings about how
+        the installation treats a site, and a site does not care who is watching it.
+
+        A key here may not shadow a core reserved one (politeness, timeout, cache half-life):
+        the core reads those on the plugin's behalf, so redefining one would change behaviour
+        the plugin does not own. Default: none.
+        """
+        return []
+
 
 class NotifierDeliveryError(RuntimeError):
     """A notifier failed to deliver after its own retries (NOT-R5). The message is

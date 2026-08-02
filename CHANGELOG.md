@@ -62,6 +62,9 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - The Runs page opens on the scheduled runs and filters to manual or both, so hand-started scrapes no longer crowd out the schedule.
 - Each scraper exposes what it has done since a stated date, and that tally can be zeroed when a configuration change makes it incomparable.
 - Its settings page now shows those totals in four groups, with the failure streak on top, and a button to start the count again.
+- A scraper can now declare its own settings, and the admin edits them in a form the app builds from that declaration alone.
+- Dragon Store's discount bands and shipping are the first of those: change them and the next cart estimate uses the new ones, no restart.
+- How many times a failed request is retried is configurable too, and the politeness field now says the site's own Crawl-delay is a hard minimum.
 
 ## [0.9.0] - 2026-07-31
 
