@@ -199,6 +199,43 @@ export async function patchScraperConfig(
 	return asJson<ScraperConfig>(res);
 }
 
+// What a scraper has done since `since` (10.B20). Cumulative and pruning-proof: the Runs page
+// answers "recently", this answers "ever".
+export interface LifetimeStats {
+	plugin_id: string;
+	since: string;
+	runs_total: number;
+	runs_ok: number;
+	runs_failed: number;
+	runs_skipped_locked: number;
+	consecutive_failures: number;
+	last_run_at: string | null;
+	last_success_at: string | null;
+	last_failure_at: string | null;
+	http_requests_total: number;
+	cache_hits_total: number;
+	bytes_downloaded_total: number;
+	politeness_wait_s_total: number;
+	run_seconds_total: number;
+	rate_limited_total: number;
+	gate_hits_total: number;
+	gate_cleared_total: number;
+	robots_denied_total: number;
+	products_delivered_total: number;
+	pages_fetched_total: number;
+	parse_failures_total: number;
+}
+
+export function getLifetimeStats(id: string): Promise<LifetimeStats> {
+	return apiFetch(`/api/admin/scrapers/${id}/lifetime-stats`).then(asJson<LifetimeStats>);
+}
+
+/** Zero the counters and restamp `since` (10.B21). Destructive, no history kept. */
+export async function resetLifetimeStats(id: string): Promise<LifetimeStats> {
+	const res = await apiFetch(`/api/admin/scrapers/${id}/lifetime-stats/reset`, { method: 'POST' });
+	return asJson<LifetimeStats>(res);
+}
+
 // Clear a scraper's scrape cache (4.B9/4.F5); returns how many entries were removed.
 export async function clearScraperCache(id: string): Promise<{ deleted: number }> {
 	const res = await apiFetch(`/api/admin/scrapers/${id}/cache`, { method: 'DELETE' });

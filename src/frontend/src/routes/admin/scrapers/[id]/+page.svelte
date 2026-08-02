@@ -12,6 +12,7 @@
 		patchScraperConfig,
 		type ScraperConfig
 	} from '$lib/api/client';
+	import LifetimePanel from '$lib/components/LifetimePanel.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 
 	let config = $state<ScraperConfig | null>(null);
@@ -150,6 +151,10 @@
 				>{/if}
 			{#if error}<span class="text-sm text-red-500">{error}</span>{/if}
 		</div>
+
+		<!-- What this scraper has done since a stated date (10.F15). Below the settings, because
+		     the settings are what you came to change and this is what you came to check. -->
+		<LifetimePanel scraperId={$page.params.id ?? ''} />
 
 		<div class="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
 			<h2 class="font-semibold">{$_('admin.scrapers.cache')}</h2>

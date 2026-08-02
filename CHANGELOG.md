@@ -61,6 +61,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - A manual scrape is now recorded like a scheduled one — its own run row and its real traffic — so the counters stop describing only half the work.
 - The Runs page opens on the scheduled runs and filters to manual or both, so hand-started scrapes no longer crowd out the schedule.
 - Each scraper exposes what it has done since a stated date, and that tally can be zeroed when a configuration change makes it incomparable.
+- Its settings page now shows those totals in four groups, with the failure streak on top, and a button to start the count again.
 
 ## [0.9.0] - 2026-07-31
 
