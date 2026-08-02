@@ -551,8 +551,7 @@ class NotifierChannelOut(BaseModel):
 
 
 class AdminNotifierOut(BaseModel):
-    # A notifier channel as the admin's page sees it (GET /api/admin/notifiers). `user_schema`
-    # is included so the admin can supply a minimal target for the channel test (POST .../test).
+    # A notifier channel as the admin's page sees it (GET /api/admin/notifiers).
     plugin_id: str
     display_name: str
     is_in_app: bool
@@ -562,6 +561,21 @@ class AdminNotifierOut(BaseModel):
     is_set: dict[str, bool] = Field(default_factory=dict)
     enabled: bool  # the admin kill-switch (PCFG-R8)
     admin_config_complete: bool
+    # Whether this channel has to prove itself before it can be switched on, and whether what is
+    # stored right now is what it proved (10.B28). `validated` goes back to false on its own when
+    # a setting changes — it is a fingerprint comparison, not a flag.
+    requires_validation: bool = False
+    validated: bool = False
+    validated_at: datetime | None = None
+
+
+class NotifierValidationOut(BaseModel):
+    # The outcome of POST /api/admin/notifiers/{id}/validate, with the channel's fresh state
+    # beside it: the badge, the switch and the timestamp all change together, so they travel
+    # together rather than costing the page a second request to find out what happened.
+    ok: bool
+    error: str | None = None
+    channel: AdminNotifierOut
 
 
 class NotifierConfigBody(BaseModel):
@@ -647,11 +661,6 @@ class MessageTemplateOut(BaseModel):
 class MessageTemplatePut(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     body: str = Field(min_length=1, max_length=20000)
-
-
-class NotifierTestResult(BaseModel):
-    ok: bool
-    error: str | None = None
 
 
 class UnreadCount(BaseModel):

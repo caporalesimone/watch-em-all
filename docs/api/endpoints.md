@@ -135,8 +135,8 @@ There is **no user-facing test send** (10.X4). It made sense while a user typed 
 |---|---|---|---|---|
 | GET | `/api/admin/notifiers` | 🛡 | — | per channel: `{plugin_id, display_name, is_in_app, admin_schema, user_schema, config, is_set, enabled, admin_config_complete}` |
 | PUT | `/api/admin/notifiers/{plugin_id}/config` | 🛡 | `{config}` | set the system config; keys filtered on the admin schema, secrets write-only. In-app → **422** `in_app_no_config` |
-| PATCH | `/api/admin/notifiers/{plugin_id}` | 🛡 | `{enabled}` | global **kill-switch** (PCFG-R8): off = unavailable to everyone, personal configs preserved. Applies to in-app too |
-| POST | `/api/admin/notifiers/{plugin_id}/test` | 🛡 | — | probe the channel with the system config, delivered to the **admin's own account** (10.B25; nothing is persisted) → `{ok, error}` |
+| PATCH | `/api/admin/notifiers/{plugin_id}` | 🛡 | `{enabled}` | global **kill-switch** (PCFG-R8): off = unavailable to everyone, personal configs preserved. Applies to in-app too. Switching **on** an unvalidated channel → **422** `not_validated` (10.B28) |
+| POST | `/api/admin/notifiers/{plugin_id}/validate` | 🛡 | — | send a real message through the channel, to the **admin's own account** (10.B25); if the server accepts it the settings are recorded as validated (NOT-R9) → `{ok, error, channel}`. Incomplete config → **422** `config_incomplete`; a refusal records nothing |
 
 ## Scraper plugin routes — Dragon Store (implemented)
 

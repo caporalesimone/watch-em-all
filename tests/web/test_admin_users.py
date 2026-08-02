@@ -135,11 +135,25 @@ def test_a_second_account_cannot_take_the_same_address_in_another_case(
 
 
 def _configure_email(client: TestClient, admin: str) -> None:
+    """A channel that can actually deliver: configured **and validated** (10.B28).
+
+    The validation is stamped into the database instead of driven through its endpoint — these
+    tests are about what happens once mail can go out, and going through the endpoint would mean
+    counting a probe among the messages they assert on.
+    """
+    from src.core import notifiers as notif
+    from src.core.db import new_session
+
     client.put(
         "/api/admin/notifiers/email/config",
         json={"config": {"smtp_host": "smtp.local", "from_address": "w@local"}},
         headers=_bearer(admin),
     )
+    with new_session() as db:
+        notif.mark_validated(db, "email")
+        # Saving settings leaves a gated channel off until it is proven (10.B28), so the switch
+        # is part of "a channel that can deliver" now, not a separate concern.
+        notif.set_admin_enabled(db, "email", True)
 
 
 class _FakeSMTP:

@@ -56,11 +56,19 @@ def email_channel(notifiers: list[NotifierPlugin]) -> NotifierPlugin | None:
 
 def channel_ready(db: Session, plugin: NotifierPlugin | None) -> bool:
     """Whether anything can actually be delivered right now: the plugin is loaded, the admin
-    kill-switch is on, and the system SMTP config is complete. Checked **before** anything is
-    written, so a refusal leaves nothing behind."""
+    kill-switch is on, the system config is complete, and the settings have been **validated**
+    (10.B28). Checked **before** anything is written, so a refusal leaves nothing behind.
+
+    Validation belongs in this list for the same reason the rest of it does. Creating an account
+    mails the only copy of its password: sending that through settings nothing has ever proven is
+    how an account is born that nobody can sign into, and the whole point of refusing early is to
+    not leave that behind.
+    """
     if plugin is None:
         return False
     if not notif.admin_enabled(db, plugin.plugin_id):
+        return False
+    if not notif.is_validated(db, plugin.plugin_id):
         return False
     return notif.is_complete(
         plugin.get_admin_config_schema(), notif.admin_config(db, plugin.plugin_id)

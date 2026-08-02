@@ -1154,11 +1154,18 @@ export interface AdminNotifier {
 	is_set: Record<string, boolean>;
 	enabled: boolean; // the admin kill-switch (PCFG-R8)
 	admin_config_complete: boolean;
+	/** Whether this channel must prove itself before it can be switched on (10.B28). */
+	requires_validation: boolean;
+	/** Whether what is stored *now* is what was proven: a fingerprint match, not a flag. */
+	validated: boolean;
+	validated_at: string | null;
 }
 
-export interface NotifierTestResult {
+/** The outcome of a validation attempt, with the channel's fresh state beside it (10.B28). */
+export interface NotifierValidationResult {
 	ok: boolean;
 	error: string | null;
+	channel: AdminNotifier;
 }
 
 export function listNotifiers(): Promise<NotifierChannel[]> {
@@ -1214,8 +1221,12 @@ export async function setAdminNotifierEnabled(
 	return asJson<AdminNotifier>(res);
 }
 
-/** Probe a channel with the system config. The target is the admin's own account (10.B25). */
-export async function testAdminNotifier(id: string): Promise<NotifierTestResult> {
-	const res = await apiFetch(`/api/admin/notifiers/${id}/test`, { method: 'POST' });
-	return asJson<NotifierTestResult>(res);
+/**
+ * Send a real message through the channel and, if the server takes it, record the settings as
+ * validated (10.B28). The target is the admin's own account (10.B25) — the address the system
+ * will really use. A failure records nothing.
+ */
+export async function validateAdminNotifier(id: string): Promise<NotifierValidationResult> {
+	const res = await apiFetch(`/api/admin/notifiers/${id}/validate`, { method: 'POST' });
+	return asJson<NotifierValidationResult>(res);
 }

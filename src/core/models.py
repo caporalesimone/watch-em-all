@@ -504,6 +504,34 @@ class NotifierAdminConfig(Base):
     )
 
 
+class NotifierValidation(Base):
+    """Proof that a channel's system config was once accepted by its server (10.B28, NOT-R9).
+
+    A channel cannot be switched on until a real message has left through it: the admin presses
+    *Validate*, the core sends one, and if the server takes it the settings are recorded here.
+    Whether that server then delivers or bounces the mail is between it and the recipient — what
+    this proves is the only thing the installation can prove, that the credentials and the host
+    it was given work.
+
+    **A separate table rather than two columns on** :class:`NotifierAdminConfig`, and that is a
+    schema decision, not a modelling preference: pre-1.0 ``create_all`` creates missing *tables*
+    but never alters existing ones, so a new table costs nothing while a new column costs a
+    database recreation — and phase 10 already spent its one.
+
+    ``config_hash`` is the fingerprint of the config that was validated. Validity is therefore
+    not a flag somebody has to remember to clear: change a setting and the hash stops matching,
+    which *is* the invalidation.
+    """
+
+    __tablename__ = "notifier_validation"
+
+    plugin_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    config_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    validated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
 class NotifierUserConfig(Base):
     """Per-user notifier config + personal activation (profile-and-notifiers.md). Phase 7.
 

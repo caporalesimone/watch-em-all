@@ -75,6 +75,8 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - Writing a message warns you when email is off or unconfigured: the message will only appear in the app, and nobody gets a mail.
 - A channel's badge now reads Active, Switched off or Not configured, instead of calling a switched-off channel available.
 - The email settings fit in three rows: host, port and TLS sit together, and so do the credentials — a plugin can say which fields belong side by side.
+- Send test became Validate settings: a channel is switched on only once a real message has actually left through it.
+- A second badge says whether the settings are validated, and changing one of them undoes that and switches the channel off.
 
 ## [0.9.0] - 2026-07-31
 

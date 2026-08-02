@@ -38,7 +38,7 @@ Legenda ruolo: 🌐 pubblico · 👤 user · 🛡 admin
 | PUT | `/api/notifiers/{plugin_id}/config` | 👤 | `{config}` | chiavi filtrate sullo schema utente; secret assente = non modificare |
 | PATCH | `/api/notifiers/{plugin_id}` | 👤 | `{enabled}` | attiva/disattiva senza perdere la config |
 
-Un invio di prova lato utente **non esiste più** (10.X4): aveva senso finché il recapito lo scriveva l'utente in quella pagina, ma da 10.B23/10.B25 il recapito **è** l'account e si è già dimostrato funzionante portando la password con cui quella persona è entrata. Quel che restava era una sonda sulla configurazione SMTP del server, che l'utente non può comunque toccare: la prova vive solo lato admin (`POST /api/admin/notifiers/{plugin_id}/test`).
+Un invio di prova lato utente **non esiste più** (10.X4): aveva senso finché il recapito lo scriveva l'utente in quella pagina, ma da 10.B23/10.B25 il recapito **è** l'account e si è già dimostrato funzionante portando la password con cui quella persona è entrata. Quel che restava era una sonda sulla configurazione SMTP del server, che l'utente non può comunque toccare: la prova vive solo lato admin, dove da 10.B28 è diventata la **validazione** del canale (`POST /api/admin/notifiers/{plugin_id}/validate`).
 
 ## Admin — utenti (ciclo di vita)
 
@@ -79,8 +79,8 @@ Il purge automatico resta il job giornaliero del worker sugli account scaduti (U
 |---|---|---|---|---|
 | GET | `/api/admin/notifiers` | 🛡 | — | per canale: schema admin, `is_set` dei secret, stato, enabled |
 | PUT | `/api/admin/notifiers/{plugin_id}/config` | 🛡 | `{config}` | chiavi filtrate sullo schema admin |
-| PATCH | `/api/admin/notifiers/{plugin_id}` | 🛡 | `{enabled}` | interruttore globale del canale (PCFG-R8): off = non disponibile per tutti, config utente preservate |
-| POST | `/api/admin/notifiers/{plugin_id}/test` | 🛡 | `{...campi utente minimi}` | verifica del canale lato sistema |
+| PATCH | `/api/admin/notifiers/{plugin_id}` | 🛡 | `{enabled}` | interruttore globale del canale (PCFG-R8): off = non disponibile per tutti, config utente preservate. Accendere un canale **non validato** → `422 not_validated` (10.B28) |
+| POST | `/api/admin/notifiers/{plugin_id}/validate` | 🛡 | — | manda un messaggio vero all'account dell'admin (10.B25); se il server lo accetta, le impostazioni risultano **validate** (NOT-R9) → `{ok, error, channel}`. Config incompleta → `422 config_incomplete`; un rifiuto non registra nulla |
 
 ## Admin — notifiche agli utenti — [admin-notifications](../3-features/admin/admin-notifications.md)
 

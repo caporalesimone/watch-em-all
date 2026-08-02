@@ -62,6 +62,18 @@ class FakeEmail(NotifierPlugin):
         self.sent.append((config, locale))
 
 
+def _serve(db: Session, email: FakeEmail, host: str = "smtp.local") -> None:
+    """A channel in the one state that delivers: configured **and validated** (10.B28).
+
+    Since a channel has to prove itself before it counts as available, "configured" alone is no
+    longer the setup these tests mean — and stamping the proof here keeps that fact in one place
+    rather than three lines at the top of every test.
+    """
+    notif.set_admin_config(db, email, {"smtp_host": host})
+    notif.mark_validated(db, email.plugin_id)
+    notif.set_admin_enabled(db, email.plugin_id, True)
+
+
 def _user(db: Session, name: str = "alice@example.com") -> User:
     u = User(username=name, password_hash="x")
     db.add(u)
@@ -97,7 +109,7 @@ def test_enqueue_active_email_is_pending_in_app_delivered() -> None:
     with _session() as db:
         user = _user(db)
         email = FakeEmail()
-        notif.set_admin_config(db, email, {"smtp_host": "smtp.local"})
+        _serve(db, email)
         notif.set_user_config(db, email, user.id, {"to_address": "a@b.co"})
         notif.set_user_enabled(db, user.id, "email", True)
         log = _digest(db, user.id)
@@ -119,7 +131,7 @@ def test_enqueue_in_app_skipped_but_email_pending() -> None:
         user = _user(db)
         email = FakeEmail()
         notif.set_admin_enabled(db, "in_app", False)
-        notif.set_admin_config(db, email, {"smtp_host": "smtp.local"})
+        _serve(db, email)
         notif.set_user_config(db, email, user.id, {"to_address": "a@b.co"})
         notif.set_user_enabled(db, user.id, "email", True)
         log = _digest(db, user.id)
@@ -134,7 +146,7 @@ def test_drain_sends_pending_and_marks_delivered() -> None:
     with _session() as db:
         user = _user(db)
         email = FakeEmail()
-        notif.set_admin_config(db, email, {"smtp_host": "smtp.local"})
+        _serve(db, email)
         notif.set_user_config(db, email, user.id, {"to_address": "a@b.co"})
         notif.set_user_enabled(db, user.id, "email", True)
         log = _digest(db, user.id)
@@ -152,7 +164,7 @@ def test_drain_records_failure_with_reason() -> None:
         user = _user(db)
         email = FakeEmail()
         email.fail = True
-        notif.set_admin_config(db, email, {"smtp_host": "smtp.local"})
+        _serve(db, email)
         notif.set_user_config(db, email, user.id, {"to_address": "a@b.co"})
         notif.set_user_enabled(db, user.id, "email", True)
         log = _digest(db, user.id)
@@ -167,7 +179,7 @@ def test_drain_marks_failed_when_notifier_not_loaded() -> None:
     with _session() as db:
         user = _user(db)
         email = FakeEmail()
-        notif.set_admin_config(db, email, {"smtp_host": "smtp.local"})
+        _serve(db, email)
         notif.set_user_config(db, email, user.id, {"to_address": "a@b.co"})
         notif.set_user_enabled(db, user.id, "email", True)
         log = _digest(db, user.id)
@@ -211,6 +223,11 @@ def test_resolve_state_transitions() -> None:
         st = notif.resolve_state(db, email, user.id)
         assert not st.available and not st.active  # no admin config yet
         notif.set_admin_config(db, email, {"smtp_host": "h"})
+        assert not notif.resolve_state(db, email, user.id).available, (
+            "configured is not proven: a channel is available only once a message has left "
+            "through it (10.B28)"
+        )
+        _serve(db, email, host="h")
         st = notif.resolve_state(db, email, user.id)
         assert st.available and not st.active  # available, but user not configured/enabled
         notif.set_user_config(db, email, user.id, {"to_address": "a@b.co"})
@@ -230,7 +247,7 @@ def test_message_drain_sends_the_text_payload_and_records_the_outcome() -> None:
     with _session() as db:
         user = _user(db)
         email = FakeEmail()
-        notif.set_admin_config(db, email, {"smtp_host": "smtp.local"})
+        _serve(db, email)
         notif.set_user_config(db, email, user.id, {"to_address": "a@b.co"})
         notif.set_user_enabled(db, user.id, "email", True)
         message = send_admin_message(
@@ -258,7 +275,7 @@ def test_a_failing_channel_records_the_reason_and_is_not_retried() -> None:
     with _session() as db:
         user = _user(db)
         email = FakeEmail(fail=True)
-        notif.set_admin_config(db, email, {"smtp_host": "smtp.local"})
+        _serve(db, email)
         notif.set_user_config(db, email, user.id, {"to_address": "a@b.co"})
         notif.set_user_enabled(db, user.id, "email", True)
         send_admin_message(
