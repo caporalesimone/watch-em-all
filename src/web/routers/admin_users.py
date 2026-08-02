@@ -1,10 +1,10 @@
 """Admin user management (user-management.md): create, list, reset, enable/disable.
 
 Every route is admin-only (require_admin via AdminDep). The deferred soft-delete with its
-grace period and restore is 10.B3; the courtesy notification that goes with it now arrives
-from the system-message catalog (10.B16) — the wording lives there, this module only says
-when to send it. There is no self-registration: accounts exist only because an admin created
-them (USR-R1).
+grace period and restore is 10.B3, and waiving that grace period is 10.B27; the courtesy
+notification that goes with either arrives from the system-message catalog (10.B16) — the
+wording lives there, this module only says when to send it. There is no self-registration:
+accounts exist only because an admin created them (USR-R1).
 
 **An admin never acts on their own account** (10.B1, Simone 2026-08-02). Disabling — and
 later deleting — yourself is refused server-side: with a single administrator it is a
@@ -24,17 +24,19 @@ from fastapi import APIRouter, Query, Request, status
 from sqlalchemy import nullsfirst, nullslast, select
 from sqlalchemy.sql.elements import UnaryExpression
 
-from src.core import credentials as cred
+from src.core import direct_mail as mail
 from src.core import notifiers as notif
 from src.core import system_messages as sysmsg
 from src.core.admin_messages import latest_broadcast_id
 from src.core.errors import APIError
 from src.core.models import User
 from src.core.notifiers import EMAIL_PLUGIN_ID
-from src.core.notify import send_system_message
+from src.core.notify import send_account_notice
 from src.core.plugins.base import NotifierPlugin
+from src.core.plugins.registry import LoadedPlugin
 from src.core.security import generate_password, hash_password
 from src.core.settings import get_system_settings
+from src.core.user_purge import purge_user
 from src.web.deps import AdminDep, SessionDep
 from src.web.schemas import AdminUserPatch, AdminUserSummary, UserCreate
 
@@ -54,12 +56,17 @@ def _notifiers(request: Request) -> list[NotifierPlugin]:
     return [lp.plugin for lp in loaded if isinstance(lp.plugin, NotifierPlugin)]
 
 
+def _plugins(request: Request) -> list[LoadedPlugin]:
+    return list(getattr(request.app.state, "loaded_plugins", []))
+
+
 def _mail_password(
     request: Request,
     db: SessionDep,
     key: str,
     *,
     first_name: str,
+    username: str,
     address: str,
     user_id: int,
 ) -> str:
@@ -70,8 +77,8 @@ def _mail_password(
     the administrator can fix it on the Notifiers page. A channel that accepted the job and then
     failed is a 502: nothing the caller did was wrong, and the account is untouched either way.
     """
-    plugin = cred.email_channel(_notifiers(request))
-    if not cred.channel_ready(db, plugin):
+    plugin = mail.email_channel(_notifiers(request))
+    if not mail.channel_ready(db, plugin):
         raise APIError(
             422,
             "email_channel_unavailable",
@@ -79,17 +86,18 @@ def _mail_password(
         )
     password = generate_password()
     try:
-        cred.send_password(
+        mail.send_password(
             db,
             plugin,
             key=key,
             user_id=user_id,
             first_name=first_name,
+            username=username,
             address=address,
             password=password,
             now=datetime.now(tz=UTC),
         )
-    except cred.CredentialMailError as exc:
+    except mail.DirectMailError as exc:
         raise APIError(
             502, "password_email_failed", f"the password could not be sent: {exc}"
         ) from exc
@@ -97,7 +105,7 @@ def _mail_password(
 
 
 def _courtesy(request: Request, db: SessionDep, user: User, key: str, **values: object) -> None:
-    """Tell somebody what has just happened to their account (USR-R11, 10.B16).
+    """Tell somebody what has just happened to their account (USR-R11, 10.B16, 10.B26).
 
     **Best-effort, and after the commit.** The account state is the operation; the courtesy note
     is a consequence of it. An administrator who disables an account must not see the request
@@ -106,7 +114,7 @@ def _courtesy(request: Request, db: SessionDep, user: User, key: str, **values: 
     somebody restored later finds the note waiting in their history.
     """
     try:
-        send_system_message(db, user, key, _notifiers(request), **values)
+        send_account_notice(db, user, key, _notifiers(request), **values)
     except Exception:  # noqa: BLE001 — a notification must never undo the thing it describes
         log.warning("courtesy notification %s failed for user %s", key, user.id, exc_info=True)
 
@@ -191,6 +199,7 @@ def create_user(
         db,
         sysmsg.CREDENTIALS_CREATED.key,
         first_name=body.first_name,
+        username=body.username,
         address=body.username,
         user_id=0,
     )
@@ -241,7 +250,8 @@ def reset_password(
         db,
         sysmsg.CREDENTIALS_RESET.key,
         first_name=user.first_name,
-        address=cred.address_of(user),
+        username=user.username,
+        address=mail.address_of(user),
         user_id=user.id,
     )
     user.password_hash = hash_password(password)
@@ -289,6 +299,42 @@ def mark_for_deletion(
             deletion_due_date=user.deletion_due_at.date().isoformat(),
         )
     return _to_summary(user)
+
+
+@router.delete(
+    "/users/{user_id}/purge",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete an already-marked account now, without waiting for its deadline (admin only).",
+)
+def purge_now(user_id: int, request: Request, admin: AdminDep, db: SessionDep) -> None:
+    """The grace period, waived (10.B27, USR-R9).
+
+    **Only for an account that is already marked.** Destruction stays a two-step act: the first
+    click sets a date and can be undone, the second says *not that date, now*. Collapsing them
+    into one button would mean a single misdirected click destroys somebody's account — and the
+    reversible window is the entire reason 10.B3 exists.
+
+    Everything else is the nightly purge, because it *is* the nightly purge: same plugin-first
+    order, same all-or-nothing rule, same farewell mail once the row is gone (10.B26).
+    """
+    user = _target(db, user_id)
+    _refuse_self(admin.sub, user)
+    if user.deletion_marked_at is None:
+        raise APIError(
+            409,
+            "not_being_deleted",
+            "mark the account for deletion before deleting it permanently",
+        )
+    if not purge_user(
+        db, user, _plugins(request), _notifiers(request), reason="deleted by an administrator"
+    ):
+        # A plugin refused to give up its data. The account is untouched and still marked, which
+        # is the only safe outcome: half a deletion is the one state nothing can recover from.
+        raise APIError(
+            500,
+            "purge_failed",
+            "a plugin could not delete this account's data; the account is unchanged",
+        )
 
 
 @router.post(

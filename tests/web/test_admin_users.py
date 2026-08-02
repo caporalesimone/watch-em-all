@@ -161,12 +161,12 @@ class _FakeSMTP:
         _FakeSMTP.sent.append(msg)
 
 
-@pytest.mark.real_credential_mail
+@pytest.mark.real_direct_mail
 def test_the_generated_password_reaches_the_account_and_nothing_else(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The whole of 10.B24 in one pass: no password in the request, one in the mailbox, and
-    that one signs in. Marked ``real_credential_mail``, so the real generator and the real
+    that one signs in. Marked ``real_direct_mail``, so the real generator and the real
     channel gate run — the rest of the suite stubs both."""
     _FakeSMTP.sent = []
     monkeypatch.setattr(smtplib, "SMTP", _FakeSMTP)
@@ -195,7 +195,7 @@ def test_the_generated_password_reaches_the_account_and_nothing_else(
     ], "generated or not, the first thing you do is choose your own"
 
 
-@pytest.mark.real_credential_mail
+@pytest.mark.real_direct_mail
 def test_no_account_is_created_when_the_email_channel_cannot_deliver(client: TestClient) -> None:
     """The channel is left unconfigured. Refusing is the point: an account whose password
     nobody will ever read is not half a success (Simone's call, 2026-08-02)."""
@@ -206,7 +206,7 @@ def test_no_account_is_created_when_the_email_channel_cannot_deliver(client: Tes
     assert {u["username"] for u in _all(client, token)} == {"admin"}, "nothing was left behind"
 
 
-@pytest.mark.real_credential_mail
+@pytest.mark.real_direct_mail
 def test_a_reset_that_cannot_be_delivered_leaves_the_old_password_working(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -443,6 +443,46 @@ def test_restoring_an_account_that_is_not_going_anywhere_is_a_409(client: TestCl
     refused = client.post(f"/api/admin/users/{uid}/restore", headers=_bearer(token))
     assert refused.status_code == 409
     assert refused.json()["code"] == "not_being_deleted"
+
+
+# --- deleting now, deadline waived (10.B27) ----------------------------------------------
+
+
+def test_an_account_must_be_marked_before_it_can_be_deleted_for_good(client: TestClient) -> None:
+    """Destruction stays two clicks: the reversible window is the reason 10.B3 exists at all."""
+    token = _admin_token(client)
+    uid = _alice_id(client, token)
+
+    refused = client.delete(f"/api/admin/users/{uid}/purge", headers=_bearer(token))
+    assert refused.status_code == 409
+    assert refused.json()["code"] == "not_being_deleted"
+    assert "alice@example.com" in {u["username"] for u in _all(client, token)}
+
+
+def test_deleting_for_good_removes_the_row_and_says_so_by_email(
+    client: TestClient, mailed_notices: list[dict[str, str]]
+) -> None:
+    token = _admin_token(client)
+    uid = _alice_id(client, token)
+    client.delete(f"/api/admin/users/{uid}", headers=_bearer(token))
+    mailed_notices.clear()  # the "scheduled for deletion" note, already asserted elsewhere
+
+    gone = client.delete(f"/api/admin/users/{uid}/purge", headers=_bearer(token))
+    assert gone.status_code == 204
+    assert "alice@example.com" not in {u["username"] for u in _all(client, token)}
+    assert client.get("/api/admin/users", headers=_bearer(token)).status_code == 200
+
+    # Sent after the delete committed, and to the address of an account that no longer exists —
+    # which is exactly why it is read off the row beforehand (10.B26).
+    assert mailed_notices == [{"key": "user.deleted", "address": "alice@example.com"}]
+
+
+def test_an_admin_cannot_delete_their_own_account_for_good(client: TestClient) -> None:
+    token = _admin_token(client)
+    admin_id = next(u["id"] for u in _all(client, token) if u["username"] == "admin")
+    refused = client.delete(f"/api/admin/users/{admin_id}/purge", headers=_bearer(token))
+    assert refused.status_code == 403
+    assert refused.json()["code"] == "cannot_target_self"
 
 
 def test_changing_the_grace_period_does_not_move_a_deadline_already_set(
