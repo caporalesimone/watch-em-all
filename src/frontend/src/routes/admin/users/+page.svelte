@@ -30,10 +30,17 @@
 		username: '',
 		first_name: '',
 		last_name: '',
-		role: 'user',
-		temp_password: ''
+		role: 'user'
 	};
 	let form = $state<NewUser>({ ...empty });
+
+	// The username is an email address (10.B23). This check is deliberately **weaker** than the
+	// server's: its job is to catch a typo before the round trip, and erring on the permissive
+	// side means the only thing it can ever do is let through something the server refuses —
+	// never the reverse. The authority is the regex in `src/core/identity.py`, and duplicating
+	// *that* here is exactly the two-implementations-of-one-rule trap 9.F8 had to undo.
+	const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+	const addressLooksWrong = $derived(form.username.length > 0 && !EMAIL_SHAPE.test(form.username));
 
 	// List controls (10.F1). The sort exists to answer "who has stopped using this", so the
 	// default stays alphabetical and the dormancy question is one click away.
@@ -86,13 +93,16 @@
 	]);
 
 	// --- actions (10.F2) ---------------------------------------------------------------
-	// A random temporary password, the same 8 alphanumerics the create form generates, shown
-	// once in clear so the admin can read it out. Same generator, one definition.
-	function randomPassword(): string {
-		const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-		const bytes = new Uint32Array(8);
-		crypto.getRandomValues(bytes);
-		return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
+	// Errors this page can actually explain, rather than one generic sentence for everything.
+	// The two email ones are new with 10.B24 and are the reason a create or a reset can now
+	// fail for a reason that has nothing to do with the account.
+	function explain(err: unknown): string {
+		if (!(err instanceof ApiErr)) return $_('admin.users.errorGeneric');
+		if (err.code === 'cannot_target_self') return $_('admin.users.errorSelf');
+		if (err.code === 'username_taken') return $_('admin.users.errorTaken');
+		if (err.code === 'email_channel_unavailable') return $_('admin.users.errorNoEmail');
+		if (err.code === 'password_email_failed') return $_('admin.users.errorMailFailed');
+		return $_('admin.users.errorGeneric');
 	}
 
 	async function act(run: () => Promise<unknown>): Promise<void> {
@@ -104,14 +114,14 @@
 		} catch (err) {
 			// The server refuses an admin acting on themselves (10.B1). The buttons are hidden
 			// for that row, so this only fires if the page is stale — say it plainly anyway.
-			error =
-				err instanceof ApiErr && err.code === 'cannot_target_self'
-					? $_('admin.users.errorSelf')
-					: $_('admin.users.errorGeneric');
+			error = explain(err);
 		}
 	}
 
 	async function doReset(user: AdminUser): Promise<void> {
+		// The confirmation names the consequences, because since 10.B24 there are three and none
+		// of them is visible from the button: a new password is generated, it is mailed to the
+		// account, and every session that person has open ends. The admin never sees it.
 		const ok = await confirmDialog({
 			title: $_('admin.users.actionReset'),
 			message: $_('admin.users.confirmReset', { values: { username: user.username } }),
@@ -119,10 +129,9 @@
 			danger: true
 		});
 		if (!ok) return;
-		const password = randomPassword();
 		void act(async () => {
-			await resetUserPassword(user.id, password);
-			notice = $_('admin.users.resetDone', { values: { username: user.username, password } });
+			await resetUserPassword(user.id);
+			notice = $_('admin.users.resetDone', { values: { username: user.username } });
 		});
 	}
 
@@ -156,15 +165,6 @@
 		return value ? new Date(value).toLocaleDateString() : '—';
 	}
 
-	// 8 alphanumeric chars (A-Z a-z 0-9, no symbols), shown in clear so the admin
-	// can read it out; they can also type their own temporary password instead.
-	function generatePassword(): void {
-		const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-		const bytes = new Uint32Array(8);
-		crypto.getRandomValues(bytes);
-		form.temp_password = Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
-	}
-
 	async function submit(event: Event): Promise<void> {
 		event.preventDefault();
 		error = null;
@@ -172,14 +172,13 @@
 		submitting = true;
 		try {
 			const created = await createUser(form);
+			// Says where the password went, because that is the only copy of it: nothing on this
+			// page will ever show it again, and the admin has nothing to write down (10.B24).
 			notice = $_('admin.users.created', { values: { username: created.username } });
 			form = { ...empty };
 			await refresh();
 		} catch (err) {
-			error =
-				err instanceof ApiErr && err.code === 'username_taken'
-					? $_('admin.users.errorTaken')
-					: $_('admin.users.errorGeneric');
+			error = explain(err);
 		} finally {
 			submitting = false;
 		}
@@ -231,7 +230,17 @@
 		<div class="grid grid-cols-2 gap-3">
 			<label class={fieldClass}>
 				{$_('admin.users.username')}
-				<input class={inputClass} bind:value={form.username} required autocomplete="off" />
+				<input
+					class={inputClass}
+					type="email"
+					bind:value={form.username}
+					required
+					autocomplete="off"
+					placeholder="name@example.com"
+				/>
+				{#if addressLooksWrong}
+					<span class="text-amber-600 dark:text-amber-400">{$_('admin.users.notAnAddress')}</span>
+				{/if}
 			</label>
 			<label class={fieldClass}>
 				{$_('admin.users.role')}
@@ -259,29 +268,13 @@
 				<input class={inputClass} bind:value={form.last_name} required />
 			</label>
 		</div>
-		<div class={fieldClass}>
-			<span>{$_('admin.users.tempPassword')}</span>
-			<div class="flex gap-2">
-				<input
-					class="{inputClass} flex-1"
-					type="text"
-					bind:value={form.temp_password}
-					required
-					minlength="8"
-					autocomplete="off"
-				/>
-				<button
-					type="button"
-					onclick={generatePassword}
-					class="rounded border border-slate-300 px-2 py-1 text-xs whitespace-nowrap hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
-				>
-					{$_('admin.users.generate')}
-				</button>
-			</div>
-		</div>
+		<!-- No password field since 10.B24. Said out loud rather than silently absent: an admin
+		     who used to type one here needs to know it is now generated and mailed, and that
+		     they will not see it. -->
+		<p class="text-xs text-slate-500 dark:text-slate-400">{$_('admin.users.passwordIsMailed')}</p>
 		<button
 			type="submit"
-			disabled={submitting}
+			disabled={submitting || addressLooksWrong}
 			class="rounded bg-slate-800 px-3 py-1.5 text-sm text-white hover:bg-slate-700 disabled:opacity-50 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white"
 		>
 			{$_('admin.users.submit')}

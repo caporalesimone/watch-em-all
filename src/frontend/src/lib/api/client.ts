@@ -555,11 +555,11 @@ export type UserStatusFilter = 'active' | 'disabled' | 'deleting';
 export type UserSort = 'username' | 'last_login';
 
 export interface NewUser {
+	/** The account's email address, which is also its username (10.B23). */
 	username: string;
 	first_name: string;
 	last_name: string;
 	role: 'user' | 'admin';
-	temp_password: string;
 }
 
 export function listUsers(opts?: {
@@ -575,12 +575,9 @@ export function listUsers(opts?: {
 	return apiFetch(`/api/admin/users${suffix}`).then(asJson<AdminUser[]>);
 }
 
-export async function resetUserPassword(id: number, tempPassword: string): Promise<AdminUser> {
-	const res = await apiFetch(`/api/admin/users/${id}/reset-password`, {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ temp_password: tempPassword })
-	});
+/** The server generates the new password and mails it (10.B24) — nothing to send, nothing back. */
+export async function resetUserPassword(id: number): Promise<AdminUser> {
+	const res = await apiFetch(`/api/admin/users/${id}/reset-password`, { method: 'POST' });
 	return asJson<AdminUser>(res);
 }
 

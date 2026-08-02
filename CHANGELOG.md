@@ -53,6 +53,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - Your username is now your email address: refused if it is not one, stored lowercase, and it signs you in whatever case you type.
 - Email notifications need no setup: they go to your account address and arrive switched on, leaving you only the on/off choice.
 - Nobody picks your first password any more: the server generates one and mails it to you, and it is never stored in your history.
+- The Users page asks for an email address and no password; the reset button says the new one is mailed and every session ends.
 
 ## [0.9.0] - 2026-07-31
 
