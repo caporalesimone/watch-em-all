@@ -403,7 +403,18 @@
 			"failed": "Failed",
 			"skipped": "Skipped",
 			"windowNote": "Counted over the last {days} days.",
-			"historyNote": "The only table nothing ever prunes."
+			"historyNote": "The only table nothing ever prunes.",
+			"loadTitle": "Load by account",
+			"byPairTitle": "By account and store",
+			"loadNote": "Traffic is counted over the window above; catalog and carts are a current state and have none.",
+			"colUser": "Account",
+			"colScraper": "Store",
+			"colProducts": "Catalog",
+			"colCarts": "Carts",
+			"colRequests": "Requests",
+			"colCache": "Cache hits",
+			"loadEmpty": "No run recorded in this window.",
+			"deletedUser": "(deleted account)"
 		}
 	},
 	"plugins": {

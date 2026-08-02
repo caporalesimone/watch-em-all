@@ -294,7 +294,18 @@
 			"failed": "Fallite",
 			"skipped": "Saltate",
 			"windowNote": "Contate sugli ultimi {days} giorni.",
-			"historyNote": "L'unica tabella che non viene mai potata."
+			"historyNote": "L'unica tabella che non viene mai potata.",
+			"loadTitle": "Carico per account",
+			"byPairTitle": "Per account e negozio",
+			"loadNote": "Il traffico è contato sulla finestra qui sopra; catalogo e carrelli sono uno stato corrente e non ne hanno.",
+			"colUser": "Account",
+			"colScraper": "Negozio",
+			"colProducts": "Catalogo",
+			"colCarts": "Carrelli",
+			"colRequests": "Richieste",
+			"colCache": "Cache hit",
+			"loadEmpty": "Nessuna run registrata in questa finestra.",
+			"deletedUser": "(account cancellato)"
 		}
 	},
 	"plugins": {

@@ -5,15 +5,24 @@
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 
-	import { getDashboard, type DashboardResponse } from '$lib/api/client';
+	import {
+		getDashboard,
+		getDashboardUsers,
+		type DashboardResponse,
+		type DashboardUsers,
+		type UserLoadRow
+	} from '$lib/api/client';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 
 	let data = $state<DashboardResponse | null>(null);
+	// Load by account (10.F8). Same window as the notification block above, so the two are
+	// read together rather than as two unrelated periods on one page.
+	let load = $state<DashboardUsers | null>(null);
 	let windowDays = $state(7);
 	let loading = $state(true);
 
 	async function refresh(): Promise<void> {
-		data = await getDashboard(windowDays);
+		[data, load] = await Promise.all([getDashboard(windowDays), getDashboardUsers(windowDays)]);
 		loading = false;
 	}
 
@@ -29,7 +38,13 @@
 		{ days: 30, label: $_('admin.dashboard.window30') }
 	]);
 
+	function personName(row: UserLoadRow): string {
+		// A purged account can still own rows in a past run; saying so beats an empty cell.
+		return row.username ?? $_('admin.dashboard.deletedUser');
+	}
+
 	const card = 'rounded-lg border border-slate-200 p-4 dark:border-slate-800';
+	const th = 'py-2 pr-4';
 	const figure = 'text-2xl font-semibold text-slate-800 dark:text-slate-100';
 	const caption = 'text-xs text-slate-500';
 </script>
@@ -125,6 +140,65 @@
 			<p class="text-xs text-slate-400">
 				{$_('admin.dashboard.windowNote', { values: { days: data.notifications.window_days } })}
 			</p>
+		</div>
+
+		<div class="space-y-3">
+			<h2 class="text-sm font-medium text-slate-600 dark:text-slate-300">
+				{$_('admin.dashboard.loadTitle')}
+			</h2>
+			<p class="text-xs text-slate-400">{$_('admin.dashboard.loadNote')}</p>
+			{#if !load || load.by_user.length === 0}
+				<p class="text-sm text-slate-500">{$_('admin.dashboard.loadEmpty')}</p>
+			{:else}
+				<table class="w-full text-left text-sm">
+					<thead class="border-b border-slate-200 text-xs text-slate-500 dark:border-slate-800">
+						<tr>
+							<th class={th}>{$_('admin.dashboard.colUser')}</th>
+							<th class={th}>{$_('admin.dashboard.colProducts')}</th>
+							<th class={th}>{$_('admin.dashboard.colCarts')}</th>
+							<th class={th}>{$_('admin.dashboard.colRequests')}</th>
+							<th class={th}>{$_('admin.dashboard.colCache')}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each load.by_user as row (row.user_id)}
+							<tr class="border-b border-slate-100 dark:border-slate-800/60">
+								<td class="{th} font-medium">{personName(row)}</td>
+								<td class={th}>{row.products}</td>
+								<td class={th}>{row.carts}</td>
+								<td class={th}>{row.http_requests}</td>
+								<td class="{th} text-slate-500">{row.cache_hits}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+
+				{#if load.by_user_and_scraper.length > 0}
+					<h3 class="pt-2 text-xs font-medium text-slate-500">
+						{$_('admin.dashboard.byPairTitle')}
+					</h3>
+					<table class="w-full text-left text-sm">
+						<thead class="border-b border-slate-200 text-xs text-slate-500 dark:border-slate-800">
+							<tr>
+								<th class={th}>{$_('admin.dashboard.colUser')}</th>
+								<th class={th}>{$_('admin.dashboard.colScraper')}</th>
+								<th class={th}>{$_('admin.dashboard.colRequests')}</th>
+								<th class={th}>{$_('admin.dashboard.colCache')}</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each load.by_user_and_scraper as row (`${row.user_id}:${row.scraper_id}`)}
+								<tr class="border-b border-slate-100 dark:border-slate-800/60">
+									<td class={th}>{personName(row)}</td>
+									<td class={th}>{row.scraper_id}</td>
+									<td class={th}>{row.http_requests}</td>
+									<td class="{th} text-slate-500">{row.cache_hits}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				{/if}
+			{/if}
 		</div>
 	{/if}
 </section>
