@@ -21,11 +21,11 @@ from typing import Any, cast
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from src.core.db import new_session
 from src.core.http import HttpClient
-from src.core.models import CatalogProduct
+from src.core.models import CatalogProduct, PriceHistory
 from src.core.plugins.context import JobBook, build_context
 from src.core.scraper_config import set_scraper_config
 
@@ -237,6 +237,36 @@ def test_watches_are_per_user(client: TestClient) -> None:
     with DragonServer() as base:
         _add_watch(client, _bearer(ta), gp_url(base, "896"))
     assert client.get(f"{DS}/watches", headers=_bearer(tb)).json() == []
+
+
+def test_delete_user_data_takes_this_users_rows_and_nobody_elses(client: TestClient) -> None:
+    """10.B4: the hook the account purge (10.B5) calls, proven on a plugin that has tables.
+
+    The invariant worth stating is the one about what it must **not** touch: since phase 9 a
+    product's price history belongs to the product, not to whoever was watching it, and
+    `price_history` deliberately carries no foreign key to `products` for exactly this
+    reason. Deleting a person cannot be allowed to take everybody else's history with it.
+    """
+    admin = _admin_token(client)
+    _uid_a, ta = _make_user(client, admin, "alice")
+    _uid_b, tb = _make_user(client, admin, "bob")
+    with DragonServer() as base:
+        url = gp_url(base, "896")
+        _add_watch(client, _bearer(ta), url)
+        _add_watch(client, _bearer(tb), url)
+
+    lp = _dragon(client)
+    ctx = build_context(lp.manifest, lp.plugin)
+    try:
+        history_before = ctx.db.scalar(select(func.count()).select_from(PriceHistory))
+        lp.plugin.delete_user_data(ctx, _uid_a)
+        history_after = ctx.db.scalar(select(func.count()).select_from(PriceHistory))
+    finally:
+        ctx.db.close()
+
+    assert client.get(f"{DS}/watches", headers=_bearer(ta)).json() == []
+    assert len(client.get(f"{DS}/watches", headers=_bearer(tb)).json()) == 1
+    assert history_after == history_before, "the price history is the product's, not the user's"
 
 
 def test_add_duplicate_watch_rejected(client: TestClient) -> None:
