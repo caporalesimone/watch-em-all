@@ -10,7 +10,11 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 **Phase 10 — Admin governance: the administrator's console filled in — run statistics and drill-down, the lifetime counters per scraper that phase 9 collects but never showed, system limits editable while it runs, full user management (with deferred deletion and restore), messages to users, retention and purge. It opens with a catalog polish: the Source column shows the store's logo alone. Entries land below as they ship.**
 
-> **This version recreates the database.** Pre-1.0 the schema changes freely and is not migrated. One column is added to `users` (when the current password was set), and it is added **at the start of the phase rather than when the feature that reads it ships** — deliberately, so the phase costs one recreation instead of two. Existing data is not carried over.
+> **This version recreates the database.** Pre-1.0 the schema changes freely and is not migrated. Two columns are added to `users`, both **at the start of the phase rather than when the features that read them ship** — deliberately, so the phase costs one recreation instead of three. Existing data is not carried over.
+
+### Changed
+
+- Schema prep, done once up front: `users` now records when its password was set and which announcement it last read.
 
 ## [0.9.0] - 2026-07-31
 
