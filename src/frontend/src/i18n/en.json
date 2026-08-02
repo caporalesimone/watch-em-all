@@ -230,6 +230,8 @@
 			"confirmReset": "Reset {username}'s password? A new one is generated and emailed to them, their current password stops working, and every session they have open is signed out. You will not see the new password.",
 			"confirmDelete": "Delete {username}? The account is switched off now and destroyed for good on {date}. Until then you can cancel.",
 			"confirmRestore": "Cancel the deletion of {username}? The account comes back disabled — enabling it is a separate step.",
+			"confirmDisable": "Disable {username}? They are signed out everywhere and cannot sign in again until you enable the account. Nothing of theirs is removed, and they are told by email.",
+			"confirmEnable": "Enable {username}? They can sign in again straight away, with the password they already had.",
 			"confirmPurge": "Delete {username} permanently, right now? The account was due to be removed on {date}; this does it immediately, together with its watches, carts and history. Nothing can be restored afterwards, and {username} is told by email.",
 			"resetDone": "A new password has been emailed to {username}, who is now signed out everywhere.",
 			"purgeDone": "{username} has been deleted permanently and told by email.",

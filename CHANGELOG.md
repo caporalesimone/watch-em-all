@@ -69,6 +69,8 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - Being disabled, scheduled for deletion or deleted now always reaches you by email, whether or not you take email notifications.
 - An account already marked for deletion can be destroyed straight away, and the person is told it happened.
 - On such a row the Users page offers that instead of a password reset, which could do nothing for an account nobody can sign into.
+- Confirmations put the account and the date they name in bold, so what you are about to act on is legible at a glance.
+- Disabling or enabling an account now asks first, and says what it does: sessions end and the person is emailed, or they can sign in again.
 
 ## [0.9.0] - 2026-07-31
 
