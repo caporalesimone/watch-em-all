@@ -27,6 +27,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - All housekeeping now runs in one nightly window at an hour you choose (7am by default), and says in the log when it starts and ends.
 - Your notification history keeps its most recent 100 entries — a number you can change — instead of growing for ever.
 - Message bodies can be written in Markdown; every channel gets it rendered, and channels that cannot show formatting get readable plain text.
+- The admin can list recent scrape runs, filter them by scraper and outcome, and open one to see which user it failed for.
 
 ### Changed
 

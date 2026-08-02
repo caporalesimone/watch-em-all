@@ -31,6 +31,7 @@ from src.web.incompatible import install_incompatibility_gate
 from src.web.jobs import reclaim_orphans, start_drainers, stop_drainers
 from src.web.routers import (
     admin_notifiers,
+    admin_runs,
     admin_scrapers,
     admin_system,
     admin_users,
@@ -176,6 +177,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_users.router, prefix="/api")
     app.include_router(admin_system.router, prefix="/api")
     app.include_router(admin_scrapers.router, prefix="/api")
+    app.include_router(admin_runs.router, prefix="/api")
     app.include_router(admin_notifiers.router, prefix="/api")
     app.include_router(catalog.router, prefix="/api")
     app.include_router(products.router, prefix="/api")

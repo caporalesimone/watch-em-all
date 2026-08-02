@@ -74,6 +74,49 @@ class UserCreate(BaseModel):
     temp_password: str = Field(min_length=8)  # AUTH-R6
 
 
+class RunSummary(BaseModel):
+    """One scrape run as the monitoring list shows it (10.B6)."""
+
+    run_id: int
+    scraper_id: str
+    trigger: str
+    slot: datetime | None
+    started_at: datetime
+    finished_at: datetime | None
+    status: str
+    users_processed: int
+    products_found: int
+    products_new: int
+    price_changes: int
+    products_removed: int
+    products_excluded: int
+    http_requests: int
+    cache_hits: int
+    error_message: str | None
+
+
+class RunUserDetail(BaseModel):
+    """One user's share of a run (10.B6). `username` is resolved here rather than left as an
+    id: the whole point of the drill-down is to answer *who* failed, and an id does not."""
+
+    user_id: int
+    username: str | None
+    started_at: datetime
+    finished_at: datetime | None
+    status: str
+    products_found: int
+    products_new: int
+    price_changes: int
+    http_requests: int
+    cache_hits: int
+    error_message: str | None
+
+
+class RunPage(BaseModel):
+    items: list[RunSummary]
+    total: int
+
+
 class AdminPasswordReset(BaseModel):
     # Same shape as creation (10.B1): the admin supplies the temporary password rather than
     # the server inventing one, so the single generator already in the admin page keeps
