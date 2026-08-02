@@ -21,6 +21,7 @@
 	} from '$lib/api/client';
 	import DeliveryList from '$lib/components/DeliveryList.svelte';
 	import MessageBody from '$lib/components/MessageBody.svelte';
+	import NotifyViewer from '$lib/components/NotifyViewer.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { confirmDialog } from '$lib/stores/confirm';
 
@@ -36,7 +37,9 @@
 
 	let users = $state<AdminUser[]>([]);
 	let sent = $state<AdminMessageSummary[]>([]);
-	let openId = $state<number | null>(null);
+	let viewing = $state<AdminMessageSummary | null>(null);
+	let viewerOpen = $state(false);
+	let viewerHtml = $state<string | null>(null);
 	let detail = $state<AdminMessageDetail | null>(null);
 
 	let sending = $state(false);
@@ -122,14 +125,21 @@
 		}
 	}
 
-	async function toggle(id: number): Promise<void> {
-		if (openId === id) {
-			openId = null;
-			return;
-		}
-		openId = id;
+	// The same popup the recipient sees (10.F19), instead of the row expansion this page used
+	// to do. The body is rendered through the preview endpoint — the very renderer that produced
+	// what was delivered — so the admin reads the message as it actually arrived, not as a
+	// second-best approximation of it.
+	async function openMessage(m: AdminMessageSummary): Promise<void> {
+		viewing = m;
+		viewerOpen = true;
 		detail = null;
-		detail = await getAdminMessage(id);
+		viewerHtml = null;
+		const [full, html] = await Promise.all([
+			getAdminMessage(m.id),
+			previewMessage(m.body).catch(() => null)
+		]);
+		detail = full;
+		viewerHtml = html;
 	}
 
 	function fmt(iso: string): string {
@@ -272,7 +282,7 @@
 				{#each sent as m (m.id)}
 					<li>
 						<button
-							onclick={() => toggle(m.id)}
+							onclick={() => openMessage(m)}
 							class="flex w-full flex-wrap items-center gap-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-900/40"
 						>
 							<span class="w-44 shrink-0 text-xs text-slate-400">{fmt(m.created_at)}</span>
@@ -289,30 +299,37 @@
 								</span>
 							{/each}
 						</button>
-
-						{#if openId === m.id}
-							<div class="space-y-4 border-t border-slate-100 py-3 pl-4 dark:border-slate-800/60">
-								<MessageBody text={m.body} />
-								{#if detail}
-									<div class="space-y-3">
-										<h3 class="text-xs font-medium text-slate-500">
-											{$_('admin.messages.recipients')}
-										</h3>
-										{#each detail.recipients as r (r.user_id)}
-											<div class="space-y-1">
-												<p class="text-xs font-medium">{r.username}</p>
-												<DeliveryList deliveries={r.channels} heading={false} />
-											</div>
-										{/each}
-									</div>
-								{:else}
-									<p class="text-xs text-slate-500">{$_('common.loading')}</p>
-								{/if}
-							</div>
-						{/if}
 					</li>
 				{/each}
 			</ul>
 		{/if}
 	</div>
 </section>
+
+{#if viewing}
+	{@const m = viewing}
+	<NotifyViewer
+		bind:open={viewerOpen}
+		title={m.title}
+		receivedAt={m.created_at}
+		bodyHtml={viewerHtml}
+		bodyText={m.body}
+		onclose={() => (viewing = null)}
+	>
+		{#snippet extra()}
+			<div class="space-y-3">
+				<h3 class="text-xs font-medium text-slate-500">{$_('admin.messages.recipients')}</h3>
+				{#if detail}
+					{#each detail.recipients as r (r.user_id)}
+						<div class="space-y-1">
+							<p class="text-xs font-medium">{r.username}</p>
+							<DeliveryList deliveries={r.channels} heading={false} />
+						</div>
+					{/each}
+				{:else}
+					<p class="text-xs text-slate-500">{$_('common.loading')}</p>
+				{/if}
+			</div>
+		{/snippet}
+	</NotifyViewer>
+{/if}

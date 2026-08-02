@@ -44,6 +44,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - Those messages never go to administrators — not the others, not the sender: the channel is for the people who use the installation.
 - Notifications you have read step back into grey, so what is still unread wins the glance instead of a small dot.
 - Every dialog in the app now behaves the same: Escape closes it, so does a click outside, and focus goes back where it was.
+- A message opens in a card at the centre of the screen, the same one whether you are the reader or the admin who sent it.
 
 ### Changed
 

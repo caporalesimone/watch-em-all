@@ -4,11 +4,20 @@
 
 	import {
 		deleteAlerts,
+		getAlert,
+		getBroadcast,
+		isTextMessage,
 		listAlerts,
+		markAlertRead,
+		markBroadcastRead,
 		notificationCategory,
+		type AlertDetail,
 		type AlertListItem,
-		type AlertPage
+		type AlertPage,
+		type TextMessagePayload
 	} from '$lib/api/client';
+	import DeliveryList from '$lib/components/DeliveryList.svelte';
+	import NotifyViewer from '$lib/components/NotifyViewer.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { confirmDialog } from '$lib/stores/confirm';
 	import { refreshUnread } from '$lib/stores/alerts';
@@ -69,6 +78,50 @@
 	// enough to open a notification.
 	function href(a: AlertListItem): string {
 		return a.source === 'broadcast' ? `/alerts/broadcast/${a.id}` : `/alerts/${a.id}`;
+	}
+
+	// A **text** message opens in the popup (10.F19); a digest still gets its own page. The
+	// unification Simone asked for is between the two places that show the same thing — the
+	// user's history and the admin's sent list — and a digest is not that thing: it is a table
+	// of carts, products and prices that a centred dialog would squeeze rather than present.
+	const opensInPopup = (a: AlertListItem): boolean => a.title !== null;
+
+	let viewer = $state<AlertDetail | null>(null);
+	let viewerOpen = $state(false);
+	let viewerLoading = $state(false);
+
+	async function openMessage(a: AlertListItem): Promise<void> {
+		viewerOpen = true;
+		viewerLoading = true;
+		viewer = null;
+		try {
+			viewer = a.source === 'broadcast' ? await getBroadcast(a.id) : await getAlert(a.id);
+			if (!viewer.read) {
+				try {
+					await (a.source === 'broadcast' ? markBroadcastRead(a.id) : markAlertRead(a.id));
+				} catch {
+					/* marking read is best-effort — never block the reading on it */
+				}
+				await load(); // the row (and any older announcement) is read now
+				void refreshUnread();
+			}
+		} catch {
+			viewerOpen = false;
+			error = $_('alerts.detailError');
+		} finally {
+			viewerLoading = false;
+		}
+	}
+
+	// The popup shows a text message, so the payload is that shape; the guard keeps TypeScript
+	// honest about the union rather than casting it away.
+	const shown = $derived<TextMessagePayload | null>(
+		viewer && isTextMessage(viewer.payload) ? viewer.payload : null
+	);
+
+	function rowClass(a: AlertListItem): string {
+		const base = 'flex flex-1 items-center gap-3 py-3 text-left';
+		return a.read ? `${base} text-slate-400 dark:text-slate-500` : base;
 	}
 
 	// What the row says at a glance: a text message shows its title, a digest its cart count.
@@ -200,39 +253,20 @@
 						<!-- An announcement is one row for everybody: there is nothing here to delete. -->
 						<span class="ml-1 w-[13px] shrink-0"></span>
 					{/if}
-					<!-- Read rows step back (10.F18): what is still to read has to win the glance, and
-					     the unread dot alone is a 8px argument. Dimmed, not hidden — it is still the
-					     user's history, and a colour change says "seen" without saying "gone". -->
-					<a
-						href={href(a)}
-						class="flex flex-1 items-center gap-3 py-3 {a.read
-							? 'text-slate-400 dark:text-slate-500'
-							: ''}"
-					>
-						<span class="w-2 shrink-0">
-							{#if !a.read}
-								<span
-									class="block h-2 w-2 rounded-full bg-indigo-500"
-									aria-label={$_('alerts.unread')}
-								></span>
-							{/if}
-						</span>
-						<span class="w-44 shrink-0 text-xs text-slate-400">{fmt(a.created_at)}</span>
-						{#if fromAdmin}
-							<!-- Icon and colour of its own (ADMSG-R3): a message from a person must not read
-							     like one more automated digest in the same list. Muted once read, so the
-							     badge does not go on shouting after the message has been dealt with. -->
-							<span
-								class="inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs {a.read
-									? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
-									: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300'}"
-							>
-								<span aria-hidden="true">📣</span>
-								{$_('alerts.categoryAdmin')}
-							</span>
-						{/if}
-						<span class="truncate text-sm {a.read ? '' : 'font-semibold'}">{preview(a)}</span>
-					</a>
+					<!-- Two wrappers, one body. A message opens the popup so it is a real <button>; a
+					     digest still navigates so it stays a real <a>, which keeps middle-click and
+					     "open in new tab" working. <svelte:element> would have been shorter and
+					     would have hidden from Svelte — and from a screen reader — which of the two
+					     it is at any moment. -->
+					{#if opensInPopup(a)}
+						<button onclick={() => openMessage(a)} class={rowClass(a)}>
+							{@render rowBody(a, fromAdmin)}
+						</button>
+					{:else}
+						<a href={href(a)} class={rowClass(a)}>
+							{@render rowBody(a, fromAdmin)}
+						</a>
+					{/if}
 				</li>
 			{/each}
 		</ul>
@@ -259,3 +293,46 @@
 		</div>
 	{/if}
 </section>
+
+<!-- The row's content, shared by the two wrappers above (10.F19). Read rows step back
+     (10.F18): what is still unread has to win the glance, and the dot alone is an 8px
+     argument. Dimmed, not hidden — it is still the user's history. -->
+{#snippet rowBody(a: AlertListItem, fromAdmin: boolean)}
+	<span class="w-2 shrink-0">
+		{#if !a.read}
+			<span class="block h-2 w-2 rounded-full bg-indigo-500" aria-label={$_('alerts.unread')}
+			></span>
+		{/if}
+	</span>
+	<span class="w-44 shrink-0 text-xs text-slate-400">{fmt(a.created_at)}</span>
+	{#if fromAdmin}
+		<!-- Icon and colour of its own (ADMSG-R3): a message from a person must not read
+							     like one more automated digest in the same list. Muted once read, so the
+							     badge does not go on shouting after the message has been dealt with. -->
+		<span
+			class="inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs {a.read
+				? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
+				: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300'}"
+		>
+			<span aria-hidden="true">📣</span>
+			{$_('alerts.categoryAdmin')}
+		</span>
+	{/if}
+	<span class="truncate text-sm {a.read ? '' : 'font-semibold'}">{preview(a)}</span>
+{/snippet}
+
+{#if shown && viewer}
+	{@const detail = viewer}
+	<NotifyViewer
+		bind:open={viewerOpen}
+		title={shown.title}
+		receivedAt={detail.created_at}
+		bodyHtml={shown.body_html ?? null}
+		bodyText={shown.body}
+		loading={viewerLoading}
+	>
+		{#snippet extra()}
+			<DeliveryList deliveries={detail.deliveries} heading={false} />
+		{/snippet}
+	</NotifyViewer>
+{/if}
