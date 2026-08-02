@@ -74,6 +74,19 @@ class UserCreate(BaseModel):
     temp_password: str = Field(min_length=8)  # AUTH-R6
 
 
+class AdminPasswordReset(BaseModel):
+    # Same shape as creation (10.B1): the admin supplies the temporary password rather than
+    # the server inventing one, so the single generator already in the admin page keeps
+    # being the only place that decides what a temporary password looks like.
+    temp_password: str = Field(min_length=8)  # AUTH-R6
+
+
+class AdminUserPatch(BaseModel):
+    # Enable / disable (10.B1). Only the flag: the role is chosen at creation and not
+    # changed afterwards, and the name is the person's, not the administrator's to edit.
+    is_active: bool
+
+
 class AdminUserSummary(BaseModel):
     id: int
     username: str

@@ -1,13 +1,21 @@
-"""Admin user management (user-management.md). MVP: create + list.
+"""Admin user management (user-management.md): create, list, reset, enable/disable.
 
-Every route is admin-only (require_admin via AdminDep). The richer lifecycle —
-reset password, disable/enable, deferred soft-delete with a grace period and
-restore, status filters, last-login sort, courtesy notifications — lands in
-phase 10. There is no self-registration: accounts exist only because an admin
-created them (USR-R1).
+Every route is admin-only (require_admin via AdminDep). The deferred soft-delete with its
+grace period and restore is 10.B3; the courtesy notification that goes with it belongs to
+the system-message catalog (10.B16), not here. There is no self-registration: accounts
+exist only because an admin created them (USR-R1).
+
+**An admin never acts on their own account** (10.B1, Simone 2026-08-02). Disabling — and
+later deleting — yourself is refused server-side: with a single administrator it is a
+lockout with no way back through the application, only through the database. The guard
+looks at *who is asking*, not at the target's role, so an admin may freely create, disable
+and delete **other** admins. Resetting your own password is not guarded: you pick the new
+one, so it locks nobody out.
 """
 
 from __future__ import annotations
+
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, status
 from sqlalchemy import select
@@ -16,9 +24,22 @@ from src.core.errors import APIError
 from src.core.models import User
 from src.core.security import hash_password
 from src.web.deps import AdminDep, SessionDep
-from src.web.schemas import AdminUserSummary, UserCreate
+from src.web.schemas import AdminPasswordReset, AdminUserPatch, AdminUserSummary, UserCreate
 
 router = APIRouter(prefix="/admin", tags=["Admin: users"])
+
+
+def _target(db: SessionDep, user_id: int) -> User:
+    user = db.get(User, user_id)
+    if user is None:
+        raise APIError(404, "user_not_found", "no such account")
+    return user
+
+
+def _refuse_self(admin_id: int, target: User) -> None:
+    """The one thing an administrator may not do to themselves (10.B1)."""
+    if target.id == admin_id:
+        raise APIError(403, "cannot_target_self", "an admin cannot disable or delete themselves")
 
 
 def _to_summary(user: User) -> AdminUserSummary:
@@ -66,4 +87,50 @@ def create_user(body: UserCreate, _admin: AdminDep, db: SessionDep) -> AdminUser
     db.add(user)
     db.commit()
     db.refresh(user)  # load server-side defaults (id, created_at)
+    return _to_summary(user)
+
+
+@router.post(
+    "/users/{user_id}/reset-password",
+    response_model=AdminUserSummary,
+    summary="Reset an account to a temporary password + forced change (admin only).",
+)
+def reset_password(
+    user_id: int, body: AdminPasswordReset, _admin: AdminDep, db: SessionDep
+) -> AdminUserSummary:
+    user = _target(db, user_id)
+    user.password_hash = hash_password(body.temp_password)
+    user.password_changed_at = datetime.now(tz=UTC)
+    user.must_change_password = True  # USR-R2, as at creation
+    # Every existing session dies with the old password: a reset exists precisely for the
+    # case where somebody else may be holding it (AUTH-R5).
+    user.token_version += 1
+    user.refresh_jti = None
+    db.commit()
+    db.refresh(user)
+    return _to_summary(user)
+
+
+@router.patch(
+    "/users/{user_id}",
+    response_model=AdminUserSummary,
+    summary="Enable or disable an account (admin only; never your own).",
+)
+def set_active(
+    user_id: int, body: AdminUserPatch, admin: AdminDep, db: SessionDep
+) -> AdminUserSummary:
+    user = _target(db, user_id)
+    if not body.is_active:
+        _refuse_self(admin.sub, user)
+    if user.is_active != body.is_active:
+        user.is_active = body.is_active
+        # Kills the refresh family, so the session cannot be renewed and the account is out
+        # **within the life of its access token** (AUTH-R5) — not instantly: nothing checks
+        # `token_version` on an access token, by design, and a short-lived token is the price
+        # of not hitting the database on every request. Re-enabling bumps it as well, so a
+        # refresh minted before the disable can never come back to life afterwards.
+        user.token_version += 1
+        user.refresh_jti = None
+        db.commit()
+        db.refresh(user)
     return _to_summary(user)

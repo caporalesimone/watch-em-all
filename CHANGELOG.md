@@ -12,6 +12,10 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 > **This version recreates the database.** Pre-1.0 the schema changes freely and is not migrated. Two columns are added to `users`, both **at the start of the phase rather than when the features that read them ship** — deliberately, so the phase costs one recreation instead of three. Existing data is not carried over.
 
+### New
+
+- An admin can reset an account's password or disable and re-enable it — but never their own, so nobody can lock themselves out.
+
 ### Changed
 
 - Schema prep, done once up front: `users` now records when its password was set and which announcement it last read.

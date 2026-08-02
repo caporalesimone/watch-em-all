@@ -1,4 +1,4 @@
-"""Tests for admin user management: create + list, admin-only (user-management.md)."""
+"""Tests for admin user management: create, list, reset, enable/disable (user-management.md)."""
 
 from __future__ import annotations
 
@@ -81,6 +81,114 @@ def test_create_validations(client: TestClient) -> None:
     assert (
         client.post("/api/admin/users", json=_payload(role="superadmin"), headers=_bearer(token))
     ).status_code == 400
+
+
+def _alice_id(client: TestClient, token: str) -> int:
+    client.post("/api/admin/users", json=_payload(), headers=_bearer(token))
+    listed = client.get("/api/admin/users", headers=_bearer(token)).json()
+    return int(next(u["id"] for u in listed if u["username"] == "alice"))
+
+
+def test_reset_password_forces_a_change_and_kills_the_old_sessions(client: TestClient) -> None:
+    token = _admin_token(client)
+    uid = _alice_id(client, token)
+    # Alice is settled in: temporary password changed, a live session in hand.
+    first = client.post("/api/auth/login", json={"username": "alice", "password": "temp-pass-123"})
+    access = first.json()["access_token"]
+    client.post(
+        "/api/auth/change-password",
+        json={"new_password": "alice-pass-123"},
+        headers=_bearer(access),
+    )
+    live = client.post("/api/auth/login", json={"username": "alice", "password": "alice-pass-123"})
+    live_refresh = str(live.json()["refresh_token"])
+
+    reset = client.post(
+        f"/api/admin/users/{uid}/reset-password",
+        json={"temp_password": "reset-pass-123"},
+        headers=_bearer(token),
+    )
+    assert reset.status_code == 200
+    assert reset.json()["must_change_password"] is True
+    # A reset exists for the case where somebody else may hold the old password, so the old
+    # password stops working and the session cannot be renewed. The access token already
+    # issued survives until it expires — that is the documented trade of not checking
+    # `token_version` on every request, not an oversight.
+    assert (
+        client.post("/api/auth/refresh", json={"refresh_token": live_refresh})
+    ).status_code == 401
+    assert (
+        client.post("/api/auth/login", json={"username": "alice", "password": "alice-pass-123"})
+    ).status_code == 401
+    again = client.post("/api/auth/login", json={"username": "alice", "password": "reset-pass-123"})
+    assert again.status_code == 200
+
+
+def test_disabling_locks_the_account_out_within_the_token_life(client: TestClient) -> None:
+    token = _admin_token(client)
+    uid = _alice_id(client, token)
+    live = client.post("/api/auth/login", json={"username": "alice", "password": "temp-pass-123"})
+    live_refresh = str(live.json()["refresh_token"])
+
+    off = client.patch(f"/api/admin/users/{uid}", json={"is_active": False}, headers=_bearer(token))
+    assert off.status_code == 200 and off.json()["is_active"] is False
+    # Out within the life of the access token, which is what the phase promises: the session
+    # cannot be renewed, and a new one cannot be opened.
+    assert (
+        client.post("/api/auth/refresh", json={"refresh_token": live_refresh})
+    ).status_code == 401
+    # Right password, disabled account → its own code, not "invalid credentials" (AUTH-R10).
+    denied = client.post("/api/auth/login", json={"username": "alice", "password": "temp-pass-123"})
+    assert denied.status_code == 403
+    assert denied.json()["code"] == "account_disabled"
+
+    on = client.patch(f"/api/admin/users/{uid}", json={"is_active": True}, headers=_bearer(token))
+    assert on.status_code == 200 and on.json()["is_active"] is True
+    assert (
+        client.post("/api/auth/login", json={"username": "alice", "password": "temp-pass-123"})
+    ).status_code == 200
+
+
+def test_an_admin_cannot_disable_themselves_but_can_disable_another_admin(
+    client: TestClient,
+) -> None:
+    """The guard is about who is asking, not about the target's role (10.B1)."""
+    token = _admin_token(client)
+    me = client.get("/api/me", headers=_bearer(token)).json()
+
+    refused = client.patch(
+        f"/api/admin/users/{me['id']}", json={"is_active": False}, headers=_bearer(token)
+    )
+    assert refused.status_code == 403
+    assert refused.json()["code"] == "cannot_target_self"
+    # Still signed in: the refusal has to leave the account exactly as it was.
+    assert client.get("/api/me", headers=_bearer(token)).status_code == 200
+
+    client.post(
+        "/api/admin/users",
+        json=_payload(username="second-admin", role="admin"),
+        headers=_bearer(token),
+    )
+    listed = client.get("/api/admin/users", headers=_bearer(token)).json()
+    other = next(u["id"] for u in listed if u["username"] == "second-admin")
+    allowed = client.patch(
+        f"/api/admin/users/{other}", json={"is_active": False}, headers=_bearer(token)
+    )
+    assert allowed.status_code == 200, "an admin may disable a different admin"
+
+
+def test_unknown_account_is_a_404(client: TestClient) -> None:
+    token = _admin_token(client)
+    assert (
+        client.patch("/api/admin/users/9999", json={"is_active": False}, headers=_bearer(token))
+    ).status_code == 404
+    assert (
+        client.post(
+            "/api/admin/users/9999/reset-password",
+            json={"temp_password": "whatever-123"},
+            headers=_bearer(token),
+        )
+    ).status_code == 404
 
 
 def test_requires_admin(client: TestClient) -> None:
