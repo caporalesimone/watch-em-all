@@ -58,6 +58,13 @@ class User(Base):
     password_changed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+    # Last broadcast this person has read (10.X1, written by 10.B12). A broadcast is one row
+    # for everybody rather than a copy per user, so read state cannot live on the message: it
+    # lives here, as "read up to N". NULL means no broadcast has ever been read, which is a
+    # different statement from 0. Deliberately NOT a foreign key to `admin_message`: that
+    # table lands an MVP later and a constraint cannot point at something that does not exist
+    # yet, the same reason `price_history` keys by identity instead of by row.
+    last_broadcast_read_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     refresh_jti: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
