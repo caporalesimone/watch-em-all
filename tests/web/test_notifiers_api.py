@@ -88,24 +88,30 @@ def test_admin_config_makes_email_available_secret_write_only(client: TestClient
     assert _by_id(client.get("/api/notifiers", headers=_bearer(token)).json())["email"]["available"]
 
 
-def test_user_config_enable_makes_email_active_and_filters_admin_keys(client: TestClient) -> None:
+def test_email_has_no_user_config_left_and_arrives_switched_on(client: TestClient) -> None:
+    """10.B25: the channel used to ask each person for a delivery address. Now the account is
+    the address, so there is nothing to fill in — and a new account arrives with it on."""
     admin = _admin_token(client)
     _configure_email_admin(client, admin)
     token = _make_user(client, admin, "alice@example.com")
 
-    # Inject an admin key alongside the user field: it must be dropped (CFG-R5).
+    email = _by_id(client.get("/api/notifiers", headers=_bearer(token)).json())["email"]
+    assert email["user_schema"] == [], "the address is not a field any more"
+    assert email["enabled"] is True, "a new account is reachable at its own address by default"
+    assert email["active"] is True
+
+    # And nothing a user posts can put a destination back: the key is not in the schema (CFG-R5).
     saved = client.put(
         "/api/notifiers/email/config",
-        json={"config": {"to_address": "a@b.co", "smtp_host": "evil"}},
+        json={"config": {"to_address": "elsewhere@b.co", "smtp_host": "evil"}},
         headers=_bearer(token),
     ).json()
-    assert saved["config"] == {"to_address": "a@b.co"}
-    assert saved["user_config_complete"] and saved["active"] is False  # not enabled yet
+    assert saved["config"] == {}
 
-    enabled = client.patch(
-        "/api/notifiers/email", json={"enabled": True}, headers=_bearer(token)
+    off = client.patch(
+        "/api/notifiers/email", json={"enabled": False}, headers=_bearer(token)
     ).json()
-    assert enabled["active"] is True
+    assert off["active"] is False
 
 
 def test_in_app_cannot_be_user_configured_or_disabled(client: TestClient) -> None:
@@ -150,11 +156,8 @@ def test_user_test_endpoint_reports_outcome(
     admin = _admin_token(client)
     _configure_email_admin(client, admin)
     token = _make_user(client, admin, "alice@example.com")
-    client.put(
-        "/api/notifiers/email/config",
-        json={"config": {"to_address": "a@b.co"}},
-        headers=_bearer(token),
-    )
+
+    sent: list[Any] = []
 
     class _FakeSMTP:
         def __init__(self, *a: object, **k: object) -> None: ...
@@ -165,8 +168,12 @@ def test_user_test_endpoint_reports_outcome(
 
         def starttls(self, context: object = None) -> None: ...
         def login(self, u: str, p: str) -> None: ...
-        def send_message(self, msg: object) -> None: ...
+
+        def send_message(self, msg: Any) -> None:
+            sent.append(msg)
 
     monkeypatch.setattr(smtplib, "SMTP", _FakeSMTP)
     res = client.post("/api/notifiers/email/test", headers=_bearer(token)).json()
     assert res["ok"] is True
+    # Nobody configured a destination anywhere: it came from the account (10.B25).
+    assert sent and sent[0]["To"] == "alice@example.com"

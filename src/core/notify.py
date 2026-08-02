@@ -173,19 +173,6 @@ def send_test(db: Session, plugin: NotifierPlugin, user_id: int) -> None:
     plugin.send_test(merged_config(db, plugin, user_id), locale, username)
 
 
-def send_test_with_config(
-    db: Session, plugin: NotifierPlugin, user_id: int, extra_user_config: dict[str, object]
-) -> None:
-    """Admin channel check (POST /api/admin/notifiers/{id}/test): the admin config merged with an
-    ad-hoc user target supplied in the request (not persisted). ``extra_user_config`` is filtered
-    on the user schema by the caller."""
-    user = db.get(User, user_id)
-    locale = user.locale if user is not None else "en"
-    username = user.username if user is not None else ""
-    cfg = {**merged_config(db, plugin, user_id), **extra_user_config}
-    plugin.send_test(cfg, locale, username)
-
-
 def in_app_visible(db: Session) -> bool:
     """Whether the in-app inbox should surface digests right now: true unless the admin has
     disabled the in-app channel (the alerts list/badge are gated on this). Defaults to true when

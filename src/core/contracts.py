@@ -53,6 +53,16 @@ class NotificationKind(StrEnum):
     ADMIN_MESSAGE = "admin_message"  # admin-written text message (category: admin)
 
 
+ACCOUNT_EMAIL_KEY = "account_email"
+"""The recipient's address, injected into every notifier's merged config by the core (10.B25).
+
+**Not** a key a plugin declares, and not one a user can set: since 10.B23 the account *is* an
+address, so where somebody's mail goes is a fact about the account rather than a preference to
+fill in a form. A channel that sends email reads this instead of asking for a destination —
+which is how there stops being two fields that can disagree about where a person is reached.
+"""
+
+
 class ConfigField(BaseModel):
     """One declarative configuration field (config-field.md, CFG-R1..R6). Phase 7.
 

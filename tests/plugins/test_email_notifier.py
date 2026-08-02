@@ -30,7 +30,8 @@ _CONFIG = {
     "smtp_port": 1025,
     "use_tls": False,
     "from_address": "watch@local",
-    "to_address": "user@local",
+    # Injected by the core from the account, not configured on the channel (10.B25).
+    "account_email": "user@local",
 }
 
 

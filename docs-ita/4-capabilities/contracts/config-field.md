@@ -59,8 +59,9 @@ class ConfigField(BaseModel):
  ConfigField(key="password", label_key="cfg.pass", type="password"),   # secret implicito
  ConfigField(key="use_tls", label_key="cfg.tls", type="bool", default=True)]
 
-# schema UTENTE (recapito personale)
-[ConfigField(key="to_address", label_key="cfg.to", type="email", required=True)]
+# schema UTENTE — per l'email è vuoto da 10.B25: il recapito è l'account, non un
+# campo. Un canale con un'impostazione davvero personale ne dichiara comunque uno.
+[]
 ```
 
 Il form generato include, per i notifier, il bottone **Test** (PROF-R8) e il flag di attivazione per-utente (gestito dal core, non dichiarato nello schema).

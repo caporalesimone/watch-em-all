@@ -560,12 +560,6 @@ class NotifierEnabledBody(BaseModel):
     enabled: bool
 
 
-class NotifierTestBody(BaseModel):
-    # Ad-hoc user fields for a test send (e.g. a target address). Empty for a user's own test
-    # (their stored config is used); the admin supplies the minimal user fields to probe a channel.
-    config: dict[str, Any] = Field(default_factory=dict)
-
-
 class NotifierTestResult(BaseModel):
     ok: bool
     error: str | None = None

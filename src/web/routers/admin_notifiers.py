@@ -12,14 +12,13 @@ from fastapi import APIRouter, Request
 
 from src.core import notifiers as notif
 from src.core.errors import APIError
-from src.core.notify import send_test_with_config
+from src.core.notify import send_test
 from src.core.plugins.base import NotifierPlugin
 from src.web.deps import AdminDep, SessionDep
 from src.web.schemas import (
     AdminNotifierOut,
     NotifierConfigBody,
     NotifierEnabledBody,
-    NotifierTestBody,
     NotifierTestResult,
 )
 
@@ -104,18 +103,19 @@ def set_admin_enabled(
 @router.post(
     "/notifiers/{plugin_id}/test",
     response_model=NotifierTestResult,
-    summary="Probe a channel with the system config + an admin-supplied target (no persistence).",
+    summary="Probe a channel with the system config, delivered to the admin's own account.",
 )
 def admin_test(
-    plugin_id: str, body: NotifierTestBody, request: Request, admin: AdminDep, db: SessionDep
+    plugin_id: str, request: Request, admin: AdminDep, db: SessionDep
 ) -> NotifierTestResult:
+    """The target used to be typed into the form; since 10.B25 it is the admin's own account
+    address. Nothing is lost — this probe answers *"does the server config work"*, and an
+    address the admin types is a worse test of that than the one the system will really use."""
     plugin = _get(request, plugin_id)
     if notif.is_in_app(plugin_id):
         return NotifierTestResult(ok=True)  # nothing to test
-    user_keys = {f.key for f in plugin.get_user_config_schema()}
-    extra = {k: v for k, v in body.config.items() if k in user_keys}
     try:
-        send_test_with_config(db, plugin, admin.sub, extra)
+        send_test(db, plugin, admin.sub)
         return NotifierTestResult(ok=True)
     except Exception as exc:
         return NotifierTestResult(ok=False, error=str(exc))

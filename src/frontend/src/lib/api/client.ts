@@ -1095,14 +1095,8 @@ export async function setAdminNotifierEnabled(
 	return asJson<AdminNotifier>(res);
 }
 
-export async function testAdminNotifier(
-	id: string,
-	config: Record<string, unknown>
-): Promise<NotifierTestResult> {
-	const res = await apiFetch(`/api/admin/notifiers/${id}/test`, {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ config })
-	});
+/** Probe a channel with the system config. The target is the admin's own account (10.B25). */
+export async function testAdminNotifier(id: string): Promise<NotifierTestResult> {
+	const res = await apiFetch(`/api/admin/notifiers/${id}/test`, { method: 'POST' });
 	return asJson<NotifierTestResult>(res);
 }

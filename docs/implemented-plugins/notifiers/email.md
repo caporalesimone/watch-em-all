@@ -14,7 +14,7 @@ third-party account needed. Standard library only (`smtplib` + `email`), no exte
 | Level | Fields | Notes |
 |---|---|---|
 | **Admin** (system) | `smtp_host`, `smtp_port` (default 587), `smtp_user`, `smtp_password` (secret), `use_tls` (default true), `from_address` | Set on the Admin → Notifiers page; until complete the channel is "not available" |
-| **User** | `to_address` (email, required) + the on/off flag | Set in the Profile, with a Test button |
+| **User** | nothing but the on/off flag | In the Profile. Since 10.B25 the channel declares **no user fields**: the recipient is the account's own address (`contact_email`, or the username, which since 10.B23 *is* an address), injected by the core as `account_email`. One place where a person is reached, so there is no second field to disagree with the first. The channel arrives switched on for a new account. |
 
 ## Formatting
 

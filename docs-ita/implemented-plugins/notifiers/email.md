@@ -11,7 +11,7 @@ Consegna digest e summary via **email (SMTP)**. È il canale di riferimento: fun
 | Livello | Campi | Note |
 |---|---|---|
 | **Admin** (sistema) | `smtp_host`, `smtp_port` (default 587), `smtp_user`, `smtp_password` (secret), `use_tls` (default true), `from_address` | Nel DB via UI admin; finché incompleta il canale è "non disponibile" per tutti |
-| **Utente** | `to_address` (email, required) + flag attivo | Dal Profilo, con bottone Test |
+| **Utente** | solo il flag attivo | Dal Profilo. Da 10.B25 il canale **non dichiara campi utente**: il destinatario è l'indirizzo dell'account (`contact_email`, altrimenti l'username, che da 10.B23 *è* un indirizzo), iniettato dal core come `account_email`. Un solo posto dove una persona si raggiunge, quindi nessun secondo campo che possa contraddire il primo. Su un account nuovo il canale nasce acceso. |
 
 ## Formattazione
 

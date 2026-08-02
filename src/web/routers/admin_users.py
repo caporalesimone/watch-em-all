@@ -22,9 +22,11 @@ from fastapi import APIRouter, Query, status
 from sqlalchemy import nullsfirst, nullslast, select
 from sqlalchemy.sql.elements import UnaryExpression
 
+from src.core import notifiers as notif
 from src.core.admin_messages import latest_broadcast_id
 from src.core.errors import APIError
 from src.core.models import User
+from src.core.notifiers import EMAIL_PLUGIN_ID
 from src.core.security import hash_password
 from src.core.settings import get_system_settings
 from src.web.deps import AdminDep, SessionDep
@@ -125,7 +127,20 @@ def create_user(body: UserCreate, _admin: AdminDep, db: SessionDep) -> AdminUser
     db.add(user)
     db.commit()
     db.refresh(user)  # load server-side defaults (id, created_at)
+    _enable_email(db, user.id)
     return _to_summary(user)
+
+
+def _enable_email(db: SessionDep, user_id: int) -> None:
+    """Email notifications on, for a brand-new account (10.B25).
+
+    Written as a row rather than changed into a global default, because the two say different
+    things: a default would also switch the channel back on for everybody who has deliberately
+    turned it off. This is a fact recorded about *this* account at the moment it was created —
+    and the reason it is on is that since 10.B23 the address is the username, so being reachable
+    there is not an extra the person opted into, it is what the account is.
+    """
+    notif.set_user_enabled(db, user_id, EMAIL_PLUGIN_ID, True)
 
 
 @router.post(

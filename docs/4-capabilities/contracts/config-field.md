@@ -50,8 +50,9 @@ class ConfigField(BaseModel):
  ConfigField(key="use_tls", label_key="email.cfg.tls", type="bool", default=True),
  ConfigField(key="from_address", label_key="email.cfg.from", type="email", required=True)]
 
-# USER schema (personal target)
-[ConfigField(key="to_address", label_key="email.cfg.to", type="email", required=True)]
+# USER schema — empty for email since 10.B25: the recipient is the account, not a
+# field. A channel with a genuinely personal setting still declares one here.
+[]
 ```
 
 Notifier forms also carry a **Test** button and the per-user activation flag (managed by the core,

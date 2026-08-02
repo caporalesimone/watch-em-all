@@ -27,7 +27,8 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.orm import Session
 
-from src.core.models import NotifierAdminConfig, NotifierUserConfig
+from src.core.contracts import ACCOUNT_EMAIL_KEY
+from src.core.models import NotifierAdminConfig, NotifierUserConfig, User
 
 if TYPE_CHECKING:
     from src.core.contracts import ConfigField
@@ -38,6 +39,13 @@ log = logging.getLogger(__name__)
 IN_APP_PLUGIN_ID = "in_app"
 """The built-in in-app channel: always active for the user (no user toggle), governed only by
 the admin kill-switch. Special-cased throughout — it has neither admin nor user config."""
+
+
+EMAIL_PLUGIN_ID = "email"
+"""The email channel, named in the core because two things outside the plugin need to point at
+it: the on-by-default switch a new account gets (10.B25), and the credential mail, which is sent
+directly rather than through the notification pipeline (10.B24). Naming it here keeps the string
+from being retyped at each of those places."""
 
 
 def is_in_app(plugin_id: str) -> bool:
@@ -213,14 +221,32 @@ def set_user_enabled(db: Session, user_id: int, plugin_id: str, enabled: bool) -
 
 def merged_config(db: Session, plugin: NotifierPlugin, user_id: int) -> dict[str, Any]:
     """The admin+user config a notifier's ``send`` receives: each side filtered on its own schema,
-    the user's keys layered over the admin's."""
+    the user's keys layered over the admin's, and the core's own keys on top of both.
+
+    The core layer is one key today — where the recipient is reached (10.B25). It goes **last**
+    on purpose: it is not a preference, it is a fact about the account, and a stale value left in
+    a stored config must not be able to redirect somebody's mail.
+    """
     admin = _filter_keys(
         plugin.get_admin_config_schema(), admin_config(db, plugin.plugin_id), side="admin"
     )
     user = _filter_keys(
         plugin.get_user_config_schema(), user_config(db, user_id, plugin.plugin_id), side="user"
     )
-    return {**admin, **user}
+    return {**admin, **user, **account_keys(db, user_id)}
+
+
+def account_keys(db: Session, user_id: int) -> dict[str, Any]:
+    """The identity keys the core injects into every merged config (10.B25).
+
+    ``contact_email`` first, then the username: the fallback is not a convenience but the normal
+    path — since 10.B23 the username *is* the address, and ``contact_email`` exists only for the
+    bootstrap admin, the one account created before anybody could type one.
+    """
+    user = db.get(User, user_id)
+    if user is None:
+        return {}
+    return {ACCOUNT_EMAIL_KEY: user.contact_email or user.username}
 
 
 @dataclass

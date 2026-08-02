@@ -1,7 +1,8 @@
 <script lang="ts">
 	// Admin notifiers (7.F4): per channel, the system config form (dynamic, from the plugin
 	// schema; secrets write-only), the global kill-switch (PCFG-R8, applies to in-app too), and
-	// a channel test with an admin-supplied target. In-app has no system config — only the switch.
+	// a channel test delivered to the admin's own account (10.B25 — the target is no longer typed
+	// in). In-app has no system config — only the switch.
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 
@@ -63,10 +64,10 @@
 		}
 	}
 
-	async function test(id: string, values: Record<string, unknown>): Promise<void> {
+	async function test(id: string): Promise<void> {
 		busy = id;
 		try {
-			const res = await testAdminNotifier(id, values);
+			const res = await testAdminNotifier(id);
 			if (res.ok) pushToast($_('admin.notifiers.testOk'), 'success');
 			else
 				pushToast($_('admin.notifiers.testFail', { values: { error: res.error ?? '' } }), 'error');
@@ -135,20 +136,24 @@
 								onSubmit={(v) => saveConfig(c.plugin_id, v)}
 							/>
 						</div>
-						{#if c.user_schema.length > 0}
-							<div class="border-t border-slate-100 pt-3 dark:border-slate-800/60">
-								<h3 class="mb-1 text-xs font-semibold text-slate-400 uppercase">
-									{$_('admin.notifiers.testTitle')}
-								</h3>
-								<p class="mb-2 text-xs text-slate-400">{$_('admin.notifiers.testHint')}</p>
-								<DynamicConfigForm
-									schema={c.user_schema}
-									busy={busy === c.plugin_id}
-									submitLabel={$_('admin.notifiers.test')}
-									onSubmit={(v) => test(c.plugin_id, v)}
-								/>
-							</div>
-						{/if}
+						<!-- The target used to be a form field here (10.B25 took it away): the probe now
+						     goes to the admin's own account address, which tests the server config
+						     better than an address typed for the occasion — it is the one the system
+						     will really use. -->
+						<div class="border-t border-slate-100 pt-3 dark:border-slate-800/60">
+							<h3 class="mb-1 text-xs font-semibold text-slate-400 uppercase">
+								{$_('admin.notifiers.testTitle')}
+							</h3>
+							<p class="mb-2 text-xs text-slate-400">{$_('admin.notifiers.testHint')}</p>
+							<button
+								type="button"
+								disabled={busy === c.plugin_id || !c.admin_config_complete}
+								onclick={() => test(c.plugin_id)}
+								class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
+							>
+								{$_('admin.notifiers.test')}
+							</button>
+						</div>
 					{/if}
 				</div>
 			{/each}

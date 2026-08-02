@@ -29,7 +29,7 @@ from src.core.alert_engine import (
     NotificationEvent,
     TextMessageEvent,
 )
-from src.core.contracts import ConfigField
+from src.core.contracts import ACCOUNT_EMAIL_KEY, ConfigField
 from src.core.plugins.base import NotifierDeliveryError, NotifierPlugin
 from src.core.plugins.context import MarkdownHelper, PluginContext
 
@@ -114,16 +114,11 @@ class EmailNotifierPlugin(NotifierPlugin):
         ]
 
     def get_user_config_schema(self) -> list[ConfigField]:
-        to_default = "me@mailpit.local" if _DEV_MAILPIT else None
-        return [
-            ConfigField(
-                key="to_address",
-                label_key="email.cfg.to",
-                type="email",
-                required=True,
-                default=to_default,
-            )
-        ]
+        """Nothing (10.B25). The channel used to ask each person for a delivery address; since
+        10.B23 the account *is* an address, so the core injects it (``ACCOUNT_EMAIL_KEY``) and
+        there is no second field left to disagree with the first. What remains for the user is
+        the on/off switch, which is not config — it lives on the row, not in the schema."""
+        return []
 
     # -------------------------------------------------------------- send
 
@@ -268,7 +263,8 @@ class EmailNotifierPlugin(NotifierPlugin):
     def _deliver(self, config: dict[str, Any], subject: str, html: str, text: str) -> None:
         host = str(config.get("smtp_host") or "").strip()
         from_addr = str(config.get("from_address") or "").strip()
-        to_addr = str(config.get("to_address") or "").strip()
+        # The recipient comes from the account, not from this channel's config (10.B25).
+        to_addr = str(config.get(ACCOUNT_EMAIL_KEY) or "").strip()
         if not host or not from_addr or not to_addr:
             raise NotifierDeliveryError("email: incomplete configuration (host/from/to)")
         try:

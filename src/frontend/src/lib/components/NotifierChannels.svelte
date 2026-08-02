@@ -117,15 +117,21 @@
 					{:else if !c.available}
 						<p class="mt-2 text-slate-500 dark:text-slate-400">{$_('notifiers.unavailableNote')}</p>
 					{:else}
-						<div class="mt-3">
-							<DynamicConfigForm
-								schema={c.user_schema}
-								config={c.config}
-								isSet={c.is_set}
-								busy={busy === c.plugin_id}
-								onSubmit={(v) => save(c.plugin_id, v)}
-							/>
-						</div>
+						<!-- A channel with nothing to fill in shows no form at all. Since 10.B25 email
+						     is exactly that: the address comes from the account, so what is left is
+						     the switch — and an empty form with a Save button under it would invite a
+						     click that does nothing. -->
+						{#if c.user_schema.length > 0}
+							<div class="mt-3">
+								<DynamicConfigForm
+									schema={c.user_schema}
+									config={c.config}
+									isSet={c.is_set}
+									busy={busy === c.plugin_id}
+									onSubmit={(v) => save(c.plugin_id, v)}
+								/>
+							</div>
+						{/if}
 						<div
 							class="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800/60"
 						>
