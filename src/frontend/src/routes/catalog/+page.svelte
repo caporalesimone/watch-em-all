@@ -445,7 +445,7 @@
 								aria-label={$_('carts.addToCart')}
 							/>
 						</td>
-						<td class="py-2 pr-4"><SourceTag pluginId={item.plugin_id} link /></td>
+						<td class="py-2 pr-4"><SourceTag pluginId={item.plugin_id} link iconOnly /></td>
 						<td class="py-2 pr-4"><ProductThumb src={item.image_url} /></td>
 						<td class="py-2 pr-4">
 							<ProductCell
