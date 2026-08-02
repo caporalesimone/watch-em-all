@@ -24,6 +24,8 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - Reset, disable and delete are one click each from the Users page; the delete confirmation names the date the account is actually destroyed.
 - Passwords can be given an expiry — never (the default), 1, 3, 6 or 12 months; an old one sends you to the change page at sign-in.
 - That expiry is a dropdown in System settings, so it can only ever be one of the values the server accepts.
+- All housekeeping now runs in one nightly window at an hour you choose (7am by default), and says in the log when it starts and ends.
+- Your notification history keeps its most recent 100 entries — a number you can change — instead of growing for ever.
 
 ### Changed
 

@@ -160,3 +160,76 @@ def test_the_core_cascade_takes_the_carts_and_leaves_the_price_history(session: 
     # Phase 9 made the history the product's: it has no foreign key to the user on purpose,
     # and it must survive the person who happened to be watching.
     assert session.scalar(select(func.count()).select_from(PriceHistory)) == 1
+
+
+# --- the nightly maintenance window (10.B8a) and the alert cap (10.B8b) ------------------
+
+
+def test_the_window_opens_at_the_local_hour_and_only_once_a_day() -> None:
+    from zoneinfo import ZoneInfo
+
+    from src.worker.main import _maintenance_due
+
+    rome = ZoneInfo("Europe/Rome")
+    # 05:00 UTC is 07:00 in Rome — the point of interpreting the hour locally.
+    before = datetime(2026, 8, 2, 4, 30, tzinfo=UTC)
+    after = datetime(2026, 8, 2, 5, 30, tzinfo=UTC)
+
+    assert _maintenance_due(before, rome, 7, None) is False
+    assert _maintenance_due(after, rome, 7, None) is True
+    # Already done today → not again, however many ticks go by.
+    assert _maintenance_due(after, rome, 7, after.astimezone(rome).date()) is False
+    # Down at 07:00, up at 11:00 → it still runs. A reboot at the wrong moment must not
+    # silently cost a day of housekeeping.
+    late = datetime(2026, 8, 2, 9, 0, tzinfo=UTC)
+    assert _maintenance_due(late, rome, 7, None) is True
+
+
+def test_alerts_are_capped_per_person_not_globally(session: Session) -> None:
+    from src.core.maintenance import purge_alerts_over_limit
+    from src.core.models import AlertLog
+
+    noisy = _user(session, "noisy", due=None)
+    quiet = _user(session, "quiet", due=None)
+    for i in range(10):
+        session.add(
+            AlertLog(
+                user_id=noisy,
+                kind="alert_digest",
+                payload_json={"n": i},
+                created_at=NOW + timedelta(minutes=i),
+            )
+        )
+    for i in range(2):
+        session.add(
+            AlertLog(
+                user_id=quiet,
+                kind="alert_digest",
+                payload_json={"n": i},
+                created_at=NOW + timedelta(minutes=i),
+            )
+        )
+    session.commit()
+
+    assert purge_alerts_over_limit(session, 3) == 7
+
+    left = list(session.scalars(select(AlertLog).where(AlertLog.user_id == noisy)))
+    assert len(left) == 3
+    assert {row.payload_json["n"] for row in left} == {7, 8, 9}, "the most recent survive"
+    # The quiet account is under the cap and is not touched: one heavy user must not push
+    # everybody else's history out.
+    assert (
+        session.scalar(select(func.count()).select_from(AlertLog).where(AlertLog.user_id == quiet))
+        == 2
+    )
+
+
+def test_a_cap_of_zero_keeps_everything(session: Session) -> None:
+    from src.core.maintenance import purge_alerts_over_limit
+    from src.core.models import AlertLog
+
+    uid = _user(session, "someone", due=None)
+    session.add(AlertLog(user_id=uid, kind="alert_digest", payload_json={}, created_at=NOW))
+    session.commit()
+    assert purge_alerts_over_limit(session, 0) == 0
+    assert session.scalar(select(func.count()).select_from(AlertLog)) == 1

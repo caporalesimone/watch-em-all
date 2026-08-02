@@ -74,6 +74,9 @@ def test_settings_get_defaults_then_patch(client: TestClient) -> None:
         # that it stays that way — a default of anything else would put every account on a
         # forced password change without an admin ever asking for one.
         "password_expiry_days": 0,
+        # The nightly window and what it leaves behind (10.B8a/b).
+        "maintenance_hour": 7,
+        "alert_keep_last": 100,
     }
     patched = client.patch(
         "/api/admin/settings",

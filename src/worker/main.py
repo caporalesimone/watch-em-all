@@ -13,7 +13,7 @@ import os
 import signal
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from types import FrameType
 from zoneinfo import ZoneInfo
 
@@ -26,7 +26,7 @@ from src.core.config import get_settings
 from src.core.db import Base, create_schema, get_engine, init_engine, new_session
 from src.core.feature_flags import effective_flags, worker_tick_seconds
 from src.core.locks import scraper_lock
-from src.core.maintenance import purge_expired
+from src.core.maintenance import purge_alerts_over_limit, purge_expired
 from src.core.models import Cart, ScraperSchedule, ScrapeRun, ScrapeUserLog
 from src.core.notify import drain_deliveries, enqueue_deliveries
 from src.core.plugins.base import NotifierPlugin, ScraperPlugin
@@ -168,9 +168,57 @@ def _boot() -> None:
         session.close()
 
 
-def _daily_maintenance(now: datetime) -> None:
+def _maintenance_due(now: datetime, tz: ZoneInfo, hour: int, last_run: date | None) -> bool:
+    """Has today's maintenance window opened, and not run yet? (10.B8a)
+
+    Pure, so the decision is testable without a clock. Interpreted in the **install
+    timezone** like the scraper slots (4.B3): "seven in the morning" has to mean the local
+    seven. It catches up rather than skipping — a worker that was down at 07:00 and starts
+    at 09:00 still tidies up today, because the alternative is a day of housekeeping quietly
+    lost whenever the machine reboots at the wrong moment.
+    """
+    local = now.astimezone(tz)
+    if last_run == local.date():
+        return False
+    return local.hour >= hour
+
+
+def _maintenance(now: datetime) -> None:
+    """The nightly housekeeping window (10.B8a): every scheduled job, in one place.
+
+    One window rather than jobs scattered around the loop, so there is a single moment to
+    look at when something did not get tidied — and a single moment the machine is busy.
+    It **announces itself at both ends**: a maintenance that starts and never says it
+    finished is the shape a hang has in a log, and without the closing line an admin cannot
+    tell one from a quiet night. The end line is in a ``finally`` so it survives a failure.
+    """
+    log.info("maintenance window started")
+    started = time.monotonic()
+    try:
+        _purge_operational_records(now)
+        _purge_alert_history()
+    finally:
+        log.info("maintenance window finished in %.1fs", time.monotonic() - started)
+
+
+def _purge_alert_history() -> None:
+    """Trim each person's notification history to the configured length (10.B8b)."""
+    try:
+        session = new_session()
+        try:
+            keep = get_system_settings(session).alert_keep_last
+            removed = purge_alerts_over_limit(session, keep)
+        finally:
+            session.close()
+        if removed:
+            log.info("alert retention: removed %d alert(s) beyond the last %d", removed, keep)
+    except Exception:
+        log.exception("alert retention failed")
+
+
+def _purge_operational_records(now: datetime) -> None:
     """Prune old system logs and run records beyond ``log_retention_days`` (MNT-R2).
-    Runs once a day from the loop; a failure must never stop the worker."""
+    A failure must never stop the worker, nor the jobs beside it in the window."""
     try:
         session = new_session()
         try:
@@ -395,6 +443,14 @@ def _drain_deliveries_step() -> None:
         session.close()
 
 
+def _maintenance_hour() -> int:
+    session = new_session()
+    try:
+        return get_system_settings(session).maintenance_hour
+    finally:
+        session.close()
+
+
 def _current_tick_seconds() -> int:
     session = new_session()
     try:
@@ -407,13 +463,16 @@ def _loop(submit: Submit, max_ticks: int | None = None) -> None:
     """Tick forever (or ``max_ticks`` times, for tests): heartbeat + dispatch due slots."""
     tz = install_tz()
     last_interval: int | None = None
-    last_maint_date = None
+    last_maint_date: date | None = None
     ticks = 0
     while max_ticks is None or ticks < max_ticks:
         now = datetime.now(UTC)
-        if now.date() != last_maint_date:  # once per (UTC) day, and at the first tick
-            _daily_maintenance(now)
-            last_maint_date = now.date()
+        # Once a day, at the configured local hour (10.B8a). It used to run at the first
+        # tick after midnight UTC, which meant "whenever the worker happened to restart" —
+        # housekeeping at an hour nobody chose, and sometimes several times a day.
+        if _maintenance_due(now, tz, _maintenance_hour(), last_maint_date):
+            _maintenance(now)
+            last_maint_date = now.astimezone(tz).date()
         _heartbeat(now)
         # The heartbeat still goes out while the schema is incompatible — it is how the web
         # knows this process is alive, and a silent worker would read as a second, different

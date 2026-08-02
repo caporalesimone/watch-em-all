@@ -52,11 +52,15 @@
 		}
 	}
 
-	const fields: { key: keyof SystemSettings; min: number }[] = [
+	const fields: { key: keyof SystemSettings; min: number; max?: number }[] = [
 		{ key: 'scraper_run_timeout_min', min: 1 },
 		{ key: 'log_retention_days', min: 0 },
 		{ key: 'catchup_warning_min', min: 0 },
-		{ key: 'user_deletion_retention_days', min: 1 }
+		{ key: 'user_deletion_retention_days', min: 1 },
+		// Both belong to the nightly window (10.B8a/b). The hour is capped at 23 rather than
+		// left open: a "24" would silently mean a window that never opens.
+		{ key: 'maintenance_hour', min: 0, max: 23 },
+		{ key: 'alert_keep_last', min: 0 }
 	];
 
 	// Fixed options rather than a number box (10.F14): the backend only accepts these five,

@@ -29,6 +29,16 @@ class SystemSettings(BaseModel):
     # account into a change on their next visit, and the range check cannot tell the two
     # apart. 0 = never, which is the default — the feature is opt-in.
     password_expiry_days: Literal[0, 30, 90, 180, 365] = 0
+    # The nightly maintenance window (10.B8a): the hour, in the install timezone, at which
+    # every housekeeping job runs. One window rather than jobs scattered through the day, so
+    # there is a single moment to look at when something did not get tidied — and a single
+    # moment the machine is busy. Default 07:00, after the night's scrapes and before anybody
+    # opens the page.
+    maintenance_hour: int = Field(default=7, ge=0, le=23)
+    # How many alerts each person keeps after the nightly purge (10.B8b). Counted, not aged:
+    # a quiet month should not empty your history, and a noisy week should not make it
+    # unreadable. 0 = keep everything, the same "off" that `log_retention_days` uses.
+    alert_keep_last: int = Field(default=100, ge=0, le=100_000)
 
 
 KNOWN_SETTINGS = set(SystemSettings.model_fields)

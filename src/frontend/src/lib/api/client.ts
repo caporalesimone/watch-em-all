@@ -248,6 +248,9 @@ export interface SystemSettings {
 	user_deletion_retention_days: number;
 	// Fixed options, not free days (10.B19): 0 = never.
 	password_expiry_days: 0 | 30 | 90 | 180 | 365;
+	// The nightly maintenance window and what it leaves behind (10.B8a/b).
+	maintenance_hour: number;
+	alert_keep_last: number;
 }
 
 export function getSettings(): Promise<SystemSettings> {

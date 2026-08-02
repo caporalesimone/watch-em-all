@@ -165,13 +165,17 @@
 				"scraper_run_timeout_min": "Timeout di run (minuti)",
 				"log_retention_days": "Retention log (giorni)",
 				"catchup_warning_min": "Soglia avviso recuperi (minuti)",
-				"user_deletion_retention_days": "Grazia cancellazione utenti (giorni)"
+				"user_deletion_retention_days": "Grazia cancellazione utenti (giorni)",
+				"maintenance_hour": "Ora della manutenzione",
+				"alert_keep_last": "Alert conservati per utente"
 			},
 			"fieldHints": {
 				"scraper_run_timeout_min": "Una run schedulata viene terminata se supera questo limite.",
 				"log_retention_days": "Log e record di run più vecchi vengono eliminati ogni giorno; 0 = mai. Lo storico prezzi non si tocca.",
 				"catchup_warning_min": "Avvisa quando uno slot recuperato è più vecchio di così (attivo quando arriva la feature).",
-				"user_deletion_retention_days": "Finestra di grazia prima della cancellazione definitiva di un utente (fase 10)."
+				"user_deletion_retention_days": "Finestra di grazia prima della cancellazione definitiva di un utente (fase 10).",
+				"maintenance_hour": "Ora locale in cui girano tutte le attività notturne di manutenzione.",
+				"alert_keep_last": "Le notifiche più vecchie si rimuovono ogni notte. 0 le tiene tutte."
 			},
 			"passwordExpiry": "Scadenza password",
 			"passwordExpiryHint": "Forza una password nuova quando l'attuale raggiunge questa età.",
