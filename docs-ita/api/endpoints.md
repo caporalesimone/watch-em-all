@@ -87,7 +87,8 @@ Il purge automatico resta il job giornaliero del worker sugli account scaduti (U
 | Metodo | Path | Ruolo | Body / Query | Note |
 |---|---|---|---|---|
 | POST | `/api/admin/messages` | 🛡 | `{title, body, user_id?}` | body in **Markdown** (AEV-R7); invio a tutti gli utenti attivi (user_id assente) o a uno specifico; sempre in storico, consegna sui canali abilitati del destinatario |
-| GET | `/api/admin/messages` | 🛡 | `?page=` | messaggi inviati con esiti di consegna per destinatario/canale; mai lo stato letto/non letto (ADMSG-R5) |
+| GET | `/api/admin/messages` | 🛡 | `?page=&audience=all\|user` | messaggi inviati con esiti di consegna per destinatario/canale; mai lo stato letto/non letto (ADMSG-R5). Il filtro separa annunci e messaggi a una persona (10.F30) |
+| DELETE | `/api/admin/messages/{id}` | 🛡 | — | toglie il messaggio dallo storico (10.B29): un **broadcast** è una riga sola, quindi sparisce anche dallo storico di tutti i destinatari; un **mirato** lascia al destinatario la sua copia in `alert_log`. Non è un annullamento dell'invio (ADMSG-R6) |
 | GET | `/api/admin/message-templates` | 🛡 | — | catalogo completo: per ogni chiave default, placeholder dichiarati, eventuale override (ADMSG-R7) |
 | PUT | `/api/admin/message-templates/{key}` | 🛡 | `{title, body}` | imposta/aggiorna l'override (body Markdown; placeholder sconosciuti segnalati, ADMSG-R8) |
 | DELETE | `/api/admin/message-templates/{key}` | 🛡 | — | ripristina il default (cancella l'override, ADMSG-R9) |

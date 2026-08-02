@@ -250,8 +250,18 @@
 							class="ml-1 shrink-0"
 						/>
 					{:else}
-						<!-- An announcement is one row for everybody: there is nothing here to delete. -->
-						<span class="ml-1 w-[13px] shrink-0"></span>
+						<!--
+							An announcement is **one row for everybody** (10.B12), so no single
+							recipient can delete it — and an empty cell where every other line has a
+							checkbox reads as a fault rather than as a rule (Simone, 2026-08-03).
+							A padlock with the reason on hover says which of the two it is; an
+							administrator can still remove the announcement for everyone.
+						-->
+						<span
+							class="ml-1 shrink-0 cursor-help text-xs text-slate-300 dark:text-slate-600"
+							title={$_('alerts.broadcastLocked')}
+							aria-label={$_('alerts.broadcastLocked')}>🔒</span
+						>
 					{/if}
 					<!-- Two wrappers, one body. A message opens the popup so it is a real <button>; a
 					     digest still navigates so it stays a real <a>, which keeps middle-click and

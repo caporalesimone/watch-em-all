@@ -1044,10 +1044,25 @@ export interface AdminMessageDetail extends AdminMessageSummary {
 	recipients: MessageRecipient[];
 }
 
-export function listAdminMessages(page = 1, pageSize = 20): Promise<AdminMessagePage> {
-	return apiFetch(`/api/admin/messages?page=${page}&page_size=${pageSize}`).then(
+/** Sent messages, newest first. `audience` narrows to broadcasts or one-to-one notes (10.F30). */
+export function listAdminMessages(
+	page = 1,
+	pageSize = 20,
+	audience: 'all' | 'user' | null = null
+): Promise<AdminMessagePage> {
+	const filter = audience ? `&audience=${audience}` : '';
+	return apiFetch(`/api/admin/messages?page=${page}&page_size=${pageSize}${filter}`).then(
 		asJson<AdminMessagePage>
 	);
+}
+
+/**
+ * Remove a sent message from the history (10.B29). Not an un-send: for a **broadcast** — one row
+ * for everybody — it also disappears from every recipient's list, which is the point, since they
+ * cannot delete it themselves. A targeted message leaves the recipient their own copy.
+ */
+export async function deleteAdminMessage(id: number): Promise<void> {
+	await apiFetch(`/api/admin/messages/${id}`, { method: 'DELETE' });
 }
 
 export function getAdminMessage(id: number): Promise<AdminMessageDetail> {

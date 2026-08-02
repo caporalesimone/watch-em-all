@@ -15,7 +15,7 @@ is no query here that could produce it.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, Request
 from sqlalchemy import func, select
@@ -126,11 +126,17 @@ def list_messages(
     db: SessionDep,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+    audience: Annotated[Literal["all", "user"] | None, Query()] = None,
 ) -> AdminMessagePage:
-    total = int(db.scalar(select(func.count()).select_from(AdminMessage)) or 0)
+    # The filter separates the two things this list mixes (10.F30): an announcement to everybody
+    # and a note to one person are the same table but not the same job, and looking for one of
+    # them among the other is most of what this page is used for.
+    where = [AdminMessage.audience == audience] if audience is not None else []
+    total = int(db.scalar(select(func.count()).select_from(AdminMessage).where(*where)) or 0)
     rows = list(
         db.scalars(
             select(AdminMessage)
+            .where(*where)
             .order_by(AdminMessage.created_at.desc(), AdminMessage.id.desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
@@ -188,6 +194,31 @@ def get_message(message_id: int, _admin: AdminDep, db: SessionDep) -> AdminMessa
     )
     counts = _counts(db, [message_id])[message_id]
     return AdminMessageDetail(**_summary(db, message, counts).model_dump(), recipients=recipients)
+
+
+@router.delete(
+    "/{message_id}",
+    status_code=204,
+    summary="Remove a sent message from the history (admin only).",
+)
+def delete_message(message_id: int, _admin: AdminDep, db: SessionDep) -> None:
+    """Delete the record of a message, and — for a broadcast — the message itself (10.B29).
+
+    **This is not an un-send** (ADMSG-R6 stands): what it removes is history, and how much of it
+    depends on where that history lives. A **broadcast** is one row for everybody, so deleting it
+    takes it out of every recipient's list as well — which is the point, since a user cannot
+    delete an announcement themselves. A **targeted** message also gave its recipient an
+    ``alert_log`` row of their own: that one is theirs, it stays, and they can delete it. The
+    delivery outcomes go either way, by cascade.
+
+    Nothing here reaches into somebody else's inbox to retract what they already read on another
+    channel. A mail that has been sent is sent.
+    """
+    message = db.get(AdminMessage, message_id)
+    if message is None:
+        raise APIError(404, "message_not_found", "no such message")
+    db.delete(message)
+    db.commit()
 
 
 @router.post(

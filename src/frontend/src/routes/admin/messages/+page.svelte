@@ -10,6 +10,7 @@
 	import { _ } from 'svelte-i18n';
 
 	import {
+		deleteAdminMessage,
 		getAdminMessage,
 		listAdminMessages,
 		listAdminNotifiers,
@@ -84,8 +85,69 @@
 					: 'ok'
 	);
 
+	// The sent list is paged and filterable (10.F30). Both live here rather than in the URL: this
+	// is the lower half of a page whose upper half is a draft, and putting the list state in the
+	// address bar would make "next page" a navigation that discards what is being written.
+	let sentPage = $state(1);
+	let sentTotal = $state(0);
+	let sentFilter = $state<'all' | 'user' | null>(null);
+	const SENT_PAGE_SIZE = 10;
+	const sentPages = $derived(Math.max(1, Math.ceil(sentTotal / SENT_PAGE_SIZE)));
+
 	async function refresh(): Promise<void> {
-		sent = (await listAdminMessages()).items;
+		const got = await listAdminMessages(sentPage, SENT_PAGE_SIZE, sentFilter);
+		sent = got.items;
+		sentTotal = got.total;
+		// Deleting the last row of the last page would otherwise leave an empty list with a page
+		// number nobody can get off.
+		if (sent.length === 0 && sentPage > 1) {
+			sentPage = 1;
+			await refresh();
+		}
+	}
+
+	function setSentFilter(next: 'all' | 'user' | null): void {
+		sentFilter = next;
+		sentPage = 1;
+		void refresh();
+	}
+
+	function goSent(delta: number): void {
+		sentPage = Math.min(sentPages, Math.max(1, sentPage + delta));
+		void refresh();
+	}
+
+	// Written out one by one, not built from a prefix: the i18n gate matches literals.
+	const sentFilters = $derived([
+		{ key: null, label: $_('admin.messages.filterAll') },
+		{ key: 'all' as const, label: $_('admin.messages.filterBroadcast') },
+		{ key: 'user' as const, label: $_('admin.messages.filterTargeted') }
+	]);
+
+	async function removeMessage(m: AdminMessageSummary): Promise<void> {
+		// Two different consequences, so two different sentences. For a broadcast this is the
+		// only way the announcement ever leaves anybody's history — a recipient cannot delete a
+		// row that belongs to everybody — and the confirmation has to say so before the click,
+		// not after.
+		const key =
+			m.audience === 'all'
+				? 'admin.messages.confirmDeleteBroadcast'
+				: 'admin.messages.confirmDeleteTargeted';
+		const who = m.audience === 'all' ? '' : (m.target_username ?? '');
+		const ok = await confirmDialog({
+			title: $_('admin.messages.deleteTitle'),
+			message: $_(key, { values: { title: m.title, username: who } }),
+			highlight: [m.title, who].filter(Boolean),
+			confirmLabel: $_('admin.messages.deleteTitle'),
+			danger: true
+		});
+		if (!ok) return;
+		try {
+			await deleteAdminMessage(m.id);
+			await refresh();
+		} catch {
+			error = $_('admin.messages.deleteError');
+		}
 	}
 
 	onMount(() => {
@@ -174,6 +236,16 @@
 
 	function fmt(iso: string): string {
 		return new Date(iso).toLocaleString();
+	}
+
+	/**
+	 * Who a message went to. "Everyone" without a count since 10.F30 (Simone's call): the count
+	 * was people while the tags beside it count deliveries, and the two numbers standing next to
+	 * each other invited exactly the reading they should not — "Everyone (1)" and "2 delivered"
+	 * looked like a contradiction and were both correct.
+	 */
+	function recipientOf(m: AdminMessageSummary): string {
+		return m.audience === 'all' ? $_('admin.messages.toAll') : (m.target_username ?? '—');
 	}
 
 	// Written as literals so the i18n gate sees the keys used.
@@ -342,33 +414,107 @@
 		<div class="space-y-3">
 			<h2 class="text-sm font-medium text-slate-500">{$_('admin.messages.sentTitle')}</h2>
 
+			<div class="flex flex-wrap gap-2 text-xs">
+				{#each sentFilters as chip (chip.label)}
+					<button
+						type="button"
+						onclick={() => setSentFilter(chip.key)}
+						class="rounded-full border px-3 py-1 {sentFilter === chip.key
+							? 'border-slate-800 bg-slate-800 text-white dark:border-slate-200 dark:bg-slate-200 dark:text-slate-900'
+							: 'border-slate-300 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800'}"
+					>
+						{chip.label}
+					</button>
+				{/each}
+			</div>
+
 			{#if sent.length === 0}
 				<p class="max-w-prose text-sm text-slate-500">{$_('admin.messages.noneSent')}</p>
 			{:else}
-				<ul class="divide-y divide-slate-100 text-sm dark:divide-slate-800/60">
-					{#each sent as m (m.id)}
-						<li>
-							<button
-								onclick={() => openMessage(m)}
-								class="flex w-full flex-wrap items-center gap-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-900/40"
-							>
-								<span class="w-44 shrink-0 text-xs text-slate-400">{fmt(m.created_at)}</span>
-								<span class="w-32 shrink-0 text-xs text-slate-500">
-									{m.audience === 'all'
-										? $_('admin.messages.toAll', { values: { count: m.recipient_count } })
-										: (m.target_username ?? '—')}
-								</span>
-								<span class="flex-1 truncate font-medium">{m.title}</span>
-								{#each Object.entries(m.outcomes).filter(([, n]) => n > 0) as [key, n] (key)}
-									<span class="rounded px-1.5 py-0.5 text-xs {outcomeClass(key)}">
-										{n}
-										{$_(OUTCOME_LABEL[key] ?? key)}
-									</span>
-								{/each}
-							</button>
-						</li>
-					{/each}
-				</ul>
+				<!--
+					A real table with headers (10.F30). It was a flex row with a fixed-width recipient
+					cell and no truncation, so `simone.caporale@cnh.com` ran straight over the title.
+					A table also gives the columns names, which this list needed anyway: a bare date
+					and a bare address beside a title do not say what they are.
+				-->
+				<div class="overflow-x-auto">
+					<table class="w-full table-fixed text-left text-sm">
+						<thead class="border-b border-slate-200 text-xs text-slate-400 dark:border-slate-800">
+							<tr>
+								<th class="w-40 py-2 pr-3 font-normal">{$_('admin.messages.colSent')}</th>
+								<th class="w-48 py-2 pr-3 font-normal">{$_('admin.messages.colRecipient')}</th>
+								<th class="py-2 pr-3 font-normal">{$_('admin.messages.colTitle')}</th>
+								<th class="w-44 py-2 pr-3 font-normal">{$_('admin.messages.colDeliveries')}</th>
+								<th class="w-20 py-2 font-normal"></th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-slate-100 dark:divide-slate-800/60">
+							{#each sent as m (m.id)}
+								<tr class="align-top hover:bg-slate-50 dark:hover:bg-slate-900/40">
+									<td class="py-2 pr-3 text-xs text-slate-400">{fmt(m.created_at)}</td>
+									<!-- Truncated, with the whole value on hover: an address is exactly the
+									     kind of cell that runs long, and it used to take the title with it. -->
+									<td class="truncate py-2 pr-3 text-xs text-slate-500" title={recipientOf(m)}>
+										{recipientOf(m)}
+									</td>
+									<td class="py-2 pr-3">
+										<button
+											onclick={() => openMessage(m)}
+											class="block w-full truncate text-left font-medium hover:underline"
+											title={m.title}
+										>
+											{m.title}
+										</button>
+									</td>
+									<td class="py-2 pr-3">
+										<!-- The number counts **deliveries** — one per recipient per channel —
+										     not people: a single recipient with mail and in-app both on is two
+										     of them, which is why "Everyone (1)" beside "2 delivered" read as
+										     a contradiction and no longer appears. -->
+										<div class="flex flex-wrap gap-1">
+											{#each Object.entries(m.outcomes).filter(([, n]) => n > 0) as [key, n] (key)}
+												<span class="rounded px-1.5 py-0.5 text-xs {outcomeClass(key)}">
+													{n}
+													{$_(OUTCOME_LABEL[key] ?? key)}
+												</span>
+											{/each}
+										</div>
+									</td>
+									<td class="py-2 text-right">
+										<button
+											type="button"
+											onclick={() => removeMessage(m)}
+											class="rounded border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/40"
+										>
+											{$_('admin.messages.deleteTitle')}
+										</button>
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+
+				<div class="flex items-center justify-between text-sm text-slate-500">
+					<span>{$_('admin.messages.sentCount', { values: { total: sentTotal } })}</span>
+					<div class="flex items-center gap-3">
+						<button
+							class="rounded border border-slate-300 px-2 py-1 disabled:opacity-40 dark:border-slate-700"
+							onclick={() => goSent(-1)}
+							disabled={sentPage <= 1}
+						>
+							{$_('catalog.prev')}
+						</button>
+						<span>{$_('catalog.pageInfo', { values: { page: sentPage, pages: sentPages } })}</span>
+						<button
+							class="rounded border border-slate-300 px-2 py-1 disabled:opacity-40 dark:border-slate-700"
+							onclick={() => goSent(1)}
+							disabled={sentPage >= sentPages}
+						>
+							{$_('catalog.next')}
+						</button>
+					</div>
+				</div>
 			{/if}
 		</div>
 	{/if}

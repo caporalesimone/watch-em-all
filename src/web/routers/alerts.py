@@ -239,6 +239,18 @@ def mark_broadcast_read(message_id: int, user: UserDep, db: SessionDep) -> None:
 
 @router.delete("", status_code=204, summary="Delete the user's alerts by id (bulk).")
 def delete_alerts(body: AlertIdsBody, user: UserDep, db: SessionDep) -> None:
+    """Delete rows of ``alert_log``, and **only** those.
+
+    ⚠ The history this list shows comes from two tables with **independent id spaces** (10.B12):
+    announcement #5 and alert #5 are different objects. The ids accepted here are *alert* ids —
+    the ones the list marks ``source="alert"``. Passing a broadcast id would not fail: it would
+    silently delete whichever alert of this user happens to carry that number.
+
+    Nothing in the app can do that today — the page only offers a checkbox on rows whose source
+    is ``alert``, because a broadcast is one shared row that no single recipient may destroy. It
+    is written down because the next caller will not have that context, and the failure mode is
+    a silent deletion of the wrong thing rather than an error.
+    """
     # Scoped to the caller's own rows (DB-R1); ids they don't own are simply not matched.
     db.execute(sa_delete(AlertLog).where(AlertLog.user_id == user.sub, AlertLog.id.in_(body.ids)))
     db.commit()

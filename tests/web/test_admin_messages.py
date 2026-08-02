@@ -87,6 +87,75 @@ def test_broadcast_is_one_row_and_everyone_sees_it(client: TestClient) -> None:
     assert _unread(client, bob) == 1
 
 
+def test_deleting_a_broadcast_takes_it_out_of_everybodys_history(client: TestClient) -> None:
+    """10.B29, and the reason the button is on the admin's page and not the recipient's: an
+    announcement is one shared row, so removing it is all-or-nothing by construction."""
+    admin = _admin_token(client)
+    alice = _make_user(client, admin, "alice@example.com")
+    sent = client.post(
+        "/api/admin/messages", json={"title": "Oops", "body": "wrong"}, headers=_bearer(admin)
+    ).json()
+    assert _unread(client, alice) == 1
+
+    gone = client.delete(f"/api/admin/messages/{sent['id']}", headers=_bearer(admin))
+    assert gone.status_code == 204
+    assert _count(AdminMessage) == 0
+    assert _count(AdminMessageDelivery) == 0, "the outcomes go with it, by cascade"
+    assert _unread(client, alice) == 0
+    assert client.get("/api/alerts", headers=_bearer(alice)).json()["items"] == []
+    again = client.delete(f"/api/admin/messages/{sent['id']}", headers=_bearer(admin))
+    assert again.status_code == 404
+
+
+def test_deleting_a_targeted_message_leaves_the_recipient_their_copy(client: TestClient) -> None:
+    """The other half of the same rule: that copy is a row of *theirs*, and ADMSG-R6 says a
+    message already delivered is not un-sent."""
+    admin = _admin_token(client)
+    alice = _make_user(client, admin, "alice@example.com")
+    alice_id = next(
+        u["id"]
+        for u in client.get("/api/admin/users", headers=_bearer(admin)).json()
+        if u["username"] == "alice@example.com"
+    )
+    sent = client.post(
+        "/api/admin/messages",
+        json={"title": "Just you", "body": "hello", "target_user_id": alice_id},
+        headers=_bearer(admin),
+    ).json()
+    assert _count(AlertLog) == 1
+
+    client.delete(f"/api/admin/messages/{sent['id']}", headers=_bearer(admin))
+    assert _count(AdminMessage) == 0
+    assert _count(AlertLog) == 1, "hers to keep, and hers to delete"
+    assert len(client.get("/api/alerts", headers=_bearer(alice)).json()["items"]) == 1
+
+
+def test_the_sent_list_separates_broadcasts_from_one_to_one_notes(client: TestClient) -> None:
+    admin = _admin_token(client)
+    alice = _make_user(client, admin, "alice@example.com")
+    _ = alice
+    alice_id = next(
+        u["id"]
+        for u in client.get("/api/admin/users", headers=_bearer(admin)).json()
+        if u["username"] == "alice@example.com"
+    )
+    client.post("/api/admin/messages", json={"title": "All", "body": "x"}, headers=_bearer(admin))
+    client.post(
+        "/api/admin/messages",
+        json={"title": "One", "body": "y", "target_user_id": alice_id},
+        headers=_bearer(admin),
+    )
+
+    def titles(query: str) -> list[str]:
+        page = client.get(f"/api/admin/messages{query}", headers=_bearer(admin)).json()
+        assert page["total"] == len(page["items"]), "the total counts the filter, not the table"
+        return [m["title"] for m in page["items"]]
+
+    assert sorted(titles("")) == ["All", "One"]
+    assert titles("?audience=all") == ["All"]
+    assert titles("?audience=user") == ["One"]
+
+
 def test_broadcast_read_pointer_moves_forward_only(client: TestClient) -> None:
     admin = _admin_token(client)
     alice = _make_user(client, admin, "alice@example.com")

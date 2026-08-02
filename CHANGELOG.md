@@ -80,6 +80,10 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - Disabled, scheduled for deletion and deleted now open the same way and name the account in bold, so you can tell which one it is about.
 - An account that cannot sign in is greyed out in the Users table, so the working ones stand out without reading the Status column.
 - Every column of that table sorts now; role and status sort by rank rather than alphabetically, which would have scattered them.
+- An announcement now shows a padlock in your history instead of a missing checkbox, and says why one recipient cannot delete it.
+- The admin can delete a sent message: for an announcement that removes it for everyone, which is the only way one ever goes away.
+- The sent list is a proper table with headers and pages, filters announcements from one-to-one notes, and no longer overlaps a long address onto the title.
+- Recipients read "Everyone" without a count, because the tags beside it count deliveries — one per person per channel — and the two numbers looked contradictory.
 
 ## [0.9.0] - 2026-07-31
 
