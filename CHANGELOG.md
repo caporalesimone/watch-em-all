@@ -35,6 +35,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - An admin Dashboard page shows the installation at a glance and how notifications went over the last 7 or 30 days.
 - The same page ranks accounts by the traffic they cause, overall and per store, so a heavy watcher is visible without exposing what they watch.
 - The admin can ask what a given day has planned: every scheduled run, in clock order, with how long that scraper usually takes.
+- A read-only day calendar draws those runs as blocks sized by their usual duration, so a heavy scraper looks heavy; clicking one opens its settings.
 
 ### Changed
 

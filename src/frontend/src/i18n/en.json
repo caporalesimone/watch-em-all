@@ -24,7 +24,8 @@
 		"debug": "Debug",
 		"priceHistory": "Price history",
 		"runs": "Runs",
-		"adminDashboard": "Dashboard"
+		"adminDashboard": "Dashboard",
+		"calendar": "Calendar"
 	},
 	"catalog": {
 		"title": "Catalog",
@@ -415,6 +416,15 @@
 			"colCache": "Cache hits",
 			"loadEmpty": "No run recorded in this window.",
 			"deletedUser": "(deleted account)"
+		},
+		"calendar": {
+			"title": "Day calendar",
+			"hint": "Read-only: this is what the worker intends to do. Change it in the schedule editor.",
+			"empty": "Nothing is scheduled for this day.",
+			"suspended": "suspended",
+			"unknownDuration": "duration unknown",
+			"today": "Today",
+			"date": "Day"
 		}
 	},
 	"plugins": {

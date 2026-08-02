@@ -464,6 +464,22 @@ export function getDashboardUsers(windowDays: number): Promise<DashboardUsers> {
 	);
 }
 
+export interface CalendarSlot {
+	scraper_id: string;
+	at: string;
+	enabled: boolean;
+	avg_seconds: number | null;
+}
+
+export interface CalendarDay {
+	date: string;
+	slots: CalendarSlot[];
+}
+
+export function getScraperCalendar(date: string): Promise<CalendarDay> {
+	return apiFetch(`/api/admin/scrapers/calendar?date=${date}`).then(asJson<CalendarDay>);
+}
+
 export interface RunSummary {
 	run_id: number;
 	scraper_id: string;
