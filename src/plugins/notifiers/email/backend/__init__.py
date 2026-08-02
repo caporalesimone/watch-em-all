@@ -90,6 +90,10 @@ class EmailNotifierPlugin(NotifierPlugin):
         port_default = 1025 if _DEV_MAILPIT else 587
         tls_default = not _DEV_MAILPIT  # Mailpit: TLS off; production: on
         from_default = "watch@mailpit.local" if _DEV_MAILPIT else None
+        # Three rows instead of six (10.F26). The widths say what belongs together: an SMTP
+        # server is one thought — where it is, on which port, with or without TLS — and reading
+        # it down a column of six made the admin assemble it themselves. Credentials are the
+        # second pair; the sender address stands alone because it is not part of the server.
         return [
             ConfigField(
                 key="smtp_host",
@@ -97,13 +101,26 @@ class EmailNotifierPlugin(NotifierPlugin):
                 type="text",
                 required=True,
                 default=host_default,
+                width="half",
             ),
             ConfigField(
-                key="smtp_port", label_key="email.cfg.port", type="number", default=port_default
+                key="smtp_port",
+                label_key="email.cfg.port",
+                type="number",
+                default=port_default,
+                width="quarter",
             ),
-            ConfigField(key="smtp_user", label_key="email.cfg.user", type="text"),
-            ConfigField(key="smtp_password", label_key="email.cfg.pass", type="password"),
-            ConfigField(key="use_tls", label_key="email.cfg.tls", type="bool", default=tls_default),
+            ConfigField(
+                key="use_tls",
+                label_key="email.cfg.tls",
+                type="bool",
+                default=tls_default,
+                width="quarter",
+            ),
+            ConfigField(key="smtp_user", label_key="email.cfg.user", type="text", width="half"),
+            ConfigField(
+                key="smtp_password", label_key="email.cfg.pass", type="password", width="half"
+            ),
             ConfigField(
                 key="from_address",
                 label_key="email.cfg.from",

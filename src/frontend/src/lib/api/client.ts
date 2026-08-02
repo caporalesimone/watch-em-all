@@ -1124,6 +1124,9 @@ export interface ConfigField {
 	help_key: string | null;
 	options: string[] | null;
 	default: string | number | boolean | null;
+	/** How much of a row the field asks for (10.F26). Optional here so a schema stored or
+	 *  mocked before the field existed still renders — missing reads as `full`. */
+	width?: 'full' | 'half' | 'third' | 'quarter';
 }
 
 // A channel as the user's Profile sees it (composite state + personal schema; secrets write-only).

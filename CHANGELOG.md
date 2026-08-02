@@ -74,6 +74,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - Save stays greyed out until you actually change something — on every form that has one, so pressing it always means a change.
 - Writing a message warns you when email is off or unconfigured: the message will only appear in the app, and nobody gets a mail.
 - A channel's badge now reads Active, Switched off or Not configured, instead of calling a switched-off channel available.
+- The email settings fit in three rows: host, port and TLS sit together, and so do the credentials — a plugin can say which fields belong side by side.
 
 ## [0.9.0] - 2026-07-31
 

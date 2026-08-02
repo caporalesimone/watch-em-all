@@ -48,6 +48,7 @@ class ConfigField(BaseModel):
 - **CFG-R4** — Validazione UI da `type`/`required`/`options`; la validazione **autoritativa** è nel backend del plugin.
 - **CFG-R5** — Al salvataggio della config **utente**, il backend **filtra le chiavi sullo schema utente** (chiavi estranee scartate e loggate): un utente non può iniettare chiavi admin. Stessa regola, simmetrica, per l'admin.
 - **CFG-R6** — `default` tipizzato coerentemente col `type` (es. `587`, `True` — non stringhe).
+- **CFG-R7** (10.F26) — `width` (`full` | `half` | `third` | `quarter`, default `full`) dichiara **quanta riga** vuole un campo. Il core disegna una griglia a 12 colonne e lo rispetta dal breakpoint `sm` in su; sotto, ogni campo occupa tutta la riga. Sta nello schema perché **solo il plugin sa quali dei suoi campi sono un unico pensiero**: host, porta e TLS *sono* un server SMTP, e letti in colonna uno sotto l'altro è l'admin a doverli rimettere insieme. Il core non può dedurlo — non impara mai il nome di un campo (CFG-R1) — e metterlo nel frontend sarebbe una regola su un campo scritta due volte, in due linguaggi. È un suggerimento di parentela, non un layout: quando c'è spazio per rispettarlo lo decide chi disegna.
 
 ## Esempio (notifier generico via canale di posta)
 

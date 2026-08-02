@@ -82,6 +82,16 @@ class ConfigField(BaseModel):
     help_key: str | None = None  # translation key for the help text
     options: list[str] | None = None  # only for select
     default: str | int | bool | None = None  # coherent with type
+    # How much of a row this field wants (10.F26). A layout *hint*, not a layout: the core
+    # renders a 12-column grid and this says how many columns to ask for, so fields that belong
+    # together — a host beside its port and its TLS switch — end up on one line instead of three.
+    #
+    # It lives in the schema because only the plugin knows which of its fields are one thought.
+    # The core cannot infer it (it never learns a field name, CFG-R1) and hard-coding it in the
+    # frontend would be the same rule in two places, for the same field, in two languages. On a
+    # narrow screen every field is full width regardless: this is a hint about relatedness, and
+    # the renderer decides when there is room to honour it.
+    width: Literal["full", "half", "third", "quarter"] = "full"
 
     @model_validator(mode="after")
     def _password_is_secret(self) -> ConfigField:

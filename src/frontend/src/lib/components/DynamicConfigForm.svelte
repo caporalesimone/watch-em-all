@@ -101,45 +101,71 @@
 
 	const field =
 		'w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900';
+
+	// The declared width as grid columns (10.F26). Twelve columns, so a half sits beside two
+	// quarters and thirds divide evenly. Written as whole class names because Tailwind scans the
+	// source for literals — `col-span-${n}` compiles to nothing at all.
+	//
+	// Below `sm` every field takes the full row: the width says which fields are one thought, not
+	// that they must be crammed side by side on a phone.
+	const SPAN: Record<string, string> = {
+		full: 'sm:col-span-12',
+		half: 'sm:col-span-6',
+		third: 'sm:col-span-4',
+		quarter: 'sm:col-span-3'
+	};
+
+	function span(f: ConfigField): string {
+		return SPAN[f.width ?? 'full'] ?? SPAN.full;
+	}
 </script>
 
 <form onsubmit={submit} class="space-y-3">
-	{#each schema as f (f.key)}
-		<label class="block text-sm">
-			<span class="mb-1 block text-slate-600 dark:text-slate-300">
-				{label(f)}{#if f.required}<span class="text-red-500"> *</span>{/if}
-			</span>
+	<div class="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-12">
+		{#each schema as f (f.key)}
+			<label class="block text-sm {span(f)}">
+				<span class="mb-1 block truncate text-slate-600 dark:text-slate-300">
+					{label(f)}{#if f.required}<span class="text-red-500"> *</span>{/if}
+				</span>
 
-			{#if f.type === 'bool'}
-				<input type="checkbox" bind:checked={values[f.key] as boolean} class="h-4 w-4" />
-			{:else if f.type === 'select'}
-				<select bind:value={values[f.key]} class={field}>
-					{#each f.options ?? [] as opt (opt)}
-						<option value={opt}>{opt}</option>
-					{/each}
-				</select>
-			{:else if f.type === 'number'}
-				<input type="number" bind:value={values[f.key]} class={field} />
-			{:else if f.secret}
-				<input
-					type="password"
-					bind:value={values[f.key]}
-					autocomplete="new-password"
-					placeholder={isSet[f.key] ? $_('notifiers.secretSet') : ''}
-					class={field}
-				/>
-			{:else}
-				<input
-					type={f.type === 'email' ? 'email' : f.type === 'url' ? 'url' : 'text'}
-					bind:value={values[f.key]}
-					placeholder={f.placeholder ?? ''}
-					class={field}
-				/>
-			{/if}
+				{#if f.type === 'bool'}
+					<!-- Boxed like the inputs beside it. A bare checkbox in a grid cell floats at a
+					     different height from its neighbours, and on a row that reads "host, port,
+					     TLS" the three controls have to line up or the row stops reading as one. -->
+					<span
+						class="flex h-[38px] items-center rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900"
+					>
+						<input type="checkbox" bind:checked={values[f.key] as boolean} class="h-4 w-4" />
+					</span>
+				{:else if f.type === 'select'}
+					<select bind:value={values[f.key]} class={field}>
+						{#each f.options ?? [] as opt (opt)}
+							<option value={opt}>{opt}</option>
+						{/each}
+					</select>
+				{:else if f.type === 'number'}
+					<input type="number" bind:value={values[f.key]} class={field} />
+				{:else if f.secret}
+					<input
+						type="password"
+						bind:value={values[f.key]}
+						autocomplete="new-password"
+						placeholder={isSet[f.key] ? $_('notifiers.secretSet') : ''}
+						class={field}
+					/>
+				{:else}
+					<input
+						type={f.type === 'email' ? 'email' : f.type === 'url' ? 'url' : 'text'}
+						bind:value={values[f.key]}
+						placeholder={f.placeholder ?? ''}
+						class={field}
+					/>
+				{/if}
 
-			{#if help(f)}<span class="mt-1 block text-xs text-slate-400">{help(f)}</span>{/if}
-		</label>
-	{/each}
+				{#if help(f)}<span class="mt-1 block text-xs text-slate-400">{help(f)}</span>{/if}
+			</label>
+		{/each}
+	</div>
 
 	<button
 		type="submit"
