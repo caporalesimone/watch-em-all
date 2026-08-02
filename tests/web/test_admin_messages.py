@@ -76,13 +76,13 @@ def test_broadcast_is_one_row_and_everyone_sees_it(client: TestClient) -> None:
     assert sent.status_code == 201
     body = sent.json()
     assert body["audience"] == "all"
-    assert body["recipient_count"] == 3  # admin + alice + bob
+    assert body["recipient_count"] == 2  # alice + bob; the admin is not an audience
 
     # The point of the design: one message row, and not a single per-user history copy.
     assert _count(AdminMessage) == 1
     assert _count(AlertLog) == 0
     # Outcomes stay per person, though — that is the part a pointer cannot compress.
-    assert _count(AdminMessageDelivery) == 3  # in-app for each; email is not configured
+    assert _count(AdminMessageDelivery) == 2  # in-app for each; email is not configured
 
     assert _unread(client, alice) == 1
     assert _unread(client, bob) == 1
@@ -248,9 +248,9 @@ def test_sent_list_shows_delivery_outcomes_never_read_state(client: TestClient) 
     item = page["items"][0]
     assert item["title"] == "Notice"
     assert item["sender_username"] == "admin"
-    assert item["recipient_count"] == 2
-    # Both recipients got the in-app copy, which is a real delivery.
-    assert item["outcomes"] == {"delivered": 2, "pending": 0, "failed": 0, "skipped": 0}
+    assert item["recipient_count"] == 1  # alice; admins are never recipients
+    # The one recipient got the in-app copy, which is a real delivery.
+    assert item["outcomes"] == {"delivered": 1, "pending": 0, "failed": 0, "skipped": 0}
     assert "read" not in item and "read_count" not in item
 
 
@@ -262,7 +262,7 @@ def test_message_detail_lists_recipients_and_their_channels(client: TestClient) 
     ).json()
 
     detail = client.get(f"/api/admin/messages/{sent['id']}", headers=_bearer(admin)).json()
-    assert {r["username"] for r in detail["recipients"]} == {"admin", "alice"}
+    assert {r["username"] for r in detail["recipients"]} == {"alice"}
     for person in detail["recipients"]:
         assert [c["plugin_id"] for c in person["channels"]] == ["in_app"]
         assert [c["status"] for c in person["channels"]] == ["delivered"]
@@ -360,3 +360,60 @@ def test_preview_is_admin_only_and_sanitises(client: TestClient) -> None:
     # What the admin sees in the preview is the escaped form, because that is what gets
     # delivered — a preview that showed the raw text would be lying about the outcome.
     assert "<script>" not in hostile and "&lt;script&gt;" in hostile
+
+
+def test_administrators_are_never_recipients(client: TestClient) -> None:
+    # Simone's rule, 2026-08-02: this channel talks to the people who use the installation, and
+    # whoever administers it already has the logs. Stated on the server, not in the dropdown.
+    admin = _admin_token(client)
+    alice = _make_user(client, admin, "alice")
+    client.post(
+        "/api/admin/users",
+        json={
+            "username": "second",
+            "first_name": "Second",
+            "last_name": "Admin",
+            "role": "admin",
+            "temp_password": "temp-pass-123",
+        },
+        headers=_bearer(admin),
+    )
+    second_id = next(
+        u["id"]
+        for u in client.get("/api/admin/users", headers=_bearer(admin)).json()
+        if u["username"] == "second"
+    )
+
+    sent = client.post(
+        "/api/admin/messages", json={"title": "Notice", "body": "b"}, headers=_bearer(admin)
+    ).json()
+    # Two admins exist and neither is counted; alice is the whole audience.
+    assert sent["recipient_count"] == 1
+    assert _unread(client, alice) == 1
+    detail = client.get(f"/api/admin/messages/{sent['id']}", headers=_bearer(admin)).json()
+    assert [r["username"] for r in detail["recipients"]] == ["alice"]
+
+    # And an admin cannot be picked out by hand either.
+    refused = client.post(
+        "/api/admin/messages",
+        json={"title": "You", "body": "b", "target_user_id": second_id},
+        headers=_bearer(admin),
+    )
+    assert refused.status_code == 422
+    assert refused.json()["code"] == "recipient_is_admin"
+
+
+def test_an_admin_cannot_message_themselves(client: TestClient) -> None:
+    admin = _admin_token(client)
+    own_id = next(
+        u["id"]
+        for u in client.get("/api/admin/users", headers=_bearer(admin)).json()
+        if u["username"] == "admin"
+    )
+    refused = client.post(
+        "/api/admin/messages",
+        json={"title": "Note to self", "body": "b", "target_user_id": own_id},
+        headers=_bearer(admin),
+    )
+    assert refused.status_code == 422
+    assert _count(AdminMessage) == 0

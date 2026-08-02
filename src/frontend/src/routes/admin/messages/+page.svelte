@@ -42,14 +42,17 @@
 	let error = $state<string | null>(null);
 	let confirmation = $state<string | null>(null);
 
-	// Only accounts that can still sign in: a message to someone locked out is an inbox nobody
-	// will open, which is the same rule the broadcast applies on the server.
-	const targets = $derived(users.filter((u) => u.is_active && !u.deletion_marked_at));
+	// Who can actually receive this: accounts that can still sign in, and **never an admin** —
+	// this channel is for the people who use the installation, and whoever administers it
+	// already has the logs. Mirrors what the server does; the server is where it is enforced.
+	const targets = $derived(
+		users.filter((u) => u.is_active && !u.deletion_marked_at && u.role !== 'admin')
+	);
 	const canSend = $derived(
 		title.trim().length > 0 &&
 			body.trim().length > 0 &&
 			!sending &&
-			(audience === 'all' || targetId !== null)
+			(audience === 'all' ? targets.length > 0 : targetId !== null)
 	);
 
 	async function refresh(): Promise<void> {
@@ -170,6 +173,13 @@
 				</select>
 			{/if}
 		</div>
+		<!-- Said out loud so a count lower than the account total does not read as a bug. -->
+		<p class="text-xs text-slate-400">{$_('admin.messages.adminsExcluded')}</p>
+		{#if audience === 'all' && targets.length === 0}
+			<p class="text-xs text-amber-600 dark:text-amber-400">
+				{$_('admin.messages.noAudience')}
+			</p>
+		{/if}
 
 		<label class="block space-y-1 text-sm">
 			<span class="text-slate-500">{$_('admin.messages.titleLabel')}</span>

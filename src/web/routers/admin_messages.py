@@ -199,8 +199,15 @@ def get_message(message_id: int, _admin: AdminDep, db: SessionDep) -> AdminMessa
 def create_message(
     body: AdminMessageCreate, request: Request, admin: AdminDep, db: SessionDep
 ) -> AdminMessageOut:
-    if body.target_user_id is not None and db.get(User, body.target_user_id) is None:
-        raise APIError(404, "user_not_found", "no such user")
+    if body.target_user_id is not None:
+        target = db.get(User, body.target_user_id)
+        if target is None:
+            raise APIError(404, "user_not_found", "no such user")
+        # Admins are not an audience for this channel, themselves least of all (Simone's rule,
+        # 2026-08-02). Refused here and not merely hidden from the composer's dropdown: a rule
+        # enforced by a widget is a rule the API does not have.
+        if target.role == "admin":
+            raise APIError(422, "recipient_is_admin", "administrators do not receive messages")
     message = send_admin_message(
         db,
         sender_id=admin.sub,

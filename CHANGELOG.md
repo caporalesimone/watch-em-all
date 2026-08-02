@@ -41,6 +41,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - Those messages arrive as email with their formatting intact; if rendering ever fails, the mail still goes out, plain.
 - Your notifications now filter by category and show announcements with their own badge, title and formatting.
 - The admin writes messages on a page of its own, with a Preview tab showing exactly what recipients get, and the sent list beneath.
+- Those messages never go to administrators — not the others, not the sender: the channel is for the people who use the installation.
 
 ### Changed
 

@@ -4,7 +4,7 @@
 
 ## Scopo
 
-Dare all'admin un canale di comunicazione verso gli utenti **dentro l'infrastruttura di notifica esistente**: una pagina da cui scrivere un messaggio (titolo + testo) e inviarlo a **tutti gli utenti** o a **un utente specifico**. Casi d'uso tipici: manutenzione programmata, novità del sistema, avviso a un singolo utente ("il tuo scraper X è sospeso, parliamone").
+Dare all'admin un canale di comunicazione verso gli utenti **dentro l'infrastruttura di notifica esistente**: una pagina da cui scrivere un messaggio (titolo + testo) e inviarlo a **tutti gli utenti** o a **un utente specifico** — mai a un altro amministratore, e mai a sé stesso (ADMSG-R1b). Casi d'uso tipici: manutenzione programmata, novità del sistema, avviso a un singolo utente ("il tuo scraper X è sospeso, parliamone").
 
 ## Le due categorie di notifica
 
@@ -37,7 +37,8 @@ La garanzia chiave è ereditata dal design esistente (ALERT-R13: storico scritto
 
 ## Requisiti
 
-- **ADMSG-R1** — L'admin dispone di una pagina per comporre un messaggio (**titolo + testo in Markdown**) e inviarlo a **tutti gli utenti attivi** o a **un utente specifico**. L'editor è una textbox con **anteprima live** del render, così quel che l'admin vede è quel che i canali HTML consegnano.
+- **ADMSG-R1** — L'admin dispone di una pagina per comporre un messaggio (**titolo + testo in Markdown**) e inviarlo a **tutti gli utenti attivi non amministratori** o a **un utente specifico non amministratore**. L'editor è una textbox con **anteprima** del render — resa dal server, così quel che l'admin vede *è* quel che i canali consegnano, non una seconda implementazione che gli somiglia; l'anteprima è su un tab e non live, per non pagare una richiesta a ogni tasto.
+- **ADMSG-R1b** — Gli **amministratori non sono destinatari** di questo canale, né gli altri né chi scrive (deciso il 2026-08-02). Il canale serve a parlare a chi *usa* l'installazione; chi la amministra ha già i log, la dashboard e il monitoraggio delle run. Il vincolo vive nel **backend** — il broadcast li esclude dalla platea e un invio mirato a un admin è rifiutato — e non solo nella tendina della pagina: una regola applicata da un widget è una regola che l'API non ha.
 - **ADMSG-R2** — Per ogni destinatario il messaggio è registrato nello **storico interno** (categoria admin, stato non letto) — **sempre**, anche senza canali configurati — e consegnato su **tutti i canali abilitati** dal destinatario, con esito per canale (stessa semantica di ALERT-R13/R14).
 - **ADMSG-R3** — Nello storico dell'utente la notifica admin è **visivamente distinta** (icona e colore dedicati alla categoria) e lo storico è filtrabile per categoria.
 - **ADMSG-R4** — Le categorie sono due: **sistema** (`alert_digest`, `summary`, `system_message`) e **admin** (`admin_message`). Il `kind` determina la categoria; i messaggi testuali hanno payload piatto (titolo + body Markdown, niente struttura a carrelli) e ogni canale li rende con gli helper del core (NOT-R8: degradazione, mai fallimento).

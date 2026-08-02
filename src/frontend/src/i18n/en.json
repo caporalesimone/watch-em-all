@@ -436,6 +436,8 @@
 			"audienceAll": "Everyone",
 			"audienceUser": "One user",
 			"pickUser": "Choose an account…",
+			"adminsExcluded": "Administrators never receive these messages, including you.",
+			"noAudience": "There is no one to send to: every account is an administrator.",
 			"titleLabel": "Title",
 			"bodyPlaceholder": "Write the message. Markdown works: **bold**, *italic*, lists, links.",
 			"markdownHint": "Markdown: **bold**, *italic*, lists, > quotes, `code`, [links](https://example.com).",

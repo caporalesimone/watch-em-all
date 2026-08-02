@@ -17,6 +17,10 @@ apart instead of being unified.
 lands in that user's ``alert_log`` like any other notification and the pointer never enters
 into it.
 
+**Administrators are never recipients** (Simone's rule, 2026-08-02) — not the sender, not the
+others. The channel is for talking to the people who use the installation; whoever administers
+it already reads the logs.
+
 Delivery outcomes are per recipient either way (ADMSG-R2), so both shapes write N rows in
 ``admin_message_delivery`` — that is the part a pointer cannot compress, because whether the
 email arrived is a fact about a person, not about the message.
@@ -39,12 +43,21 @@ if TYPE_CHECKING:
 
 
 def recipients(db: Session, target_user_id: int | None) -> list[User]:
-    """Who the message goes to: one named user, or every account that can still sign in.
+    """Who the message goes to: one named user, or every *non-admin* account that can still
+    sign in.
 
-    A broadcast deliberately skips disabled accounts and accounts marked for deletion — sending
-    an announcement to someone who cannot log in to read it is filling an inbox nobody will
-    open. A *targeted* message has no such filter: telling one person that their account is on
-    its way out is precisely the case ADMSG-R1 exists for.
+    A broadcast skips disabled accounts and accounts marked for deletion — sending an
+    announcement to someone who cannot log in to read it is filling an inbox nobody will open.
+
+    It also skips **administrators**, including the sender (Simone's rule, 2026-08-02). This
+    channel exists for an admin to talk to the people who use the installation, and an admin is
+    not one of them: they already have the log, the dashboard and the run monitor. Enforced
+    here, in the reach, and not only in the composer's dropdown — a rule that lives in a widget
+    is a rule the API does not have.
+
+    A *targeted* message keeps the disabled/deleting filter off: telling one person that their
+    account is on its way out is precisely the case ADMSG-R1 exists for. It is still refused for
+    an admin, by the caller.
     """
     if target_user_id is not None:
         user = db.get(User, target_user_id)
@@ -52,7 +65,11 @@ def recipients(db: Session, target_user_id: int | None) -> list[User]:
     return list(
         db.scalars(
             select(User)
-            .where(User.is_active.is_(True), User.deletion_marked_at.is_(None))
+            .where(
+                User.is_active.is_(True),
+                User.deletion_marked_at.is_(None),
+                User.role != "admin",
+            )
             .order_by(User.id)
         ).all()
     )
