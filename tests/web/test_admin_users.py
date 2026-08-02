@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 from fastapi.testclient import TestClient
 
 
@@ -264,6 +266,35 @@ def test_restoring_an_account_that_is_not_going_anywhere_is_a_409(client: TestCl
     refused = client.post(f"/api/admin/users/{uid}/restore", headers=_bearer(token))
     assert refused.status_code == 409
     assert refused.json()["code"] == "not_being_deleted"
+
+
+def test_changing_the_grace_period_does_not_move_a_deadline_already_set(
+    client: TestClient,
+) -> None:
+    """10.B7: the due date is a fact about that marking, not a formula re-read later."""
+    token = _admin_token(client)
+    uid = _alice_id(client, token)
+    marked = client.delete(f"/api/admin/users/{uid}", headers=_bearer(token)).json()
+    original_deadline = marked["deletion_due_at"]
+
+    changed = client.patch(
+        "/api/admin/settings", json={"user_deletion_retention_days": 1}, headers=_bearer(token)
+    )
+    assert changed.status_code == 200
+    assert changed.json()["user_deletion_retention_days"] == 1
+
+    still = next(u for u in _all(client, token) if u["username"] == "alice")
+    assert still["deletion_due_at"] == original_deadline, (
+        "shortening the grace period must not pull an account's execution date forward"
+    )
+
+    # New markings do get the new period — that is the difference between the two.
+    client.post("/api/admin/users", json=_payload(username="bob"), headers=_bearer(token))
+    bob = next(u for u in _all(client, token) if u["username"] == "bob")
+    fresh = client.delete(f"/api/admin/users/{bob['id']}", headers=_bearer(token)).json()
+    marked_at = datetime.fromisoformat(fresh["deletion_marked_at"])
+    due_at = datetime.fromisoformat(fresh["deletion_due_at"])
+    assert due_at - marked_at == timedelta(days=1)
 
 
 def test_an_admin_cannot_delete_themselves(client: TestClient) -> None:

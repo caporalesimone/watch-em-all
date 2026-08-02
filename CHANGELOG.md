@@ -19,6 +19,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - Deleting an account no longer destroys it: it is marked with a deadline and can be restored until then, coming back disabled.
 - Removing a person takes their plugin data with them and leaves every product's price history untouched — that belongs to the product.
 - Accounts past their deletion deadline are destroyed once a day; if any plugin fails to clean up, nothing is destroyed and tomorrow retries.
+- Changing the deletion grace period only affects accounts marked from then on; a deadline already set never moves.
 
 ### Changed
 
