@@ -8,9 +8,12 @@ The reach of the send lives in the core ([admin_messages](../../core/admin_messa
 module is the HTTP shape around it, plus the one refusal worth making here: a message addressed
 to an account that does not exist is a mistake, not an empty broadcast.
 
-Reading back (10.B13) shows **delivery and only delivery** (ADMSG-R5): which channel took it
-for which recipient, and why one failed. Whether anybody opened it does not appear, and there
-is no query here that could produce it.
+Reading back (10.B13) shows **delivery per recipient** (ADMSG-R5): which channel took it for
+which person, and why one failed. Since 10.B30 it also reports **how many** have opened it —
+an aggregate, never a name. The distinction is the whole of the rule: *"twelve of twenty read
+this"* is a fact about a message, *"Alice read it and Bob did not"* is a fact about Alice, and
+only the first belongs to the sender. The per-recipient view below therefore still carries
+delivery alone, and there is no query here that could produce the second.
 """
 
 from __future__ import annotations
@@ -18,12 +21,12 @@ from __future__ import annotations
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, Request
-from sqlalchemy import func, select
+from sqlalchemy import distinct, func, select
 
 from src.core.admin_messages import send_admin_message
 from src.core.errors import APIError
 from src.core.markdown import to_html
-from src.core.models import AdminMessage, AdminMessageDelivery, User
+from src.core.models import AdminMessage, AdminMessageDelivery, AlertLog, User
 from src.core.plugins.base import NotifierPlugin
 from src.web.deps import AdminDep, SessionDep
 from src.web.schemas import (
@@ -84,14 +87,66 @@ def _counts(db: SessionDep, message_ids: list[int]) -> dict[int, MessageOutcomeC
     return tally
 
 
+def _read_counts(db: SessionDep, messages: list[AdminMessage]) -> dict[int, int]:
+    """How many recipients have opened each message in the app (10.B30).
+
+    **Two grouped queries for a whole page**, never one per row — the same rule `_counts` above
+    already follows. Nothing here is worse than linear in the rows it touches:
+
+    - a **targeted** message has an ``alert_log`` row of its own carrying ``admin_message_id``,
+      so read is that row's ``read_at``. One ``GROUP BY`` over a table the nightly purge keeps
+      short (``alert_keep_last``).
+    - a **broadcast** has no per-user row: reading is the pointer ``last_broadcast_read_id``, so
+      a recipient has read announcement *M* when their pointer has reached *M*'s id. The
+      recipients are the delivery rows — indexed on ``admin_message_id`` — joined to their user
+      by primary key.
+
+    Restricting to the delivery rows is not a detail: an account created **after** an
+    announcement starts its pointer at the newest id (``latest_broadcast_id``), so "pointer ≥ id"
+    over all users would count somebody who never received it as having read it.
+
+    A recipient who deletes the message without opening it simply never appears here, which is
+    the answer to *"what if they delete it unread"* — it counts as unread, as it should.
+    """
+    out = {m.id: 0 for m in messages}
+    targeted = [m.id for m in messages if m.audience != "all"]
+    broadcasts = [m.id for m in messages if m.audience == "all"]
+
+    if targeted:
+        for message_id, n in db.execute(
+            select(AlertLog.admin_message_id, func.count())
+            .where(AlertLog.admin_message_id.in_(targeted), AlertLog.read_at.is_not(None))
+            .group_by(AlertLog.admin_message_id)
+        ).all():
+            out[int(message_id)] = int(n)
+
+    if broadcasts:
+        for message_id, n in db.execute(
+            select(
+                AdminMessageDelivery.admin_message_id,
+                func.count(distinct(AdminMessageDelivery.user_id)),
+            )
+            .join(User, User.id == AdminMessageDelivery.user_id)
+            .where(
+                AdminMessageDelivery.admin_message_id.in_(broadcasts),
+                User.last_broadcast_read_id.is_not(None),
+                User.last_broadcast_read_id >= AdminMessageDelivery.admin_message_id,
+            )
+            .group_by(AdminMessageDelivery.admin_message_id)
+        ).all():
+            out[int(message_id)] = int(n)
+    return out
+
+
 def _summary(
-    db: SessionDep, message: AdminMessage, counts: MessageOutcomeCounts
+    db: SessionDep, message: AdminMessage, counts: MessageOutcomeCounts, read_count: int = 0
 ) -> AdminMessageSummary:
     sender = db.get(User, message.sender_id) if message.sender_id else None
     return AdminMessageSummary(
         **_out(db, message).model_dump(),
         sender_username=sender.username if sender else None,
         outcomes=counts,
+        read_count=read_count,
     )
 
 
@@ -143,8 +198,9 @@ def list_messages(
         ).all()
     )
     counts = _counts(db, [m.id for m in rows])
+    reads = _read_counts(db, rows)
     return AdminMessagePage(
-        items=[_summary(db, m, counts[m.id]) for m in rows],
+        items=[_summary(db, m, counts[m.id], reads[m.id]) for m in rows],
         total=total,
         page=page,
         page_size=page_size,
@@ -193,7 +249,10 @@ def get_message(message_id: int, _admin: AdminDep, db: SessionDep) -> AdminMessa
         key=lambda r: (not any(c.status == "failed" for c in r.channels), r.username),
     )
     counts = _counts(db, [message_id])[message_id]
-    return AdminMessageDetail(**_summary(db, message, counts).model_dump(), recipients=recipients)
+    read_count = _read_counts(db, [message])[message_id]
+    return AdminMessageDetail(
+        **_summary(db, message, counts, read_count).model_dump(), recipients=recipients
+    )
 
 
 @router.delete(

@@ -316,16 +316,21 @@
 	</span>
 	<span class="w-44 shrink-0 text-xs text-slate-400">{fmt(a.created_at)}</span>
 	{#if fromAdmin}
-		<!-- Icon and colour of its own (ADMSG-R3): a message from a person must not read
-							     like one more automated digest in the same list. Muted once read, so the
-							     badge does not go on shouting after the message has been dealt with. -->
+		<!-- Icon and colour of its own (ADMSG-R3): a message from a person must not read like one
+		     more automated digest in the same list. Muted once read, so the badge stops shouting
+		     after the message has been dealt with.
+
+		     Two kinds under that one heading, told apart since 10.F31: a **📣 announcement** went
+		     to everybody, a **✉️ direct message** was written to you. Same sender, very different
+		     reasons to open it now — and the two also behave differently in this list, since only
+		     the second one you can delete. -->
 		<span
 			class="inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs {a.read
 				? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
 				: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300'}"
 		>
-			<span aria-hidden="true">📣</span>
-			{$_('alerts.categoryAdmin')}
+			<span aria-hidden="true">{a.source === 'broadcast' ? '📣' : '✉️'}</span>
+			{a.source === 'broadcast' ? $_('alerts.categoryAdmin') : $_('alerts.categoryDirect')}
 		</span>
 	{/if}
 	<span class="truncate text-sm {a.read ? '' : 'font-semibold'}">{preview(a)}</span>

@@ -303,23 +303,81 @@ def test_sending_requires_admin(client: TestClient) -> None:
     assert client.post("/api/admin/messages", json={"title": "t", "body": "b"}).status_code == 401
 
 
-def test_sent_list_shows_delivery_outcomes_never_read_state(client: TestClient) -> None:
-    # ADMSG-R5, stated as a test: the admin's view of a message is about channels, not people.
+def test_sent_list_counts_readers_but_never_names_them(client: TestClient) -> None:
+    """ADMSG-R5 as amended by 10.B30, stated as a test.
+
+    The rule moved, and the test says exactly where to. The admin may know **how many** have
+    opened a message — a fact about the message — and may not know **who** — a fact about a
+    person. So the summary carries an aggregate and the per-recipient view carries delivery
+    alone; if a username ever appears next to a read state, this fails.
+    """
     admin = _admin_token(client)
-    _make_user(client, admin, "alice@example.com")
-    client.post(
+    alice = _make_user(client, admin, "alice@example.com")
+    sent = client.post(
         "/api/admin/messages", json={"title": "Notice", "body": "body"}, headers=_bearer(admin)
-    )
+    ).json()
 
     page = client.get("/api/admin/messages", headers=_bearer(admin)).json()
-    assert page["total"] == 1
     item = page["items"][0]
     assert item["title"] == "Notice"
     assert item["sender_username"] == "admin"
     assert item["recipient_count"] == 1  # alice; admins are never recipients
-    # The one recipient got the in-app copy, which is a real delivery.
+    # The one recipient got the in-app copy, which is a real delivery — and has not read it.
     assert item["outcomes"] == {"delivered": 1, "pending": 0, "failed": 0, "skipped": 0}
-    assert "read" not in item and "read_count" not in item
+    assert item["read_count"] == 0
+
+    client.post(f"/api/alerts/broadcasts/{sent['id']}/read", headers=_bearer(alice))
+    after = client.get("/api/admin/messages", headers=_bearer(admin)).json()["items"][0]
+    assert after["read_count"] == 1
+
+    # …and still not a word about *which* recipient that was.
+    detail = client.get(f"/api/admin/messages/{sent['id']}", headers=_bearer(admin)).json()
+    for recipient in detail["recipients"]:
+        assert set(recipient) == {"user_id", "username", "channels"}
+        for channel in recipient["channels"]:
+            assert "read" not in channel and "read_at" not in channel
+
+
+def test_a_message_deleted_without_being_opened_counts_as_unread(client: TestClient) -> None:
+    """Simone's call, and the only reading the data supports: what we know is whether somebody
+    opened it, and a row that was thrown away was never opened."""
+    admin = _admin_token(client)
+    alice = _make_user(client, admin, "alice@example.com")
+    alice_id = next(
+        u["id"]
+        for u in client.get("/api/admin/users", headers=_bearer(admin)).json()
+        if u["username"] == "alice@example.com"
+    )
+    sent = client.post(
+        "/api/admin/messages",
+        json={"title": "Just you", "body": "hi", "target_user_id": alice_id},
+        headers=_bearer(admin),
+    ).json()
+    alert_id = client.get("/api/alerts", headers=_bearer(alice)).json()["items"][0]["id"]
+
+    client.request("DELETE", "/api/alerts", json={"ids": [alert_id]}, headers=_bearer(alice))
+    item = client.get(f"/api/admin/messages/{sent['id']}", headers=_bearer(admin)).json()
+    assert item["read_count"] == 0
+    assert item["recipient_count"] == 1, "it was still sent to somebody; that much is history"
+
+
+def test_a_broadcast_counts_only_the_readers_who_received_it(client: TestClient) -> None:
+    """The trap this avoids: an account created **after** an announcement starts its pointer at
+    the newest id, so "pointer ≥ id" over all users would count it as having read a message it
+    never got."""
+    admin = _admin_token(client)
+    alice = _make_user(client, admin, "alice@example.com")
+    sent = client.post(
+        "/api/admin/messages", json={"title": "Before", "body": "x"}, headers=_bearer(admin)
+    ).json()
+    _make_user(client, admin, "bob@example.com")  # arrives afterwards, pointer already at the top
+
+    detail = client.get(f"/api/admin/messages/{sent['id']}", headers=_bearer(admin)).json()
+    assert detail["recipient_count"] == 1 and detail["read_count"] == 0
+
+    client.post(f"/api/alerts/broadcasts/{sent['id']}/read", headers=_bearer(alice))
+    after = client.get(f"/api/admin/messages/{sent['id']}", headers=_bearer(admin)).json()
+    assert after["read_count"] == 1, "alice, and only alice — bob was never a recipient"
 
 
 def test_message_detail_lists_recipients_and_their_channels(client: TestClient) -> None:

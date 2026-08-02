@@ -500,8 +500,8 @@ class MessagePreviewOut(BaseModel):
 
 
 class MessageOutcomeCounts(BaseModel):
-    # How the send went, per status (10.B13). Deliberately not "read": ADMSG-R5 gives the admin
-    # delivery, not reception — whether somebody opened it is theirs.
+    # How the send went, per status (10.B13). These count **deliveries** — one per recipient per
+    # channel — so a single person with mail and in-app both on contributes two.
     delivered: int = 0
     pending: int = 0
     failed: int = 0
@@ -511,6 +511,12 @@ class MessageOutcomeCounts(BaseModel):
 class AdminMessageSummary(AdminMessageOut):
     sender_username: str | None
     outcomes: MessageOutcomeCounts
+    # How many recipients have opened it in the app (10.B30). **An aggregate and only an
+    # aggregate**: ADMSG-R5 keeps *who* read a message out of the admin's reach, and the
+    # per-recipient view below still carries delivery alone. In-app is the only reception this
+    # installation can honestly claim to know — an email that left the building says nothing
+    # about whether anybody looked at it.
+    read_count: int = 0
 
 
 class AdminMessagePage(BaseModel):

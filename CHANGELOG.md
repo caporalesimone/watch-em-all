@@ -84,6 +84,8 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - The admin can delete a sent message: for an announcement that removes it for everyone, which is the only way one ever goes away.
 - The sent list is a proper table with headers and pages, filters announcements from one-to-one notes, and no longer overlaps a long address onto the title.
 - Recipients read "Everyone" without a count, because the tags beside it count deliveries — one per person per channel — and the two numbers looked contradictory.
+- The sent list now counts people instead: how many an announcement reached and how many opened it in the app, with a tag left only for failures.
+- A message written to you alone is tagged Direct message with a letter, so it does not read like an announcement to everybody.
 
 ## [0.9.0] - 2026-07-31
 

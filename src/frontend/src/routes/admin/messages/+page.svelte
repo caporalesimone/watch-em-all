@@ -248,19 +248,9 @@
 		return m.audience === 'all' ? $_('admin.messages.toAll') : (m.target_username ?? '—');
 	}
 
-	// Written as literals so the i18n gate sees the keys used.
-	const OUTCOME_LABEL: Record<string, string> = {
-		delivered: 'admin.messages.outDelivered',
-		pending: 'admin.messages.outPending',
-		failed: 'admin.messages.outFailed',
-		skipped: 'admin.messages.outSkipped'
-	};
-	function outcomeClass(key: string): string {
-		if (key === 'delivered')
-			return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300';
-		if (key === 'failed') return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
-		return 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400';
-	}
+	// The per-status tally is gone from the list (10.B30): it counted deliveries, and the only
+	// one of them an admin acts on is a failure, which the row still shows. The full breakdown
+	// per recipient and per channel is a click away, in the popup, where it belongs.
 </script>
 
 <section class="space-y-8">
@@ -444,7 +434,7 @@
 								<th class="w-40 py-2 pr-3 font-normal">{$_('admin.messages.colSent')}</th>
 								<th class="w-48 py-2 pr-3 font-normal">{$_('admin.messages.colRecipient')}</th>
 								<th class="py-2 pr-3 font-normal">{$_('admin.messages.colTitle')}</th>
-								<th class="w-44 py-2 pr-3 font-normal">{$_('admin.messages.colDeliveries')}</th>
+								<th class="w-44 py-2 pr-3 font-normal">{$_('admin.messages.colReach')}</th>
 								<th class="w-20 py-2 font-normal"></th>
 							</tr>
 						</thead>
@@ -467,17 +457,37 @@
 										</button>
 									</td>
 									<td class="py-2 pr-3">
-										<!-- The number counts **deliveries** — one per recipient per channel —
-										     not people: a single recipient with mail and in-app both on is two
-										     of them, which is why "Everyone (1)" beside "2 delivered" read as
-										     a contradiction and no longer appears. -->
-										<div class="flex flex-wrap gap-1">
-											{#each Object.entries(m.outcomes).filter(([, n]) => n > 0) as [key, n] (key)}
-												<span class="rounded px-1.5 py-0.5 text-xs {outcomeClass(key)}">
-													{n}
-													{$_(OUTCOME_LABEL[key] ?? key)}
+										<!--
+											People, not deliveries (10.B30, Simone's call). The old tags counted
+											one per recipient per channel, so a single reader produced "2
+											delivered" — arithmetic nobody needed. What an admin wants from a
+											sent announcement is how far it went and how much of it landed.
+
+											"Read" is **in-app only**, and that is not a shortcut: an email that
+											left the building says nothing about whether anybody looked at it,
+											and a number pretending otherwise is worse than no number. It stays
+											an aggregate — *who* read it is not the sender's business (ADMSG-R5).
+										-->
+										<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+											<span class="text-slate-500" title={$_('admin.messages.reachedHint')}>
+												{$_('admin.messages.reached', { values: { n: m.recipient_count } })}
+											</span>
+											<span
+												class="text-slate-500 {m.read_count > 0 ? 'font-medium' : ''}"
+												title={$_('admin.messages.readHint')}
+											>
+												{$_('admin.messages.readCount', { values: { n: m.read_count } })}
+											</span>
+											<!-- The one delivery fact still worth a tag: a channel that refused is
+											     something to act on, unlike a tally of successes. -->
+											{#if m.outcomes.failed > 0}
+												<span
+													class="rounded bg-red-100 px-1.5 py-0.5 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+												>
+													{m.outcomes.failed}
+													{$_('admin.messages.outFailed')}
 												</span>
-											{/each}
+											{/if}
 										</div>
 									</td>
 									<td class="py-2 text-right">

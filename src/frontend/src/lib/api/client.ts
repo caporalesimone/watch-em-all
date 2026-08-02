@@ -1025,6 +1025,8 @@ export interface AdminMessageSummary {
 	created_at: string;
 	sender_username: string | null;
 	outcomes: MessageOutcomeCounts;
+	/** How many recipients have opened it **in the app** (10.B30). An aggregate, never a name. */
+	read_count: number;
 }
 
 export interface AdminMessagePage {

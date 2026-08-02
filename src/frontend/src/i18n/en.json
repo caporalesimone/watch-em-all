@@ -170,7 +170,8 @@
 		"deliveryNone": "No active channel — this notification lives only in your history.",
 		"channelInApp": "In-app",
 		"channelEmail": "Email",
-		"broadcastLocked": "Announcements are one message shared by everyone, so a single recipient cannot delete one. An administrator can remove it for everybody."
+		"broadcastLocked": "Announcements are one message shared by everyone, so a single recipient cannot delete one. An administrator can remove it for everybody.",
+		"categoryDirect": "Direct message"
 	},
 	"notifiers": {
 		"title": "Notification channels",
@@ -536,7 +537,7 @@
 			"colSent": "Sent",
 			"colRecipient": "Recipient",
 			"colTitle": "Title",
-			"colDeliveries": "Deliveries",
+			"colReach": "Reach",
 			"sentCount": "{total} message(s)",
 			"filterAll": "All",
 			"filterBroadcast": "To everyone",
@@ -547,10 +548,11 @@
 			"deleteError": "Could not delete that message.",
 			"toAll": "Everyone",
 			"recipients": "Delivery per recipient",
-			"outDelivered": "delivered",
-			"outPending": "pending",
 			"outFailed": "failed",
-			"outSkipped": "in-app only"
+			"reached": "{n} reached",
+			"reachedHint": "How many accounts it was sent to, at the moment it was sent.",
+			"readCount": "{n} read",
+			"readHint": "How many of them have opened it in the app. Only in-app: an email that left the server says nothing about whether anybody looked at it. A message deleted without being opened counts as unread."
 		}
 	},
 	"plugins": {
