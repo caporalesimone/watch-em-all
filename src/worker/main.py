@@ -28,7 +28,7 @@ from src.core.feature_flags import effective_flags, worker_tick_seconds
 from src.core.locks import scraper_lock
 from src.core.maintenance import purge_alerts_over_limit, purge_expired
 from src.core.models import Cart, ScraperSchedule, ScrapeRun, ScrapeUserLog
-from src.core.notify import drain_deliveries, enqueue_deliveries
+from src.core.notify import drain_deliveries, drain_message_deliveries, enqueue_deliveries
 from src.core.plugins.base import NotifierPlugin, ScraperPlugin
 from src.core.plugins.context import PluginContext, build_context
 from src.core.plugins.registry import LoadedPlugin, load_plugins
@@ -433,7 +433,9 @@ def _drain_deliveries_step() -> None:
     Decoupled from the scrape so a slow/failing channel never blocks a run. Never raises."""
     session = new_session()
     try:
-        n = drain_deliveries(session, _notifiers)
+        # Both queues on the same step: an admin message is a notification like any other, and
+        # giving it a timer of its own would only mean two things to keep in sync (10.B12).
+        n = drain_deliveries(session, _notifiers) + drain_message_deliveries(session, _notifiers)
         if n:
             log.info("delivery drain: processed %d pending delivery(ies)", n)
     except Exception:

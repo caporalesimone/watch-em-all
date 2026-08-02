@@ -22,6 +22,7 @@ from fastapi import APIRouter, Query, status
 from sqlalchemy import nullsfirst, nullslast, select
 from sqlalchemy.sql.elements import UnaryExpression
 
+from src.core.admin_messages import latest_broadcast_id
 from src.core.errors import APIError
 from src.core.models import User
 from src.core.security import hash_password
@@ -117,6 +118,9 @@ def create_user(body: UserCreate, _admin: AdminDep, db: SessionDep) -> AdminUser
         role=body.role,
         is_active=True,
         must_change_password=True,  # USR-R2: forced change at first login
+        # Announcements sent before this account existed are not its backlog (10.B12): the
+        # pointer starts at the newest one, so a new inbox opens empty.
+        last_broadcast_read_id=latest_broadcast_id(db),
     )
     db.add(user)
     db.commit()

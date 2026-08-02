@@ -808,6 +808,9 @@ export interface AlertDigestPayload {
 
 export interface AlertListItem {
 	id: number;
+	// Which table the id belongs to (10.B12). The history is a union of the user's own rows and
+	// the shared announcements, so an id alone does not identify a notification.
+	source: 'alert' | 'broadcast';
 	kind: string;
 	created_at: string;
 	read: boolean;
@@ -830,6 +833,7 @@ export interface AlertDelivery {
 
 export interface AlertDetail {
 	id: number;
+	source: 'alert' | 'broadcast';
 	kind: string;
 	created_at: string;
 	read: boolean;

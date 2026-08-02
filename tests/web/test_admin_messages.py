@@ -1,0 +1,235 @@
+"""Admin messages: sending, the single-row broadcast and the read pointer (10.B12).
+
+The tests worth having here are the ones that pin the *design* decision, not the endpoint: a
+broadcast must cost one row however many accounts there are, and the badge must still count it
+for each of them. Get either half wrong and the feature looks fine in a two-user installation.
+"""
+
+from __future__ import annotations
+
+from fastapi.testclient import TestClient
+from sqlalchemy import func, select
+
+from src.core.db import new_session
+from src.core.models import AdminMessage, AdminMessageDelivery, AlertLog
+
+
+def _bearer(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _admin_token(client: TestClient) -> str:
+    login = client.post("/api/auth/login", json={"username": "admin", "password": "initpass123"})
+    access = login.json()["access_token"]
+    client.post(
+        "/api/auth/change-password", json={"new_password": "adminpass123"}, headers=_bearer(access)
+    )
+    relogin = client.post("/api/auth/login", json={"username": "admin", "password": "adminpass123"})
+    return str(relogin.json()["access_token"])
+
+
+def _make_user(client: TestClient, admin: str, username: str) -> str:
+    """Create an account and return a usable token (past the forced first change)."""
+    client.post(
+        "/api/admin/users",
+        json={
+            "username": username,
+            "first_name": username.title(),
+            "last_name": "Test",
+            "role": "user",
+            "temp_password": "temp-pass-123",
+        },
+        headers=_bearer(admin),
+    )
+    first = client.post("/api/auth/login", json={"username": username, "password": "temp-pass-123"})
+    client.post(
+        "/api/auth/change-password",
+        json={"new_password": "user-pass-123"},
+        headers=_bearer(first.json()["access_token"]),
+    )
+    again = client.post("/api/auth/login", json={"username": username, "password": "user-pass-123"})
+    return str(again.json()["access_token"])
+
+
+def _count(model: type) -> int:
+    session = new_session()
+    try:
+        return int(session.scalar(select(func.count()).select_from(model)) or 0)
+    finally:
+        session.close()
+
+
+def _unread(client: TestClient, token: str) -> int:
+    return int(client.get("/api/alerts/unread-count", headers=_bearer(token)).json()["count"])
+
+
+def test_broadcast_is_one_row_and_everyone_sees_it(client: TestClient) -> None:
+    admin = _admin_token(client)
+    alice = _make_user(client, admin, "alice")
+    bob = _make_user(client, admin, "bob")
+
+    sent = client.post(
+        "/api/admin/messages",
+        json={"title": "Maintenance", "body": "We are **down** on Sunday."},
+        headers=_bearer(admin),
+    )
+    assert sent.status_code == 201
+    body = sent.json()
+    assert body["audience"] == "all"
+    assert body["recipient_count"] == 3  # admin + alice + bob
+
+    # The point of the design: one message row, and not a single per-user history copy.
+    assert _count(AdminMessage) == 1
+    assert _count(AlertLog) == 0
+    # Outcomes stay per person, though — that is the part a pointer cannot compress.
+    assert _count(AdminMessageDelivery) == 3  # in-app for each; email is not configured
+
+    assert _unread(client, alice) == 1
+    assert _unread(client, bob) == 1
+
+
+def test_broadcast_read_pointer_moves_forward_only(client: TestClient) -> None:
+    admin = _admin_token(client)
+    alice = _make_user(client, admin, "alice")
+
+    first = client.post(
+        "/api/admin/messages", json={"title": "One", "body": "first"}, headers=_bearer(admin)
+    ).json()
+    second = client.post(
+        "/api/admin/messages", json={"title": "Two", "body": "second"}, headers=_bearer(admin)
+    ).json()
+    assert _unread(client, alice) == 2
+
+    # Reading the newer one clears the older: "read up to N" is all a pointer can say, and for
+    # announcements that is the right shape (it is exactly why alerts keep per-row read state).
+    assert (
+        client.post(
+            f"/api/alerts/broadcasts/{second['id']}/read", headers=_bearer(alice)
+        ).status_code
+        == 204
+    )
+    assert _unread(client, alice) == 0
+
+    # And it never rewinds: re-reading the older one does not resurrect the newer.
+    client.post(f"/api/alerts/broadcasts/{first['id']}/read", headers=_bearer(alice))
+    assert _unread(client, alice) == 0
+
+
+def test_broadcast_predating_an_account_arrives_already_read(client: TestClient) -> None:
+    admin = _admin_token(client)
+    client.post(
+        "/api/admin/messages",
+        json={"title": "Old news", "body": "before you"},
+        headers=_bearer(admin),
+    )
+    late = _make_user(client, admin, "late")
+    # An announcement is addressed to the people who were there. The archive is still visible —
+    # announcements are public by nature — but it is not a backlog to clear, so the badge is 0.
+    assert _unread(client, late) == 0
+    listed = client.get("/api/alerts", headers=_bearer(late)).json()
+    assert [(i["source"], i["read"]) for i in listed["items"]] == [("broadcast", True)]
+
+
+def test_history_unions_alerts_and_broadcasts(client: TestClient) -> None:
+    admin = _admin_token(client)
+    alice = _make_user(client, admin, "alice")
+    alice_id = next(
+        u["id"]
+        for u in client.get("/api/admin/users", headers=_bearer(admin)).json()
+        if u["username"] == "alice"
+    )
+    client.post(
+        "/api/admin/messages",
+        json={"title": "Just you", "body": "personal", "target_user_id": alice_id},
+        headers=_bearer(admin),
+    )
+    announcement = client.post(
+        "/api/admin/messages", json={"title": "Everyone", "body": "shared"}, headers=_bearer(admin)
+    ).json()
+
+    listed = client.get("/api/alerts", headers=_bearer(alice)).json()
+    assert listed["total"] == 2
+    # Two sources, one list: the personal message has a row of its own, the announcement does
+    # not, and the ids belong to different tables — which is why `source` exists.
+    assert {i["source"] for i in listed["items"]} == {"alert", "broadcast"}
+    assert all(i["kind"] == "admin_message" for i in listed["items"])
+
+    detail = client.get(
+        f"/api/alerts/broadcasts/{announcement['id']}", headers=_bearer(alice)
+    ).json()
+    assert detail["source"] == "broadcast"
+    assert detail["payload"]["title"] == "Everyone"
+    assert detail["read"] is False
+    # The user sees how it was delivered to *them* — the in-app copy, at least.
+    assert [d["status"] for d in detail["deliveries"]] == ["delivered"]
+
+    client.post(f"/api/alerts/broadcasts/{announcement['id']}/read", headers=_bearer(alice))
+    after = client.get(
+        f"/api/alerts/broadcasts/{announcement['id']}", headers=_bearer(alice)
+    ).json()
+    assert after["read"] is True
+
+
+def test_targeted_message_lands_in_that_users_history_only(client: TestClient) -> None:
+    admin = _admin_token(client)
+    alice = _make_user(client, admin, "alice")
+    bob = _make_user(client, admin, "bob")
+    alice_id = next(
+        u["id"]
+        for u in client.get("/api/admin/users", headers=_bearer(admin)).json()
+        if u["username"] == "alice"
+    )
+
+    sent = client.post(
+        "/api/admin/messages",
+        json={"title": "About your scraper", "body": "Let us talk.", "target_user_id": alice_id},
+        headers=_bearer(admin),
+    )
+    assert sent.status_code == 201
+    assert sent.json()["audience"] == "user"
+    assert sent.json()["target_username"] == "alice"
+    assert sent.json()["recipient_count"] == 1
+
+    # One recipient means the ordinary path: a real history row, no pointer involved.
+    assert _count(AlertLog) == 1
+    assert _unread(client, alice) == 1
+    assert _unread(client, bob) == 0
+
+    listed = client.get("/api/alerts", headers=_bearer(alice)).json()
+    assert [item["kind"] for item in listed["items"]] == ["admin_message"]
+    detail = client.get(f"/api/alerts/{listed['items'][0]['id']}", headers=_bearer(alice)).json()
+    assert detail["payload"]["title"] == "About your scraper"
+    assert detail["payload"]["body"] == "Let us talk."
+
+
+def test_a_user_with_no_channels_still_gets_it_in_app(client: TestClient) -> None:
+    # ADMSG-R2 / ALERT-R13: the history is written regardless, so the message cannot be lost by
+    # a person who has configured nothing. In-app is the channel nobody can switch off.
+    admin = _admin_token(client)
+    alice = _make_user(client, admin, "alice")
+    client.post(
+        "/api/admin/messages", json={"title": "Heads up", "body": "hello"}, headers=_bearer(admin)
+    )
+    assert _unread(client, alice) == 1
+
+
+def test_unknown_target_is_refused_not_silently_broadcast(client: TestClient) -> None:
+    admin = _admin_token(client)
+    resp = client.post(
+        "/api/admin/messages",
+        json={"title": "Nobody", "body": "x", "target_user_id": 9999},
+        headers=_bearer(admin),
+    )
+    assert resp.status_code == 404
+    assert resp.json()["code"] == "user_not_found"
+    assert _count(AdminMessage) == 0
+
+
+def test_sending_requires_admin(client: TestClient) -> None:
+    admin = _admin_token(client)
+    alice = _make_user(client, admin, "alice")
+    resp = client.post(
+        "/api/admin/messages", json={"title": "t", "body": "b"}, headers=_bearer(alice)
+    )
+    assert resp.status_code == 403
+    assert client.post("/api/admin/messages", json={"title": "t", "body": "b"}).status_code == 401

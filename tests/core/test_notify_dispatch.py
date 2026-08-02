@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from src.core import notifiers as notif
-from src.core.alert_engine import AlertEvent
+from src.core.alert_engine import AlertEvent, NotificationEvent
 from src.core.contracts import ConfigField
 from src.core.db import Base
 from src.core.models import AlertDelivery, AlertLog, User
@@ -55,7 +55,7 @@ class FakeEmail(NotifierPlugin):
     def get_user_config_schema(self) -> list[ConfigField]:
         return [ConfigField(key="to_address", label_key="x", type="email", required=True)]
 
-    def send(self, notification: AlertEvent, config: dict[str, Any], locale: str) -> None:
+    def send(self, notification: NotificationEvent, config: dict[str, Any], locale: str) -> None:
         if self.fail:
             raise NotifierDeliveryError("boom")
         self.sent.append((config, locale))

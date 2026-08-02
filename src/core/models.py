@@ -22,6 +22,7 @@ from sqlalchemy import (
     LargeBinary,
     Numeric,
     String,
+    Text,
     UniqueConstraint,
     func,
 )
@@ -392,6 +393,79 @@ class AlertDelivery(Base):
     )
     plugin_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     # pending | delivered | failed | skipped | skipped_no_notifier
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="pending")
+    error: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class AdminMessage(Base):
+    """One message written by an admin (admin-notifications.md, ADMSG-R1/R6). Phase 10 (10.B12).
+
+    **A broadcast is one row, not one row per user** (Simone's decision, 2026-08-02): what an
+    announcement costs stops depending on how many accounts exist, and read state stays private
+    because it is never written here at all — each user carries a pointer instead
+    (``users.last_broadcast_read_id``). A message to a single user has one recipient already, so
+    it takes the ordinary path and lands in that user's ``alert_log``.
+
+    Immutable once sent (ADMSG-R6): there is no edit and no recall, because a message that has
+    already reached an inbox cannot be unsent — a mistake is corrected by sending another one.
+    ``sender_id`` goes null if the author's account is later deleted; the message stays, since
+    the people who received it still have it.
+    """
+
+    __tablename__ = "admin_message"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    sender_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    # "all" = broadcast (the pointer applies) | "user" = one recipient (an alert_log row).
+    audience: Mapped[str] = mapped_column(String(8), nullable=False, default="all")
+    target_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    # Frozen at send time: the audience of an announcement is who it went to *then*, and
+    # counting the users table later would answer a different question every month.
+    recipient_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class AdminMessageDelivery(Base):
+    """Per-recipient, per-channel outcome for an admin message (ADMSG-R2/R5). Phase 10 (10.B12).
+
+    A separate table from ``alert_delivery`` for one structural reason: a broadcast has no
+    ``alert_log`` row to hang outcomes off, and the outcome is inherently per **user** — the one
+    thing ``alert_delivery`` never had to know, because a digest belongs to a single person by
+    construction. Same status vocabulary, so the drain logic reads the same either way.
+
+    Note what this table does **not** contain: whether the recipient read it. Delivery is the
+    admin's business (ADMSG-R5), reading is not.
+    """
+
+    __tablename__ = "admin_message_delivery"
+    __table_args__ = (
+        Index("ix_admin_msg_delivery_msg", "admin_message_id"),
+        Index("ix_admin_msg_delivery_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    admin_message_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("admin_message.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    plugin_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    # pending | delivered | failed | skipped | skipped_no_notifier — as alert_delivery.
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="pending")
     error: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

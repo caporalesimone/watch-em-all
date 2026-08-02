@@ -23,7 +23,7 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-from src.core.alert_engine import AlertEvent, CartAlertPayload
+from src.core.alert_engine import AlertEvent, CartAlertPayload, NotificationEvent
 from src.core.contracts import ConfigField
 from src.core.plugins.base import NotifierDeliveryError, NotifierPlugin
 
@@ -117,7 +117,12 @@ class EmailNotifierPlugin(NotifierPlugin):
 
     # -------------------------------------------------------------- send
 
-    def send(self, notification: AlertEvent, config: dict[str, Any], locale: str) -> None:
+    def send(self, notification: NotificationEvent, config: dict[str, Any], locale: str) -> None:
+        if not isinstance(notification, AlertEvent):
+            # Text messages arrive with 10.B12 but are rendered by 10.B15, one MVP later. Until
+            # then the honest outcome is a recorded failure with a readable reason — better than
+            # a half-formatted email, and it is the reason the drain stores one.
+            raise NotifierDeliveryError("email: text messages not rendered yet")
         subject, html, text = self._format(notification, _strings(locale))
         self._deliver(config, subject, html, text)
 

@@ -13,9 +13,11 @@ from fastapi import APIRouter, Query
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select
 
+from src.core.admin_messages import unread_broadcast_count
+from src.core.contracts import NotificationKind
 from src.core.errors import APIError
-from src.core.models import AlertDelivery, AlertLog
-from src.core.notify import in_app_visible
+from src.core.models import AdminMessage, AdminMessageDelivery, AlertDelivery, AlertLog, User
+from src.core.notify import in_app_visible, message_event
 from src.web.deps import SessionDep, UserDep
 from src.web.schemas import (
     AlertDeliveryOut,
@@ -55,24 +57,65 @@ def list_alerts(
     if kind is not None:
         where.append(AlertLog.kind == kind)
     total = db.scalar(select(func.count()).select_from(AlertLog).where(*where)) or 0
-    rows = db.scalars(
-        select(AlertLog)
-        .where(*where)
-        .order_by(AlertLog.created_at.desc(), AlertLog.id.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    ).all()
+    take = page * page_size  # enough of each source to fill this page after the merge
     items = [
         AlertListItem(
             id=r.id,
+            source="alert",
             kind=r.kind,
             created_at=r.created_at,
             read=r.read_at is not None,
             cart_count=_cart_count(r),
         )
-        for r in rows
+        for r in db.scalars(
+            select(AlertLog)
+            .where(*where)
+            .order_by(AlertLog.created_at.desc(), AlertLog.id.desc())
+            .limit(take)
+        ).all()
     ]
-    return AlertPage(items=items, total=total, page=page, page_size=page_size)
+
+    # The second source (10.B12). Broadcasts live in their own table — one row for everybody —
+    # so the history is a union rather than a query, and the merge happens here in Python. It
+    # can afford to: the nightly purge caps a user's alert rows and announcements are rare, so
+    # both sides are short lists. A SQL union would buy nothing and cost the read.
+    person = db.get(User, user.sub)
+    if person is not None and kind in (None, NotificationKind.ADMIN_MESSAGE.value):
+        pointer = person.last_broadcast_read_id
+        broadcasts = db.scalars(
+            select(AdminMessage)
+            .where(AdminMessage.audience == "all")
+            .order_by(AdminMessage.created_at.desc(), AdminMessage.id.desc())
+            .limit(take)
+        ).all()
+        total += _broadcast_total(db)
+        items += [
+            AlertListItem(
+                id=b.id,
+                source="broadcast",
+                kind=NotificationKind.ADMIN_MESSAGE.value,
+                created_at=b.created_at,
+                # Read state is the pointer, not a flag: "read up to N" (see mark_broadcast_read).
+                read=pointer is not None and b.id <= pointer,
+                cart_count=0,
+            )
+            for b in broadcasts
+        ]
+
+    items.sort(key=lambda i: (i.created_at, i.id), reverse=True)
+    start = (page - 1) * page_size
+    return AlertPage(
+        items=items[start : start + page_size], total=total, page=page, page_size=page_size
+    )
+
+
+def _broadcast_total(db: SessionDep) -> int:
+    return int(
+        db.scalar(
+            select(func.count()).select_from(AdminMessage).where(AdminMessage.audience == "all")
+        )
+        or 0
+    )
 
 
 @router.get("/unread-count", response_model=UnreadCount, summary="Unread count for the badge.")
@@ -87,7 +130,73 @@ def unread_count(user: UserDep, db: SessionDep) -> UnreadCount:
         )
         or 0
     )
+    # The second source (10.B12). A broadcast has no row of its own per user, so its unread
+    # state is the gap between the pointer and the newest announcement — the read-side price of
+    # writing one row instead of N.
+    row = db.get(User, user.sub)
+    if row is not None:
+        count += unread_broadcast_count(db, row)
     return UnreadCount(count=count)
+
+
+@router.get(
+    "/broadcasts/{message_id}",
+    response_model=AlertDetail,
+    summary="One announcement in full, with this user's own delivery outcomes.",
+)
+def get_broadcast(message_id: int, user: UserDep, db: SessionDep) -> AlertDetail:
+    if not in_app_visible(db):
+        raise APIError(404, "alert_not_found", "alert not found")
+    message = db.get(AdminMessage, message_id)
+    if message is None or message.audience != "all":
+        raise APIError(404, "alert_not_found", "alert not found")
+    person = db.get(User, user.sub)
+    pointer = person.last_broadcast_read_id if person is not None else None
+    deliveries = [
+        AlertDeliveryOut(
+            plugin_id=d.plugin_id, status=d.status, error=d.error, updated_at=d.updated_at
+        )
+        # Only this person's rows: the message is shared, the delivery is not (DB-R1).
+        for d in db.scalars(
+            select(AdminMessageDelivery)
+            .where(
+                AdminMessageDelivery.admin_message_id == message.id,
+                AdminMessageDelivery.user_id == user.sub,
+            )
+            .order_by(AdminMessageDelivery.id)
+        ).all()
+    ]
+    return AlertDetail(
+        id=message.id,
+        source="broadcast",
+        kind=NotificationKind.ADMIN_MESSAGE.value,
+        created_at=message.created_at,
+        read=pointer is not None and message.id <= pointer,
+        payload=message_event(message, user.sub).model_dump(mode="json"),
+        deliveries=deliveries,
+    )
+
+
+@router.post(
+    "/broadcasts/{message_id}/read",
+    status_code=204,
+    summary="Mark announcements read up to this one (the pointer only moves forward).",
+)
+def mark_broadcast_read(message_id: int, user: UserDep, db: SessionDep) -> None:
+    """Advance the pointer, never rewind it.
+
+    Reading is **monotone** here, and deliberately so: "read up to N" is the only sentence a
+    pointer can say, so marking a recent announcement read also clears the older ones. That is
+    the accepted trade of the single-row design — and it is the right shape for announcements,
+    where the newest one is the one that matters, while alerts keep their per-row read state
+    precisely because there it would be wrong.
+    """
+    row = db.get(User, user.sub)
+    if row is None:
+        raise APIError(404, "alert_not_found", "alert not found")
+    if row.last_broadcast_read_id is None or message_id > row.last_broadcast_read_id:
+        row.last_broadcast_read_id = message_id
+        db.commit()
 
 
 @router.delete("", status_code=204, summary="Delete the user's alerts by id (bulk).")

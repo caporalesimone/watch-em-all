@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.core.alert_engine import AlertEvent
+from src.core.alert_engine import NotificationEvent
 from src.core.plugins.base import NotifierPlugin
 
 
@@ -22,7 +22,7 @@ class InAppNotifierPlugin(NotifierPlugin):
     display_name = "In-app"
     # No tables (table_metadata stays None) and no config schema: the core owns the record.
 
-    def send(self, notification: AlertEvent, config: dict[str, Any], locale: str) -> None:
+    def send(self, notification: NotificationEvent, config: dict[str, Any], locale: str) -> None:
         return  # no-op: the alert_log row IS the in-app delivery (marked inline by the core)
 
     def send_test(self, config: dict[str, Any], locale: str, username: str = "") -> None:

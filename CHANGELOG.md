@@ -36,6 +36,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - The same page ranks accounts by the traffic they cause, overall and per store, so a heavy watcher is visible without exposing what they watch.
 - The admin can ask what a given day has planned: every scheduled run, in clock order, with how long that scraper usually takes.
 - A read-only day calendar draws those runs as blocks sized by their usual duration, so a heavy scraper looks heavy; clicking one opens its settings.
+- The admin can send a message to everyone or to one person; it reaches every channel they have, and the in-app copy always.
 
 ### Changed
 

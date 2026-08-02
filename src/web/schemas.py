@@ -396,7 +396,10 @@ class CartItemsBody(BaseModel):
 class AlertListItem(BaseModel):
     # A row of the alert history list (6.B8). `read` = read_at is set; `cart_count` is the
     # number of carts in a digest (0 for non-digest kinds) — a light preview for the list.
+    # `source` says which table the id belongs to (10.B12): the history is a union of the
+    # user's own rows and the shared announcements, and the two id spaces are independent.
     id: int
+    source: str = "alert"  # alert | broadcast
     kind: str
     created_at: datetime
     read: bool
@@ -423,11 +426,35 @@ class AlertDetail(BaseModel):
     # One notification in full (6.B8): the self-sufficient digest payload plus its read state
     # and the per-channel delivery outcomes (7.F5).
     id: int
+    source: str = "alert"  # alert | broadcast — see AlertListItem
     kind: str
     created_at: datetime
     read: bool
     payload: dict[str, Any]
     deliveries: list[AlertDeliveryOut] = Field(default_factory=list)
+
+
+# --------------------------------------------------------------- admin messages (phase 10.B12)
+
+
+class AdminMessageCreate(BaseModel):
+    # What the admin composes (ADMSG-R1). `target_user_id` absent = every active account.
+    title: str = Field(min_length=1, max_length=200)
+    body: str = Field(min_length=1, max_length=20_000)  # Markdown (AEV-R7)
+    target_user_id: int | None = None
+
+
+class AdminMessageOut(BaseModel):
+    # A sent message as the admin sees it. `recipient_count` is frozen at send time, so it keeps
+    # saying who it went to even after accounts come and go.
+    id: int
+    audience: str  # all | user
+    target_user_id: int | None
+    target_username: str | None
+    title: str
+    body: str
+    recipient_count: int
+    created_at: datetime
 
 
 # --------------------------------------------------------------------------- notifiers (phase 7)
