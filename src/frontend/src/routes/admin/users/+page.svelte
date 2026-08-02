@@ -127,6 +127,7 @@
 		const ok = await confirmDialog({
 			title: $_('admin.users.actionReset'),
 			message: $_('admin.users.confirmReset', { values: { username: user.username } }),
+			highlight: [user.username],
 			confirmLabel: $_('admin.users.actionReset'),
 			danger: true
 		});
@@ -146,6 +147,7 @@
 		const ok = await confirmDialog({
 			title: $_('admin.users.actionDelete'),
 			message: $_('admin.users.confirmDelete', { values }),
+			highlight: [values.username, values.date],
 			confirmLabel: $_('admin.users.actionDelete'),
 			danger: true
 		});
@@ -158,11 +160,13 @@
 		// three parts out loud: the deadline on the row is being waived, the data goes with the
 		// account, and the person is told by email. "Are you sure?" would be the wrong question —
 		// the admin is sure, what they may not know is what exactly is about to happen.
+		const due = when(user.deletion_due_at);
 		const ok = await confirmDialog({
 			title: $_('admin.users.actionPurge'),
-			message: $_('admin.users.confirmPurge', {
-				values: { username: user.username, date: when(user.deletion_due_at) }
-			}),
+			message: $_('admin.users.confirmPurge', { values: { username: user.username, date: due } }),
+			// The date only if there is one: `when()` answers an em dash for a missing value, and
+			// emphasising that would pick out every dash in the sentence instead.
+			highlight: user.deletion_due_at ? [user.username, due] : [user.username],
 			confirmLabel: $_('admin.users.actionPurge'),
 			danger: true
 		});
@@ -177,10 +181,31 @@
 		const ok = await confirmDialog({
 			title: $_('admin.users.actionRestore'),
 			message: $_('admin.users.confirmRestore', { values: { username: user.username } }),
+			highlight: [user.username],
 			confirmLabel: $_('admin.users.actionRestore')
 		});
 		if (!ok) return;
 		void act(() => restoreUser(user.id));
+	}
+
+	async function doToggleActive(user: AdminUser): Promise<void> {
+		// Asked for, in both directions, because neither is only a flag. Disabling ends every
+		// session that person has open and emails them about it; enabling lets somebody back in
+		// who was deliberately shut out. Both are worth a beat between the click and the effect —
+		// and the two buttons sit where a deletion used to, on rows a mis-click can reach.
+		const disabling = user.is_active;
+		const action = disabling ? 'admin.users.actionDisable' : 'admin.users.actionEnable';
+		const ok = await confirmDialog({
+			title: $_(action),
+			message: disabling
+				? $_('admin.users.confirmDisable', { values: { username: user.username } })
+				: $_('admin.users.confirmEnable', { values: { username: user.username } }),
+			highlight: [user.username],
+			confirmLabel: $_(action),
+			danger: disabling
+		});
+		if (!ok) return;
+		void act(() => setUserActive(user.id, !user.is_active));
 	}
 
 	function when(value: string | null): string {
@@ -379,10 +404,7 @@
 										<button type="button" class={actionClass} onclick={() => doReset(user)}
 											>{$_('admin.users.actionReset')}</button
 										>
-										<button
-											type="button"
-											class={actionClass}
-											onclick={() => act(() => setUserActive(user.id, !user.is_active))}
+										<button type="button" class={actionClass} onclick={() => doToggleActive(user)}
 											>{user.is_active
 												? $_('admin.users.actionDisable')
 												: $_('admin.users.actionEnable')}</button

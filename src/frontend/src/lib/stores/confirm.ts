@@ -16,6 +16,20 @@ import { writable } from 'svelte/store';
 export interface ConfirmRequest {
 	title: string;
 	message: string;
+	/**
+	 * The values interpolated into `message` that should stand out — a username, a date.
+	 *
+	 * Passed as **data, not markup**: the message stays a plain string and <ConfirmHost> does the
+	 * emphasis by splitting on these substrings. The two alternatives were both worse. Markdown in
+	 * the message would need a renderer here, and the app already renders Markdown on the server
+	 * precisely so one set of rules cannot drift into two (9.F8). Bold tags in the translation
+	 * would mean `{@html}` on a string that carries a username — untrusted text into the DOM, to
+	 * make a word heavier.
+	 *
+	 * Every occurrence is emphasised, so a message that names the account twice reads the same
+	 * both times.
+	 */
+	highlight?: string[];
 	/** Label of the affirmative button; say what will happen ("Delete", "Send"), not "OK". */
 	confirmLabel: string;
 	/** Destructive or irreversible: the button goes red. */
