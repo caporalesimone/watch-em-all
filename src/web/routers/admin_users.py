@@ -15,7 +15,7 @@ one, so it locks nobody out.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query, status
@@ -25,6 +25,7 @@ from sqlalchemy.sql.elements import UnaryExpression
 from src.core.errors import APIError
 from src.core.models import User
 from src.core.security import hash_password
+from src.core.settings import get_system_settings
 from src.web.deps import AdminDep, SessionDep
 from src.web.schemas import AdminPasswordReset, AdminUserPatch, AdminUserSummary, UserCreate
 
@@ -55,6 +56,8 @@ def _to_summary(user: User) -> AdminUserSummary:
         must_change_password=user.must_change_password,
         last_login_at=user.last_login_at,
         created_at=user.created_at,
+        deletion_marked_at=user.deletion_marked_at,
+        deletion_due_at=user.deletion_due_at,
     )
 
 
@@ -137,6 +140,52 @@ def reset_password(
     # case where somebody else may be holding it (AUTH-R5).
     user.token_version += 1
     user.refresh_jti = None
+    db.commit()
+    db.refresh(user)
+    return _to_summary(user)
+
+
+@router.delete(
+    "/users/{user_id}",
+    response_model=AdminUserSummary,
+    summary="Mark an account for deletion after the grace period (admin only; never your own).",
+)
+def mark_for_deletion(user_id: int, admin: AdminDep, db: SessionDep) -> AdminUserSummary:
+    """Soft delete (USR-R8): nothing is destroyed here, a date is set. The worker does the
+    irreversible half when that date passes (10.B5)."""
+    user = _target(db, user_id)
+    _refuse_self(admin.sub, user)
+    if user.deletion_marked_at is None:
+        now = datetime.now(tz=UTC)
+        grace = get_system_settings(db).user_deletion_retention_days
+        user.deletion_marked_at = now
+        # Computed once, here. The due date is a **fact about this marking**, not a formula
+        # re-evaluated later: changing the grace period afterwards must not move the deadline
+        # of an account already on its way out (10.B7).
+        user.deletion_due_at = now + timedelta(days=grace)
+        user.is_active = False
+        user.token_version += 1
+        user.refresh_jti = None
+        db.commit()
+        db.refresh(user)
+    return _to_summary(user)
+
+
+@router.post(
+    "/users/{user_id}/restore",
+    response_model=AdminUserSummary,
+    summary="Cancel a pending deletion — the account comes back disabled, never active.",
+)
+def restore(user_id: int, _admin: AdminDep, db: SessionDep) -> AdminUserSummary:
+    user = _target(db, user_id)
+    if user.deletion_marked_at is None:
+        raise APIError(409, "not_being_deleted", "this account is not marked for deletion")
+    user.deletion_marked_at = None
+    user.deletion_due_at = None
+    # Deliberately **not** re-activated (USR-R10): undoing a deletion answers "do not destroy
+    # this", which is a smaller statement than "let this person back in". Turning it on again
+    # is a second, deliberate click.
+    user.is_active = False
     db.commit()
     db.refresh(user)
     return _to_summary(user)

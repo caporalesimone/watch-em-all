@@ -16,6 +16,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 - An admin can reset an account's password or disable and re-enable it — but never their own, so nobody can lock themselves out.
 - The user list sorts by last sign-in, with never-signed-in at the dormant end, and filters by active, disabled or being deleted.
+- Deleting an account no longer destroys it: it is marked with a deadline and can be restored until then, coming back disabled.
 
 ### Changed
 

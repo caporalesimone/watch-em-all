@@ -83,6 +83,16 @@ def test_create_validations(client: TestClient) -> None:
     ).status_code == 400
 
 
+def _all(client: TestClient, token: str) -> list[dict[str, object]]:
+    listed: list[dict[str, object]] = client.get("/api/admin/users", headers=_bearer(token)).json()
+    return listed
+
+
+def _names(client: TestClient, token: str, status_filter: str) -> set[str]:
+    listed = client.get(f"/api/admin/users?status={status_filter}", headers=_bearer(token)).json()
+    return {str(u["username"]) for u in listed}
+
+
 def _alice_id(client: TestClient, token: str) -> int:
     client.post("/api/admin/users", json=_payload(), headers=_bearer(token))
     listed = client.get("/api/admin/users", headers=_bearer(token)).json()
@@ -117,14 +127,10 @@ def test_list_filters_by_status_without_overlap(client: TestClient) -> None:
     client.post("/api/admin/users", json=_payload(username="bob"), headers=_bearer(token))
     client.patch(f"/api/admin/users/{uid}", json={"is_active": False}, headers=_bearer(token))
 
-    def names(query: str) -> set[str]:
-        listed = client.get(f"/api/admin/users?status={query}", headers=_bearer(token)).json()
-        return {u["username"] for u in listed}
-
-    assert names("active") == {"admin", "bob"}
-    assert names("disabled") == {"alice"}
-    assert names("deleting") == set()  # nothing is marked yet — that is 10.B3
-    assert client.get("/api/admin/users", headers=_bearer(token)).json().__len__() == 3
+    assert _names(client, token, "active") == {"admin", "bob"}
+    assert _names(client, token, "disabled") == {"alice"}
+    assert _names(client, token, "deleting") == set()  # nothing is marked yet — that is 10.B3
+    assert len(_all(client, token)) == 3
 
 
 def test_reset_password_forces_a_change_and_kills_the_old_sessions(client: TestClient) -> None:
@@ -213,6 +219,60 @@ def test_an_admin_cannot_disable_themselves_but_can_disable_another_admin(
         f"/api/admin/users/{other}", json={"is_active": False}, headers=_bearer(token)
     )
     assert allowed.status_code == 200, "an admin may disable a different admin"
+
+
+def test_soft_delete_sets_a_deadline_and_destroys_nothing(client: TestClient) -> None:
+    token = _admin_token(client)
+    uid = _alice_id(client, token)
+
+    marked = client.delete(f"/api/admin/users/{uid}", headers=_bearer(token)).json()
+    assert marked["deletion_marked_at"] is not None
+    assert marked["deletion_due_at"] is not None
+    assert marked["is_active"] is False
+    # The row is still there — that is the whole point of a soft delete.
+    assert "alice" in {u["username"] for u in _all(client, token)}
+    assert _names(client, token, "deleting") == {"alice"}
+    # And she is out: right password, but the account is on its way to being destroyed.
+    denied = client.post("/api/auth/login", json={"username": "alice", "password": "temp-pass-123"})
+    assert denied.status_code == 403
+    assert denied.json()["code"] == "account_disabled"
+
+
+def test_restore_brings_the_account_back_disabled_never_active(client: TestClient) -> None:
+    token = _admin_token(client)
+    uid = _alice_id(client, token)
+    client.delete(f"/api/admin/users/{uid}", headers=_bearer(token))
+
+    back = client.post(f"/api/admin/users/{uid}/restore", headers=_bearer(token)).json()
+    assert back["deletion_marked_at"] is None and back["deletion_due_at"] is None
+    # Undoing a deletion says "do not destroy this", which is less than "let them back in".
+    assert back["is_active"] is False
+    assert _names(client, token, "disabled") == {"alice"}
+    assert (
+        client.post("/api/auth/login", json={"username": "alice", "password": "temp-pass-123"})
+    ).status_code == 403
+
+    client.patch(f"/api/admin/users/{uid}", json={"is_active": True}, headers=_bearer(token))
+    assert (
+        client.post("/api/auth/login", json={"username": "alice", "password": "temp-pass-123"})
+    ).status_code == 200
+
+
+def test_restoring_an_account_that_is_not_going_anywhere_is_a_409(client: TestClient) -> None:
+    token = _admin_token(client)
+    uid = _alice_id(client, token)
+    refused = client.post(f"/api/admin/users/{uid}/restore", headers=_bearer(token))
+    assert refused.status_code == 409
+    assert refused.json()["code"] == "not_being_deleted"
+
+
+def test_an_admin_cannot_delete_themselves(client: TestClient) -> None:
+    token = _admin_token(client)
+    me = client.get("/api/me", headers=_bearer(token)).json()
+    refused = client.delete(f"/api/admin/users/{me['id']}", headers=_bearer(token))
+    assert refused.status_code == 403
+    assert refused.json()["code"] == "cannot_target_self"
+    assert client.get("/api/me", headers=_bearer(token)).status_code == 200
 
 
 def test_unknown_account_is_a_404(client: TestClient) -> None:

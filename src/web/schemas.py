@@ -97,6 +97,10 @@ class AdminUserSummary(BaseModel):
     must_change_password: bool
     last_login_at: datetime | None
     created_at: datetime
+    # Deferred deletion (10.B3). Both null on a normal account; together they are the
+    # "being deleted" state the status filter reads and the page shows as a countdown.
+    deletion_marked_at: datetime | None = None
+    deletion_due_at: datetime | None = None
 
 
 class CatalogItemSource(BaseModel):
