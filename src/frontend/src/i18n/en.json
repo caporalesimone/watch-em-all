@@ -433,6 +433,20 @@
 			"today": "Today",
 			"date": "Day"
 		},
+		"templates": {
+			"intro": "The texts this installation sends on its own. Every message the core declares is listed, on its built-in wording until you rewrite it.",
+			"default": "Default",
+			"custom": "Rewritten",
+			"titleLabel": "Subject",
+			"placeholders": "Placeholders:",
+			"requiredHint": "The ones marked * are required — a save without them is refused, because the message would go out without the thing it exists to carry.",
+			"unknownHint": "Not declared by this message: {names}. It will be delivered as literal text.",
+			"reset": "Back to default",
+			"confirmReset": "Drop your version and go back to the built-in wording? Your text is not kept.",
+			"saved": "Saved.",
+			"errorSave": "Could not save this message.",
+			"errorMissing": "This message must keep its required placeholder."
+		},
 		"messages": {
 			"title": "Messages to users",
 			"compose": "New message",
@@ -456,6 +470,8 @@
 			"sentTo": "Sent to {count} recipient(s).",
 			"sendError": "The message could not be sent.",
 			"immutableHint": "Once sent it cannot be edited or recalled.",
+			"sectionAnnouncements": "Announcements",
+			"sectionSystem": "System messages",
 			"sentTitle": "Sent",
 			"noneSent": "No message has been sent yet.",
 			"toAll": "Everyone ({count})",

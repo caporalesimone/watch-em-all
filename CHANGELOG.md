@@ -57,6 +57,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - Your profile shows where notifications reach you and why you cannot change it; the bootstrap admin, the one exception, sets its own.
 - Disabling an account, or scheduling it for deletion, now tells the person — and the deletion note names the date it happens.
 - Those system texts can be rewritten by the admin over the API, one at a time, and dropping the rewrite goes back to the built-in wording.
+- A System messages tab lists them all with their placeholders, a preview of what is really delivered, and one click back to the default.
 
 ## [0.9.0] - 2026-07-31
 

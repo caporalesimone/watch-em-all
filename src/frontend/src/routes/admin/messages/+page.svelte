@@ -23,7 +23,13 @@
 	import MessageBody from '$lib/components/MessageBody.svelte';
 	import NotifyViewer from '$lib/components/NotifyViewer.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
+	import SystemMessages from '$lib/components/SystemMessages.svelte';
 	import { confirmDialog } from '$lib/stores/confirm';
+
+	// Two things live on this page and they are not the same job: writing to people, and
+	// editing what the system writes on its own (10.F11). Two tabs rather than two entries in
+	// the sidebar — an admin looking for "the words this installation sends" looks in one place.
+	let section = $state<'announcements' | 'system'>('announcements');
 
 	let title = $state('');
 	let body = $state('');
@@ -164,146 +170,169 @@
 <section class="space-y-8">
 	<PageTitle title={$_('admin.messages.title')} />
 
-	<!-- ------------------------------------------------------------------ compose -->
-	<div class="space-y-4 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
-		<h2 class="text-sm font-medium text-slate-500">{$_('admin.messages.compose')}</h2>
+	<div class="flex gap-2 text-sm">
+		<button
+			onclick={() => (section = 'announcements')}
+			class="rounded-full border px-3 py-1 {section === 'announcements'
+				? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
+				: 'border-slate-300 text-slate-500 dark:border-slate-700'}"
+		>
+			{$_('admin.messages.sectionAnnouncements')}
+		</button>
+		<button
+			onclick={() => (section = 'system')}
+			class="rounded-full border px-3 py-1 {section === 'system'
+				? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
+				: 'border-slate-300 text-slate-500 dark:border-slate-700'}"
+		>
+			{$_('admin.messages.sectionSystem')}
+		</button>
+	</div>
 
-		<div class="flex flex-wrap items-center gap-4 text-sm">
-			<label class="flex items-center gap-2">
-				<input type="radio" bind:group={audience} value="all" />
-				{$_('admin.messages.audienceAll')}
-			</label>
-			<label class="flex items-center gap-2">
-				<input type="radio" bind:group={audience} value="user" />
-				{$_('admin.messages.audienceUser')}
-			</label>
-			{#if audience === 'user'}
-				<select
-					bind:value={targetId}
-					class="rounded border border-slate-300 px-2 py-1 dark:border-slate-700 dark:bg-slate-900"
-				>
-					<option value={null}>{$_('admin.messages.pickUser')}</option>
-					{#each targets as u (u.id)}
-						<option value={u.id}>{u.username}</option>
-					{/each}
-				</select>
+	{#if section === 'system'}
+		<SystemMessages />
+	{:else}
+		<!-- ------------------------------------------------------------------ compose -->
+		<div class="space-y-4 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+			<h2 class="text-sm font-medium text-slate-500">{$_('admin.messages.compose')}</h2>
+
+			<div class="flex flex-wrap items-center gap-4 text-sm">
+				<label class="flex items-center gap-2">
+					<input type="radio" bind:group={audience} value="all" />
+					{$_('admin.messages.audienceAll')}
+				</label>
+				<label class="flex items-center gap-2">
+					<input type="radio" bind:group={audience} value="user" />
+					{$_('admin.messages.audienceUser')}
+				</label>
+				{#if audience === 'user'}
+					<select
+						bind:value={targetId}
+						class="rounded border border-slate-300 px-2 py-1 dark:border-slate-700 dark:bg-slate-900"
+					>
+						<option value={null}>{$_('admin.messages.pickUser')}</option>
+						{#each targets as u (u.id)}
+							<option value={u.id}>{u.username}</option>
+						{/each}
+					</select>
+				{/if}
+			</div>
+			<!-- Said out loud so a count lower than the account total does not read as a bug. -->
+			<p class="text-xs text-slate-400">{$_('admin.messages.adminsExcluded')}</p>
+			{#if audience === 'all' && targets.length === 0}
+				<p class="text-xs text-amber-600 dark:text-amber-400">
+					{$_('admin.messages.noAudience')}
+				</p>
 			{/if}
-		</div>
-		<!-- Said out loud so a count lower than the account total does not read as a bug. -->
-		<p class="text-xs text-slate-400">{$_('admin.messages.adminsExcluded')}</p>
-		{#if audience === 'all' && targets.length === 0}
-			<p class="text-xs text-amber-600 dark:text-amber-400">
-				{$_('admin.messages.noAudience')}
-			</p>
-		{/if}
 
-		<label class="block space-y-1 text-sm">
-			<span class="text-slate-500">{$_('admin.messages.titleLabel')}</span>
-			<input
-				bind:value={title}
-				maxlength="200"
-				class="w-full rounded border border-slate-300 px-2 py-1 dark:border-slate-700 dark:bg-slate-900"
-			/>
-		</label>
+			<label class="block space-y-1 text-sm">
+				<span class="text-slate-500">{$_('admin.messages.titleLabel')}</span>
+				<input
+					bind:value={title}
+					maxlength="200"
+					class="w-full rounded border border-slate-300 px-2 py-1 dark:border-slate-700 dark:bg-slate-900"
+				/>
+			</label>
 
-		<div>
-			<div class="flex gap-1 border-b border-slate-200 text-sm dark:border-slate-800">
-				<button
-					onclick={() => (tab = 'write')}
-					class="rounded-t px-3 py-1.5 {tab === 'write'
-						? 'border border-b-transparent border-slate-200 font-medium dark:border-slate-800'
-						: 'text-slate-500'}"
-				>
-					{$_('admin.messages.tabWrite')}
-				</button>
-				<button
-					onclick={showPreview}
-					class="rounded-t px-3 py-1.5 {tab === 'preview'
-						? 'border border-b-transparent border-slate-200 font-medium dark:border-slate-800'
-						: 'text-slate-500'}"
-				>
-					{$_('admin.messages.tabPreview')}
-				</button>
+			<div>
+				<div class="flex gap-1 border-b border-slate-200 text-sm dark:border-slate-800">
+					<button
+						onclick={() => (tab = 'write')}
+						class="rounded-t px-3 py-1.5 {tab === 'write'
+							? 'border border-b-transparent border-slate-200 font-medium dark:border-slate-800'
+							: 'text-slate-500'}"
+					>
+						{$_('admin.messages.tabWrite')}
+					</button>
+					<button
+						onclick={showPreview}
+						class="rounded-t px-3 py-1.5 {tab === 'preview'
+							? 'border border-b-transparent border-slate-200 font-medium dark:border-slate-800'
+							: 'text-slate-500'}"
+					>
+						{$_('admin.messages.tabPreview')}
+					</button>
+				</div>
+
+				{#if tab === 'write'}
+					<textarea
+						bind:value={body}
+						rows="14"
+						maxlength="20000"
+						placeholder={$_('admin.messages.bodyPlaceholder')}
+						class="w-full rounded-b border border-slate-300 p-3 font-mono text-sm dark:border-slate-700 dark:bg-slate-900"
+					></textarea>
+					<p class="mt-1 text-xs text-slate-400">{$_('admin.messages.markdownHint')}</p>
+				{:else}
+					<div
+						class="min-h-[14rem] rounded-b border border-slate-300 p-3 dark:border-slate-700 dark:bg-slate-900"
+					>
+						{#if previewing}
+							<p class="text-sm text-slate-500">{$_('common.loading')}</p>
+						{:else if previewErr}
+							<p class="text-sm text-red-500">{$_('admin.messages.previewError')}</p>
+						{:else if previewHtml}
+							<MessageBody html={previewHtml} text={body} />
+						{:else}
+							<p class="text-sm text-slate-400">{$_('admin.messages.previewEmpty')}</p>
+						{/if}
+					</div>
+					<!-- Said out loud because it is the promise the server-side render buys: this is
+				     not an approximation of the message, it is the message. -->
+					<p class="mt-1 text-xs text-slate-400">{$_('admin.messages.previewIsExact')}</p>
+				{/if}
 			</div>
 
-			{#if tab === 'write'}
-				<textarea
-					bind:value={body}
-					rows="14"
-					maxlength="20000"
-					placeholder={$_('admin.messages.bodyPlaceholder')}
-					class="w-full rounded-b border border-slate-300 p-3 font-mono text-sm dark:border-slate-700 dark:bg-slate-900"
-				></textarea>
-				<p class="mt-1 text-xs text-slate-400">{$_('admin.messages.markdownHint')}</p>
-			{:else}
-				<div
-					class="min-h-[14rem] rounded-b border border-slate-300 p-3 dark:border-slate-700 dark:bg-slate-900"
+			<div class="flex flex-wrap items-center gap-3">
+				<button
+					onclick={send}
+					disabled={!canSend}
+					class="rounded bg-indigo-600 px-4 py-1.5 text-sm text-white hover:bg-indigo-500 disabled:opacity-40"
 				>
-					{#if previewing}
-						<p class="text-sm text-slate-500">{$_('common.loading')}</p>
-					{:else if previewErr}
-						<p class="text-sm text-red-500">{$_('admin.messages.previewError')}</p>
-					{:else if previewHtml}
-						<MessageBody html={previewHtml} text={body} />
-					{:else}
-						<p class="text-sm text-slate-400">{$_('admin.messages.previewEmpty')}</p>
-					{/if}
-				</div>
-				<!-- Said out loud because it is the promise the server-side render buys: this is
-				     not an approximation of the message, it is the message. -->
-				<p class="mt-1 text-xs text-slate-400">{$_('admin.messages.previewIsExact')}</p>
+					{audience === 'all'
+						? $_('admin.messages.sendAll', { values: { count: targets.length } })
+						: $_('admin.messages.sendOne')}
+				</button>
+				<span class="text-xs text-slate-400">{$_('admin.messages.immutableHint')}</span>
+				{#if confirmation}<span class="text-sm text-emerald-600">{confirmation}</span>{/if}
+				{#if error}<span class="text-sm text-red-500">{error}</span>{/if}
+			</div>
+		</div>
+
+		<!-- ------------------------------------------------------------------- sent -->
+		<div class="space-y-3">
+			<h2 class="text-sm font-medium text-slate-500">{$_('admin.messages.sentTitle')}</h2>
+
+			{#if sent.length === 0}
+				<p class="max-w-prose text-sm text-slate-500">{$_('admin.messages.noneSent')}</p>
+			{:else}
+				<ul class="divide-y divide-slate-100 text-sm dark:divide-slate-800/60">
+					{#each sent as m (m.id)}
+						<li>
+							<button
+								onclick={() => openMessage(m)}
+								class="flex w-full flex-wrap items-center gap-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-900/40"
+							>
+								<span class="w-44 shrink-0 text-xs text-slate-400">{fmt(m.created_at)}</span>
+								<span class="w-32 shrink-0 text-xs text-slate-500">
+									{m.audience === 'all'
+										? $_('admin.messages.toAll', { values: { count: m.recipient_count } })
+										: (m.target_username ?? '—')}
+								</span>
+								<span class="flex-1 truncate font-medium">{m.title}</span>
+								{#each Object.entries(m.outcomes).filter(([, n]) => n > 0) as [key, n] (key)}
+									<span class="rounded px-1.5 py-0.5 text-xs {outcomeClass(key)}">
+										{n}
+										{$_(OUTCOME_LABEL[key] ?? key)}
+									</span>
+								{/each}
+							</button>
+						</li>
+					{/each}
+				</ul>
 			{/if}
 		</div>
-
-		<div class="flex flex-wrap items-center gap-3">
-			<button
-				onclick={send}
-				disabled={!canSend}
-				class="rounded bg-indigo-600 px-4 py-1.5 text-sm text-white hover:bg-indigo-500 disabled:opacity-40"
-			>
-				{audience === 'all'
-					? $_('admin.messages.sendAll', { values: { count: targets.length } })
-					: $_('admin.messages.sendOne')}
-			</button>
-			<span class="text-xs text-slate-400">{$_('admin.messages.immutableHint')}</span>
-			{#if confirmation}<span class="text-sm text-emerald-600">{confirmation}</span>{/if}
-			{#if error}<span class="text-sm text-red-500">{error}</span>{/if}
-		</div>
-	</div>
-
-	<!-- ------------------------------------------------------------------- sent -->
-	<div class="space-y-3">
-		<h2 class="text-sm font-medium text-slate-500">{$_('admin.messages.sentTitle')}</h2>
-
-		{#if sent.length === 0}
-			<p class="max-w-prose text-sm text-slate-500">{$_('admin.messages.noneSent')}</p>
-		{:else}
-			<ul class="divide-y divide-slate-100 text-sm dark:divide-slate-800/60">
-				{#each sent as m (m.id)}
-					<li>
-						<button
-							onclick={() => openMessage(m)}
-							class="flex w-full flex-wrap items-center gap-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-900/40"
-						>
-							<span class="w-44 shrink-0 text-xs text-slate-400">{fmt(m.created_at)}</span>
-							<span class="w-32 shrink-0 text-xs text-slate-500">
-								{m.audience === 'all'
-									? $_('admin.messages.toAll', { values: { count: m.recipient_count } })
-									: (m.target_username ?? '—')}
-							</span>
-							<span class="flex-1 truncate font-medium">{m.title}</span>
-							{#each Object.entries(m.outcomes).filter(([, n]) => n > 0) as [key, n] (key)}
-								<span class="rounded px-1.5 py-0.5 text-xs {outcomeClass(key)}">
-									{n}
-									{$_(OUTCOME_LABEL[key] ?? key)}
-								</span>
-							{/each}
-						</button>
-					</li>
-				{/each}
-			</ul>
-		{/if}
-	</div>
+	{/if}
 </section>
 
 {#if viewing}

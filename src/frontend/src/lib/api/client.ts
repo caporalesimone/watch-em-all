@@ -997,6 +997,42 @@ export async function previewMessage(body: string): Promise<string> {
 	return (await asJson<{ body_html: string }>(res)).body_html;
 }
 
+// The system-message catalog (10.B17). One entry per key the core declares, whether or not an
+// admin has rewritten it — so the list is the catalog, and `is_override` says which is which.
+export interface MessageTemplate {
+	key: string;
+	title: string;
+	body: string;
+	default_title: string;
+	default_body: string;
+	placeholders: string[];
+	required: string[];
+	is_override: boolean;
+	unknown_placeholders: string[];
+}
+
+export function listMessageTemplates(): Promise<MessageTemplate[]> {
+	return apiFetch('/api/admin/message-templates').then(asJson<MessageTemplate[]>);
+}
+
+export async function saveMessageTemplate(
+	key: string,
+	title: string,
+	body: string
+): Promise<MessageTemplate> {
+	const res = await apiFetch(`/api/admin/message-templates/${key}`, {
+		method: 'PUT',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ title, body })
+	});
+	return asJson<MessageTemplate>(res);
+}
+
+/** Drop the override: the message goes back to the core's default (not a copy of it). */
+export async function resetMessageTemplate(key: string): Promise<void> {
+	await asEmpty(await apiFetch(`/api/admin/message-templates/${key}`, { method: 'DELETE' }));
+}
+
 export function getUnreadCount(): Promise<number> {
 	return apiFetch('/api/alerts/unread-count')
 		.then(asJson<{ count: number }>)
