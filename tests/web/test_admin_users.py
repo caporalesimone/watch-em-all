@@ -292,6 +292,67 @@ def test_list_sorts_by_last_login_with_the_never_seen_at_the_dormant_end(
     )
 
 
+def test_every_column_sorts_and_the_ranked_ones_are_not_alphabetical(client: TestClient) -> None:
+    """10.F28. Role and status are the interesting two: sorted as text, `admin | super_user |
+    user` is a coincidence and `active | deleting | disabled` puts the account being destroyed in
+    the middle. They are ranked instead."""
+    token = _admin_token(client)
+    for username, role, last in (
+        ("zoe@example.com", "user", "Adams"),
+        ("bob@example.com", "admin", "Zeta"),
+        ("carol@example.com", "super_user", "Monti"),
+    ):
+        client.post(
+            "/api/admin/users",
+            json=_payload(username=username, role=role, last_name=last),
+            headers=_bearer(token),
+        )
+
+    def order(sort: str, direction: str = "asc") -> list[str]:
+        got = client.get(f"/api/admin/users?sort={sort}&order={direction}", headers=_bearer(token))
+        return [u["username"] for u in got.json()]
+
+    # Least privileged first, and the bootstrap admin ties with bob — the username breaks it.
+    assert order("role") == [
+        "zoe@example.com",
+        "carol@example.com",
+        "admin",
+        "bob@example.com",
+    ]
+    # Surname first (Adams, Monti, Zeta). Checked as a relative order because the bootstrap
+    # admin has no surname at all and an empty string sorts ahead of every real one.
+    by_name = [u for u in order("name") if u != "admin"]
+    assert by_name == ["zoe@example.com", "carol@example.com", "bob@example.com"]
+
+    # Status: everybody is change-pending except the admin, so it leads; then a disabled account
+    # and finally one on its way out, which is the far end whatever `is_active` says.
+    client.patch(
+        f"/api/admin/users/{_id_of(client, token, 'carol@example.com')}",
+        json={"is_active": False},
+        headers=_bearer(token),
+    )
+    client.delete(
+        f"/api/admin/users/{_id_of(client, token, 'zoe@example.com')}", headers=_bearer(token)
+    )
+    assert order("status") == [
+        "admin",
+        "bob@example.com",
+        "carol@example.com",
+        "zoe@example.com",
+    ]
+
+    # A missing deletion date is not an extreme, it is an account outside the question: last
+    # whichever way the column points.
+    assert order("due_at")[0] == "zoe@example.com"
+    assert order("due_at", "desc")[0] == "zoe@example.com"
+
+
+def _id_of(client: TestClient, token: str, username: str) -> str:
+    """The account's id as a path fragment — the list types its values as ``object``, and every
+    caller here is about to interpolate it into a URL anyway."""
+    return str(next(u["id"] for u in _all(client, token) if u["username"] == username))
+
+
 def test_list_filters_by_status_without_overlap(client: TestClient) -> None:
     token = _admin_token(client)
     uid = _alice_id(client, token)

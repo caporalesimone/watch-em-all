@@ -27,7 +27,7 @@ Role legend: 🌐 public · 👤 user · ⚡ super-user (and admin) · 🛡 admi
 | Method | Path | Role | Body | Notes |
 |---|---|---|---|---|
 | POST | `/api/admin/users` | 🛡 | `{username, first_name, last_name, role}` | creates an account with a forced first-login password change; duplicate username → 409 (USR-R1/R2/R15). The username **is** an email address and the password is generated and mailed, never typed here (10.B23/10.B24): `422 email_channel_unavailable` if the channel cannot deliver, and no account is created. `role` ∈ {`user`, `super_user`, `admin`} — chosen here and not changed afterwards |
-| GET | `/api/admin/users` | 🛡 | — | lists all accounts (username, name, role, status, last login). `?status=active\|disabled\|deleting`, `?sort=username\|last_login`, `?order=asc\|desc` |
+| GET | `/api/admin/users` | 🛡 | — | lists all accounts (username, name, role, status, last login). `?status=active\|disabled\|deleting`; `?sort=` on **any column** (`username\|name\|role\|status\|last_login\|marked_at\|due_at`, 10.F28 — role and status by rank, not alphabetically) with `?order=asc\|desc` |
 | PATCH | `/api/admin/users/{id}` | 🛡 | `{is_active}` | enable/disable. Disabling kills the refresh family and tells the person (USR-R11); never your own account → `403 cannot_target_self` |
 | POST | `/api/admin/users/{id}/reset-password` | 🛡 | — | generate a new password, mail it, force a change and end every session (AUTH-R5) |
 | DELETE | `/api/admin/users/{id}` | 🛡 | — | **soft delete**: switches the account off and sets `deletion_due_at` = now + grace period. Nothing is destroyed (USR-R7) |

@@ -21,8 +21,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query, Request, status
-from sqlalchemy import nullsfirst, nullslast, select
-from sqlalchemy.sql.elements import UnaryExpression
+from sqlalchemy import case, nullsfirst, nullslast, select
 
 from src.core import direct_mail as mail
 from src.core import notifiers as notif
@@ -141,10 +140,62 @@ def _to_summary(user: User) -> AdminUserSummary:
     )
 
 
+UserSort = Literal["username", "name", "role", "status", "last_login", "marked_at", "due_at"]
+"""Every column of the table (10.F28). A column an admin can read is a column they will want to
+group by, and the alternative — sorting the page they were handed — sorts one page of many."""
+
+
+def _ordering(sort: UserSort, order: Literal["asc", "desc"]) -> list[Any]:
+    """The ORDER BY for one column, plus a tiebreaker.
+
+    Two of these are not columns at all. **Role** and **status** are ranked rather than sorted
+    alphabetically: `admin | super_user | user` in alphabetical order is a coincidence, and
+    `active | deleting | disabled` puts the account being destroyed in the middle. Ranked, both
+    read from healthiest/least privileged upward, which is what the eye is looking for.
+
+    Every branch ends with the username, so equal ranks come out in a stable, readable order
+    instead of whatever the database happens to return this time.
+    """
+    asc = order == "asc"
+
+    def direction(column: Any) -> Any:
+        return column.asc() if asc else column.desc()
+
+    if sort == "last_login":
+        # Never signed in is the far end of dormant, not a missing value to sweep aside:
+        # ascending (longest idle first) it belongs at the top, descending at the bottom.
+        # The database default does the opposite, so both ends are stated explicitly.
+        column = User.last_login_at
+        first = nullsfirst(column.asc()) if asc else nullslast(column.desc())
+    elif sort in ("marked_at", "due_at"):
+        # The opposite treatment, and for the opposite reason: an account with no deletion date
+        # is not at an extreme of anything, it is simply not in this conversation. It goes last
+        # whichever way the column is pointing.
+        column = User.deletion_marked_at if sort == "marked_at" else User.deletion_due_at
+        first = nullslast(direction(column))
+    elif sort == "name":
+        # Surname first: it is how a list of people is read, and the column shows both.
+        return [direction(User.last_name), direction(User.first_name), User.username.asc()]
+    elif sort == "role":
+        rank = case({"user": 0, "super_user": 1, "admin": 2}, value=User.role, else_=99)
+        first = direction(rank)
+    elif sort == "status":
+        rank = case(
+            (User.deletion_marked_at.is_not(None), 3),
+            (User.is_active.is_(False), 2),
+            (User.must_change_password.is_(True), 1),
+            else_=0,
+        )
+        first = direction(rank)
+    else:
+        return [direction(User.username)]
+    return [first, User.username.asc()]
+
+
 @router.get(
     "/users",
     response_model=list[AdminUserSummary],
-    summary="List all accounts (admin only).",
+    summary="List all accounts (admin only), sortable on every column.",
 )
 def list_users(
     _admin: AdminDep,
@@ -152,7 +203,7 @@ def list_users(
     status_filter: Annotated[
         Literal["active", "disabled", "deleting"] | None, Query(alias="status")
     ] = None,
-    sort: Literal["username", "last_login"] = "username",
+    sort: UserSort = "username",
     order: Literal["asc", "desc"] = "asc",
 ) -> list[AdminUserSummary]:
     stmt = select(User)
@@ -166,17 +217,7 @@ def list_users(
     elif status_filter == "disabled":
         stmt = stmt.where(User.is_active.is_(False), User.deletion_marked_at.is_(None))
 
-    ordering: UnaryExpression[Any]
-    if sort == "last_login":
-        column = User.last_login_at
-        # Never signed in is the far end of dormant, not a missing value to sweep aside:
-        # ascending (longest idle first) it belongs at the top, descending at the bottom.
-        # The database default does the opposite, so both ends are stated explicitly.
-        ordering = nullsfirst(column.asc()) if order == "asc" else nullslast(column.desc())
-    else:
-        ordering = User.username.asc() if order == "asc" else User.username.desc()
-
-    users = db.scalars(stmt.order_by(ordering)).all()
+    users = db.scalars(stmt.order_by(*_ordering(sort, order))).all()
     return [_to_summary(u) for u in users]
 
 

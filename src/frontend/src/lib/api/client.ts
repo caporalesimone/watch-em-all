@@ -630,7 +630,15 @@ export interface AdminUser {
 }
 
 export type UserStatusFilter = 'active' | 'disabled' | 'deleting';
-export type UserSort = 'username' | 'last_login';
+/** Every column of the Users table (10.F28). Role and status are ranked, not alphabetical. */
+export type UserSort =
+	| 'username'
+	| 'name'
+	| 'role'
+	| 'status'
+	| 'last_login'
+	| 'marked_at'
+	| 'due_at';
 
 export interface NewUser {
 	/** The account's email address, which is also its username (10.B23). */

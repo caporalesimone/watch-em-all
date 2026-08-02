@@ -69,11 +69,23 @@
 			order = order === 'asc' ? 'desc' : 'asc';
 		} else {
 			sort = column;
-			// Last login opens on the dormant end: that is the reason to sort by it at all.
-			order = column === 'last_login' ? 'asc' : 'asc';
+			order = 'asc';
 		}
 		void refresh();
 	}
+
+	// Every column, in the order the table shows them (10.F28). Written out as literals so the
+	// i18n gate can see each key, and defined once so the header cannot disagree with the body
+	// about which columns exist.
+	const columns = $derived([
+		{ key: 'username' as const, label: $_('admin.users.username') },
+		{ key: 'name' as const, label: $_('admin.users.colName') },
+		{ key: 'role' as const, label: $_('admin.users.colRole') },
+		{ key: 'status' as const, label: $_('admin.users.colStatus') },
+		{ key: 'last_login' as const, label: $_('admin.users.colLastLogin') },
+		{ key: 'marked_at' as const, label: $_('admin.users.colMarkedAt') },
+		{ key: 'due_at' as const, label: $_('admin.users.colDueAt') }
+	]);
 
 	function setFilter(next: UserStatusFilter | null): void {
 		statusFilter = next;
@@ -350,33 +362,54 @@
 		<table class="w-full text-left text-sm">
 			<thead class="border-b border-slate-200 text-xs text-slate-500 dark:border-slate-800">
 				<tr>
-					<th class="cursor-pointer py-2 pr-4 select-none" onclick={() => sortBy('username')}
-						>{$_('admin.users.username')}{arrow('username')}</th
-					>
-					<th class="py-2 pr-4">{$_('admin.users.colName')}</th>
-					<th class="py-2 pr-4">{$_('admin.users.colRole')}</th>
-					<th class="py-2 pr-4">{$_('admin.users.colStatus')}</th>
-					<th class="cursor-pointer py-2 pr-4 select-none" onclick={() => sortBy('last_login')}
-						>{$_('admin.users.colLastLogin')}{arrow('last_login')}</th
-					>
-					<th class="py-2 pr-4">{$_('admin.users.colMarkedAt')}</th>
-					<th class="py-2 pr-4">{$_('admin.users.colDueAt')}</th>
+					{#each columns as column (column.key)}
+						<th class="py-2 pr-4">
+							<!-- A real button, not a clickable <th>: sorting a table is an action, and a
+							     keyboard has to be able to reach it. -->
+							<button
+								type="button"
+								class="cursor-pointer font-normal select-none hover:text-slate-700 dark:hover:text-slate-300"
+								onclick={() => sortBy(column.key)}
+							>
+								{column.label}{arrow(column.key)}
+							</button>
+						</th>
+					{/each}
 					<th class="py-2 pr-4"></th>
 				</tr>
 			</thead>
 			<tbody>
 				{#each users as user (user.id)}
-					<tr class="border-b border-slate-100 dark:border-slate-800/60">
+					<!--
+						An account that cannot sign in reads dimmer than one that can (10.F28). Faded,
+						not hidden and not struck through: it is still a row to act on — the buttons on
+						it keep their normal weight — but the eye should find the working accounts
+						without reading the Status column one line at a time. It covers accounts on
+						their way out too, which are inactive by definition; their deletion date stays
+						red, because that is the one thing on the row still worth noticing.
+					-->
+					<tr
+						class="border-b border-slate-100 dark:border-slate-800/60 {user.is_active
+							? ''
+							: 'text-slate-400 dark:text-slate-500'}"
+					>
 						<td class="py-2 pr-4 font-medium">{user.username}</td>
 						<td class="py-2 pr-4">{user.first_name} {user.last_name}</td>
 						<td class="py-2 pr-4">{roleLabel(user.role)}</td>
 						<td class="py-2 pr-4">{status(user)}</td>
-						<td class="py-2 pr-4 text-slate-500">{lastLogin(user)}</td>
-						<td class="py-2 pr-4 text-slate-500">{when(user.deletion_marked_at)}</td>
+						<!-- Secondary on an active row, inherited on a faded one: `text-slate-500` is
+						     *darker* than the row's `text-slate-400`, so keeping it would make the
+						     least important cells the strongest thing on a disabled line. -->
+						<td class="py-2 pr-4 {user.is_active ? 'text-slate-500' : ''}">{lastLogin(user)}</td>
+						<td class="py-2 pr-4 {user.is_active ? 'text-slate-500' : ''}"
+							>{when(user.deletion_marked_at)}</td
+						>
 						<td
 							class="py-2 pr-4 {user.deletion_due_at
 								? 'text-red-600 dark:text-red-400'
-								: 'text-slate-500'}">{when(user.deletion_due_at)}</td
+								: user.is_active
+									? 'text-slate-500'
+									: ''}">{when(user.deletion_due_at)}</td
 						>
 						<td class="py-2 pr-4">
 							<!--
