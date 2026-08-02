@@ -1,4 +1,4 @@
-"""Lifetime statistics per scraper (9.B6c; phase 9b decides how to show them).
+"""Lifetime statistics per scraper (9.B6c; phase 10 decides how to show them, 10.B20/10.F15).
 
 One cumulative row per ``plugin_id``. It exists because ``scrape_run`` has retention: querying
 that table answers "recently", never "ever". Two groups of writer, on purpose:

@@ -36,10 +36,10 @@
   *Risultato: grafici interattivi per prodotto e carrello.*
 - [x] **Fase 9 — Dragon Store completo** → [phase-09-dragonstore-complete.md](phase-09-dragonstore-complete.md) — completata (`0.9.0`)
   *Risultato: monitoraggio per categorie, catalogo gestibile.*
-- [ ] **Fase 9b — Statistics** → [phase-09b-statistics.md](phase-09b-statistics.md)
-  *Risultato: le statistiche che la Fase 9 raccoglie nel database (per prodotto e per scraper) trovano una rappresentazione. La Fase 9 non ne mostra nessuna: si decide qui, guardando numeri veri già accumulati invece di immaginarseli su una tabella vuota.*
 - [ ] 🚧 **Fase 10 — Governo admin** (in corso, `0.10.x`) → [phase-10-admin-governance.md](phase-10-admin-governance.md)
-  *Risultato: plancia admin completa — statistiche, limiti, utenti, manutenzione. (Creazione/elenco utenti **anticipati** come MVP prima della Fase 3; qui restano reset password, disabilita/riabilita, cancellazione differita + restore, filtri di stato, ultimo accesso, notifiche di cortesia, dashboard del carico.)*
+  *Risultato: plancia admin completa — statistiche, limiti, utenti, manutenzione. (Creazione/elenco utenti **anticipati** come MVP prima della Fase 3; qui restano reset password, disabilita/riabilita, cancellazione differita + restore, filtri di stato, ultimo accesso, notifiche di cortesia, dashboard del carico.) Assorbe anche la **metà per scraper** della ex Fase 9b: i contatori di sempre che la Fase 9 raccoglie senza mostrarli.*
+- [ ] **Fase 10b — Statistiche per prodotto** → [phase-10b-statistics.md](phase-10b-statistics.md)
+  *Risultato: i contatori che la Fase 9 raccoglie su ogni riga di catalogo trovano una rappresentazione nella pagina utente, accanto al grafico dei prezzi. Era la "Fase 9b"; la metà admin è finita nella Fase 10, e quel che resta sta **dopo** la 10 per una ragione sua — servono settimane di numeri veri, non una tabella vuota.*
 - [ ] **Fase 11 — Summary, analisi prezzi, export** → [phase-11-insights.md](phase-11-insights.md)
   *Risultato: report periodico, badge minimo storico e convenienza, export dei dati.*
 - [ ] **Fase 12 — Rifinitura e 1.0** → [phase-12-polish-v1.md](phase-12-polish-v1.md)
@@ -59,7 +59,7 @@
 flowchart LR
     F0[0 Pipeline] --> F1[1 Fondamenta] --> F2[2 Plugin system] --> F3[3 Primo scrape] --> F4[4 Worker]
     F4 --> F5[5 Carrelli] --> F6[6 Alert in-app] --> F7[7 Email 🎉 0.1]
-    F7 --> F8[8 Grafici] --> F9[9 DragonStore full] --> F10[10 Admin] --> F11[11 Insight] --> F12[12 1.0]
+    F7 --> F8[8 Grafici] --> F9[9 DragonStore full] --> F10[10 Admin] --> F10b[10b Statistiche prodotto] --> F11[11 Insight] --> F12[12 1.0]
     F12 -.post-1.0.-> F13[13 Resilienza scraping 💡]
 ```
 

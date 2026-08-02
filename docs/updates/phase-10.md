@@ -1,7 +1,8 @@
 # Phase 10 — Admin governance 🛡
 
 > Feature-level recap. Phase 10 fills in the administrator's console: statistics and drill-down
-> for the runs, system limits editable while the application runs, full user management (deferred
+> for the runs, the **lifetime counters per scraper** that phase 9 started collecting and nobody
+> has seen yet, system limits editable while the application runs, full user management (deferred
 > deletion with a restore, filters, last login), messages to users, and the retention and purge
 > that keep the tables from growing for ever.
 >

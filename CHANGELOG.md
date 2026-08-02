@@ -8,7 +8,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 ## [0.10.0] - Unreleased
 
-**Phase 10 — Admin governance: the administrator's console filled in — run statistics and drill-down, system limits editable while it runs, full user management (with deferred deletion and restore), messages to users, retention and purge. It opens with a catalog polish: the Source column shows the store's logo alone. Entries land below as they ship.**
+**Phase 10 — Admin governance: the administrator's console filled in — run statistics and drill-down, the lifetime counters per scraper that phase 9 collects but never showed, system limits editable while it runs, full user management (with deferred deletion and restore), messages to users, retention and purge. It opens with a catalog polish: the Source column shows the store's logo alone. Entries land below as they ship.**
 
 ## [0.9.0] - 2026-07-31
 

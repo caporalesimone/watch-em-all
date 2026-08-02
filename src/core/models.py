@@ -108,7 +108,7 @@ class CatalogProduct(Base):
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # --- per-product statistics (9.B6b) -------------------------------------------------
     # Counted per catalog row, so per user: two users watching the same product keep their
-    # own numbers. Written by the catalog service; how they are shown is phase 9b.
+    # own numbers. Written by the catalog service; how they are shown is phase 10b.
     #
     # Fresh reads only: a delivery served from the scrape cache increments `cache_hits`
     # instead, otherwise this would count "times we re-served a page" rather than times the
@@ -630,7 +630,7 @@ class ScrapeCache(Base):
 
 
 class ScraperStats(Base):
-    """Lifetime statistics for one scraper (9.B6c, phase 9b decides how to show them).
+    """Lifetime statistics for one scraper (9.B6c, phase 10 decides how to show them).
 
     One row per ``plugin_id``, **global** (not per user), and **cumulative**. It exists
     because ``scrape_run`` has retention: aggregating that table answers "recently", never
