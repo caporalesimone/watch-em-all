@@ -89,6 +89,44 @@ def _alice_id(client: TestClient, token: str) -> int:
     return int(next(u["id"] for u in listed if u["username"] == "alice"))
 
 
+def test_list_sorts_by_last_login_with_the_never_seen_at_the_dormant_end(
+    client: TestClient,
+) -> None:
+    """10.B2: the sort exists to find dormant accounts, so 'never signed in' is the extreme."""
+    token = _admin_token(client)
+    client.post("/api/admin/users", json=_payload(), headers=_bearer(token))
+    client.post("/api/admin/users", json=_payload(username="bob"), headers=_bearer(token))
+    # Only alice ever signs in; bob never does. The admin has just logged in too.
+    client.post("/api/auth/login", json={"username": "alice", "password": "temp-pass-123"})
+
+    oldest_first = client.get(
+        "/api/admin/users?sort=last_login&order=asc", headers=_bearer(token)
+    ).json()
+    assert oldest_first[0]["username"] == "bob", "never signed in is the most dormant of all"
+    assert oldest_first[0]["last_login_at"] is None
+
+    newest_first = client.get(
+        "/api/admin/users?sort=last_login&order=desc", headers=_bearer(token)
+    ).json()
+    assert newest_first[-1]["username"] == "bob", "and it belongs at the other end reversed"
+
+
+def test_list_filters_by_status_without_overlap(client: TestClient) -> None:
+    token = _admin_token(client)
+    uid = _alice_id(client, token)
+    client.post("/api/admin/users", json=_payload(username="bob"), headers=_bearer(token))
+    client.patch(f"/api/admin/users/{uid}", json={"is_active": False}, headers=_bearer(token))
+
+    def names(query: str) -> set[str]:
+        listed = client.get(f"/api/admin/users?status={query}", headers=_bearer(token)).json()
+        return {u["username"] for u in listed}
+
+    assert names("active") == {"admin", "bob"}
+    assert names("disabled") == {"alice"}
+    assert names("deleting") == set()  # nothing is marked yet — that is 10.B3
+    assert client.get("/api/admin/users", headers=_bearer(token)).json().__len__() == 3
+
+
 def test_reset_password_forces_a_change_and_kills_the_old_sessions(client: TestClient) -> None:
     token = _admin_token(client)
     uid = _alice_id(client, token)

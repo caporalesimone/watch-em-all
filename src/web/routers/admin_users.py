@@ -16,9 +16,11 @@ one, so it locks nobody out.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, status
-from sqlalchemy import select
+from fastapi import APIRouter, Query, status
+from sqlalchemy import nullsfirst, nullslast, select
+from sqlalchemy.sql.elements import UnaryExpression
 
 from src.core.errors import APIError
 from src.core.models import User
@@ -61,8 +63,37 @@ def _to_summary(user: User) -> AdminUserSummary:
     response_model=list[AdminUserSummary],
     summary="List all accounts (admin only).",
 )
-def list_users(_admin: AdminDep, db: SessionDep) -> list[AdminUserSummary]:
-    users = db.scalars(select(User).order_by(User.username)).all()
+def list_users(
+    _admin: AdminDep,
+    db: SessionDep,
+    status_filter: Annotated[
+        Literal["active", "disabled", "deleting"] | None, Query(alias="status")
+    ] = None,
+    sort: Literal["username", "last_login"] = "username",
+    order: Literal["asc", "desc"] = "asc",
+) -> list[AdminUserSummary]:
+    stmt = select(User)
+    # "Being deleted" is not a column but the combination the login gate already reads
+    # (USR-R14): an account marked for deletion is out whatever `is_active` says, so it must
+    # not also show up under "disabled" or the two filters would overlap.
+    if status_filter == "deleting":
+        stmt = stmt.where(User.deletion_marked_at.is_not(None))
+    elif status_filter == "active":
+        stmt = stmt.where(User.is_active.is_(True), User.deletion_marked_at.is_(None))
+    elif status_filter == "disabled":
+        stmt = stmt.where(User.is_active.is_(False), User.deletion_marked_at.is_(None))
+
+    ordering: UnaryExpression[Any]
+    if sort == "last_login":
+        column = User.last_login_at
+        # Never signed in is the far end of dormant, not a missing value to sweep aside:
+        # ascending (longest idle first) it belongs at the top, descending at the bottom.
+        # The database default does the opposite, so both ends are stated explicitly.
+        ordering = nullsfirst(column.asc()) if order == "asc" else nullslast(column.desc())
+    else:
+        ordering = User.username.asc() if order == "asc" else User.username.desc()
+
+    users = db.scalars(stmt.order_by(ordering)).all()
     return [_to_summary(u) for u in users]
 
 
