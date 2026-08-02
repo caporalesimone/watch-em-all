@@ -6,6 +6,8 @@ functional endpoints, refresh rotation and reuse detection, logout."""
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -157,3 +159,49 @@ def test_logout_then_refresh_is_rejected(client: TestClient) -> None:
 
     after = client.post("/api/auth/refresh", json={"refresh_token": refresh})
     assert after.status_code == 401
+
+
+def test_an_old_password_is_forced_to_change_at_the_next_sign_in(client: TestClient) -> None:
+    """10.B19: expiry reuses the forced-change flow rather than refusing the login.
+
+    The account is not in trouble — the password is old. Locking somebody out over age
+    would be a punishment; sending them to the change page is the actual intent.
+    """
+    access = _login(client, "initpass123")
+    assert (
+        client.post(
+            "/api/auth/change-password", headers=_auth(access), json={"new_password": "newpass123"}
+        ).status_code
+        == 204
+    )
+    token = _login(client, "newpass123")
+    assert client.get("/api/me", headers=_auth(token)).json()["must_change_password"] is False
+
+    # Off by default: turning it on is what makes anything happen.
+    client.patch("/api/admin/settings", headers=_auth(token), json={"password_expiry_days": 30})
+    session = new_session()
+    try:
+        user = session.scalars(select(User).where(User.username == "admin")).one()
+        user.password_changed_at = datetime.now(UTC) - timedelta(days=31)
+        session.commit()
+    finally:
+        session.close()
+
+    aged = _login(client, "newpass123")  # still gets in
+    assert client.get("/api/me", headers=_auth(aged)).json()["must_change_password"] is True
+
+
+def test_expiry_off_leaves_an_ancient_password_alone(client: TestClient) -> None:
+    access = _login(client, "initpass123")
+    client.post(
+        "/api/auth/change-password", headers=_auth(access), json={"new_password": "newpass123"}
+    )
+    session = new_session()
+    try:
+        user = session.scalars(select(User).where(User.username == "admin")).one()
+        user.password_changed_at = datetime.now(UTC) - timedelta(days=4000)
+        session.commit()
+    finally:
+        session.close()
+    token = _login(client, "newpass123")
+    assert client.get("/api/me", headers=_auth(token)).json()["must_change_password"] is False

@@ -8,7 +8,7 @@ DB, rotate; a reused (stale-jti) refresh bumps token_version (global logout) and
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Request, Response, status
 from sqlalchemy import select
@@ -25,6 +25,7 @@ from src.core.security import (
     new_jti,
     verify_password,
 )
+from src.core.settings import get_system_settings
 from src.web.deps import ClaimsDep, SessionDep, SettingsDep
 from src.web.schemas import ChangePasswordRequest, LoginRequest, RefreshRequest, TokenPair
 
@@ -58,6 +59,12 @@ def _issue_pair(settings: SettingsDep, user: User) -> TokenPair:
     return TokenPair(access_token=access, refresh_token=refresh, expires_at=access_exp)
 
 
+def _as_utc(value: datetime) -> datetime:
+    """SQLite hands back naive timestamps; everything we write is UTC (same helper idea as
+    9.B6b). Comparing a naive value with an aware one raises, and only in the tests."""
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+
 @router.post(
     "/login",
     response_model=TokenPair,
@@ -78,7 +85,17 @@ def login(body: LoginRequest, request: Request, settings: SettingsDep, db: Sessi
         raise APIError(403, "account_disabled", "this account can no longer sign in")
 
     _login_limiter.reset(rl_key)
-    user.last_login_at = datetime.now(tz=UTC)
+    now = datetime.now(tz=UTC)
+    # Password expiry (10.B19). Enforced here rather than as a refusal: the account is not in
+    # trouble, the password is old, so it reuses the forced-change flow the first login
+    # already knows — the person gets in and is sent straight to the change page. `0` = never,
+    # and it is the default, so nothing happens unless an admin turned this on.
+    max_age_days = get_system_settings(db).password_expiry_days
+    if max_age_days and not user.must_change_password:
+        age = now - _as_utc(user.password_changed_at)
+        if age > timedelta(days=max_age_days):
+            user.must_change_password = True
+    user.last_login_at = now
     pair = _issue_pair(settings, user)
     db.commit()
     return pair

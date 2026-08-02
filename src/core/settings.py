@@ -7,7 +7,7 @@ later MVP (4.F2) — 4.B5 only reads ``scraper_run_timeout_min``.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -24,6 +24,11 @@ class SystemSettings(BaseModel):
     catchup_warning_min: int = Field(default=10, ge=0, le=1440)
     log_retention_days: int = Field(default=90, ge=0, le=3650)  # 0 = never purge
     user_deletion_retention_days: int = Field(default=30, ge=1, le=365)
+    # How long a password may stand before the next sign-in forces a new one (10.B19).
+    # **Fixed options, not free days**: an admin typing 3 instead of 30 would lock every
+    # account into a change on their next visit, and the range check cannot tell the two
+    # apart. 0 = never, which is the default — the feature is opt-in.
+    password_expiry_days: Literal[0, 30, 90, 180, 365] = 0
 
 
 KNOWN_SETTINGS = set(SystemSettings.model_fields)
