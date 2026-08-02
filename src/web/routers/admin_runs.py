@@ -63,6 +63,7 @@ def list_runs(
     status_filter: Annotated[
         Literal["ok", "partial", "error", "timeout", "running"] | None, Query(alias="status")
     ] = None,
+    trigger: Literal["scheduled", "manual", "all"] = "scheduled",
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=200)] = 25,
 ) -> RunPage:
@@ -71,6 +72,13 @@ def list_runs(
         where.append(ScrapeRun.scraper_id == scraper_id)
     if status_filter:
         where.append(ScrapeRun.status == status_filter)
+    # **Scheduled by default** (Simone, 2026-08-02). Since 10.B20 a manual scrape writes a run
+    # row too, which is what makes the traffic honest — but the question this page usually
+    # answers is "is the schedule healthy", and a handful of manual runs interleaved with it
+    # would push the scheduled ones off the first page on exactly the day somebody is
+    # debugging by hand. They are one click away, and `all` shows both.
+    if trigger != "all":
+        where.append(ScrapeRun.trigger == trigger)
 
     total = db.scalar(select(func.count()).select_from(ScrapeRun).where(*where)) or 0
     # Newest first, and `run_id` as the tie-break: two runs can start in the same second

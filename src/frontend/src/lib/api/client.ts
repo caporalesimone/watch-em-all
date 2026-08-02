@@ -535,12 +535,15 @@ export interface RunPage {
 export function listRuns(opts?: {
 	scraperId?: string | null;
 	status?: string | null;
+	/** Scheduled (the server's default), manual, or both (10.B20). */
+	trigger?: 'scheduled' | 'manual' | 'all';
 	page?: number;
 	pageSize?: number;
 }): Promise<RunPage> {
 	const q = new URLSearchParams();
 	if (opts?.scraperId) q.set('scraper_id', opts.scraperId);
 	if (opts?.status) q.set('status', opts.status);
+	if (opts?.trigger) q.set('trigger', opts.trigger);
 	q.set('page', String(opts?.page ?? 1));
 	q.set('page_size', String(opts?.pageSize ?? 25));
 	return apiFetch(`/api/admin/runs?${q}`).then(asJson<RunPage>);

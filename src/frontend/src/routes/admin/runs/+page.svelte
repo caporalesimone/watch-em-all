@@ -12,13 +12,18 @@
 	let total = $state(0);
 	let page = $state(1);
 	let statusFilter = $state<string | null>(null);
+	// Scheduled by default (Simone, 2026-08-02). A manual scrape writes a run row too since
+	// 10.B20 — which is what makes the traffic honest — but the question this page usually
+	// answers is "is the schedule healthy", and manual runs interleaved with it would push the
+	// scheduled ones off the first page on exactly the day somebody is debugging by hand.
+	let trigger = $state<'scheduled' | 'manual' | 'all'>('scheduled');
 	let loading = $state(true);
 
 	const PAGE_SIZE = 25;
 	const pages = $derived(Math.max(1, Math.ceil(total / PAGE_SIZE)));
 
 	async function refresh(): Promise<void> {
-		const result = await listRuns({ status: statusFilter, page, pageSize: PAGE_SIZE });
+		const result = await listRuns({ status: statusFilter, trigger, page, pageSize: PAGE_SIZE });
 		runs = result.items;
 		total = result.total;
 		loading = false;
@@ -29,6 +34,12 @@
 	function setStatus(next: string | null): void {
 		statusFilter = next;
 		page = 1; // a filtered set is shorter, and page 7 of it may not exist
+		void refresh();
+	}
+
+	function setTrigger(next: 'scheduled' | 'manual' | 'all'): void {
+		trigger = next;
+		page = 1;
 		void refresh();
 	}
 
@@ -44,6 +55,12 @@
 		{ key: 'partial', label: $_('admin.runs.statusPartial') },
 		{ key: 'error', label: $_('admin.runs.statusError') },
 		{ key: 'timeout', label: $_('admin.runs.statusTimeout') }
+	]);
+
+	const triggers = $derived([
+		{ key: 'scheduled' as const, label: $_('admin.runs.triggerScheduled') },
+		{ key: 'manual' as const, label: $_('admin.runs.triggerManual') },
+		{ key: 'all' as const, label: $_('admin.runs.triggerAll') }
 	]);
 
 	function outcomeLabel(status: string): string {
@@ -93,6 +110,20 @@
 <section class="space-y-4">
 	<PageTitle title={$_('admin.runs.title')} />
 	<p class="text-sm text-slate-500">{$_('admin.runs.hint')}</p>
+
+	<div class="flex flex-wrap gap-2 text-xs">
+		{#each triggers as chip (chip.key)}
+			<button
+				type="button"
+				onclick={() => setTrigger(chip.key)}
+				class="rounded-full border px-3 py-1 {trigger === chip.key
+					? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
+					: 'border-slate-300 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800'}"
+			>
+				{chip.label}
+			</button>
+		{/each}
+	</div>
 
 	<div class="flex flex-wrap gap-2 text-xs">
 		{#each outcomes as chip (chip.label)}

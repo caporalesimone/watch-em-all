@@ -27,6 +27,7 @@ from src.core.plugins.base import ScraperPlugin
 from src.core.plugins.context import build_context
 from src.core.plugins.manifest import Manifest
 from src.core.plugins.registry import LoadedPlugin
+from src.core.run_log import record_traffic
 
 log = logging.getLogger("wea.web.jobs")
 
@@ -86,6 +87,9 @@ def _run_one(drainer: _Drainer) -> bool:
         log.exception("job drainer for %s failed", drainer.plugin_id)
         return False
     finally:
+        # Only what the drainer's own client did: a plugin that builds a context of its
+        # own inside the job records that one itself, beside the client it created.
+        record_traffic(context.db, drainer.plugin_id, context.http)
         context.db.close()
         lock.release()
 

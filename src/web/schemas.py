@@ -574,6 +574,45 @@ class NotifierEnabledBody(BaseModel):
     enabled: bool
 
 
+class LifetimeStats(BaseModel):
+    """What a scraper has done since ``since`` (10.B20).
+
+    Four groups, because they answer four different questions and mixing them is how a
+    monitoring page stops being read: **activity** (did it run, is it failing now),
+    **traffic** (what went out towards the site), **health** (how the site answered), and
+    **yield** (what came back). ``since`` is part of the payload and not decoration: a
+    cumulative counter with no start date cannot be interpreted after a configuration change,
+    and resetting it (10.B21) restamps exactly this field.
+    """
+
+    plugin_id: str
+    since: datetime
+
+    runs_total: int
+    runs_ok: int
+    runs_failed: int
+    runs_skipped_locked: int
+    consecutive_failures: int
+    last_run_at: datetime | None
+    last_success_at: datetime | None
+    last_failure_at: datetime | None
+
+    http_requests_total: int
+    cache_hits_total: int
+    bytes_downloaded_total: int
+    politeness_wait_s_total: int
+    run_seconds_total: int
+
+    rate_limited_total: int
+    gate_hits_total: int
+    gate_cleared_total: int
+    robots_denied_total: int
+
+    products_delivered_total: int
+    pages_fetched_total: int
+    parse_failures_total: int
+
+
 class MessageTemplateOut(BaseModel):
     """One entry of the system-message catalog (10.B17). Carries the default **and** what is in
     force, so the editor can show both and offer "back to default" without a second request."""

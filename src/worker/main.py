@@ -23,21 +23,23 @@ from sqlalchemy.orm import Session
 from src.core.alert_engine import run_for_user
 from src.core.cart_engine import AdjustmentFn
 from src.core.config import get_settings
+from src.core.contracts import DeltaCounters
 from src.core.db import Base, create_schema, get_engine, init_engine, new_session
 from src.core.feature_flags import effective_flags, worker_tick_seconds
 from src.core.locks import scraper_lock
 from src.core.maintenance import purge_alerts_over_limit, purge_expired
-from src.core.models import Cart, ScraperSchedule, ScrapeRun, ScrapeUserLog
+from src.core.models import Cart, ScraperSchedule
 from src.core.notify import drain_deliveries, drain_message_deliveries, enqueue_deliveries
 from src.core.plugins.base import NotifierPlugin, ScraperPlugin
 from src.core.plugins.context import PluginContext, build_context
 from src.core.plugins.registry import LoadedPlugin, load_plugins
 from src.core.process_status import report
+from src.core.run_log import close_run, open_run, run_one_user
 from src.core.schedule import due_slot, install_tz, set_last_slot
 from src.core.schema_drift import check_schema_drift
 from src.core.scrape import implements_scraping, stamp_cooldown
 from src.core.scrape_cache import purge_expired as purge_expired_cache
-from src.core.scraper_stats import bump, record_run
+from src.core.scraper_stats import bump
 from src.core.settings import get_system_settings
 from src.core.system_log import install_system_log_handler
 from src.core.user_purge import purge_due_users
@@ -250,17 +252,6 @@ def _purge_operational_records(now: datetime) -> None:
         log.exception("account purge failed")
 
 
-def _aggregate_status(outcomes: list[str], timed_out: bool) -> str:
-    """Run status from the per-user outcomes (scheduling-models.md)."""
-    if timed_out:
-        return "timeout"
-    if not outcomes or all(o == "ok" for o in outcomes):
-        return "ok"
-    if any(o == "ok" for o in outcomes):
-        return "partial"
-    return "error"
-
-
 def _run_scraper(
     plugin: ScraperPlugin,
     ctx: PluginContext,
@@ -274,10 +265,13 @@ def _run_scraper(
     manual-cooldown anchor (SCR-R15) per user; a per-user error doesn't stop the others
     (POOL-R5); a run past ``deadline`` stops between users (SCHED-R7); the last slot is
     recorded even on failure/timeout (CRON-R6). Returns the set of user ids processed, so
-    the caller can run the alert engine for them (event-driven alerts)."""
-    run = ScrapeRun(scraper_id=scraper_id, trigger=trigger, slot=slot, started_at=datetime.now(UTC))
-    ctx.db.add(run)
-    ctx.db.commit()
+    the caller can run the alert engine for them (event-driven alerts).
+
+    The bookkeeping itself lives in :mod:`src.core.run_log` since 10.B20, shared with the
+    manual path — what stays here is the scheduling: the deadline, the cooldown stamp, and
+    the rule that one user's failure does not stop the queue.
+    """
+    run = open_run(ctx.db, scraper_id, trigger=trigger, slot=slot)
     outcomes: list[str] = []
     processed: set[int] = set()
     timed_out = False
@@ -288,63 +282,37 @@ def _run_scraper(
                 log.warning("scrape timed out: %s (slot %s)", scraper_id, slot)
                 break
             processed.add(user_id)
-            ulog = ScrapeUserLog(run_id=run.run_id, user_id=user_id, started_at=datetime.now(UTC))
-            ctx.db.add(ulog)
-            before = ctx.http.request_count
-            before_hits = ctx.http.cache_hits
-            try:
-                stamp_cooldown(ctx.db, scraper_id, user_id)
-                delta = plugin.run_for_user(ctx, user_id)
-                ulog.products_found = delta.found
-                ulog.products_new = delta.new
-                ulog.price_changes = delta.price_changes
-                run.products_removed += delta.removed
-                # What the scraper filtered out before delivering (9.B5): the column has been
-                # on scrape_run since 4.B6 and nothing wrote it, so a run over a category of 39
-                # reported 38 found and left the missing one unaccounted for. Only the plugin
-                # knows — the catalog service is handed the survivors.
-                run.products_excluded += delta.excluded
-                ulog.status = "ok"
-                outcomes.append("ok")
-            except Exception as exc:
-                log.exception("scrape failed: %s user %s", scraper_id, user_id)
-                ulog.status = "error"
-                ulog.error_message = str(exc)[:500]
-                outcomes.append("error")
-            ulog.http_requests = ctx.http.request_count - before
-            ulog.cache_hits = ctx.http.cache_hits - before_hits
-            ulog.finished_at = datetime.now(UTC)
-            run.users_processed += 1
-            run.products_found += ulog.products_found
-            run.products_new += ulog.products_new
-            run.price_changes += ulog.price_changes
-            run.http_requests += ulog.http_requests
-            run.cache_hits += ulog.cache_hits
-            ctx.db.commit()
+
+            def work(uid: int = user_id) -> DeltaCounters:
+                # Inside the per-user slice, not before it: the cooldown stamp is a database
+                # write like any other, and if it fails that is this user's problem, not a
+                # reason to abandon everybody still in the queue (POOL-R5).
+                stamp_cooldown(ctx.db, scraper_id, uid)
+                return plugin.run_for_user(ctx, uid)
+
+            outcomes.append(
+                run_one_user(
+                    ctx.db,
+                    run,
+                    user_id,
+                    work,
+                    http_before=(ctx.http.request_count, ctx.http.cache_hits),
+                    http_after=lambda: (ctx.http.request_count, ctx.http.cache_hits),
+                )
+            )
     except Exception as exc:
         log.exception("scrape run failed: %s", scraper_id)
         run.error_message = str(exc)[:500]
     finally:
-        run.status = _aggregate_status(outcomes, timed_out)
-        run.finished_at = datetime.now(UTC)
-        ctx.db.commit()
-        # Lifetime statistics (9.B6c): scrape_run has retention, so this row is the only
-        # memory of what this scraper has ever done. Never let it break a run.
-        try:
-            record_run(
-                ctx.db,
-                scraper_id,
-                ok=run.status == "ok",
-                seconds=(run.finished_at - run.started_at).total_seconds(),
-                http_requests=run.http_requests,
-                cache_hits=run.cache_hits,
-                bytes_downloaded=ctx.http.bytes_downloaded,
-                politeness_wait_s=ctx.http.waited_seconds,
-                robots_denied=ctx.http.robots_denied,
-                products_delivered=run.products_found,
-            )
-        except Exception:
-            log.exception("could not record the lifetime statistics of %s", scraper_id)
+        close_run(
+            ctx.db,
+            run,
+            outcomes,
+            timed_out=timed_out,
+            bytes_downloaded=ctx.http.bytes_downloaded,
+            politeness_wait_s=ctx.http.waited_seconds,
+            robots_denied=ctx.http.robots_denied,
+        )
         set_last_slot(ctx.db, scraper_id, slot)
         log.info(
             "run %s (%s): %s — %d user(s), found=%d new=%d price_changes=%d removed=%d "

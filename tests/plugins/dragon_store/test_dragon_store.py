@@ -345,6 +345,67 @@ def test_scrape_now_populates_catalog(client: TestClient) -> None:
     assert page["items"][0]["plugin_id"] == "dragon_store"
 
 
+def test_a_manual_scrape_is_recorded_like_a_scheduled_one(client: TestClient) -> None:
+    """10.B20. Until phase 10 the manual path did the traffic and reported none of it, while
+    the counters the plugin bumps from inside went up regardless — two numbers about the same
+    requests, disagreeing. Now it writes a run row marked `manual` and moves the lifetime
+    counters; Simone's call was to record everything and let the Runs page filter."""
+    admin = _admin_token(client)
+    _uid, token = _make_user(client, admin, "sudo@example.com", role="super_user")
+    h = _bearer(token)
+    with DragonServer() as base:
+        _add_watch(client, h, gp_url(base, "896"))
+        _wait_resolved(client, h)
+        assert client.post(f"{DS}/scrape-now", headers=h).status_code == 202
+
+    # Default view is the schedule: a manual run must not be in it (Simone, 2026-08-02).
+    scheduled = client.get("/api/admin/runs", headers=_bearer(admin)).json()
+    assert scheduled["total"] == 0
+
+    manual = client.get("/api/admin/runs?trigger=manual", headers=_bearer(admin)).json()
+    assert manual["total"] == 1
+    run = manual["items"][0]
+    assert run["trigger"] == "manual" and run["slot"] is None
+    assert run["users_processed"] == 1
+    assert run["status"] == "ok"
+
+    # …and the drill-down works on it like any other run.
+    detail = client.get(f"/api/admin/runs/{run['run_id']}", headers=_bearer(admin)).json()
+    assert len(detail) == 1 and detail[0]["status"] == "ok"
+
+    stats = client.get(
+        "/api/admin/scrapers/dragon_store/lifetime-stats", headers=_bearer(admin)
+    ).json()
+    assert stats["runs_total"] == 1 and stats["runs_ok"] == 1
+    assert stats["products_delivered_total"] >= 1
+    # The requests really made towards the site — including the ones the *job* made while
+    # resolving the pasted URL, which used to be invisible here even though the plugin's own
+    # counters were going up at the same time (the gap 10.B20 exists to close).
+    assert stats["http_requests_total"] > 0
+
+
+def test_the_lifetime_counters_reset_and_restamp(client: TestClient) -> None:
+    """10.B21: destructive and without history — the new `since` is the whole record."""
+    admin = _admin_token(client)
+    _uid, token = _make_user(client, admin, "sudo@example.com", role="super_user")
+    h = _bearer(token)
+    with DragonServer() as base:
+        _add_watch(client, h, gp_url(base, "896"))
+        _wait_resolved(client, h)
+        client.post(f"{DS}/scrape-now", headers=h)
+
+    before = client.get(
+        "/api/admin/scrapers/dragon_store/lifetime-stats", headers=_bearer(admin)
+    ).json()
+    assert before["runs_total"] > 0
+
+    after = client.post(
+        "/api/admin/scrapers/dragon_store/lifetime-stats/reset", headers=_bearer(admin)
+    ).json()
+    assert after["runs_total"] == 0 and after["http_requests_total"] == 0
+    assert after["since"] > before["since"], "the counters restart from a stated moment"
+
+
 def test_scrape_now_cooldown_blocks_second(client: TestClient) -> None:
     _uid, token = _super_user(client)
     h = _bearer(token)

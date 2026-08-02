@@ -58,6 +58,9 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - Disabling an account, or scheduling it for deletion, now tells the person — and the deletion note names the date it happens.
 - Those system texts can be rewritten by the admin over the API, one at a time, and dropping the rewrite goes back to the built-in wording.
 - A System messages tab lists them all with their placeholders, a preview of what is really delivered, and one click back to the default.
+- A manual scrape is now recorded like a scheduled one — its own run row and its real traffic — so the counters stop describing only half the work.
+- The Runs page opens on the scheduled runs and filters to manual or both, so hand-started scrapes no longer crowd out the schedule.
+- Each scraper exposes what it has done since a stated date, and that tally can be zeroed when a configuration change makes it incomparable.
 
 ## [0.9.0] - 2026-07-31
 

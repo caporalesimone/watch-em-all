@@ -68,6 +68,7 @@ from src.core.plugins.context import (
     build_http_client,
 )
 from src.core.robots import origin_of
+from src.core.run_log import record_traffic
 from src.core.scraper_stats import bump
 from src.web.deps import SessionDep, UserDep
 from src.web.jobs import poke
@@ -442,6 +443,9 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
     """
     logger = logging.getLogger(f"wea.plugin.{PLUGIN_ID}")
     db = new_session()
+    # Declared out here so the `finally` can record what this resolution cost the site even
+    # when it ended badly (10.B20): the requests were made either way.
+    context: PluginContext | None = None
     try:
         watch = db.get(Watch, watch_id)
         if watch is None:  # removed while it sat in the queue
@@ -555,6 +559,11 @@ def _resolve_watch(plugin: DragonStorePlugin, watch_id: int) -> None:
         db.rollback()
         _mark_failed(db, watch_id, "an internal error stopped this; the next run will retry")
     finally:
+        # This context builds its own HTTP client (see `_request_context`), so the core's job
+        # drainer cannot see what it did: the traffic is recorded here, beside the client that
+        # made it, and that is why the helper lives in the core and only the call is here.
+        if context is not None:
+            record_traffic(db, PLUGIN_ID, context.http)
         db.close()
 
 
