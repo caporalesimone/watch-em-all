@@ -23,6 +23,15 @@
 		}
 	});
 
+	function setExpiry(value: number): void {
+		if (!settings) return;
+		settings = {
+			...settings,
+			password_expiry_days: value as SystemSettings['password_expiry_days']
+		};
+		saved = false;
+	}
+
 	function setField(key: keyof SystemSettings, value: number): void {
 		if (settings) settings = { ...settings, [key]: value };
 		saved = false;
@@ -49,6 +58,17 @@
 		{ key: 'catchup_warning_min', min: 0 },
 		{ key: 'user_deletion_retention_days', min: 1 }
 	];
+
+	// Fixed options rather than a number box (10.F14): the backend only accepts these five,
+	// and a free field would let an admin type 3 and put everybody on a forced change. The
+	// labels are written out, not built from the value, so the i18n gate can see them.
+	const expiryOptions = $derived([
+		{ value: 0 as const, label: $_('admin.settings.expiryNever') },
+		{ value: 30 as const, label: $_('admin.settings.expiry30') },
+		{ value: 90 as const, label: $_('admin.settings.expiry90') },
+		{ value: 180 as const, label: $_('admin.settings.expiry180') },
+		{ value: 365 as const, label: $_('admin.settings.expiry365') }
+	]);
 
 	const inputClass =
 		'rounded border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900';
@@ -89,6 +109,24 @@
 						/>
 					</label>
 				{/each}
+
+				<label class="flex items-center justify-between gap-4 text-sm">
+					<span class="flex flex-col pr-4">
+						<span class="text-slate-600 dark:text-slate-300"
+							>{$_('admin.settings.passwordExpiry')}</span
+						>
+						<span class="text-xs text-slate-400">{$_('admin.settings.passwordExpiryHint')}</span>
+					</span>
+					<select
+						class="{inputClass} w-40"
+						value={settings.password_expiry_days}
+						onchange={(e) => setExpiry(Number(e.currentTarget.value))}
+					>
+						{#each expiryOptions as option (option.value)}
+							<option value={option.value}>{option.label}</option>
+						{/each}
+					</select>
+				</label>
 			</div>
 		</div>
 

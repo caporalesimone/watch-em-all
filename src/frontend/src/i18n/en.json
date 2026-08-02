@@ -281,7 +281,14 @@
 				"log_retention_days": "Logs and run records older than this are purged daily; 0 = never. Price history is never pruned.",
 				"catchup_warning_min": "Warn when a recovered slot is older than this (takes effect as the feature lands).",
 				"user_deletion_retention_days": "Grace window before a deleted user is removed for good (phase 10)."
-			}
+			},
+			"passwordExpiry": "Password expiry",
+			"passwordExpiryHint": "Force a new password once the current one reaches this age.",
+			"expiryNever": "Never",
+			"expiry30": "1 month",
+			"expiry90": "3 months",
+			"expiry180": "6 months",
+			"expiry365": "1 year"
 		},
 		"featureFlags": {
 			"title": "Feature flags",

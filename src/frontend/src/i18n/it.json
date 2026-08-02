@@ -172,7 +172,14 @@
 				"log_retention_days": "Log e record di run più vecchi vengono eliminati ogni giorno; 0 = mai. Lo storico prezzi non si tocca.",
 				"catchup_warning_min": "Avvisa quando uno slot recuperato è più vecchio di così (attivo quando arriva la feature).",
 				"user_deletion_retention_days": "Finestra di grazia prima della cancellazione definitiva di un utente (fase 10)."
-			}
+			},
+			"passwordExpiry": "Scadenza password",
+			"passwordExpiryHint": "Forza una password nuova quando l'attuale raggiunge questa età.",
+			"expiryNever": "Mai",
+			"expiry30": "1 mese",
+			"expiry90": "3 mesi",
+			"expiry180": "6 mesi",
+			"expiry365": "1 anno"
 		},
 		"featureFlags": {
 			"title": "Feature flag",

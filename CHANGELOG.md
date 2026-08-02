@@ -23,6 +23,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - The Users page filters by status and sorts by last sign-in, and shows when an account was marked for deletion and when it goes.
 - Reset, disable and delete are one click each from the Users page; the delete confirmation names the date the account is actually destroyed.
 - Passwords can be given an expiry — never (the default), 1, 3, 6 or 12 months; an old one sends you to the change page at sign-in.
+- That expiry is a dropdown in System settings, so it can only ever be one of the values the server accepts.
 
 ### Changed
 

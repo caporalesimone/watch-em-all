@@ -246,6 +246,8 @@ export interface SystemSettings {
 	catchup_warning_min: number;
 	log_retention_days: number;
 	user_deletion_retention_days: number;
+	// Fixed options, not free days (10.B19): 0 = never.
+	password_expiry_days: 0 | 30 | 90 | 180 | 365;
 }
 
 export function getSettings(): Promise<SystemSettings> {
