@@ -15,11 +15,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from src.core import notifiers as notif
+from src.core.admin_messages import send_admin_message
 from src.core.alert_engine import AlertEvent, NotificationEvent
 from src.core.contracts import ConfigField
 from src.core.db import Base
-from src.core.models import AlertDelivery, AlertLog, User
-from src.core.notify import drain_deliveries, enqueue_deliveries
+from src.core.models import AdminMessageDelivery, AlertDelivery, AlertLog, User
+from src.core.notify import drain_deliveries, drain_message_deliveries, enqueue_deliveries
 from src.core.plugins.base import NotifierDeliveryError, NotifierPlugin
 
 NOW = datetime(2026, 7, 23, 9, 0, tzinfo=UTC)
@@ -42,9 +43,9 @@ class FakeEmail(NotifierPlugin):
     plugin_id = "email"
     display_name = "Email"
 
-    def __init__(self) -> None:
+    def __init__(self, fail: bool = False) -> None:
         self.sent: list[tuple[dict[str, Any], str]] = []
-        self.fail = False
+        self.fail = fail
 
     def get_admin_config_schema(self) -> list[ConfigField]:
         return [
@@ -220,3 +221,58 @@ def test_resolve_state_transitions() -> None:
         assert notif.resolve_state(db, in_app, user.id).active  # always active for the user
         notif.set_admin_enabled(db, "in_app", False)
         assert not notif.resolve_state(db, in_app, user.id).active  # admin kill-switch
+
+
+# ----------------------------------------------------------------- admin messages (10.B12)
+
+
+def test_message_drain_sends_the_text_payload_and_records_the_outcome() -> None:
+    with _session() as db:
+        user = _user(db)
+        email = FakeEmail()
+        notif.set_admin_config(db, email, {"smtp_host": "smtp.local"})
+        notif.set_user_config(db, email, user.id, {"to_address": "a@b.co"})
+        notif.set_user_enabled(db, user.id, "email", True)
+        message = send_admin_message(
+            db,
+            sender_id=None,
+            title="Notice",
+            body="**hello**",
+            target_user_id=user.id,
+            notifiers=[FakeInApp(), email],
+        )
+        assert drain_message_deliveries(db, [FakeInApp(), email]) == 1  # only the network one
+
+        rows = db.scalars(
+            select(AdminMessageDelivery).where(AdminMessageDelivery.admin_message_id == message.id)
+        ).all()
+        assert {r.plugin_id: r.status for r in rows} == {
+            "in_app": "delivered",
+            "email": "delivered",
+        }
+        # The notifier received the flat text payload, not a digest — the whole point of the union.
+        assert len(email.sent) == 1
+
+
+def test_a_failing_channel_records_the_reason_and_is_not_retried() -> None:
+    with _session() as db:
+        user = _user(db)
+        email = FakeEmail(fail=True)
+        notif.set_admin_config(db, email, {"smtp_host": "smtp.local"})
+        notif.set_user_config(db, email, user.id, {"to_address": "a@b.co"})
+        notif.set_user_enabled(db, user.id, "email", True)
+        send_admin_message(
+            db,
+            sender_id=None,
+            title="Notice",
+            body="hello",
+            target_user_id=user.id,
+            notifiers=[email],
+        )
+        drain_message_deliveries(db, [email])
+        row = db.scalars(
+            select(AdminMessageDelivery).where(AdminMessageDelivery.plugin_id == "email")
+        ).one()
+        assert row.status == "failed" and row.error == "boom"
+        # Best-effort, as with digests: a failed row is never re-drained.
+        assert drain_message_deliveries(db, [email]) == 0

@@ -38,6 +38,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - A read-only day calendar draws those runs as blocks sized by their usual duration, so a heavy scraper looks heavy; clicking one opens its settings.
 - The admin can send a message to everyone or to one person; it reaches every channel they have, and the in-app copy always.
 - Sent messages list with how delivery went per recipient and channel — never whether anyone read them, which stays theirs.
+- Those messages arrive as email with their formatting intact; if rendering ever fails, the mail still goes out, plain.
 
 ### Changed
 
