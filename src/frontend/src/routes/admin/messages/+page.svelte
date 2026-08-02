@@ -12,11 +12,13 @@
 	import {
 		getAdminMessage,
 		listAdminMessages,
+		listAdminNotifiers,
 		listUsers,
 		previewMessage,
 		sendAdminMessage,
 		type AdminMessageDetail,
 		type AdminMessageSummary,
+		type AdminNotifier,
 		type AdminUser
 	} from '$lib/api/client';
 	import DeliveryList from '$lib/components/DeliveryList.svelte';
@@ -65,6 +67,23 @@
 			(audience === 'all' ? targets.length > 0 : targetId !== null)
 	);
 
+	// Where this message will actually land (10.F24). The in-app copy always exists (ADMSG-R2),
+	// but email is the only channel that leaves the installation, and an admin composing a
+	// maintenance notice is entitled to know before pressing Send that nobody will get a mail.
+	// Two causes, one consequence, said separately because they are fixed differently: the
+	// kill-switch is a click, an incomplete SMTP config is a form.
+	let notifiers = $state<AdminNotifier[]>([]);
+	const email = $derived(notifiers.find((n) => n.plugin_id === 'email'));
+	const emailReach = $derived(
+		email === undefined
+			? 'none' // no email plugin loaded at all: nothing to warn about
+			: !email.enabled
+				? 'off'
+				: !email.admin_config_complete
+					? 'unconfigured'
+					: 'ok'
+	);
+
 	async function refresh(): Promise<void> {
 		sent = (await listAdminMessages()).items;
 	}
@@ -72,6 +91,11 @@
 	onMount(() => {
 		void refresh();
 		void listUsers().then((u) => (users = u));
+		// A banner that fails to load is a banner that stays quiet: the page's job is composing,
+		// and a warning about delivery must never be the reason it cannot be used.
+		void listAdminNotifiers()
+			.then((n) => (notifiers = n))
+			.catch(() => undefined);
 	});
 
 	async function showPreview(): Promise<void> {
@@ -192,6 +216,21 @@
 	{#if section === 'system'}
 		<SystemMessages />
 	{:else}
+		{#if emailReach === 'off' || emailReach === 'unconfigured'}
+			<div
+				class="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+			>
+				<span>
+					{emailReach === 'off'
+						? $_('admin.messages.emailOff')
+						: $_('admin.messages.emailUnconfigured')}
+				</span>
+				<a href="/admin/notifiers" class="font-medium underline">
+					{$_('admin.messages.emailFix')}
+				</a>
+			</div>
+		{/if}
+
 		<!-- ------------------------------------------------------------------ compose -->
 		<div class="space-y-4 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
 			<h2 class="text-sm font-medium text-slate-500">{$_('admin.messages.compose')}</h2>
