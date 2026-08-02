@@ -414,6 +414,56 @@ export function getCartHistory(cartId: number, range: HistoryRange): Promise<Car
 }
 
 // Admin user management (USR-*): create + list. Admin-only on the backend.
+export interface DashboardTotals {
+	users_total: number;
+	users_active: number;
+	users_deleting: number;
+	products_total: number;
+	products_delisted: number;
+	carts_total: number;
+	price_history_rows: number;
+	watched_scrapers: number;
+}
+
+export interface DashboardNotifications {
+	window_days: number;
+	alerts: number;
+	delivered: number;
+	failed: number;
+	skipped: number;
+}
+
+export interface DashboardResponse {
+	totals: DashboardTotals;
+	notifications: DashboardNotifications;
+}
+
+export interface UserLoadRow {
+	user_id: number;
+	username: string | null;
+	scraper_id: string | null;
+	products: number;
+	carts: number;
+	http_requests: number;
+	cache_hits: number;
+}
+
+export interface DashboardUsers {
+	window_days: number;
+	by_user: UserLoadRow[];
+	by_user_and_scraper: UserLoadRow[];
+}
+
+export function getDashboard(windowDays: number): Promise<DashboardResponse> {
+	return apiFetch(`/api/admin/dashboard?window_days=${windowDays}`).then(asJson<DashboardResponse>);
+}
+
+export function getDashboardUsers(windowDays: number): Promise<DashboardUsers> {
+	return apiFetch(`/api/admin/dashboard/users?window_days=${windowDays}`).then(
+		asJson<DashboardUsers>
+	);
+}
+
 export interface RunSummary {
 	run_id: number;
 	scraper_id: string;

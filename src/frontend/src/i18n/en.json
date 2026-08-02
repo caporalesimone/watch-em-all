@@ -23,7 +23,8 @@
 		"alerts": "Alerts",
 		"debug": "Debug",
 		"priceHistory": "Price history",
-		"runs": "Runs"
+		"runs": "Runs",
+		"adminDashboard": "Dashboard"
 	},
 	"catalog": {
 		"title": "Catalog",
@@ -383,6 +384,26 @@
 			"colError": "Error",
 			"deletedUser": "(deleted account)",
 			"close": "Close"
+		},
+		"dashboard": {
+			"title": "Dashboard",
+			"window7": "7 days",
+			"window30": "30 days",
+			"totalsTitle": "Installation",
+			"usersTotal": "Accounts",
+			"usersActive": "Active",
+			"usersDeleting": "Being deleted",
+			"products": "Catalog rows",
+			"productsDelisted": "Delisted",
+			"carts": "Carts",
+			"history": "Price history rows",
+			"notificationsTitle": "Notifications",
+			"alerts": "Digests written",
+			"delivered": "Delivered",
+			"failed": "Failed",
+			"skipped": "Skipped",
+			"windowNote": "Counted over the last {days} days.",
+			"historyNote": "The only table nothing ever prunes."
 		}
 	},
 	"plugins": {

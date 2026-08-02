@@ -21,7 +21,8 @@
 		"systemLogs": "Log di sistema",
 		"settings": "Impostazioni",
 		"priceHistory": "Storico prezzi",
-		"runs": "Run"
+		"runs": "Run",
+		"adminDashboard": "Dashboard"
 	},
 	"catalog": {
 		"title": "Catalogo",
@@ -274,6 +275,26 @@
 			"colError": "Errore",
 			"deletedUser": "(account cancellato)",
 			"close": "Chiudi"
+		},
+		"dashboard": {
+			"title": "Dashboard",
+			"window7": "7 giorni",
+			"window30": "30 giorni",
+			"totalsTitle": "Installazione",
+			"usersTotal": "Account",
+			"usersActive": "Attivi",
+			"usersDeleting": "In cancellazione",
+			"products": "Righe di catalogo",
+			"productsDelisted": "Delistati",
+			"carts": "Carrelli",
+			"history": "Righe di storico prezzi",
+			"notificationsTitle": "Notifiche",
+			"alerts": "Digest scritti",
+			"delivered": "Consegnate",
+			"failed": "Fallite",
+			"skipped": "Saltate",
+			"windowNote": "Contate sugli ultimi {days} giorni.",
+			"historyNote": "L'unica tabella che non viene mai potata."
 		}
 	},
 	"plugins": {

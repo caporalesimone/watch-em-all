@@ -31,6 +31,7 @@
 	const primary = $derived<NavItem[]>(
 		isAdmin
 			? [
+					{ href: '/admin/dashboard', key: 'nav.adminDashboard' },
 					{ href: '/admin/logs', key: 'nav.systemLogs' },
 					{ href: '/admin/users', key: 'nav.users' },
 					{
