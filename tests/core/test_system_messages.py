@@ -82,6 +82,22 @@ def test_validation_separates_a_typo_from_a_broken_credential(client: TestClient
     assert missing == []
 
 
+def test_every_account_notice_names_its_account_in_bold(client: TestClient) -> None:
+    """The three lifecycle notices open the same way and each says, in bold, which account it is
+    about: they arrive unasked, possibly at an address that holds more than one."""
+    with new_session() as db:
+        for key in ("user.disabled", "user.marked_for_deletion", "user.deleted"):
+            _, body = sysmsg.resolve(
+                db,
+                key,
+                first_name="Alice",
+                username="alice@example.com",
+                deletion_due_date="2026-09-01",
+            )
+            assert "(**alice@example.com**)" in body, key
+            assert "Your Watch 'Em All account (**alice@example.com**) has" in body, key
+
+
 def test_an_unknown_key_is_a_programming_error(client: TestClient) -> None:
     with new_session() as db, pytest.raises(sysmsg.UnknownMessageKey):
         sysmsg.resolve(db, "no.such.message")

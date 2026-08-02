@@ -43,13 +43,17 @@ class SystemMessage:
     required: tuple[str, ...] = field(default=())
 
 
+# The three account-lifecycle notices open the same way on purpose: *Your Watch 'Em All account
+# (**{username}**) has …*. They are the only messages a person may receive without having asked
+# for anything, quite possibly at an address that carries more than one account, so each of them
+# names which account it is about — in bold, because that is the word the reader is looking for.
 USER_DISABLED = SystemMessage(
     key="user.disabled",
     title="Your Watch 'Em All account has been disabled",
     body=(
         "Hello {first_name},\n\n"
-        "An administrator has disabled your Watch 'Em All account, so you can no longer sign "
-        "in. Nothing of yours has been removed.\n\n"
+        "Your Watch 'Em All account (**{username}**) has been disabled by an administrator, so "
+        "you can no longer sign in. Nothing of yours has been removed.\n\n"
         "If you think this is a mistake, get in touch with whoever administers the "
         "installation."
     ),
@@ -61,8 +65,8 @@ USER_MARKED_FOR_DELETION = SystemMessage(
     title="Your Watch 'Em All account is scheduled for deletion",
     body=(
         "Hello {first_name},\n\n"
-        "Your Watch 'Em All account ({username}) has been added to the list of accounts due to "
-        "be removed, and is scheduled for deletion on **{deletion_due_date}**. You can no "
+        "Your Watch 'Em All account (**{username}**) has been added to the list of accounts due "
+        "to be removed, and is scheduled for deletion on **{deletion_due_date}**. You can no "
         "longer sign in, but until that date nothing is destroyed and an administrator can "
         "still bring the account back.\n\n"
         "If this is not what you expected, get in touch with whoever administers the "
@@ -76,7 +80,7 @@ USER_DELETED = SystemMessage(
     title="Your Watch 'Em All account has been deleted",
     body=(
         "Hello {first_name},\n\n"
-        "Your Watch 'Em All account ({username}) has been permanently deleted, together with "
+        "Your Watch 'Em All account (**{username}**) has been permanently deleted, together with "
         "everything it held: watches, carts, alerts and notification history.\n\n"
         "This cannot be undone and there is nothing left to restore. If you need access again, "
         "an administrator has to create a new account for you."

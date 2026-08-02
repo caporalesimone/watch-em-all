@@ -77,6 +77,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - The email settings fit in three rows: host, port and TLS sit together, and so do the credentials — a plugin can say which fields belong side by side.
 - Send test became Validate settings: a channel is switched on only once a real message has actually left through it.
 - A second badge says whether the settings are validated, and changing one of them undoes that and switches the channel off.
+- Disabled, scheduled for deletion and deleted now open the same way and name the account in bold, so you can tell which one it is about.
 
 ## [0.9.0] - 2026-07-31
 
