@@ -1,17 +1,21 @@
 <script lang="ts">
 	// User notifier channels (7.F3): the Profile "Notification channels" section. Lists the
 	// channels the admin has made available, each with its composite state, the personal
-	// config form (dynamic, from the plugin schema), an on/off toggle and a Test button.
+	// config form (dynamic, from the plugin schema) and an on/off toggle.
 	// In-app is shown as always-on with no form. Self-contained/props-driven (FE-18).
+	//
+	// The Test button is gone since 10.X4. It was here from when a user typed their own
+	// delivery address into this page; since 10.B23 the address *is* the account, and it has
+	// already proved it works — the password that got this person in arrived on it. What the
+	// button really probed was the server's SMTP config, which is the administrator's to fix
+	// and is tested from their own page.
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 
 	import {
-		ApiErr,
 		listNotifiers,
 		setNotifierConfig,
 		setNotifierEnabled,
-		testNotifier,
 		type NotifierChannel
 	} from '$lib/api/client';
 	import DynamicConfigForm from '$lib/components/DynamicConfigForm.svelte';
@@ -58,20 +62,6 @@
 			replace(await setNotifierEnabled(c.plugin_id, !c.enabled));
 		} catch {
 			pushToast($_('notifiers.saveError'), 'error');
-		} finally {
-			busy = null;
-		}
-	}
-
-	async function test(id: string): Promise<void> {
-		busy = id;
-		try {
-			const res = await testNotifier(id);
-			if (res.ok) pushToast($_('notifiers.testOk'), 'success');
-			else pushToast($_('notifiers.testFail', { values: { error: res.error ?? '' } }), 'error');
-		} catch (err) {
-			const msg = err instanceof ApiErr ? err.detail : '';
-			pushToast($_('notifiers.testFail', { values: { error: msg } }), 'error');
 		} finally {
 			busy = null;
 		}
@@ -142,14 +132,6 @@
 								class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
 							>
 								{c.enabled ? $_('notifiers.deactivate') : $_('notifiers.activate')}
-							</button>
-							<button
-								type="button"
-								disabled={busy === c.plugin_id || !c.user_config_complete}
-								onclick={() => test(c.plugin_id)}
-								class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
-							>
-								{$_('notifiers.test')}
 							</button>
 						</div>
 					{/if}

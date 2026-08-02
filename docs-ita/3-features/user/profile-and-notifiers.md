@@ -22,7 +22,7 @@ La pagina Profilo concentra anche tutto ciò che riguarda la consegna delle noti
 ### Canali (notifier)
 - **PROF-R6** — La pagina elenca **tutti i notifier abilitati nel sistema**; per ciascuno l'utente vede: stato di configurazione di sistema (se l'admin non ha configurato la sua parte, il canale è mostrato come "non disponibile"), il **form dei propri campi personali** (generato dallo schema dichiarato dal plugin) e un flag **attivo/non attivo**.
 - **PROF-R7** — Un canale consegna solo se: abilitato nel sistema (manifest) **e** configurato dall'admin **e** configurato dall'utente (campi obbligatori validi) **e** attivato dall'utente. Lo stato composito è mostrato chiaramente.
-- **PROF-R8** — Ogni canale ha un bottone **Test**: invia una notifica di prova con la configurazione corrente (merge sistema+utente) e mostra l'esito. Nessuna persistenza del test.
+- **PROF-R8** — ~~Ogni canale ha un bottone **Test**.~~ **Ritirato in 10.X4.** Aveva senso finché il recapito lo scriveva l'utente in quella pagina; da 10.B23/10.B25 il recapito **è** l'account e si è già dimostrato funzionante portando la password con cui quella persona è entrata. Quel che restava era una sonda sulla configurazione SMTP del server esposta a chi non la può correggere: la prova resta lato admin (NOT-R6).
 - **PROF-R9** — I campi segreti sono mascherati e write-only (mai rispediti al client); un valore già impostato è indicato senza rivelarlo.
 - **PROF-R10** — Disattivare un canale **non** ne cancella la configurazione (si può riattivare senza reinserire i dati).
 - **PROF-R12** (10.F17) — L'**indirizzo di notifica è l'account**. Da 10.B23 l'username *è* un indirizzo email, quindi il profilo lo **mostra** e non offre niente da modificare: cambiare dove arriva la posta vorrebbe dire cambiare con cosa si accede, che è un'operazione dell'admin. L'unica eccezione è l'**admin di bootstrap**, che accede con un nome e non con un indirizzo e quindi imposta il proprio `contact_email` (`PATCH /api/me {contact_email}`, validato e normalizzato a minuscolo); per ogni altro account la risposta è `403 address_not_editable`. Conseguenza sul canale email: **non dichiara più campi utente** (10.B25), quindi nel profilo di quel canale resta l'interruttore — e su un account nuovo è già acceso.
@@ -36,7 +36,6 @@ stateDiagram-v2
     Configurabile --> Pronto: l'utente compila i campi obbligatori
     Pronto --> Attivo: l'utente attiva il canale
     Attivo --> Pronto: disattivazione (config conservata)
-    Attivo --> Attivo: test di invio
 ```
 
 ## Banner di dashboard

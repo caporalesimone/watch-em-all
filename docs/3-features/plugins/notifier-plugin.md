@@ -41,8 +41,10 @@ class NotifierPlugin(BasePlugin):
 - **NOT-R5 — Errors.** The plugin does a few short retries with backoff on transient errors, then
   raises `NotifierDeliveryError` with a readable reason. The core records the final per-channel
   outcome (`delivered`/`failed`/`skipped`); a failed channel blocks neither the others nor the history.
-- **NOT-R6 — Test.** Every notifier sends a **test** with the current merged config, invoked by the
-  user (own target) and the admin (channel check). No persistence.
+- **NOT-R6 — Test.** Every notifier sends a **test** with the current merged config. **Admin-only
+  since 10.X4**: the probe answers *"does the system config work"*, which is a question for whoever
+  can fix it, and its target is the admin's own account rather than an address typed in a field. No
+  persistence.
 - **NOT-R7 — Content survives formatting.** Whatever the channel format, the decision-carrying data
   must survive: event tags, before/after prices, **provenance**, links, cart totals and threshold.
 

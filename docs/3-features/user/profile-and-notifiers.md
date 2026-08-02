@@ -28,15 +28,18 @@ The Profile page gathers what concerns the account itself: identity, interface l
 
 A **Notification channels** section lists every notifier the admin has made available. For each
 channel the user sees its **composite state** and, where applicable, a personal config form (rendered
-from the plugin's [`ConfigField`](../../4-capabilities/contracts/config-field.md) schema), an **on/off**
-toggle and a **Test** button (outcome shown as a toast). See [notifier-plugin](../plugins/notifier-plugin.md).
+from the plugin's [`ConfigField`](../../4-capabilities/contracts/config-field.md) schema) and an
+**on/off** toggle. See [notifier-plugin](../plugins/notifier-plugin.md).
 
 - **PROF-R6/R7** — A channel delivers only when it is admin-enabled **and** its system config is
   complete **and** the user's required fields are valid **and** the user has activated it. The
   composite state is shown plainly (available / needs your details / active). A channel the admin has
   globally disabled is **not listed**.
-- **PROF-R8** — Each configurable channel has a **Test** button: sends a test with the current merged
-  config; no persistence.
+- **PROF-R8** — ~~Each configurable channel has a **Test** button.~~ **Withdrawn in 10.X4.** It made
+  sense while a user typed their own delivery address into this page. Since 10.B23/10.B25 the address
+  *is* the account, and it has already proved it works by carrying the password that person signed in
+  with; what was left probed the server's SMTP config from a page whose owner cannot change it. The
+  probe survives on the admin's own page, where it can be acted on (NOT-R6).
 - **PROF-R9** — Secret fields are masked and write-only (never returned); a stored value is shown as
   "saved" without revealing it.
 - **PROF-R10** — Deactivating a channel keeps its config (re-activate without re-typing).

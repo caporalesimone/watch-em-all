@@ -149,12 +149,26 @@ def test_admin_disabling_in_app_hides_inbox(client: TestClient) -> None:
     assert client.get("/api/alerts/unread-count", headers=_bearer(token)).json()["count"] == 0
 
 
-def test_user_test_endpoint_reports_outcome(
+def test_the_profile_has_no_test_send_anymore(client: TestClient) -> None:
+    """10.X4: the user-facing probe is gone, not hidden. A route left in place and unlinked is
+    a route that comes back the next time somebody reads the OpenAPI page."""
+    admin = _admin_token(client)
+    token = _make_user(client, admin, "alice@example.com")
+    assert client.post("/api/notifiers/email/test", headers=_bearer(token)).status_code == 404
+
+
+def test_the_admin_probe_delivers_to_the_admins_own_account(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """The probe that survived (10.X4), and the reason it can: it answers a question about the
+    **system** config, and its destination is not typed anywhere — it is the account's own."""
     admin = _admin_token(client)
     _configure_email_admin(client, admin)
-    token = _make_user(client, admin, "alice@example.com")
+    # The bootstrap admin's username is not an address, so it carries a contact email (10.X2);
+    # that is where its own mail goes.
+    client.patch(
+        "/api/me", json={"contact_email": "boss@example.com"}, headers=_bearer(admin)
+    ).raise_for_status()
 
     sent: list[Any] = []
 
@@ -172,7 +186,6 @@ def test_user_test_endpoint_reports_outcome(
             sent.append(msg)
 
     monkeypatch.setattr(smtplib, "SMTP", _FakeSMTP)
-    res = client.post("/api/notifiers/email/test", headers=_bearer(token)).json()
+    res = client.post("/api/admin/notifiers/email/test", headers=_bearer(admin)).json()
     assert res["ok"] is True
-    # Nobody configured a destination anywhere: it came from the account (10.B25).
-    assert sent and sent[0]["To"] == "alice@example.com"
+    assert sent and sent[0]["To"] == "boss@example.com"
