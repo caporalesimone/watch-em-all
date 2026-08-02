@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import smtplib
 from datetime import datetime, timedelta
+from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -31,7 +34,6 @@ def _payload(**over: object) -> dict[str, object]:
         "first_name": "Alice",
         "last_name": "Rossi",
         "role": "user",
-        "temp_password": "temp-pass-123",
     }
     base.update(over)
     return base
@@ -76,11 +78,6 @@ def test_create_validations(client: TestClient) -> None:
     token = _admin_token(client)
     assert (
         client.post("/api/admin/users", json=_payload(last_name=""), headers=_bearer(token))
-    ).status_code == 400
-    assert (
-        client.post(
-            "/api/admin/users", json=_payload(temp_password="short"), headers=_bearer(token)
-        )
     ).status_code == 400
     assert (
         client.post("/api/admin/users", json=_payload(role="superadmin"), headers=_bearer(token))
@@ -132,6 +129,107 @@ def test_a_second_account_cannot_take_the_same_address_in_another_case(
         "/api/admin/users", json=_payload(username="DUP@Example.COM"), headers=_bearer(token)
     )
     assert dup.status_code == 409, "casing is not a way to own the same address twice"
+
+
+# ------------------------------------------------ the password is generated and mailed (10.B24)
+
+
+def _configure_email(client: TestClient, admin: str) -> None:
+    client.put(
+        "/api/admin/notifiers/email/config",
+        json={"config": {"smtp_host": "smtp.local", "from_address": "w@local"}},
+        headers=_bearer(admin),
+    )
+
+
+class _FakeSMTP:
+    """Records what would have gone out. Class-level, because the send happens inside the
+    request and there is no handle on the plugin from out here."""
+
+    sent: list[Any] = []
+
+    def __init__(self, *a: object, **k: object) -> None: ...
+    def __enter__(self) -> _FakeSMTP:
+        return self
+
+    def __exit__(self, *a: object) -> None: ...
+
+    def starttls(self, context: object = None) -> None: ...
+    def login(self, u: str, p: str) -> None: ...
+
+    def send_message(self, msg: Any) -> None:
+        _FakeSMTP.sent.append(msg)
+
+
+@pytest.mark.real_credential_mail
+def test_the_generated_password_reaches_the_account_and_nothing_else(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The whole of 10.B24 in one pass: no password in the request, one in the mailbox, and
+    that one signs in. Marked ``real_credential_mail``, so the real generator and the real
+    channel gate run — the rest of the suite stubs both."""
+    _FakeSMTP.sent = []
+    monkeypatch.setattr(smtplib, "SMTP", _FakeSMTP)
+    token = _admin_token(client)
+    _configure_email(client, token)
+
+    created = client.post("/api/admin/users", json=_payload(), headers=_bearer(token))
+    assert created.status_code == 201
+    assert "password" not in created.json(), "a credential must not travel back in a response"
+
+    assert len(_FakeSMTP.sent) == 1
+    mail = _FakeSMTP.sent[0]
+    assert mail["To"] == "alice@example.com"
+    body = mail.get_body(preferencelist=("plain",)).get_content()
+    # The password is whatever the server invented; find it by the line that carries it.
+    line = next(ln for ln in body.splitlines() if "Password:" in ln)
+    password = line.split("Password:")[1].strip().strip("*")
+    assert len(password) >= 12
+
+    login = client.post(
+        "/api/auth/login", json={"username": "alice@example.com", "password": password}
+    )
+    assert login.status_code == 200
+    assert client.get("/api/me", headers=_bearer(login.json()["access_token"])).json()[
+        "must_change_password"
+    ], "generated or not, the first thing you do is choose your own"
+
+
+@pytest.mark.real_credential_mail
+def test_no_account_is_created_when_the_email_channel_cannot_deliver(client: TestClient) -> None:
+    """The channel is left unconfigured. Refusing is the point: an account whose password
+    nobody will ever read is not half a success (Simone's call, 2026-08-02)."""
+    token = _admin_token(client)
+    refused = client.post("/api/admin/users", json=_payload(), headers=_bearer(token))
+    assert refused.status_code == 422
+    assert refused.json()["code"] == "email_channel_unavailable"
+    assert {u["username"] for u in _all(client, token)} == {"admin"}, "nothing was left behind"
+
+
+@pytest.mark.real_credential_mail
+def test_a_reset_that_cannot_be_delivered_leaves_the_old_password_working(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _FakeSMTP.sent = []
+    monkeypatch.setattr(smtplib, "SMTP", _FakeSMTP)
+    token = _admin_token(client)
+    _configure_email(client, token)
+    uid = _alice_id(client, token)
+    password = _mailed_password()
+
+    # Now the channel goes down between the creation and the reset.
+    client.patch("/api/admin/notifiers/email", json={"enabled": False}, headers=_bearer(token))
+    refused = client.post(f"/api/admin/users/{uid}/reset-password", headers=_bearer(token))
+    assert refused.status_code == 422
+    assert (
+        client.post("/api/auth/login", json={"username": "alice@example.com", "password": password})
+    ).status_code == 200, "a reset that could not be delivered must not have happened"
+
+
+def _mailed_password() -> str:
+    body: str = _FakeSMTP.sent[-1].get_body(preferencelist=("plain",)).get_content()
+    line = next(ln for ln in body.splitlines() if "Password:" in ln)
+    return line.split("Password:")[1].strip().strip("*")
 
 
 def _all(client: TestClient, token: str) -> list[dict[str, object]]:
@@ -212,11 +310,8 @@ def test_reset_password_forces_a_change_and_kills_the_old_sessions(client: TestC
     )
     live_refresh = str(live.json()["refresh_token"])
 
-    reset = client.post(
-        f"/api/admin/users/{uid}/reset-password",
-        json={"temp_password": "reset-pass-123"},
-        headers=_bearer(token),
-    )
+    # No password in the request any more (10.B24): the server invents one and mails it.
+    reset = client.post(f"/api/admin/users/{uid}/reset-password", headers=_bearer(token))
     assert reset.status_code == 200
     assert reset.json()["must_change_password"] is True
     # A reset exists for the case where somebody else may hold the old password, so the old
@@ -231,8 +326,11 @@ def test_reset_password_forces_a_change_and_kills_the_old_sessions(client: TestC
             "/api/auth/login", json={"username": "alice@example.com", "password": "alice-pass-123"}
         )
     ).status_code == 401
+    # …and the one that was mailed does work. `mailed_passwords` pins the generator, so the
+    # test knows what was sent without the server having to hand it back in the response —
+    # which it must never do (the password exists in the mailbox and the hash, nowhere else).
     again = client.post(
-        "/api/auth/login", json={"username": "alice@example.com", "password": "reset-pass-123"}
+        "/api/auth/login", json={"username": "alice@example.com", "password": "temp-pass-123"}
     )
     assert again.status_code == 200
 

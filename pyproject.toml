@@ -63,6 +63,9 @@ testpaths = ["tests"]
 # servers bind port 0, and no fixture is session- or module-scoped.
 # Use `-n0` when debugging a single failure — with workers the output interleaves.
 addopts = "-q -n auto"
+markers = [
+    "real_credential_mail: opt out of the stubbed password mail (see tests/conftest.py)",
+]
 
 [build-system]
 requires = ["poetry-core>=2.0"]

@@ -32,7 +32,6 @@ def _user_token(client: TestClient, admin: str) -> str:
             "first_name": "Alice",
             "last_name": "Doe",
             "role": "user",
-            "temp_password": "temp-pass-123",
         },
         headers=_bearer(admin),
     )

@@ -52,6 +52,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - Second schema step: a username is now sized for an email address, and the bootstrap admin can hold one of its own.
 - Your username is now your email address: refused if it is not one, stored lowercase, and it signs you in whatever case you type.
 - Email notifications need no setup: they go to your account address and arrive switched on, leaving you only the on/off choice.
+- Nobody picks your first password any more: the server generates one and mails it to you, and it is never stored in your history.
 
 ## [0.9.0] - 2026-07-31
 

@@ -80,7 +80,6 @@ def test_the_drill_down_puts_the_failure_first_and_names_the_user(client: TestCl
             "first_name": "A",
             "last_name": "R",
             "role": "user",
-            "temp_password": "temp-pass-123",
         },
         headers=_bearer(token),
     ).json()

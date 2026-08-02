@@ -75,3 +75,39 @@ def client(app: FastAPI) -> Iterator[TestClient]:
     bootstrap, plugins), leaving it runs the shutdown half."""
     with TestClient(app) as test_client:
         yield test_client
+
+
+TEMP_PASSWORD = "temp-pass-123"
+"""What :func:`mailed_passwords` makes the server generate, so a test can sign in afterwards."""
+
+
+@pytest.fixture(autouse=True)
+def mailed_passwords(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> list[dict[str, str]]:
+    """Creating an account now mails a generated password (10.B24), which two things in this
+    suite could not live with: the password is random, and sending it needs a working SMTP.
+
+    So by default the generator is pinned to :data:`TEMP_PASSWORD` — the string the suite has
+    always used, which is why almost no test had to change — and the send is recorded instead of
+    performed. The returned list is what went out, for tests that want to assert on it.
+
+    A test that wants the **real** thing, channel gate included, marks itself
+    ``@pytest.mark.real_credential_mail`` and gets no patching at all. That marker is the only
+    way this fixture can hide a genuine failure, and it is on the tests that would notice.
+    """
+    sent: list[dict[str, str]] = []
+    if request.node.get_closest_marker("real_credential_mail"):
+        return sent
+
+    from src.core import credentials as cred
+    from src.web.routers import admin_users
+
+    monkeypatch.setattr(admin_users, "generate_password", lambda: TEMP_PASSWORD)
+    monkeypatch.setattr(cred, "channel_ready", lambda db, plugin: True)
+
+    def _record(db: object, plugin: object, **kw: object) -> None:
+        sent.append({"address": str(kw["address"]), "password": str(kw["password"])})
+
+    monkeypatch.setattr(cred, "send_password", _record)
+    return sent

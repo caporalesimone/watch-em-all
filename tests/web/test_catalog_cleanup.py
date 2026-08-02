@@ -56,7 +56,6 @@ def _account(client: TestClient, username: str, role: str = "user") -> tuple[int
             "first_name": "T",
             "last_name": "U",
             "role": role,
-            "temp_password": "temp-pass-123",
         },
         headers=_bearer(admin),
     )

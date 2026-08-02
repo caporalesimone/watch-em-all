@@ -18,19 +18,21 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Request, status
 from sqlalchemy import nullsfirst, nullslast, select
 from sqlalchemy.sql.elements import UnaryExpression
 
+from src.core import credentials as cred
 from src.core import notifiers as notif
 from src.core.admin_messages import latest_broadcast_id
 from src.core.errors import APIError
 from src.core.models import User
 from src.core.notifiers import EMAIL_PLUGIN_ID
-from src.core.security import hash_password
+from src.core.plugins.base import NotifierPlugin
+from src.core.security import generate_password, hash_password
 from src.core.settings import get_system_settings
 from src.web.deps import AdminDep, SessionDep
-from src.web.schemas import AdminPasswordReset, AdminUserPatch, AdminUserSummary, UserCreate
+from src.web.schemas import AdminUserPatch, AdminUserSummary, UserCreate
 
 router = APIRouter(prefix="/admin", tags=["Admin: users"])
 
@@ -40,6 +42,53 @@ def _target(db: SessionDep, user_id: int) -> User:
     if user is None:
         raise APIError(404, "user_not_found", "no such account")
     return user
+
+
+def _notifiers(request: Request) -> list[NotifierPlugin]:
+    loaded = list(getattr(request.app.state, "loaded_plugins", []))
+    return [lp.plugin for lp in loaded if isinstance(lp.plugin, NotifierPlugin)]
+
+
+def _mail_password(
+    request: Request,
+    db: SessionDep,
+    template: cred.CredentialTemplate,
+    *,
+    first_name: str,
+    address: str,
+    user_id: int,
+) -> str:
+    """Generate a password, put it in front of its owner, and hand it back to be hashed (10.B24).
+
+    Both refusals are deliberate and both happen **before** anything is written. A channel that
+    cannot deliver is a 422 — this is a precondition of the operation, not a server fault, and
+    the administrator can fix it on the Notifiers page. A channel that accepted the job and then
+    failed is a 502: nothing the caller did was wrong, and the account is untouched either way.
+    """
+    plugin = cred.email_channel(_notifiers(request))
+    if not cred.channel_ready(db, plugin):
+        raise APIError(
+            422,
+            "email_channel_unavailable",
+            "the email channel is off or not configured, so no password can be delivered",
+        )
+    password = generate_password()
+    try:
+        cred.send_password(
+            db,
+            plugin,
+            template=template,
+            user_id=user_id,
+            first_name=first_name,
+            address=address,
+            password=password,
+            now=datetime.now(tz=UTC),
+        )
+    except cred.CredentialMailError as exc:
+        raise APIError(
+            502, "password_email_failed", f"the password could not be sent: {exc}"
+        ) from exc
+    return password
 
 
 def _refuse_self(admin_id: int, target: User) -> None:
@@ -109,14 +158,22 @@ def list_users(
     status_code=status.HTTP_201_CREATED,
     summary="Create an account with a temporary password + forced first change (admin only).",
 )
-def create_user(body: UserCreate, _admin: AdminDep, db: SessionDep) -> AdminUserSummary:
+def create_user(
+    body: UserCreate, request: Request, _admin: AdminDep, db: SessionDep
+) -> AdminUserSummary:
     if db.scalar(select(User.id).where(User.username == body.username)) is not None:
         raise APIError(409, "username_taken", "that username is already in use")
+    # The password is generated and mailed (10.B24), so it is sent **before** the account is
+    # written: an account whose password nobody will ever read is not half a success, and this
+    # ordering means a refusal leaves nothing behind to clean up.
+    password = _mail_password(
+        request, db, cred.CREATED, first_name=body.first_name, address=body.username, user_id=0
+    )
     user = User(
         username=body.username,
         first_name=body.first_name,
         last_name=body.last_name,
-        password_hash=hash_password(body.temp_password),
+        password_hash=hash_password(password),
         role=body.role,
         is_active=True,
         must_change_password=True,  # USR-R2: forced change at first login
@@ -146,13 +203,23 @@ def _enable_email(db: SessionDep, user_id: int) -> None:
 @router.post(
     "/users/{user_id}/reset-password",
     response_model=AdminUserSummary,
-    summary="Reset an account to a temporary password + forced change (admin only).",
+    summary="Generate a new password, mail it to the account, and force a change (admin only).",
 )
 def reset_password(
-    user_id: int, body: AdminPasswordReset, _admin: AdminDep, db: SessionDep
+    user_id: int, request: Request, _admin: AdminDep, db: SessionDep
 ) -> AdminUserSummary:
     user = _target(db, user_id)
-    user.password_hash = hash_password(body.temp_password)
+    # Mailed first, for the same reason as at creation: if it cannot be delivered, the account
+    # keeps the password it has rather than one nobody can read (10.B24).
+    password = _mail_password(
+        request,
+        db,
+        cred.RESET,
+        first_name=user.first_name,
+        address=cred.address_of(user),
+        user_id=user.id,
+    )
+    user.password_hash = hash_password(password)
     user.password_changed_at = datetime.now(tz=UTC)
     user.must_change_password = True  # USR-R2, as at creation
     # Every existing session dies with the old password: a reset exists precisely for the

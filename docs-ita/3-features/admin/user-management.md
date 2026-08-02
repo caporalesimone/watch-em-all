@@ -7,6 +7,7 @@
 ## Requisiti
 
 - **USR-R3** — L'admin può **reimpostare la password** di un utente (nuova temporanea + cambio forzato al primo login): **è l'unico modo con cui l'admin cambia la password di un utente** (non esiste un "imposta password definitiva" diretto). È il flusso di recupero per password dimenticata — non esiste reset self-service via email, scelta coerente con la postura hobby.
+  > **Da 10.B24 la password non la sceglie l'admin: la genera il server e la spedisce.** Invio **diretto via SMTP**, mai attraverso la pipeline delle notifiche: quella scrive in `alert_log` prima che un canale la veda, e una credenziale finirebbe in chiaro nello storico in-app. L'invio **ignora la preferenza dell'utente** sulle notifiche email — l'interruttore governa gli avvisi, non le credenziali, e chi lo ha spento deve comunque poter entrare. Se il canale non è utilizzabile (spento o non configurato) **l'operazione si rifiuta prima di scrivere qualsiasi cosa**: creazione → `422 email_channel_unavailable` e nessun account, reset → `422` e la vecchia password continua a funzionare. Il reset invalida comunque le sessioni (AUTH-R5), quindi l'utente viene sloggato.
 - **USR-R4** — L'admin può **disabilitare/riabilitare** un account. La disabilitazione invalida le sessioni (con la tolleranza dichiarata di pochi minuti dell'access token, vedi [security posture](../../../docs/2-architecture/security-posture.md)).
 
 ### Cancellazione differita
@@ -25,7 +26,7 @@
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Temporaneo: admin crea l'account<br/>(password temporanea)
+    [*] --> Temporaneo: admin crea l'account<br/>(password generata e spedita)
     Temporaneo --> Attivo: primo login + cambio password
     Attivo --> Temporaneo: reset password (admin)
     Attivo --> Disabilitato: admin disabilita<br/>(notifica di cortesia)
@@ -43,6 +44,6 @@ stateDiagram-v2
 | Tabella account | username, ruolo, stato (attivo/disabilitato/**in cancellazione**/cambio password pendente), lingua, data creazione, **ultimo accesso** (colonna ordinabile, USR-R13), data marcatura e **scadenza** per i marcati |
 | Filtro stato | un click tra **attivo / disabilitato / in cancellazione** (USR-R14) |
 | Azioni per riga (icone) | reset password · **abilita/disabilita** · **cancella** (= marca con scadenza) · **annulla cancellazione** (solo per i marcati, → disabilitato) |
-| Creazione | form: username, **nome, cognome**, ruolo, password temporanea (o generata) |
+| Creazione | form: indirizzo email (che *è* l'username, 10.B23), **nome, cognome**, ruolo. **Nessun campo password** (10.B24): la genera il server e la spedisce via SMTP diretto |
 
 L'admin **non vede**: cataloghi, carrelli, notifiche, configurazioni personali dei canali.

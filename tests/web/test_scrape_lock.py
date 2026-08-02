@@ -34,7 +34,6 @@ def _user_token(client: TestClient, admin: str) -> str:
             # The manual scrape belongs to the super-user from 9.B8: a plain account is
             # refused by the API before it ever reaches the lock.
             "role": "super_user",
-            "temp_password": "temp-pass-123",
         },
         headers=_bearer(admin),
     )

@@ -37,7 +37,6 @@ def _make_user(client: TestClient, admin: str, username: str) -> str:
             "first_name": username.title(),
             "last_name": "Test",
             "role": "user",
-            "temp_password": "temp-pass-123",
         },
         headers=_bearer(admin),
     )
@@ -374,7 +373,6 @@ def test_administrators_are_never_recipients(client: TestClient) -> None:
             "first_name": "Second",
             "last_name": "Admin",
             "role": "admin",
-            "temp_password": "temp-pass-123",
         },
         headers=_bearer(admin),
     )

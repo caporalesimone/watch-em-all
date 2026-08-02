@@ -33,7 +33,6 @@ def _make_user(client: TestClient, admin_token: str, username: str) -> str:
             "first_name": "T",
             "last_name": "U",
             "role": "user",
-            "temp_password": "temp-pass-123",
         },
         headers=_bearer(admin_token),
     )

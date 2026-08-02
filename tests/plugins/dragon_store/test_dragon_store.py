@@ -140,7 +140,6 @@ def _make_user(
             "first_name": "Test",
             "last_name": "User",
             "role": role,
-            "temp_password": "temp-pass-123",
         },
         headers=_bearer(admin_token),
     )

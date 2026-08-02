@@ -65,14 +65,15 @@ class HealthResponse(BaseModel):
 
 class UserCreate(BaseModel):
     # Admin-created account (USR-R1/R15): an **email address** + first/last name (both
-    # required) + role + a temporary password the user must change at first login (USR-R2).
+    # required) + role. **No password field** since 10.B24: the server generates one and mails
+    # it, so no credential travels through a form, a browser history or an admin's notes. The
+    # forced change at first login (USR-R2) stays; only who picks the first password changed.
     username: str = Field(min_length=1, max_length=USERNAME_MAX)
     first_name: str = Field(min_length=1, max_length=64)
     last_name: str = Field(min_length=1, max_length=64)
     # Three levels since 9.B8. A role is chosen at creation and not changed afterwards:
     # promoting an existing account is phase 10, where the actions on accounts live.
     role: Literal["admin", "super_user", "user"]
-    temp_password: str = Field(min_length=8)  # AUTH-R6
 
     @field_validator("username")
     @classmethod
@@ -196,13 +197,6 @@ class CalendarSlot(BaseModel):
 class CalendarDay(BaseModel):
     date: str
     slots: list[CalendarSlot]
-
-
-class AdminPasswordReset(BaseModel):
-    # Same shape as creation (10.B1): the admin supplies the temporary password rather than
-    # the server inventing one, so the single generator already in the admin page keeps
-    # being the only place that decides what a temporary password looks like.
-    temp_password: str = Field(min_length=8)  # AUTH-R6
 
 
 class AdminUserPatch(BaseModel):

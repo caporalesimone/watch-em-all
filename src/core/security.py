@@ -36,6 +36,22 @@ def new_jti() -> str:
     return secrets.token_hex(16)
 
 
+# Deliberately missing 0/O and 1/l/I: this password is read out of an email and typed once by
+# hand, and a character somebody cannot tell apart turns a working credential into a support
+# request. The cost is ~0.3 bits per character, which 16 characters can afford.
+_PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
+
+
+def generate_password(length: int = 16) -> str:
+    """A password the system invents, for an account it has just created or reset (10.B24).
+
+    It exists in exactly two places and never in a third: the recipient's mailbox, and the
+    bcrypt hash in the database. Nobody types it into a form, so it is not chosen by an
+    administrator and does not pass through a browser, a screen share or a set of notes.
+    """
+    return "".join(secrets.choice(_PASSWORD_ALPHABET) for _ in range(length))
+
+
 @dataclass(frozen=True)
 class TokenClaims:
     sub: int
