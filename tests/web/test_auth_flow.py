@@ -7,6 +7,10 @@ functional endpoints, refresh rotation and reuse detection, logout."""
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
+
+from src.core.db import new_session
+from src.core.models import User
 
 
 def _auth(token: str) -> dict[str, str]:
@@ -111,6 +115,37 @@ def test_normal_change_requires_and_verifies_current_password(client: TestClient
         json={"old_password": "newpass123", "new_password": "another123"},
     )
     assert ok.status_code == 204
+
+
+def test_password_changed_at_follows_the_password(client: TestClient) -> None:
+    """10.X1: the column exists, is stamped at creation, and moves on every change.
+
+    It is written an MVP before `password_expiry` (10.B19) reads it, so the only thing
+    provable today is that the value tracks the password rather than staying at the
+    bootstrap instant — which is the whole point of measuring an age against it.
+    """
+    session = new_session()
+    try:
+        at_creation = session.scalars(select(User).where(User.username == "admin")).one()
+        stamped = at_creation.password_changed_at
+    finally:
+        session.close()
+    assert stamped is not None, "the bootstrap admin must carry a creation stamp, never NULL"
+
+    access = _login(client, "initpass123")
+    assert (
+        client.post(
+            "/api/auth/change-password", headers=_auth(access), json={"new_password": "newpass123"}
+        ).status_code
+        == 204
+    )
+
+    session = new_session()
+    try:
+        after = session.scalars(select(User).where(User.username == "admin")).one()
+        assert after.password_changed_at > stamped
+    finally:
+        session.close()
 
 
 def test_logout_then_refresh_is_rejected(client: TestClient) -> None:

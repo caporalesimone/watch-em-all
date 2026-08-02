@@ -152,6 +152,7 @@ def change_password(body: ChangePasswordRequest, claims: ClaimsDep, db: SessionD
             )
 
     user.password_hash = hash_password(body.new_password)
+    user.password_changed_at = datetime.now(tz=UTC)  # 10.X1: the age `password_expiry` measures
     user.must_change_password = False
     user.token_version += 1  # AUTH-R5: invalidate all tokens; client logs in again
     user.refresh_jti = None

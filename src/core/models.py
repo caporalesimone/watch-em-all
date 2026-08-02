@@ -49,6 +49,15 @@ class User(Base):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     locale: Mapped[str] = mapped_column(String(8), nullable=False, default="en")
     must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # When the password currently in place was set (10.X1). Stamped at creation like
+    # `created_at` and moved on every password write, so `password_expiry` (10.B19) has an
+    # age to measure without a NULL meaning two different things ("never changed" and
+    # "predates the column"). It lands one MVP ahead of the logic that reads it: `create_all`
+    # does not alter existing tables, so adding it later would be a second database
+    # recreation — and that would reset the per-product counters phase 10b is waiting on.
+    password_changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     refresh_jti: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

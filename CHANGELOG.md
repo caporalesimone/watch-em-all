@@ -10,6 +10,8 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 
 **Phase 10 — Admin governance: the administrator's console filled in — run statistics and drill-down, the lifetime counters per scraper that phase 9 collects but never showed, system limits editable while it runs, full user management (with deferred deletion and restore), messages to users, retention and purge. It opens with a catalog polish: the Source column shows the store's logo alone. Entries land below as they ship.**
 
+> **This version recreates the database.** Pre-1.0 the schema changes freely and is not migrated. One column is added to `users` (when the current password was set), and it is added **at the start of the phase rather than when the feature that reads it ships** — deliberately, so the phase costs one recreation instead of two. Existing data is not carried over.
+
 ## [0.9.0] - 2026-07-31
 
 **Phase 9 — Dragon Store, complete: paste a category URL and dozens of products flow into your catalog on every run (with de-duplication and the site's own exclusions); delisted products grey out on their own and clear with a click. A product's price history now belongs to the product, so it outlives your catalog and you inherit it when you start watching.**
