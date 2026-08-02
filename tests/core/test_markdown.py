@@ -15,6 +15,28 @@ def test_ordinary_formatting_survives() -> None:
     assert 'href="https://example.com"' in html
 
 
+def test_headings_render_but_two_levels_down() -> None:
+    """10.B31. They were dropped altogether because an ``<h1>`` inside a notification card
+    looks like the app broke — which was true of the level, not of the feature. Demoting says
+    what a heading in a message actually is: a section of somebody's message, inside a page
+    that already owns its own h1 and h2."""
+    html = to_html("# Top\n\n## Under\n\n###### Deepest")
+    assert "<h3>Top</h3>" in html
+    assert "<h4>Under</h4>" in html
+    # Already at the bottom of the scale: shifting cannot invent an h8.
+    assert "<h6>Deepest</h6>" in html
+    assert "<h1" not in html and "<h2" not in html
+
+
+def test_emoji_travel_untouched() -> None:
+    """Nothing has to be switched on for them: they are ordinary characters, and the parser
+    and the sanitiser both leave them alone. Written down as a test because the question was
+    asked, and an answer in prose decays."""
+    html = to_html("# Rilascio \U0001f680\n\nCiao \U0001f44b **ok** ❤️")
+    assert "\U0001f680" in html and "\U0001f44b" in html and "❤️" in html
+    assert "\U0001f680" in strip("# Rilascio \U0001f680")
+
+
 def test_html_written_into_the_source_never_becomes_an_element() -> None:
     """Admin-authored is a statement about who typed it, not about what is in it.
 

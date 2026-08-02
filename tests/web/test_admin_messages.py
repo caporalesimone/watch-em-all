@@ -130,6 +130,29 @@ def test_deleting_a_targeted_message_leaves_the_recipient_their_copy(client: Tes
     assert len(client.get("/api/alerts", headers=_bearer(alice)).json()["items"]) == 1
 
 
+def test_a_title_and_a_body_full_of_emoji_survive_the_round_trip(client: TestClient) -> None:
+    """Simone asked whether emoji need enabling. They do not — they are ordinary characters,
+    UTF-8 all the way down — and this is the end-to-end proof rather than the assurance."""
+    admin = _admin_token(client)
+    _make_user(client, admin, "alice@example.com")
+    title = "Rilascio \U0001f680 pronto"
+    body = "# Novità ❤️\n\nCiao \U0001f44b — tutto **ok**"
+
+    sent = client.post(
+        "/api/admin/messages", json={"title": title, "body": body}, headers=_bearer(admin)
+    )
+    assert sent.status_code == 201
+    listed = client.get("/api/admin/messages", headers=_bearer(admin)).json()["items"][0]
+    assert listed["title"] == title
+    assert listed["body"] == body
+
+    rendered = client.post(
+        "/api/admin/messages/preview", json={"body": body}, headers=_bearer(admin)
+    ).json()["body_html"]
+    assert "❤️" in rendered and "\U0001f44b" in rendered
+    assert "<h3>" in rendered, "and the heading is a heading again (10.B31)"
+
+
 def test_the_sent_list_separates_broadcasts_from_one_to_one_notes(client: TestClient) -> None:
     admin = _admin_token(client)
     alice = _make_user(client, admin, "alice@example.com")

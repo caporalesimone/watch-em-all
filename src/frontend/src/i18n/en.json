@@ -517,7 +517,7 @@
 			"noAudience": "There is no one to send to: every account is an administrator.",
 			"titleLabel": "Title",
 			"bodyPlaceholder": "Write the message. Markdown works: **bold**, *italic*, lists, links.",
-			"markdownHint": "Markdown: **bold**, *italic*, lists, > quotes, `code`, [links](https://example.com).",
+			"markdownHint": "Markdown: # headings, **bold**, *italic*, lists, > quotes, `code`, [links](https://example.com). Emoji work as they are 🚀",
 			"tabWrite": "Write",
 			"tabPreview": "Preview",
 			"previewEmpty": "Nothing to preview yet — write something first.",

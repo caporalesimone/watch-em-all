@@ -39,6 +39,36 @@
 	.message-body :global(p) {
 		margin: 0 0 0.75rem;
 	}
+	/* Headings arrive already demoted to h3–h6 by the core renderer (10.B31), because the page
+	   around them owns h1 and h2. Sized here from the message's own text rather than from the
+	   page scale, so the largest one a body can produce still reads as a section of a message
+	   and not as the title of the screen it is sitting in. */
+	.message-body :global(h3),
+	.message-body :global(h4),
+	.message-body :global(h5),
+	.message-body :global(h6) {
+		font-weight: 600;
+		line-height: 1.3;
+		margin: 1.25rem 0 0.5rem;
+	}
+	.message-body :global(h3) {
+		font-size: 1.25em;
+	}
+	.message-body :global(h4) {
+		font-size: 1.1em;
+	}
+	.message-body :global(h5),
+	.message-body :global(h6) {
+		font-size: 1em;
+	}
+	/* No gap above the first line of a message: a body that opens with a heading should start
+	   where every other body starts. */
+	.message-body :global(h3:first-child),
+	.message-body :global(h4:first-child),
+	.message-body :global(h5:first-child),
+	.message-body :global(h6:first-child) {
+		margin-top: 0;
+	}
 	.message-body :global(ul),
 	.message-body :global(ol) {
 		margin: 0 0 0.75rem 1.25rem;
