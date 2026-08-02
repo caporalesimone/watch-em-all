@@ -5,13 +5,19 @@
 	import {
 		ApiErr,
 		createUser,
+		getSettings,
 		listUsers,
+		markUserForDeletion,
+		resetUserPassword,
+		restoreUser,
+		setUserActive,
 		type AdminUser,
 		type NewUser,
 		type UserSort,
 		type UserStatusFilter
 	} from '$lib/api/client';
 	import PageTitle from '$lib/components/PageTitle.svelte';
+	import { auth } from '$lib/stores/auth';
 
 	let users = $state<AdminUser[]>([]);
 	let loading = $state(true);
@@ -31,6 +37,9 @@
 	// List controls (10.F1). The sort exists to answer "who has stopped using this", so the
 	// default stays alphabetical and the dormancy question is one click away.
 	let statusFilter = $state<UserStatusFilter | null>(null);
+	// Read once for the delete confirmation, which has to name a date before the server has
+	// computed one. The server stays the authority: this only previews it.
+	let graceDays = $state(30);
 	let sort = $state<UserSort>('username');
 	let order = $state<'asc' | 'desc'>('asc');
 
@@ -39,7 +48,12 @@
 		loading = false;
 	}
 
-	onMount(() => void refresh());
+	onMount(() => {
+		void refresh();
+		void getSettings()
+			.then((s) => (graceDays = s.user_deletion_retention_days))
+			.catch(() => undefined); // a stale preview is better than a broken page
+	});
 
 	function sortBy(column: UserSort): void {
 		if (sort === column) {
@@ -69,6 +83,56 @@
 		{ key: 'disabled' as const, label: $_('admin.users.filterDisabled') },
 		{ key: 'deleting' as const, label: $_('admin.users.filterDeleting') }
 	]);
+
+	// --- actions (10.F2) ---------------------------------------------------------------
+	// A random temporary password, the same 8 alphanumerics the create form generates, shown
+	// once in clear so the admin can read it out. Same generator, one definition.
+	function randomPassword(): string {
+		const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+		const bytes = new Uint32Array(8);
+		crypto.getRandomValues(bytes);
+		return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
+	}
+
+	async function act(run: () => Promise<unknown>): Promise<void> {
+		error = null;
+		notice = null;
+		try {
+			await run();
+			await refresh();
+		} catch (err) {
+			// The server refuses an admin acting on themselves (10.B1). The buttons are hidden
+			// for that row, so this only fires if the page is stale — say it plainly anyway.
+			error =
+				err instanceof ApiErr && err.code === 'cannot_target_self'
+					? $_('admin.users.errorSelf')
+					: $_('admin.users.errorGeneric');
+		}
+	}
+
+	function doReset(user: AdminUser): void {
+		if (!confirm($_('admin.users.confirmReset', { values: { username: user.username } }))) return;
+		const password = randomPassword();
+		void act(async () => {
+			await resetUserPassword(user.id, password);
+			notice = $_('admin.users.resetDone', { values: { username: user.username, password } });
+		});
+	}
+
+	function doDelete(user: AdminUser): void {
+		// The confirmation names the date the account actually dies, not just "are you sure":
+		// the reversible window is the whole point of a deferred deletion, so it has to be on
+		// the dialog that opens it.
+		const preview = new Date(Date.now() + graceDays * 86_400_000).toLocaleDateString();
+		const values = { username: user.username, date: preview };
+		if (!confirm($_('admin.users.confirmDelete', { values }))) return;
+		void act(() => markUserForDeletion(user.id));
+	}
+
+	function doRestore(user: AdminUser): void {
+		if (!confirm($_('admin.users.confirmRestore', { values: { username: user.username } }))) return;
+		void act(() => restoreUser(user.id));
+	}
 
 	function when(value: string | null): string {
 		return value ? new Date(value).toLocaleDateString() : '—';
@@ -136,6 +200,10 @@
 	const inputClass =
 		'rounded border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900';
 	const fieldClass = 'flex flex-col gap-1 text-xs text-slate-500';
+	const actionClass =
+		'rounded border border-slate-300 px-2 py-1 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800';
+	const dangerClass =
+		'rounded border border-red-300 px-2 py-1 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/40';
 </script>
 
 <section class="space-y-8">
@@ -235,6 +303,7 @@
 					>
 					<th class="py-2 pr-4">{$_('admin.users.colMarkedAt')}</th>
 					<th class="py-2 pr-4">{$_('admin.users.colDueAt')}</th>
+					<th class="py-2 pr-4"></th>
 				</tr>
 			</thead>
 			<tbody>
@@ -251,6 +320,37 @@
 								? 'text-red-600 dark:text-red-400'
 								: 'text-slate-500'}">{when(user.deletion_due_at)}</td
 						>
+						<td class="py-2 pr-4">
+							<!--
+								Nothing at all on your own row, rather than disabled buttons: the API refuses
+								it outright (10.B1), and a greyed-out control says "later, maybe" about
+								something that is never going to be allowed.
+							-->
+							{#if user.id !== $auth.user?.id}
+								<div class="flex flex-wrap gap-2 text-xs">
+									<button type="button" class={actionClass} onclick={() => doReset(user)}
+										>{$_('admin.users.actionReset')}</button
+									>
+									{#if user.deletion_marked_at}
+										<button type="button" class={actionClass} onclick={() => doRestore(user)}
+											>{$_('admin.users.actionRestore')}</button
+										>
+									{:else}
+										<button
+											type="button"
+											class={actionClass}
+											onclick={() => act(() => setUserActive(user.id, !user.is_active))}
+											>{user.is_active
+												? $_('admin.users.actionDisable')
+												: $_('admin.users.actionEnable')}</button
+										>
+										<button type="button" class={dangerClass} onclick={() => doDelete(user)}
+											>{$_('admin.users.actionDelete')}</button
+										>
+									{/if}
+								</div>
+							{/if}
+						</td>
 					</tr>
 				{/each}
 			</tbody>

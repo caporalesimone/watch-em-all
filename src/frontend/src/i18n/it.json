@@ -116,7 +116,17 @@
 			"filterDisabled": "Disabilitati",
 			"filterDeleting": "In cancellazione",
 			"colMarkedAt": "Marcato",
-			"colDueAt": "Eliminato il"
+			"colDueAt": "Eliminato il",
+			"actionReset": "Reimposta password",
+			"actionDisable": "Disabilita",
+			"actionEnable": "Abilita",
+			"actionDelete": "Elimina",
+			"actionRestore": "Annulla eliminazione",
+			"confirmReset": "Reimpostare la password di {username}? Quella attuale smette di funzionare e dovrà sceglierne una nuova.",
+			"confirmDelete": "Eliminare {username}? L'account si spegne subito e viene distrutto definitivamente il {date}. Fino ad allora puoi annullare.",
+			"confirmRestore": "Annullare l'eliminazione di {username}? L'account torna disabilitato — riattivarlo è un passo a parte.",
+			"resetDone": "Nuova password temporanea per {username}: {password}",
+			"errorSelf": "Non puoi disabilitare o eliminare il tuo account."
 		},
 		"notifiers": {
 			"title": "Notifier",

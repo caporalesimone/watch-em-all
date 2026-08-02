@@ -213,7 +213,17 @@
 			"filterDisabled": "Disabled",
 			"filterDeleting": "Being deleted",
 			"colMarkedAt": "Marked",
-			"colDueAt": "Deleted on"
+			"colDueAt": "Deleted on",
+			"actionReset": "Reset password",
+			"actionDisable": "Disable",
+			"actionEnable": "Enable",
+			"actionDelete": "Delete",
+			"actionRestore": "Cancel deletion",
+			"confirmReset": "Reset {username}'s password? Their current password stops working and they will have to set a new one.",
+			"confirmDelete": "Delete {username}? The account is switched off now and destroyed for good on {date}. Until then you can cancel.",
+			"confirmRestore": "Cancel the deletion of {username}? The account comes back disabled — enabling it is a separate step.",
+			"resetDone": "New temporary password for {username}: {password}",
+			"errorSelf": "You cannot disable or delete your own account."
 		},
 		"notifiers": {
 			"title": "Notifiers",

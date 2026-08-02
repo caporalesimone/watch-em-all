@@ -71,7 +71,7 @@ Cosa c'è già nel database, scritto da [`scraper_stats.py`](../../src/core/scra
 ### Frontend
 
 - [x] **10.F1 — Pagina utenti: lista** (~1h): stato, **ultimo accesso ordinabile**, data marcatura e scadenza, **filtro stato** attivo/disabilitato/in cancellazione. *Verifica: ordinamento e filtro corretti da browser.*
-- [ ] **10.F2 — Pagina utenti: azioni** (~1h): creazione, reset password, abilita/disabilita, cancella (soft, con riepilogo e data di eliminazione programmata), **annulla cancellazione**. *Verifica: annullamento porta a disabilitato, mai ad attivo.*
+- [x] **10.F2 — Pagina utenti: azioni** (~1h): creazione, reset password, abilita/disabilita, cancella (soft, con riepilogo e data di eliminazione programmata), **annulla cancellazione**. *Verifica: annullamento porta a disabilitato, mai ad attivo.*
 - [ ] **10.F3 — Monitoraggio run: elenco** (~1h): per-scraper: stato corrente, ultima run, elenco run ([scraper-monitoring](../3-features/admin/scraper-monitoring.md)). *Verifica: lo stato di ogni scraper è leggibile a colpo d'occhio.*
 - [ ] **10.F4 — Monitoraggio run: drill-down** (~1h): dettaglio per-utente di una run. *Verifica: run partial → l'utente fallito è individuabile col suo errore.*
 - [ ] **10.F5 — Trend e contatori della finestra recente** (~1h): grafici durate/http_requests/variazioni per run (componente grafico riusato), contatori 7/30gg, da `10.B6`. Sono i numeri che hanno un **asse dei tempi**; i cumulativi di sempre sono `10.F15` e vanno in un blocco separato, non mescolati a questi. *Verifica: trend leggibili; è dichiarato che la finestra si ferma alla retention.*
