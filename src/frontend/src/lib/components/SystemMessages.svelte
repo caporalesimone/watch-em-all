@@ -42,6 +42,11 @@
 
 	onMount(load);
 
+	/** Whether the draft still says what the row said when it was opened (10.F23). */
+	function edited(t: MessageTemplate): boolean {
+		return draftTitle !== t.title || draftBody !== t.body;
+	}
+
 	function open(t: MessageTemplate): void {
 		if (openKey === t.key) {
 			openKey = null;
@@ -203,9 +208,13 @@
 							</div>
 
 							<div class="flex flex-wrap items-center gap-3 text-sm">
+								<!-- Save also waits for an actual edit (10.F23): opening a row fills the
+								     draft with the text in force, so an untouched form would otherwise
+								     offer to store the wording as an override that changes nothing —
+								     and the badge next to the key would start saying "rewritten". -->
 								<button
 									onclick={() => save(t)}
-									disabled={busy || !draftTitle.trim() || !draftBody.trim()}
+									disabled={busy || !draftTitle.trim() || !draftBody.trim() || !edited(t)}
 									class="rounded bg-indigo-600 px-4 py-1.5 text-white hover:bg-indigo-500 disabled:opacity-40"
 								>
 									{$_('common.save')}

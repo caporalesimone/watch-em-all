@@ -8,6 +8,7 @@
 	import { _ } from 'svelte-i18n';
 
 	import type { ConfigField } from '$lib/api/client';
+	import { changed, snapshot } from '$lib/forms';
 
 	let {
 		schema,
@@ -22,7 +23,7 @@
 		isSet?: Record<string, boolean>;
 		busy?: boolean;
 		submitLabel?: string;
-		onSubmit: (values: Record<string, unknown>) => void;
+		onSubmit: (values: Record<string, unknown>) => void | Promise<unknown>;
 	} = $props();
 
 	const ACRONYMS: Record<string, string> = {
@@ -50,6 +51,10 @@
 
 	// Local editable values, rebuilt whenever the schema/config change (e.g. after a save).
 	let values = $state<Record<string, unknown>>({});
+	// What Save compares against (10.F23). A secret starts blank and blank means "keep what is
+	// stored", so an untouched form with a stored secret is genuinely unchanged — typing into
+	// that box is the only thing that makes it dirty, which is the same rule the submit uses.
+	let baseline = $state<Record<string, unknown>>({});
 	let sig = '';
 	$effect(() => {
 		const next = JSON.stringify([schema.map((f) => f.key), config]);
@@ -61,9 +66,12 @@
 			else v[f.key] = config[f.key] ?? f.default ?? (f.type === 'bool' ? false : '');
 		}
 		values = v;
+		baseline = snapshot(v);
 	});
 
-	function submit(event: SubmitEvent): void {
+	const dirty = $derived(changed(values, baseline));
+
+	async function submit(event: SubmitEvent): Promise<void> {
 		event.preventDefault();
 		const out: Record<string, unknown> = {};
 		for (const f of schema) {
@@ -79,7 +87,16 @@
 				out[f.key] = val ?? '';
 			}
 		}
-		onSubmit(out);
+		await onSubmit(out);
+		// Clean again once the save has been made. Optimistic, and deliberately so: the pages that
+		// own these forms report their own failures (a toast, a red line) and do not throw, so the
+		// alternative would be a form that stays dirty for ever after one server hiccup. What the
+		// admin typed is still in the boxes either way — touching a field re-arms Save.
+		//
+		// A secret goes back to blank, because that is what "keep the stored value" looks like and
+		// the value is now stored.
+		for (const f of schema) if (f.secret) values[f.key] = '';
+		baseline = snapshot(values);
 	}
 
 	const field =
@@ -126,7 +143,7 @@
 
 	<button
 		type="submit"
-		disabled={busy}
+		disabled={busy || !dirty}
 		class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
 	>
 		{submitLabel ?? $_('common.save')}

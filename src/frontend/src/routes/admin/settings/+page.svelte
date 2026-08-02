@@ -6,16 +6,22 @@
 
 	import { getSettings, patchSettings, type SystemSettings } from '$lib/api/client';
 	import PageTitle from '$lib/components/PageTitle.svelte';
+	import { changed, snapshot } from '$lib/forms';
 
 	let settings = $state<SystemSettings | null>(null);
+	// What Save compares against (10.F23): the values as the server last handed them over.
+	let baseline = $state<SystemSettings | null>(null);
 	let loading = $state(true);
 	let saving = $state(false);
 	let saved = $state(false);
 	let error = $state<string | null>(null);
 
+	const dirty = $derived(settings !== null && changed(settings, baseline));
+
 	onMount(async () => {
 		try {
 			settings = await getSettings();
+			baseline = snapshot(settings);
 		} catch {
 			error = $_('admin.settings.loadError');
 		} finally {
@@ -44,6 +50,7 @@
 		error = null;
 		try {
 			settings = await patchSettings(settings);
+			baseline = snapshot(settings);
 			saved = true;
 		} catch {
 			error = $_('admin.settings.saveError');
@@ -138,7 +145,7 @@
 			<button
 				class="rounded bg-slate-800 px-4 py-1.5 text-sm text-white hover:bg-slate-700 disabled:opacity-50 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white"
 				onclick={save}
-				disabled={saving}
+				disabled={saving || !dirty}
 			>
 				{$_('common.save')}
 			</button>

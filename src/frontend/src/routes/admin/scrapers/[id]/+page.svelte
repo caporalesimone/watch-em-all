@@ -18,8 +18,10 @@
 	import DynamicConfigForm from '$lib/components/DynamicConfigForm.svelte';
 	import LifetimePanel from '$lib/components/LifetimePanel.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
+	import { changed, snapshot } from '$lib/forms';
 
 	let config = $state<ScraperConfig | null>(null);
+	let baseline = $state<ScraperConfig | null>(null); // what Save compares against (10.F23)
 	let displayName = $state('');
 	let loading = $state(true);
 	let saving = $state(false);
@@ -73,6 +75,7 @@
 				getScraperPluginConfig(sid).catch(() => null)
 			]);
 			config = cfg;
+			baseline = snapshot(cfg);
 			pluginCfg = declared;
 			displayName = list.find((s) => s.scraper_id === sid)?.display_name ?? sid;
 		} catch {
@@ -87,6 +90,8 @@
 		saved = false;
 	}
 
+	const dirty = $derived(config !== null && changed(config, baseline));
+
 	async function save(): Promise<void> {
 		const sid = $page.params.id;
 		if (!config || !sid) return;
@@ -95,6 +100,7 @@
 		error = null;
 		try {
 			config = await patchScraperConfig(sid, config);
+			baseline = snapshot(config);
 			saved = true;
 		} catch {
 			error = $_('admin.scrapers.saveError');
@@ -178,7 +184,7 @@
 			<button
 				class="rounded bg-slate-800 px-4 py-1.5 text-sm text-white hover:bg-slate-700 disabled:opacity-50 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white"
 				onclick={save}
-				disabled={saving}
+				disabled={saving || !dirty}
 			>
 				{$_('common.save')}
 			</button>

@@ -8,16 +8,21 @@
 
 	import { getFeatureFlags, patchFeatureFlags, type FeatureFlags } from '$lib/api/client';
 	import PageTitle from '$lib/components/PageTitle.svelte';
+	import { changed, snapshot } from '$lib/forms';
 
 	let flags = $state<FeatureFlags>({});
+	let baseline = $state<FeatureFlags>({}); // what Save compares against (10.F23)
 	let loading = $state(true);
 	let saving = $state(false);
 	let saved = $state(false);
 	let error = $state<string | null>(null);
 
+	const dirty = $derived(changed(flags, baseline));
+
 	onMount(async () => {
 		try {
 			flags = await getFeatureFlags();
+			baseline = snapshot(flags);
 		} catch {
 			error = $_('admin.featureFlags.loadError');
 		} finally {
@@ -43,6 +48,7 @@
 		error = null;
 		try {
 			flags = await patchFeatureFlags(flags);
+			baseline = snapshot(flags);
 			saved = true;
 		} catch {
 			error = $_('admin.featureFlags.saveError');
@@ -113,7 +119,7 @@
 			<button
 				class="rounded bg-slate-800 px-4 py-1.5 text-sm text-white hover:bg-slate-700 disabled:opacity-50 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white"
 				onclick={save}
-				disabled={saving}
+				disabled={saving || !dirty}
 			>
 				{$_('common.save')}
 			</button>

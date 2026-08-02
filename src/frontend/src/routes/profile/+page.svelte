@@ -25,6 +25,9 @@
 	let addressBusy = $state(false);
 	let addressMsg = $state('');
 	const canEditAddress = $derived($auth.user?.email_editable === true);
+	// Save waits for a real edit (10.F23). The box opens filled with the address in force, so
+	// without this it offers to write back the value it is already showing.
+	const addressChanged = $derived(address.trim() !== ($auth.user?.notification_email ?? ''));
 
 	async function saveAddress(event: SubmitEvent): Promise<void> {
 		event.preventDefault();
@@ -114,7 +117,7 @@
 					/>
 					<button
 						type="submit"
-						disabled={addressBusy}
+						disabled={addressBusy || !addressChanged}
 						class="rounded border border-slate-300 px-3 py-1.5 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
 					>
 						{$_('common.save')}
