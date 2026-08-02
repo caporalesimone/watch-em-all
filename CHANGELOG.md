@@ -18,6 +18,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - The user list sorts by last sign-in, with never-signed-in at the dormant end, and filters by active, disabled or being deleted.
 - Deleting an account no longer destroys it: it is marked with a deadline and can be restored until then, coming back disabled.
 - Removing a person takes their plugin data with them and leaves every product's price history untouched — that belongs to the product.
+- Accounts past their deletion deadline are destroyed once a day; if any plugin fails to clean up, nothing is destroyed and tomorrow retries.
 
 ### Changed
 

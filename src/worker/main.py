@@ -40,6 +40,7 @@ from src.core.scrape_cache import purge_expired as purge_expired_cache
 from src.core.scraper_stats import bump, record_run
 from src.core.settings import get_system_settings
 from src.core.system_log import install_system_log_handler
+from src.core.user_purge import purge_due_users
 from src.worker.runner import Runner
 
 log = logging.getLogger("wea.worker")
@@ -48,6 +49,8 @@ HEARTBEAT_FILE = os.environ.get("WEA_HEARTBEAT_FILE", "/tmp/worker-heartbeat")
 
 # Schedulable scrapers (scraper_id -> LoadedPlugin), populated at boot.
 _loaded: dict[str, LoadedPlugin] = {}
+# Every loaded plugin, for the account purge (10.B5), which must ask them all.
+_all_plugins: list[LoadedPlugin] = []
 
 # All loaded scraper plugins (scraper_id -> ScraperPlugin), for binding get_adjustments
 # during alert runs — a scraper_specific cart's scraper may not be schedulable.
@@ -109,6 +112,11 @@ def _boot() -> None:
     _loaded.clear()
     _scrapers.clear()
     _notifiers.clear()
+    # Every plugin, not just the schedulable scrapers: the account purge (10.B5) has to ask
+    # each one to drop its rows, and a notifier with per-user tables is as relevant there as
+    # a scraper is.
+    _all_plugins.clear()
+    _all_plugins.extend(loaded)
     for lp in loaded:
         if isinstance(lp.plugin, ScraperPlugin):
             _scrapers[lp.plugin.plugin_id] = lp.plugin
@@ -179,6 +187,19 @@ def _daily_maintenance(now: datetime) -> None:
             )
     except Exception:
         log.exception("daily maintenance failed")
+
+    # Accounts whose grace period has expired (10.B5, CRON-R10). Its own try: an account
+    # that will not delete must not take the log retention down with it, and vice versa.
+    try:
+        session = new_session()
+        try:
+            purged = purge_due_users(session, now, _all_plugins)
+        finally:
+            session.close()
+        if purged:
+            log.info("purged %d account(s) past their deletion deadline", purged)
+    except Exception:
+        log.exception("account purge failed")
 
 
 def _aggregate_status(outcomes: list[str], timed_out: bool) -> str:
