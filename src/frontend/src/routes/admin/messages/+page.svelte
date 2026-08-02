@@ -468,12 +468,21 @@
 											and a number pretending otherwise is worse than no number. It stays
 											an aggregate — *who* read it is not the sender's business (ADMSG-R5).
 										-->
-										<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-											<span class="text-slate-500" title={$_('admin.messages.reachedHint')}>
+										<div class="flex flex-wrap items-center gap-1 text-xs">
+											<!-- Chips, the same shape the rest of the app uses for a state. The
+											     first stays neutral — how far a message went is a fact, not good
+											     news — while the second goes green only once somebody has opened
+											     it, so a glance down the column finds what actually landed. -->
+											<span
+												class="rounded bg-slate-100 px-1.5 py-0.5 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+												title={$_('admin.messages.reachedHint')}
+											>
 												{$_('admin.messages.reached', { values: { n: m.recipient_count } })}
 											</span>
 											<span
-												class="text-slate-500 {m.read_count > 0 ? 'font-medium' : ''}"
+												class="rounded px-1.5 py-0.5 {m.read_count > 0
+													? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+													: 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'}"
 												title={$_('admin.messages.readHint')}
 											>
 												{$_('admin.messages.readCount', { values: { n: m.read_count } })}
