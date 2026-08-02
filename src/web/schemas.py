@@ -457,6 +457,38 @@ class AdminMessageOut(BaseModel):
     created_at: datetime
 
 
+class MessageOutcomeCounts(BaseModel):
+    # How the send went, per status (10.B13). Deliberately not "read": ADMSG-R5 gives the admin
+    # delivery, not reception — whether somebody opened it is theirs.
+    delivered: int = 0
+    pending: int = 0
+    failed: int = 0
+    skipped: int = 0  # includes `skipped_no_notifier`: in-app only, which is still a delivery
+
+
+class AdminMessageSummary(AdminMessageOut):
+    sender_username: str | None
+    outcomes: MessageOutcomeCounts
+
+
+class AdminMessagePage(BaseModel):
+    items: list[AdminMessageSummary]
+    total: int
+    page: int
+    page_size: int
+
+
+class MessageRecipientOut(BaseModel):
+    # One recipient of a message and how each of their channels went.
+    user_id: int
+    username: str
+    channels: list[AlertDeliveryOut] = Field(default_factory=list)
+
+
+class AdminMessageDetail(AdminMessageSummary):
+    recipients: list[MessageRecipientOut] = Field(default_factory=list)
+
+
 # --------------------------------------------------------------------------- notifiers (phase 7)
 
 

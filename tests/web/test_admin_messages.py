@@ -233,3 +233,46 @@ def test_sending_requires_admin(client: TestClient) -> None:
     )
     assert resp.status_code == 403
     assert client.post("/api/admin/messages", json={"title": "t", "body": "b"}).status_code == 401
+
+
+def test_sent_list_shows_delivery_outcomes_never_read_state(client: TestClient) -> None:
+    # ADMSG-R5, stated as a test: the admin's view of a message is about channels, not people.
+    admin = _admin_token(client)
+    _make_user(client, admin, "alice")
+    client.post(
+        "/api/admin/messages", json={"title": "Notice", "body": "body"}, headers=_bearer(admin)
+    )
+
+    page = client.get("/api/admin/messages", headers=_bearer(admin)).json()
+    assert page["total"] == 1
+    item = page["items"][0]
+    assert item["title"] == "Notice"
+    assert item["sender_username"] == "admin"
+    assert item["recipient_count"] == 2
+    # Both recipients got the in-app copy, which is a real delivery.
+    assert item["outcomes"] == {"delivered": 2, "pending": 0, "failed": 0, "skipped": 0}
+    assert "read" not in item and "read_count" not in item
+
+
+def test_message_detail_lists_recipients_and_their_channels(client: TestClient) -> None:
+    admin = _admin_token(client)
+    _make_user(client, admin, "alice")
+    sent = client.post(
+        "/api/admin/messages", json={"title": "Notice", "body": "body"}, headers=_bearer(admin)
+    ).json()
+
+    detail = client.get(f"/api/admin/messages/{sent['id']}", headers=_bearer(admin)).json()
+    assert {r["username"] for r in detail["recipients"]} == {"admin", "alice"}
+    for person in detail["recipients"]:
+        assert [c["plugin_id"] for c in person["channels"]] == ["in_app"]
+        assert [c["status"] for c in person["channels"]] == ["delivered"]
+    # Still no reception anywhere in the payload.
+    assert all("read" not in r for r in detail["recipients"])
+
+
+def test_message_detail_404_and_admin_only(client: TestClient) -> None:
+    admin = _admin_token(client)
+    alice = _make_user(client, admin, "alice")
+    assert client.get("/api/admin/messages/999", headers=_bearer(admin)).status_code == 404
+    assert client.get("/api/admin/messages", headers=_bearer(alice)).status_code == 403
+    assert client.get("/api/admin/messages").status_code == 401
