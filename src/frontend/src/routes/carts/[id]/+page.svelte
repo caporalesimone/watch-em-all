@@ -18,6 +18,7 @@
 	import ProductThumb from '$lib/components/ProductThumb.svelte';
 	import SourceTag from '$lib/components/SourceTag.svelte';
 	import { money } from '$lib/format';
+	import { confirmDialog } from '$lib/stores/confirm';
 	import { mountedPlugins } from '$lib/stores/plugins';
 
 	const cartId = $derived(Number($page.params.id));
@@ -78,7 +79,14 @@
 	}
 
 	async function remove(): Promise<void> {
-		if (!cart || !confirm($_('carts.deleteConfirm'))) return;
+		if (!cart) return;
+		const ok = await confirmDialog({
+			title: $_('carts.delete'),
+			message: $_('carts.deleteConfirm'),
+			confirmLabel: $_('carts.delete'),
+			danger: true
+		});
+		if (!ok) return;
 		busy = true;
 		try {
 			await deleteCart(cart.id);

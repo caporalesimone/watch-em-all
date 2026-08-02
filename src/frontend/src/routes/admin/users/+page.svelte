@@ -17,6 +17,7 @@
 		type UserStatusFilter
 	} from '$lib/api/client';
 	import PageTitle from '$lib/components/PageTitle.svelte';
+	import { confirmDialog } from '$lib/stores/confirm';
 	import { auth } from '$lib/stores/auth';
 
 	let users = $state<AdminUser[]>([]);
@@ -110,8 +111,14 @@
 		}
 	}
 
-	function doReset(user: AdminUser): void {
-		if (!confirm($_('admin.users.confirmReset', { values: { username: user.username } }))) return;
+	async function doReset(user: AdminUser): Promise<void> {
+		const ok = await confirmDialog({
+			title: $_('admin.users.actionReset'),
+			message: $_('admin.users.confirmReset', { values: { username: user.username } }),
+			confirmLabel: $_('admin.users.actionReset'),
+			danger: true
+		});
+		if (!ok) return;
 		const password = randomPassword();
 		void act(async () => {
 			await resetUserPassword(user.id, password);
@@ -119,18 +126,29 @@
 		});
 	}
 
-	function doDelete(user: AdminUser): void {
+	async function doDelete(user: AdminUser): Promise<void> {
 		// The confirmation names the date the account actually dies, not just "are you sure":
 		// the reversible window is the whole point of a deferred deletion, so it has to be on
 		// the dialog that opens it.
 		const preview = new Date(Date.now() + graceDays * 86_400_000).toLocaleDateString();
 		const values = { username: user.username, date: preview };
-		if (!confirm($_('admin.users.confirmDelete', { values }))) return;
+		const ok = await confirmDialog({
+			title: $_('admin.users.actionDelete'),
+			message: $_('admin.users.confirmDelete', { values }),
+			confirmLabel: $_('admin.users.actionDelete'),
+			danger: true
+		});
+		if (!ok) return;
 		void act(() => markUserForDeletion(user.id));
 	}
 
-	function doRestore(user: AdminUser): void {
-		if (!confirm($_('admin.users.confirmRestore', { values: { username: user.username } }))) return;
+	async function doRestore(user: AdminUser): Promise<void> {
+		const ok = await confirmDialog({
+			title: $_('admin.users.actionRestore'),
+			message: $_('admin.users.confirmRestore', { values: { username: user.username } }),
+			confirmLabel: $_('admin.users.actionRestore')
+		});
+		if (!ok) return;
 		void act(() => restoreUser(user.id));
 	}
 

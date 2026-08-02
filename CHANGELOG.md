@@ -42,6 +42,8 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - Your notifications now filter by category and show announcements with their own badge, title and formatting.
 - The admin writes messages on a page of its own, with a Preview tab showing exactly what recipients get, and the sent list beneath.
 - Those messages never go to administrators — not the others, not the sender: the channel is for the people who use the installation.
+- Notifications you have read step back into grey, so what is still unread wins the glance instead of a small dot.
+- Every dialog in the app now behaves the same: Escape closes it, so does a click outside, and focus goes back where it was.
 
 ### Changed
 

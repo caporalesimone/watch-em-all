@@ -9,6 +9,7 @@
 	import { getAdminErrors, getHealth } from '$lib/api/client';
 	import AdminErrors from '$lib/components/AdminErrors.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
+	import ConfirmHost from '$lib/components/ConfirmHost.svelte';
 	import Toaster from '$lib/components/Toaster.svelte';
 	import { setupI18n } from '$lib/i18n';
 	import { adminErrors } from '$lib/stores/adminErrors';
@@ -123,3 +124,5 @@
 
 <!-- Single top-center toast portal (phase 7): transient outcomes, above everything. -->
 <Toaster />
+<!-- One dialog for every confirmation in the app (10.T2); pages call confirmDialog(). -->
+<ConfirmHost />

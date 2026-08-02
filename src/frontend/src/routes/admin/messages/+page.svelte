@@ -22,6 +22,7 @@
 	import DeliveryList from '$lib/components/DeliveryList.svelte';
 	import MessageBody from '$lib/components/MessageBody.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
+	import { confirmDialog } from '$lib/stores/confirm';
 
 	let title = $state('');
 	let body = $state('');
@@ -90,7 +91,12 @@
 			audience === 'all'
 				? $_('admin.messages.confirmAll', { values: { count: targets.length } })
 				: $_('admin.messages.confirmUser', { values: { username: recipient } });
-		if (!confirm(question)) return;
+		const ok = await confirmDialog({
+			title: $_('admin.messages.compose'),
+			message: question,
+			confirmLabel: $_('admin.messages.sendOne')
+		});
+		if (!ok) return;
 
 		sending = true;
 		error = null;

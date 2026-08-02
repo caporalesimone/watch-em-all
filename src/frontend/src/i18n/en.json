@@ -6,7 +6,8 @@
 		"loading": "Loading…",
 		"save": "Save",
 		"saved": "Saved",
-		"cancel": "Cancel"
+		"cancel": "Cancel",
+		"close": "Close"
 	},
 	"nav": {
 		"dashboard": "Dashboard",

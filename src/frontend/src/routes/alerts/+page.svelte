@@ -10,6 +10,7 @@
 		type AlertPage
 	} from '$lib/api/client';
 	import PageTitle from '$lib/components/PageTitle.svelte';
+	import { confirmDialog } from '$lib/stores/confirm';
 	import { refreshUnread } from '$lib/stores/alerts';
 
 	const PAGE_SIZE = 20;
@@ -105,7 +106,13 @@
 
 	async function removeSelected(): Promise<void> {
 		if (selectedIds.length === 0) return;
-		if (!confirm($_('alerts.deleteConfirm', { values: { count: selectedIds.length } }))) return;
+		const ok = await confirmDialog({
+			title: $_('alerts.delete'),
+			message: $_('alerts.deleteConfirm', { values: { count: selectedIds.length } }),
+			confirmLabel: $_('alerts.delete'),
+			danger: true
+		});
+		if (!ok) return;
 		deleting = true;
 		deleteErr = null;
 		try {
@@ -193,7 +200,15 @@
 						<!-- An announcement is one row for everybody: there is nothing here to delete. -->
 						<span class="ml-1 w-[13px] shrink-0"></span>
 					{/if}
-					<a href={href(a)} class="flex flex-1 items-center gap-3 py-3">
+					<!-- Read rows step back (10.F18): what is still to read has to win the glance, and
+					     the unread dot alone is a 8px argument. Dimmed, not hidden — it is still the
+					     user's history, and a colour change says "seen" without saying "gone". -->
+					<a
+						href={href(a)}
+						class="flex flex-1 items-center gap-3 py-3 {a.read
+							? 'text-slate-400 dark:text-slate-500'
+							: ''}"
+					>
 						<span class="w-2 shrink-0">
 							{#if !a.read}
 								<span
@@ -205,9 +220,12 @@
 						<span class="w-44 shrink-0 text-xs text-slate-400">{fmt(a.created_at)}</span>
 						{#if fromAdmin}
 							<!-- Icon and colour of its own (ADMSG-R3): a message from a person must not read
-							     like one more automated digest in the same list. -->
+							     like one more automated digest in the same list. Muted once read, so the
+							     badge does not go on shouting after the message has been dealt with. -->
 							<span
-								class="inline-flex shrink-0 items-center gap-1 rounded bg-violet-100 px-1.5 py-0.5 text-xs text-violet-700 dark:bg-violet-900/40 dark:text-violet-300"
+								class="inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs {a.read
+									? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
+									: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300'}"
 							>
 								<span aria-hidden="true">📣</span>
 								{$_('alerts.categoryAdmin')}

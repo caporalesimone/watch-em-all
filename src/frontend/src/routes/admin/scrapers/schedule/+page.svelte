@@ -14,6 +14,7 @@
 		type PluginInfo,
 		type ScraperListItem
 	} from '$lib/api/client';
+	import Modal from '$lib/components/Modal.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import ScheduleTimeline from '$lib/components/ScheduleTimeline.svelte';
 
@@ -272,35 +273,39 @@
 	{/if}
 
 	{#if pendingInfo}
-		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-			<div
-				class="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-700 dark:bg-slate-900"
-				role="dialog"
-				aria-modal="true"
-			>
-				<p class="text-sm">
-					{$_('admin.scrapers.removeConfirm', {
-						values: { time: pendingInfo.time, name: pendingInfo.name }
-					})}
-				</p>
-				<div class="mt-4 flex justify-end gap-3">
-					<button
-						type="button"
-						class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
-						onclick={() => (pendingRemoval = null)}
-					>
-						{$_('common.cancel')}
-					</button>
-					<button
-						type="button"
-						class="rounded bg-red-700 px-3 py-1.5 text-sm text-white hover:bg-red-600 disabled:opacity-40"
-						onclick={confirmRemove}
-						disabled={saving}
-					>
-						{$_('admin.scrapers.removeAction')}
-					</button>
-				</div>
-			</div>
-		</div>
+		{@const info = pendingInfo}
+		<!-- Not confirmDialog(): the affirmative button has to stay disabled while the save is in
+		     flight, and a promise-based confirm has no handle on the dialog once it is open. So
+		     it is the base Modal with its own buttons — which is exactly the case that made the
+		     base worth having. -->
+		<Modal
+			open={true}
+			size="sm"
+			title={$_('admin.scrapers.removeAction')}
+			icon="⚠️"
+			closeLabel={$_('common.cancel')}
+			onclose={() => (pendingRemoval = null)}
+		>
+			<p class="text-sm">
+				{$_('admin.scrapers.removeConfirm', { values: { time: info.time, name: info.name } })}
+			</p>
+			{#snippet actions()}
+				<button
+					type="button"
+					class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+					onclick={() => (pendingRemoval = null)}
+				>
+					{$_('common.cancel')}
+				</button>
+				<button
+					type="button"
+					class="rounded bg-red-700 px-3 py-1.5 text-sm text-white hover:bg-red-600 disabled:opacity-40"
+					onclick={confirmRemove}
+					disabled={saving}
+				>
+					{$_('admin.scrapers.removeAction')}
+				</button>
+			{/snippet}
+		</Modal>
 	{/if}
 </section>
