@@ -26,6 +26,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - That expiry is a dropdown in System settings, so it can only ever be one of the values the server accepts.
 - All housekeeping now runs in one nightly window at an hour you choose (7am by default), and says in the log when it starts and ends.
 - Your notification history keeps its most recent 100 entries — a number you can change — instead of growing for ever.
+- Message bodies can be written in Markdown; every channel gets it rendered, and channels that cannot show formatting get readable plain text.
 
 ### Changed
 
