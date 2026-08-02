@@ -9,17 +9,25 @@ the two must not be shown as if they answered the same question.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, time, timedelta
+from datetime import date as date_type
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query
 from sqlalchemy import func, select
 
 from src.core.errors import APIError
-from src.core.models import ScrapeRun, ScrapeUserLog, User
+from src.core.models import ScraperSchedule, ScrapeRun, ScrapeUserLog, User
+from src.core.schedule import install_tz
 from src.web.deps import AdminDep, SessionDep
-from src.web.schemas import RunPage, RunSummary, RunUserDetail
+from src.web.schemas import CalendarDay, CalendarSlot, RunPage, RunSummary, RunUserDetail
 
 router = APIRouter(prefix="/admin", tags=["Admin: runs"])
+
+
+def _as_utc(value: datetime) -> datetime:
+    """SQLite gives naive timestamps back; everything written here is UTC."""
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 
 def _summary(run: ScrapeRun) -> RunSummary:
@@ -111,3 +119,66 @@ def run_detail(run_id: int, _admin: AdminDep, db: SessionDep) -> list[RunUserDet
         )
         for row in rows
     ]
+
+
+@router.get(
+    "/scrapers/calendar",
+    response_model=CalendarDay,
+    summary="The runs planned for one day, with how long they usually take (admin only).",
+)
+def calendar(
+    _admin: AdminDep,
+    db: SessionDep,
+    date: str | None = None,
+) -> CalendarDay:
+    """What the machine intends to do on a given day.
+
+    Suspended scrapers are **returned and marked**, not filtered out: a day that looks empty
+    because everything is switched off is indistinguishable from a day nothing was ever
+    scheduled for, and those are very different problems.
+    """
+    try:
+        day = date_type.fromisoformat(date) if date else datetime.now(tz=install_tz()).date()
+    except ValueError as exc:
+        raise APIError(422, "invalid_date", "date must be YYYY-MM-DD") from exc
+
+    tz = install_tz()
+    # Averaged in Python, not in SQL: the two dialects spell a timestamp difference
+    # differently (`julianday` vs `extract(epoch ...)`), and the volume here is a fortnight of
+    # runs — buying portability with a loop over a handful of rows is the right trade.
+    # Only runs that **finished** count, and only the ones that went somewhere: an unfinished
+    # row has no duration at all, and a timed-out one would drag the average towards the
+    # failure instead of towards what the day normally costs.
+    since = datetime.now(tz=UTC) - timedelta(days=14)
+    durations: dict[str, list[float]] = {}
+    for run in db.scalars(
+        select(ScrapeRun).where(
+            ScrapeRun.finished_at.is_not(None),
+            ScrapeRun.started_at >= since,
+            ScrapeRun.status.in_(("ok", "partial")),
+        )
+    ):
+        assert run.finished_at is not None  # guarded by the query
+        seconds = (_as_utc(run.finished_at) - _as_utc(run.started_at)).total_seconds()
+        durations.setdefault(run.scraper_id, []).append(seconds)
+    averages = {
+        scraper: int(sum(values) / len(values)) for scraper, values in durations.items() if values
+    }
+
+    slots: list[CalendarSlot] = []
+    for schedule in db.scalars(select(ScraperSchedule).order_by(ScraperSchedule.scraper_id)):
+        for raw in schedule.times:
+            # Stored canonically as HH:MM:SS since 4.F1, but HH:MM is still accepted there,
+            # so both shapes have to survive a round trip through this endpoint.
+            hh, mm, *rest = (int(part) for part in raw.split(":"))
+            at = datetime.combine(day, time(hh, mm, rest[0] if rest else 0), tzinfo=tz)
+            slots.append(
+                CalendarSlot(
+                    scraper_id=schedule.scraper_id,
+                    at=at,
+                    enabled=schedule.enabled,
+                    avg_seconds=averages.get(schedule.scraper_id) or None,
+                )
+            )
+    slots.sort(key=lambda s: (s.at, s.scraper_id))
+    return CalendarDay(date=day.isoformat(), slots=slots)

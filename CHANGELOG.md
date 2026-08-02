@@ -34,6 +34,7 @@ Each entry is **short** and reads as a user-facing story: first a **bullet list 
 - A second one ranks accounts by the load they create, overall and per store, so heavy traffic has a name without exposing what it watches.
 - An admin Dashboard page shows the installation at a glance and how notifications went over the last 7 or 30 days.
 - The same page ranks accounts by the traffic they cause, overall and per store, so a heavy watcher is visible without exposing what they watch.
+- The admin can ask what a given day has planned: every scheduled run, in clock order, with how long that scraper usually takes.
 
 ### Changed
 

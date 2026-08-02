@@ -115,3 +115,58 @@ def test_an_unknown_run_is_a_404_and_the_routes_are_admin_only(client: TestClien
     token = _admin_token(client)
     assert client.get("/api/admin/runs/9999", headers=_bearer(token)).status_code == 404
     assert client.get("/api/admin/runs").status_code == 401
+
+
+def test_the_calendar_lists_the_days_planned_runs_and_marks_the_suspended(
+    client: TestClient,
+) -> None:
+    """10.B18: a day that looks empty because everything is off is a different problem from
+    a day nothing was ever scheduled for, so suspended scrapers are returned and marked."""
+    token = _admin_token(client)
+    client.put(
+        "/api/admin/scrapers/dragon_store",
+        json={"times": ["14:30", "02:00"], "enabled": False},
+        headers=_bearer(token),
+    )
+    day = client.get("/api/admin/scrapers/calendar?date=2026-08-05", headers=_bearer(token)).json()
+    assert day["date"] == "2026-08-05"
+    times = [slot["at"][11:16] for slot in day["slots"]]
+    assert times == ["02:00", "14:30"], "sorted by clock, not by how they were typed"
+    assert all(slot["enabled"] is False for slot in day["slots"])
+    # Nothing has run, so there is no duration to average — and null says that, where a
+    # default would draw a confident block around a guess.
+    assert all(slot["avg_seconds"] is None for slot in day["slots"])
+
+
+def test_the_calendar_reports_how_long_recent_runs_took(client: TestClient) -> None:
+    token = _admin_token(client)
+    client.put(
+        "/api/admin/scrapers/dragon_store",
+        json={"times": ["09:00"], "enabled": True},
+        headers=_bearer(token),
+    )
+    session = new_session()
+    try:
+        for minutes in (2, 4):
+            session.add(
+                ScrapeRun(
+                    scraper_id="dragon_store",
+                    trigger="scheduled",
+                    started_at=datetime.now(UTC) - timedelta(hours=1),
+                    finished_at=datetime.now(UTC) - timedelta(hours=1) + timedelta(minutes=minutes),
+                    status="ok",
+                )
+            )
+        session.commit()
+    finally:
+        session.close()
+
+    day = client.get("/api/admin/scrapers/calendar", headers=_bearer(token)).json()
+    assert day["slots"][0]["avg_seconds"] == 180, "the mean of two and four minutes"
+
+
+def test_a_broken_date_is_a_422(client: TestClient) -> None:
+    token = _admin_token(client)
+    bad = client.get("/api/admin/scrapers/calendar?date=not-a-date", headers=_bearer(token))
+    assert bad.status_code == 422
+    assert bad.json()["code"] == "invalid_date"

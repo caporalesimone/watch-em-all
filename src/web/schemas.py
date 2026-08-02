@@ -165,6 +165,25 @@ class DashboardUsers(BaseModel):
     by_user_and_scraper: list[UserLoadRow]
 
 
+class CalendarSlot(BaseModel):
+    """One planned run on a given day (10.B18, SCHED-R10).
+
+    ``avg_seconds`` is what recent runs of this scraper actually took, so the calendar can
+    draw a block with a width instead of a tick — null when there is nothing to average, and
+    null is honest: an invented default would draw a confident block around a guess.
+    """
+
+    scraper_id: str
+    at: datetime
+    enabled: bool
+    avg_seconds: int | None
+
+
+class CalendarDay(BaseModel):
+    date: str
+    slots: list[CalendarSlot]
+
+
 class AdminPasswordReset(BaseModel):
     # Same shape as creation (10.B1): the admin supplies the temporary password rather than
     # the server inventing one, so the single generator already in the admin page keeps
